@@ -1,7 +1,5 @@
-# GenJAX
-
 <p align="center">
-<img width="350px" src="./logo.png"/>
+<img width="450" src="./logo.png"/>
 </p>
 
 (**Probabilistic programming language**) GenJAX is a probabilistic programming language (PPL): a system which provides automation for writing programs which perform computations on probability distributions, including sampling, variational approximation, gradient estimation for expected values, and more.

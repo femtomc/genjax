@@ -1101,6 +1101,14 @@ class Trace(Generic[X, R], Pytree):
         else:
             return self._score
 
+    def update(self, args, x: X):
+        gen_fn = self.get_gen_fn()
+        return gen_fn.update(args, self, x)
+
+    def __getitem__(self, addr):
+        choices = self.get_choices()
+        return get_choices(choices[addr])  # pyright: ignore
+
 
 def get_choices(x: Trace[X, R] | X) -> X:
     if isinstance(x, Trace):
