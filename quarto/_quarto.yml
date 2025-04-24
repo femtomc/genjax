@@ -1,0 +1,27 @@
+project:
+  type: website
+  output-dir: ../docs
+
+website:
+  title: "GenJAX"
+
+format:
+  html:
+      theme:
+          light: [cosmo, light.scss]
+      toc: true
+      toc-location: right
+      css: custom.css
+      code-overflow: wrap
+      highlight-style: ayu
+      sidebar: false
+      self-contained: true
+      code-line-numbers: false
+      code-color: black
+      grid:
+          margin-width: 350px
+      execute:
+        column: margin
+        reference-location: margin
+        citation-location: margin
+        jupyter: python3
