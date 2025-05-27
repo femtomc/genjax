@@ -33,7 +33,7 @@ system-requirements = {cuda = "12"}
 jaxlib = { version = "*", extras = ["cuda12"] }
 
 [tool.pixi.feature.cuda.tasks]
-figs = "pixi run python examples/gol/export_figures.py"
+gol-figs = "pixi run python examples/gol/export_figures.py"
 
 [tool.pixi.feature.format.tasks]
 format = "ruff format . && ruff check . --fix"
