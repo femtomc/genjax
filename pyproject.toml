@@ -26,6 +26,15 @@ min_confidence = 80
 paths = ["src"]
 sort_by_size = true
 
+[tool.pixi.feature.cuda]
+system-requirements = {cuda = "12"}
+
+[tool.pixi.feature.cuda.target.linux-64.dependencies]
+jaxlib = { version = "*", build = "cuda12" }
+
+[tool.pixi.feature.cuda.tasks]
+figs = "pixi run python examples/gol/export_figures.py"
+
 [tool.pixi.feature.format.tasks]
 format = "ruff format . && ruff check . --fix"
 vulture = "vulture"
@@ -34,10 +43,8 @@ vulture = "vulture"
 deploy = "quarto publish gh-pages ./quarto"
 preview = "quarto preview ./quarto"
 
-[tool.pixi.feature.gol.tasks]
-figs = "pixi run python examples/gol/export_figures.py"
-
 [tool.pixi.environments]
+cuda = ["cuda"]
 format = { features = ["format"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "docs" }
 gol = { features = ["gol"], solve-group = "default" }
@@ -45,4 +52,4 @@ gol = { features = ["gol"], solve-group = "default" }
 [dependency-groups]
 format = ["ruff>=0.9.2,<0.10","vulture>=2.14,<3"]
 docs = ["jupyter"]
-gol = ["matplotlib"]
+cuda = ["matplotlib"]
