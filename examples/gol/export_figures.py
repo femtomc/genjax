@@ -25,12 +25,12 @@ def save_blinker_gibbs_figure():
     fig.savefig("examples/gol/figs/gibbs_on_blinker.pdf")
 
 
-def save_logo_gibbs_figure():
+def save_logo_gibbs_figure(chain_length=250):
     print("Running Gibbs sampler on MIT logo.")
     t = time.time()
     logo = get_mit_logo()
     run_summary = core.run_sampler_and_get_summary(
-        jrand.key(1), core.GibbsSampler(logo, 0.03), 20, 1
+        jrand.key(1), core.GibbsSampler(logo, 0.03), chain_length, 1
     )
     final_pred_post = run_summary.predictive_posterior_scores[-1]
     final_n_bit_flips = run_summary.n_incorrect_bits_in_reconstructed_image(logo)
@@ -41,9 +41,10 @@ def save_logo_gibbs_figure():
           Making figure.
           """)
     fig = core.get_gol_sampler_lastframe_figure(get_mit_logo(), run_summary, 1)
-    fig.savefig("examples/gol/figs/gibbs_on_logo.pdf")
+    fig.savefig(f"examples/gol/figs/gibbs_on_logo_{chain_length}.pdf")
 
 
 if __name__ == "__main__":
     save_blinker_gibbs_figure()
-    save_logo_gibbs_figure()
+    save_logo_gibbs_figure(chain_length=0)
+    save_logo_gibbs_figure(chain_length=250)
