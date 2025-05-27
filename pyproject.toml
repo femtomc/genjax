@@ -30,7 +30,7 @@ sort_by_size = true
 system-requirements = {cuda = "12"}
 
 [tool.pixi.feature.cuda.target.linux-64.pypi-dependencies]
-jaxlib = { version = "*", extras = ["cuda12"] }
+jaxlib = { version = "*", extras = ["cuda"] }
 
 [tool.pixi.feature.cuda.tasks]
 gol-figs = "pixi run python examples/gol/export_figures.py"
