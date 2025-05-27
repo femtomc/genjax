@@ -1111,9 +1111,19 @@ class Trace(Generic[X, R], Pytree):
 
 
 def get_choices(x: Trace[X, R] | X) -> X:
-    if isinstance(x, Trace):
-        return x.get_choices()
-    return x
+    x = x.get_choices() if isinstance(x, Trace) else x
+
+    def _get_choices(x):
+        if isinstance(x, Trace):
+            return get_choices(x)
+        else:
+            return x
+
+    return jtu.tree_map(
+        _get_choices,
+        x,
+        is_leaf=lambda x: isinstance(x, Trace),
+    )
 
 
 class GFI(Generic[X, R], Pytree):

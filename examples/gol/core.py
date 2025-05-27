@@ -1,8 +1,9 @@
 import jax.numpy as jnp
-from genjax import flip, gen, trace
-from genjax import modular_vmap as vmap
 from jax.lax import dynamic_slice
 from jax.nn import softmax
+
+from genjax import Pytree, flip, gen, get_choices, trace
+from genjax import modular_vmap as vmap
 
 neighbors_filter = jnp.array(
     [
@@ -140,28 +141,6 @@ def gibbs_move_on_cell_fast(i, j, current_state, future_state, p_flip):
     return val
 
 
-## Version with Gibbs sampling ##
-def get_scores_using_gfi(i, j, current_state, future_state, p_flip):
-    current_trace, _ = generate_state_pair.importance(
-        C["init", :].set(current_state)
-        ^ C["step", "cells", :, :, "bit"].set(future_state),
-        (current_state.shape[0], current_state.shape[1], p_flip),
-    )
-    _, wt0, _, _ = current_trace.update(C["init", i, j].set(0))
-    _, wt1, _, _ = current_trace.update(C["init", i, j].set(1))
-    return softmax(jnp.array([wt0, wt1]))
-
-
-@gen
-def gibbs_move_on_cell_using_gfi(i, j, current_state, future_state, p_flip):
-    """
-    Gibbs sample a bit for the position (i, j).
-    Runs in O(n cells in board).
-    """
-    p_zero = get_scores_using_gfi(i, j, current_state, future_state, p_flip)[0]
-    return trace("bit", flip, (1 - p_zero,))
-
-
 ### Full Gibbs Sweep Implementation ###
 
 
@@ -200,3 +179,34 @@ def full_gibbs_sweep(
                 p_flip,
             )
     return current_state
+
+
+@Pytree.dataclass
+class GibbsSampler(Pytree):
+    target_image: jnp.ndarray
+    p_flip: jnp.ndarray
+
+    def get_initial_state(self):
+        # Initialize a sample.
+        def initialize(step, n_y, n_x, p_flip):
+            @gen
+            def proposal():
+                init = trace("init", flip.vmap().vmap(), (0.5 * jnp.ones((n_y, n_x)),))
+
+            init_q_trace = proposal.simulate(())
+            p, _ = generate_state_pair.assess(
+                (n_x, n_y, p_flip),
+                {**init_q_trace.get_choices(), **step},
+            )
+            return (
+                get_choices(init_q_trace),
+                p + init_q_trace.get_score(),
+            )
+
+        init, _ = initialize(
+            {"step": {"cells": {"bit": self.target_image}}},
+            self.target_image.shape[0],
+            self.target_image.shape[1],
+            self.p_flip,
+        )
+        return init
