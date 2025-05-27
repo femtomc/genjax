@@ -30,7 +30,7 @@ def save_logo_gibbs_figure():
     t = time.time()
     logo = get_mit_logo()
     run_summary = core.run_sampler_and_get_summary(
-        jrand.key(1), core.GibbsSampler(logo, 0.03), 250, 1
+        jrand.key(1), core.GibbsSampler(logo, 0.03), 20, 1
     )
     final_pred_post = run_summary.predictive_posterior_scores[-1]
     final_n_bit_flips = run_summary.n_incorrect_bits_in_reconstructed_image(logo)
