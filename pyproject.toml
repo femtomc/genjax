@@ -47,7 +47,6 @@ preview = "quarto preview ./quarto"
 cuda = ["cuda"]
 format = { features = ["format"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "docs" }
-gol = { features = ["gol"], solve-group = "default" }
 
 [dependency-groups]
 format = ["ruff>=0.9.2,<0.10","vulture>=2.14,<3"]
