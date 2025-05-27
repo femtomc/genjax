@@ -34,7 +34,7 @@ def get_blinker_10x10():
 
 
 def get_popl_logo():
-    img = jnp.array(mpimg.imread("examples/gol/assets/popl_logo.png"))
+    img = jnp.array(mpimg.imread("examples/gol/assets/popl.png"))
 
     # Convert the image to grayscale, considering the alpha channel
     alpha_channel = img[:, :, 3]
@@ -44,7 +44,7 @@ def get_popl_logo():
     gray_img = jnp.where(alpha_channel == 0, 1, gray_img)
 
     # Apply a threshold to convert to black and white
-    bw = jnp.where(gray_img < 0.9, 1, 0)
+    bw = jnp.where(gray_img < 0.7, 1, 0)
 
     # change dims to 512x512
     new_height = 512 * bw.shape[0] // bw.shape[1]

@@ -2,7 +2,7 @@ import time
 
 import core
 import jax.random as jrand
-from dataloading import get_blinker_4x4, get_mit_logo
+from dataloading import get_blinker_4x4, get_mit_logo, get_popl_logo
 from jax import jit
 
 from genjax import seed
