@@ -5,7 +5,13 @@ from matplotlib import image as mpimg
 
 def get_blinker_4x4():
     return jnp.array(
-        [[0, 0, 0, 0], [0, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], dtype=int
+        [
+            [0, 0, 0, 0],
+            [0, 1, 1, 1],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+        dtype=int,
     )
 
 

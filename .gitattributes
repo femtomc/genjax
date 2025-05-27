@@ -7,3 +7,4 @@ quarto/* linguist-documentation
 *.js linguist-vendored
 *.ipynb linguist-vendored
 *.css linguist-vendored
+*.pdf

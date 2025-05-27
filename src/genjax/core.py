@@ -1101,9 +1101,9 @@ class Trace(Generic[X, R], Pytree):
         else:
             return self._score
 
-    def update(self, args, x: X):
+    def update(self, x: X, args=None):
         gen_fn = self.get_gen_fn()
-        return gen_fn.update(args, self, x)
+        return gen_fn.update(self.get_args() if args is None else args, self, x)
 
     def __getitem__(self, addr):
         choices = self.get_choices()
@@ -1150,7 +1150,7 @@ class GFI(Generic[X, R], Pytree):
         self,
         args,
         x: X,
-    ) -> tuple[Weight, R]:
+    ) -> Trace[X, R]:
         pass
 
     @abstractmethod
@@ -1184,9 +1184,13 @@ class GFI(Generic[X, R], Pytree):
     def repeat(self, n: int):
         return self.vmap(in_axes=None, axis_size=n)
 
-    def log_density(self, args: tuple[Any, ...], x: X) -> Score:
-        score, _ = self.assess(args, x)
-        return score
+    def log_density(
+        self,
+        args: tuple[Any, ...],
+        x: X,
+    ) -> Score:
+        tr = self.assess(args, x)
+        return -tr.get_score()
 
 
 ########################
@@ -1215,28 +1219,26 @@ class Vmap(Generic[X, R], GFI[X, R]):
         self,
         args,
     ) -> Trace[X, R]:
-        tr = modular_vmap(
+        return modular_vmap(
             self.gen_fn.simulate,
             in_axes=(self.in_axes,),
             axis_size=self.axis_size,
             axis_name=self.axis_name,
             spmd_axis_name=self.spmd_axis_name,
         )(args)
-        return tr
 
     def assess(
         self,
         args,
         x: X,
-    ) -> tuple[Weight, R]:
-        w, r = modular_vmap(
+    ) -> Trace[X, R]:
+        return modular_vmap(
             self.gen_fn.assess,
             in_axes=(self.in_axes, 0),
             axis_size=self.axis_size,
             axis_name=self.axis_name,
             spmd_axis_name=self.spmd_axis_name,
         )(args, x)
-        return jnp.sum(w), r
 
     def update(
         self,
@@ -1280,9 +1282,9 @@ class Distribution(Generic[X], GFI[X, X]):
         self,
         args,
         x: X,
-    ) -> tuple[Weight, X]:
+    ) -> Trace[X, X]:
         log_density = self.logpdf(x, *args)
-        return log_density, x
+        return Trace(self, args, x, x, -log_density)
 
     def update(
         self,
@@ -1366,7 +1368,8 @@ class Simulate:
 @dataclass
 class Assess:
     choice_map: dict[str, Any]
-    weight: Weight
+    trace_map: dict[str, Any]
+    score: Weight
 
     def __call__(
         self,
@@ -1376,9 +1379,10 @@ class Assess:
     ) -> R:
         x = self.choice_map[addr]
         x = get_choices(x)
-        w, r = gen_fn.assess(args, x)
-        self.weight += w
-        return r
+        tr = gen_fn.assess(args, x)
+        self.score += tr.get_score()
+        self.trace_map[addr] = tr
+        return tr.get_retval()
 
 
 @dataclass
@@ -1447,13 +1451,13 @@ class Fn(
         self,
         args,
         x: dict[str, Any],
-    ) -> tuple[Weight, R]:
-        handler_stack.append(Assess(x, jnp.array(0.0)))
+    ) -> Trace[dict[str, Any], R]:
+        handler_stack.append(Assess(x, {}, jnp.array(0.0)))
         r = self.source(*args)
         handler = handler_stack.pop()
         assert isinstance(handler, Assess)
-        w = handler.weight
-        return w, r
+        score, trace_map = handler.score, handler.trace_map
+        return Trace(self, args, trace_map, r, score)
 
     def update(
         self,
