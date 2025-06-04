@@ -1,13 +1,26 @@
 import time
 
 import core
+import jax.numpy as jnp
 import jax.random as jrand
-from dataloading import get_blinker_4x4, get_mit_logo, get_popl_logo
-from jax import jit
+from dataloading import get_blinker_4x4, get_mit_logo
 
-from genjax import seed
 
 blinker_small = get_blinker_4x4()
+
+
+def timing(fn, repeats=200, inner_repeats=200):
+    times = []
+    for i in range(repeats):
+        possible = []
+        for i in range(inner_repeats):
+            start_time = time.perf_counter()
+            fn()
+            interval = time.perf_counter() - start_time
+            possible.append(interval)
+        times.append(jnp.array(possible).min())
+    times = jnp.array(times)
+    return times, (jnp.mean(times), jnp.std(times))
 
 
 def save_blinker_gibbs_figure():

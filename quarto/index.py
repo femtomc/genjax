@@ -37,16 +37,13 @@
 import genstudio.plot as Plot
 import jax.numpy as jnp
 import jax.random as jrand
-import jax.tree_util as jtu
 import treescope
-from jax import make_jaxpr, vmap
+from jax import make_jaxpr
 from jax.lax import cond, scan
 from jax.numpy import array, sum
 
 from genjax import (
     GFI,
-    Trace,
-    flip,
     gen,
     normal,
     normal_reinforce,

@@ -389,8 +389,8 @@ def get_gol_figure_and_updater(
         ax3 = fig.add_subplot(gs_main[0, 3])
 
     # Titles for each subplot
-    ax1.set_title(f"Predictive Posterior Score")
-    ax2.set_title(f"Softness Parameter")
+    ax1.set_title("Predictive Posterior Score")
+    ax2.set_title("Softness Parameter")
     ax3.set_title("Target State to Reconstruct")
     ax4.set_title("Inferred Previous State")
     if grid_layout:

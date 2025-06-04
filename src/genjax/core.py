@@ -15,7 +15,6 @@ import jax.random as jrand
 import jax.tree_util as jtu
 import jaxtyping as jtyping
 import penzai.pz as pz
-from beartype.vale import Is
 from jax import api_util, tree_util
 from jax._src.interpreters.batching import AxisData  # pyright: ignore
 from jax.core import eval_jaxpr
@@ -23,7 +22,6 @@ from jax.extend.core import ClosedJaxpr, Jaxpr, Literal, Primitive, Var
 from jax.interpreters import ad, batching, mlir
 from jax.interpreters import partial_eval as pe
 from jax.lax import cond_p, scan, scan_p, switch
-from jax.scipy.special import logsumexp
 from jax.util import safe_map, split_list
 from numpy import dtype
 from tensorflow_probability.substrates import jax as tfp

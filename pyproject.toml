@@ -34,6 +34,7 @@ jaxlib = { version = "*", extras = ["cuda"] }
 
 [tool.pixi.feature.cuda.tasks]
 gol-figs = "pixi run python examples/gol/export_figures.py"
+timing = "pixi run python examples/gol/time_scaling.py"
 
 [tool.pixi.feature.format.tasks]
 format = "ruff format . && ruff check . --fix"

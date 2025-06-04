@@ -1,5 +1,3 @@
-from jax import make_jaxpr
-
 from genjax import gen, normal
 
 

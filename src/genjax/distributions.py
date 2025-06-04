@@ -1,15 +1,8 @@
 import jax.numpy as jnp
-from jax import vmap
 from tensorflow_probability.substrates import jax as tfp
 
 from genjax.core import (
-    Callable,
-    Distribution,
-    X,
-    distribution,
     tfp_distribution,
-    wrap_logpdf,
-    wrap_sampler,
 )
 
 tfd = tfp.distributions

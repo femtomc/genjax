@@ -33,6 +33,11 @@ def get_blinker_10x10():
     )
 
 
+def get_blinker_n(n: int):
+    init = jnp.zeros((n, n), dtype=int)
+    return init.at[n - 2, n - 2 : n + 1].set(1)
+
+
 def get_popl_logo():
     img = jnp.array(mpimg.imread("examples/gol/assets/popl.png"))
 
