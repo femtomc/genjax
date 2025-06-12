@@ -28,7 +28,7 @@ from .core import (
     Distribution,
     Fn,
     Pytree,
-    Trace,
+    Tr,
     Vmap,
     gen,
     get_choices,
@@ -43,6 +43,9 @@ from .distributions import (
     categorical,
     flip,
     normal,
+    uniform,
+    exponential,
+    poisson,
 )
 
 __all__ = [
@@ -56,6 +59,9 @@ __all__ = [
     "add_cost",
     "bernoulli",
     "beta",
+    "uniform",
+    "exponential",
+    "poisson",
     "categorical",
     "categorical_enum_parallel",
     "expectation",

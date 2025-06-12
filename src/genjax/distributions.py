@@ -37,3 +37,18 @@ normal = tfp_distribution(
     tfd.Normal,
     name="Normal",
 )
+
+uniform = tfp_distribution(
+    tfd.Uniform,
+    name="Uniform",
+)
+
+exponential = tfp_distribution(
+    tfd.Exponential,
+    name="Exponential",
+)
+
+poisson = tfp_distribution(
+    tfd.Poisson,
+    name="Poisson",
+)
