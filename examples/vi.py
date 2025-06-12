@@ -21,7 +21,7 @@ def elbo(data: dict, theta):
     # Use GFI methods to structure the objective function!
     tr = variational_family.simulate((theta,))
     q = tr.get_score()
-    p, _ = variational_model.assess((), {**data, **tr.get_choices()})
+    p = variational_model.log_density((), {**data, **tr.get_choices()})
     return p - q
 
 
