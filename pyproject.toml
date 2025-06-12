@@ -33,6 +33,7 @@ system-requirements = {cuda = "12"}
 jaxlib = { version = "*", extras = ["cuda"] }
 
 [tool.pixi.feature.cuda.tasks]
+betaber-timing = "pixi run python examples/betaber/timing.py"
 gol-timing = "pixi run python examples/gol/time_scaling.py"
 gol-figs = "pixi run python examples/gol/figures.py"
 curvefit-figs = "pixi run python examples/curvefit/figures.py"
