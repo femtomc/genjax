@@ -229,13 +229,13 @@ def model():
     x = normal(0.0, 10.0) @ "x"
     y = normal(0.0, 10.0) @ "y"
     rs = x**2 + y**2
-    z = normal(rs, 0.1 + (rs / 100.0)) @ "z"
+    normal(rs, 0.1 + (rs / 100.0)) @ "z"
 
 
 @gen
 def proposal(*args):
-    x = normal(0.0, 10.0) @ "x"
-    y = normal(0.0, 10.0) @ "y"
+    normal(0.0, 10.0) @ "x"
+    normal(0.0, 10.0) @ "y"
 
 
 # Tell me the model, what address to marginalize to,
@@ -305,13 +305,13 @@ for p in [0.1, 0.3, 0.5, 0.7, 0.9]:
 @gen
 def variational_model():
     x = normal(0.0, 1.0) @ "x"
-    y = normal(x, 0.3) @ "y"
+    normal(x, 0.3) @ "y"
 
 
 @gen
 def variational_family(theta):
     # Use distribution with a gradient strategy!
-    x = normal_reinforce(theta, 1.0) @ "x"
+    normal_reinforce(theta, 1.0) @ "x"
 
 
 @expectation
@@ -365,7 +365,7 @@ dot(jnp.arange(500), thetas)
 @gen
 def reparam_variational_family(theta):
     # Use distribution with a gradient strategy!
-    x = normal_reparam(theta, 1.0) @ "x"
+    normal_reparam(theta, 1.0) @ "x"
 
 
 _, thetas = seed(optimize)(

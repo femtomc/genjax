@@ -234,7 +234,7 @@ class GibbsSampler(Pytree):
         def initialize(step, n_y, n_x, p_flip):
             @gen
             def proposal():
-                init = (
+                (
                     flip.vmap().vmap()(
                         0.5 * jnp.ones((n_y, n_x)),
                     )

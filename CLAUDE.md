@@ -59,7 +59,9 @@ pixi run deploy
 
 ## Overview
 
-GenJAX is a probabilistic programming language embedded in Python.  A probabilistic program language (PPL) is a system which provides automation for writing programs which perform computations on probability distributions, including sampling, variational approximation, gradient estimation for expected values, and more.
+GenJAX is a probabilistic programming language embedded in Python.  
+
+A probabilistic program language (PPL) is a system which provides automation for writing programs which perform computations on probability distributions, including sampling, variational approximation, gradient estimation of expected values, and more.
 
 The design of GenJAX is centered on programmable inference: automation which allows users of GenJAX to express and customize Bayesian inference algorithms (algorithms for computing with posterior distributions, answering questions like "`x` probabilistically affects `y`, and I observe `y`: what are my new beliefs about `x`?"). Programmable inference includes advanced forms of Monte Carlo and variational inference methods.
 
@@ -167,12 +169,20 @@ The codebase uses JAX extensively for automatic differentiation, vectorization, 
 
 ## Development Overview
 
-1. Make changes to source code in `src/genjax/`
-2. Run relevant tests to verify functionality
-3. Update examples if adding new features
-4. Ensure JAX transformations (`jit`, `vmap`) still work
+### Key workflows
 
-### Compiler Overview
+1. (**core-dev**) Developing or making changes to core functionality.
+   - Make changes to source code in `src/genjax/`
+   - Run relevant tests to verify functionality
+   - Update examples if adding new features
+   - Ensure JAX transformations (`jit`, `vmap`) still work
+
+2. (**example-dev**) Developing new examples using `GenJAX`.
+   - Create a new folder under `examples`, for instance: `examples/foo`.
+   - Create a new "core" Python file (for instance: `examples/foo/core.py`) which will contain the definitions of generative functions, and any inference functionality.
+   - Create a new "figures" Python file (for instance: `examples/foo/figures.py`) which will contain plotting code.
+
+### High-level Compiler Reference
 
 This is a high-level sketch of how GenJAX (thought of as a compiler) works:
 
@@ -203,7 +213,7 @@ genjax/
 └── quarto/               # Quarto website source
 ```
 
-## Key Workflows
+## Key Usage Workflows
 
 ### 1. Defining a generative function
 
@@ -218,7 +228,7 @@ def model():
     # Return observables
 ```
 
-### 2. GFI Basic Usage
+### 2. Basic Usage of the GFI
 
 ```python
 # Sampling a trace.
@@ -245,33 +255,37 @@ grad = objective.grad_estimate(params)
 
 ## Design Patterns
 
-### Generative Function Composition
+### Programmable Monte Carlo Inference
 
-- Within `@gen`, a generative function can call other generative functions by using the addressing syntax e.g. `other_gen_fn(*args) @ "addr"`
-- Given a generative function, `.vmap()` can be used to create a `Vmap` generative function.
-- Address namespacing prevents conflicts
-
-### Trace Manipulation
-
-- Traces are the data _lingua franca_ of generative functions: they store samples of probabilistic choices, probabilistic data like scores (reciprocals of densities), the return value from executing the generative function.
-- Traces are treated as immutable records of execution, including random choices and probabilistic data like scores.
-- To mutate a trace, the interfaces `update()` and `regenerate()` are used: these interfaces create new traces with modifications.
-- These interfaces are useful for expressing MCMC proposals and importance sampling algorithms, including sequential Monte Carlo.
-
-### Model + Inference
+#### High-level workflow
 
 1. Define generative model with `@gen`
 2. Use GFI methods for basic inference
 3. Implement custom algorithms using trace manipulation
 4. Optimize with ADEV for variational approaches
 
-### Debugging
+#### Generative Function Composition
+
+- Within `@gen`, a generative function can call other generative functions by using the addressing syntax e.g. `other_gen_fn(*args) @ "addr"`
+- Given a generative function, `.vmap()` can be used to create a `Vmap` generative function.
+- Address namespacing prevents conflicts
+
+#### Trace Manipulation
+
+- Traces are the data _lingua franca_ of generative functions: they store samples of probabilistic choices, probabilistic data like scores (reciprocals of densities), the return value from executing the generative function.
+- Traces are treated as immutable records of execution, including random choices and probabilistic data like scores.
+- To mutate a trace, the interfaces `update()` and `regenerate()` are used: these interfaces create new traces with modifications.
+- These interfaces are useful for expressing MCMC proposals and importance sampling algorithms, including sequential Monte Carlo.
+
+#### Debugging
 
 - Examine traces to understand model behavior
 - Use `assess()` to check density computations
 - Leverage JAX debugging tools (jax.debug)
 
-### Gradient Estimation Strategies
+### Programmable variational inference
+
+### Optimization of Expected Values
 
 - Different samplers support different gradient estimators
 - `normal_reparam`: Reparameterization gradients
@@ -346,7 +360,7 @@ grad = objective.grad_estimate(params)
 - **PJAX**: stands for _Probabilistic_ JAX, an extension of JAX with custom primitives (`sample_p`, `log_density_p`) which GenJAX uses as an intermediate representation of its probabilistic computations.
 - **ADEV**: Automatic Differentiation of Expected Values
 - **Trace**: Recording of the execution of a generative function.
-- **Address**: String identifier for random variables (e.g., `"x"`, `"alpha"`)
+- **Address**: String identifier for random variables (e.g., `"x"`, `"alpha"`, etc)
 - **Score**: Negative log probability (log of the reciprocal `1/P(choices)`)
 - **Programmable Inference**: Ability to customize inference algorithms
 

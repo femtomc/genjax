@@ -53,7 +53,7 @@ def timing_figure(
     # arr = arr / arr[0]
 
     fig = plt.figure(figsize=(12, 6))
-    bars = plt.bar(
+    plt.bar(
         ns,
         arr,
         color="skyblue",

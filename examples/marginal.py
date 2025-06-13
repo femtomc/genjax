@@ -10,9 +10,9 @@ def model():
         return x, y
 
     x, y = submodel.T() @ "inner"
-    z = normal(x**2 + y**2, 0.3) @ "z"
+    normal(x**2 + y**2, 0.3) @ "z"
 
 
 @gen
 def proposal(*args):
-    x = normal(0.0, 1.0) @ "z"
+    normal(0.0, 1.0) @ "z"

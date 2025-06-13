@@ -7,13 +7,13 @@ from genjax import expectation, gen, normal, normal_reinforce, seed
 @gen
 def variational_model():
     x = normal(0.0, 1.0) @ "x"
-    y = normal(x, 0.3) @ "y"
+    normal(x, 0.3) @ "y"
 
 
 @gen
 def variational_family(theta):
     # Use distribution with a gradient strategy!
-    x = normal_reinforce(theta, 1.0) @ "x"
+    normal_reinforce(theta, 1.0) @ "x"
 
 
 @expectation
