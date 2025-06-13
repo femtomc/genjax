@@ -67,12 +67,12 @@ The design of GenJAX is centered on programmable inference: automation which all
 
 ## Key concepts
 
-### 1. Datatypes: Generative Functions & Traces
+### Datatypes: Generative Functions & Traces
 
 - **Generative Function**: A probabilistic program that implements the Generative Function Interface (GFI)
 - **Trace**: A recording of execution containing random choices sampled durng the execution, the arguments of the execution, the return value of the execution, and the score of the execution (the score is $\log \frac{1}{P(\text{random choices})}$, the reciprocal of the density in logspace).
 
-### 2. Generative Function Interface
+### Generative Function Interface
 
 The generative function interface, or GFI consists of a set of interface methods for working with generative functions and traces.
 
@@ -94,7 +94,7 @@ Below, we enumerate the list of interfaces, with their signatures. We use GenJAX
 - `Trace[X, R].get_score() -> Score` (Get the score of the execution)
 - `Trace[X, R].get_choices() -> X` (Get the traced random choices of the execution that produced the trace)
 
-### 3. Generative Function Languages
+### Generative Function Languages
 
 GenJAX supports syntactic abstractions to make constructing generative functions convenient and concise.
 
@@ -145,6 +145,8 @@ get_choices(trace)["x"]["s"]
 Nesting can be applied to arbitrary depths.
 
 #### Generative function combinators
+
+### Programmable inference algorithms
 
 ## Codebase Architecture
 
