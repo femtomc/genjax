@@ -34,6 +34,7 @@ tfd = tfp.distributions
 ##########
 
 Any = btyping.Any
+Addr = btyping.Tuple | str
 PRNGKey = jtyping.PRNGKeyArray
 Array = jtyping.Array
 ArrayLike = jtyping.ArrayLike
@@ -1155,6 +1156,117 @@ def get_retval(x: Trace[X, R]) -> R:
     return x.get_retval()
 
 
+##############
+# Selections #
+##############
+
+
+@Pytree.dataclass
+class AllSel(Pytree):
+    def match(self, addr) -> "tuple[bool, AllSel]":
+        return True, self
+
+
+@Pytree.dataclass
+class NoneSel(Pytree):
+    def match(self, addr) -> "tuple[bool, NoneSel]":
+        return False, self
+
+
+@Pytree.dataclass
+class StrSel(Pytree):
+    s: str = Pytree.static()
+
+    def match(self, addr) -> tuple[bool, AllSel | NoneSel]:
+        check = addr == self.s
+        return check, AllSel() if check else NoneSel()
+
+
+@Pytree.dataclass
+class DictSel(Pytree):
+    d: "dict[str, Any]"
+
+    def match(self, addr) -> "tuple[bool, Any]":
+        check = addr in self.d
+        return check, self.d[addr] if check else NoneSel()
+
+
+@Pytree.dataclass
+class ComplSel(Pytree):
+    s: "S"
+
+    def match(self, addr) -> "tuple[bool, ComplSel]":
+        check, rest = self.s.match(addr)
+        return not check, ComplSel(rest)
+
+
+@Pytree.dataclass
+class InSel(Pytree):
+    s1: "S"
+    s2: "S"
+
+    def match(self, addr) -> "tuple[bool, InSel]":
+        check1, r1 = self.s1.match(addr)
+        check2, r2 = self.s2.match(addr)
+        return check1 and check2, InSel(r1, r2)
+
+
+@Pytree.dataclass
+class OrSel(Pytree):
+    s1: "S"
+    s2: "S"
+
+    def match(self, addr) -> "tuple[bool, OrSel]":
+        check1, r1 = self.s1.match(addr)
+        check2, r2 = self.s2.match(addr)
+        return check1 or check2, OrSel(r1, r2)
+
+
+@Pytree.dataclass
+class S(Pytree):
+    s: NoneSel | AllSel | StrSel | DictSel | ComplSel | InSel | OrSel
+
+    def match(self, addr) -> "tuple[bool, S]":
+        check, rest = self.s.match(addr)
+        return check, S(rest) if not isinstance(rest, S) else rest
+
+    def __xor__(self, other: "S") -> "S":
+        return S(InSel(self, other))
+
+    def __invert__(self) -> "S":
+        return S(ComplSel(self))
+
+    def __contains__(self, addr) -> bool:
+        check, _ = self.match(addr)
+        return check
+
+    def __or__(self, other) -> "S":
+        return S(OrSel(self, other))
+
+    def __call__(self, addr) -> "tuple[bool, S]":
+        return self.match(addr)
+
+
+def sel(*v: tuple[()] | str | dict[str, Any] | None) -> S:
+    assert len(v) <= 1
+    if len(v) == 1:
+        if v[0] is None:
+            return S(NoneSel())
+        if v[0] == ():
+            return S(AllSel())
+        elif isinstance(v[0], dict):
+            return S(DictSel(v[0]))
+        else:
+            assert isinstance(v[0], str)
+            return S(StrSel(v[0]))
+    else:
+        return S(NoneSel())
+
+
+def match(addr: Addr, sel: S):
+    return sel.match(addr)
+
+
 class GFI(Generic[X, R], Pytree):
     def __call__(self, *args) -> "Thunk[X, R] | R":
         if handler_stack:
@@ -1171,7 +1283,7 @@ class GFI(Generic[X, R], Pytree):
     def simulate(
         self,
         args,
-    ) -> Tr[X, R]:
+    ) -> Trace[X, R]:
         pass
 
     @abstractmethod
@@ -1179,7 +1291,7 @@ class GFI(Generic[X, R], Pytree):
         self,
         args,
         x: X | None,
-    ) -> tuple[Tr[X, R], Weight]:
+    ) -> tuple[Trace[X, R], Weight]:
         pass
 
     @abstractmethod
@@ -1187,16 +1299,25 @@ class GFI(Generic[X, R], Pytree):
         self,
         args,
         x: X,
-    ) -> Tr[X, R]:
+    ) -> Trace[X, R]:
         pass
 
     @abstractmethod
     def update(
         self,
         args_,
-        tr: Tr[X, R],
-        x_: X,
-    ) -> tuple[Tr[X, R], Weight, X]:
+        tr: Trace[X, R],
+        x_: X | None,
+    ) -> tuple[Tr[X, R], Weight, X | None]:
+        pass
+
+    @abstractmethod
+    def regenerate(
+        self,
+        args_,
+        tr: Trace[X, R],
+        sel: S,
+    ) -> tuple[Tr[X, R], Weight, X | None]:
         pass
 
     @abstractmethod
@@ -1302,7 +1423,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
         args_,
         tr: Tr[X, R],
         x_: X,
-    ) -> tuple[Tr[X, R], Weight, X]:
+    ) -> tuple[Tr[X, R], Weight, X | None]:
         new_tr, w, discard = modular_vmap(
             self.gen_fn.update,
             in_axes=(self.in_axes, 0, 0),
@@ -1310,6 +1431,21 @@ class Vmap(Generic[X, R], GFI[X, R]):
             axis_name=self.axis_name,
             spmd_axis_name=self.spmd_axis_name,
         )(args_, tr, x_)
+        return new_tr, jnp.sum(w), discard
+
+    def regenerate(
+        self,
+        args_,
+        tr: Tr[X, R],
+        s: S,
+    ) -> tuple[Tr[X, R], Weight, X | None]:
+        new_tr, w, discard = modular_vmap(
+            self.gen_fn.update,
+            in_axes=(self.in_axes, 0, None),
+            axis_size=self.axis_size,
+            axis_name=self.axis_name,
+            spmd_axis_name=self.spmd_axis_name,
+        )(args_, tr, s)
         return new_tr, jnp.sum(w), discard
 
     def merge(self, x: X, x_: X) -> X:
@@ -1359,14 +1495,42 @@ class Distribution(Generic[X], GFI[X, X]):
         self,
         args_,
         tr: Tr[X, X],
-        x_: X,
-    ) -> tuple[Tr[X, X], Weight, X]:
-        log_density_ = self.logpdf(x_, *args_)
-        return (
-            Tr(self, args_, x_, x_, -log_density_),
-            log_density_ + tr.get_score(),
-            tr.get_retval(),
-        )
+        x_: X | None,
+    ) -> tuple[Tr[X, X], Weight, X | None]:
+        if x_ is None:
+            x_ = get_choices(tr)
+            log_density_ = self.logpdf(x_, *args_)
+            return (
+                Tr(self, args_, x_, x_, -log_density_),
+                log_density_ + tr.get_score(),
+                tr.get_retval(),
+            )
+        else:
+            log_density_ = self.logpdf(x_, *args_)
+            return (
+                Tr(self, args_, x_, x_, -log_density_),
+                log_density_ + tr.get_score(),
+                tr.get_retval(),
+            )
+
+    def regenerate(
+        self,
+        args_,
+        tr: Tr[X, X],
+        s: S,
+    ) -> tuple[Tr[X, X], Weight, X | None]:
+        if () in s:
+            tr_ = self.simulate(args_)
+            w = -tr_.get_score() + tr.get_score()
+            return tr_, w, get_choices(tr)
+        else:
+            x_ = get_choices(tr)
+            log_density_ = self.logpdf(get_choices(tr), *args_)
+            return (
+                Tr(self, args_, x_, x_, -log_density_),
+                log_density_ + tr.get_score(),
+                None,
+            )
 
     def merge(self, x: X, x_: X) -> X:
         raise Exception(
@@ -1511,7 +1675,32 @@ class Update(Generic[R]):
         return tr.get_retval()
 
 
-handler_stack: list[Simulate | Assess | Update] = []
+@dataclass
+class Regenerate(Generic[R]):
+    trace: Tr[dict[str, Any], R]
+    s: S
+    trace_map: dict[str, Any]
+    discard: dict[str, Any]
+    score: Score
+    weight: Weight
+
+    def __call__(
+        self,
+        addr: str,
+        gen_fn: GFI[X, R],
+        args_,
+    ) -> R:
+        subtrace = self.trace.get_choices()[addr]
+        subs = self.s[addr]
+        tr, w, discard = gen_fn.regenerate(args_, subtrace, subs)
+        self.trace_map[addr] = tr
+        self.discard[addr] = discard
+        self.score += tr.get_score()
+        self.weight += w
+        return tr.get_retval()
+
+
+handler_stack: list[Simulate | Assess | Generate | Update | Regenerate] = []
 
 
 # Generative function "FFI" invocation (no staging).
@@ -1575,9 +1764,28 @@ class Fn(
         self,
         args_,
         tr: Tr[dict[str, Any], R],
-        x_: dict[str, Any],
-    ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any]]:
+        x_: dict[str, Any] | None,
+    ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any] | None]:
+        x_ = {} if x_ is None else x_
         handler_stack.append(Update(tr, x_, {}, {}, jnp.array(0.0), jnp.array(0.0)))
+        r = self.source(*args_)
+        handler = handler_stack.pop()
+        assert isinstance(handler, Update)
+        trace_map, score, w, discard = (
+            handler.trace_map,
+            handler.score,
+            handler.weight,
+            handler.discard,
+        )
+        return Tr(self, args_, trace_map, r, score), w, discard
+
+    def regenerate(
+        self,
+        args_,
+        tr: Tr[dict[str, Any], R],
+        s: S,
+    ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any] | None]:
+        handler_stack.append(Regenerate(tr, s, {}, {}, jnp.array(0.0), jnp.array(0.0)))
         r = self.source(*args_)
         handler = handler_stack.pop()
         assert isinstance(handler, Update)
@@ -1601,9 +1809,10 @@ def gen(fn: Callable[..., R]) -> Fn[R]:
     return Fn(source=fn)
 
 
-########
-# Scan #
-########
+##########
+# Markov #
+##########
+
 
 ########
 # Cond #
@@ -1676,4 +1885,26 @@ class Cond(Generic[X, R], GFI[X, R]):
             CondTr(self, idx, [tr, tr_]),
             jnp.select(idx, [w, w]),
             self.callee.merge(discard, discard_),
+        )
+
+    def regenerate(
+        self,
+        args,
+        tr: CondTr[X, R],
+        s: S,
+    ) -> tuple[Trace[X, R], Weight, X | None]:
+        (idx, *args) = args
+        tr, w, discard = self.callee.regenerate(args, tr.trs[0], s)
+        tr_, w_, discard_ = self.callee_.regenerate(args, tr.trs[1], s)
+        discard = (
+            discard
+            if discard_ is None
+            else discard_
+            if discard is None
+            else self.callee.merge(discard, discard_)
+        )
+        return (
+            CondTr(self, idx, [tr, tr_]),
+            jnp.select(idx, [w, w]),
+            discard,
         )

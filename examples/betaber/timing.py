@@ -68,7 +68,7 @@ def numpyro_timing(
 ):
     import numpyro
     import numpyro.distributions as dist
-    from numpyro.handlers import block, replay, seed, substitute, trace
+    from numpyro.handlers import block, replay, seed
     from numpyro.infer.util import (
         log_density,
     )

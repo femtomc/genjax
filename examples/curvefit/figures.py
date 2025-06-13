@@ -59,7 +59,7 @@ def onepoint_curve(x):
 
 
 @gen
-def n_datapoints(n):
+def npoint_curve(n):
     curve = sine() @ "curve"
     xs = jnp.arange(0, n)
     ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
@@ -70,7 +70,7 @@ def _infer_latents(key, ys, n_samples):
     constraints = {"ys": {"obs": ys}}
     samples, weights = seed(
         vmap(
-            lambda constraints: n_datapoints.generate((len(ys),), constraints),
+            lambda constraints: npoint_curve.generate((len(ys),), constraints),
             axis_size=n_samples,
             in_axes=None,
         )
@@ -146,7 +146,7 @@ def visualize_multipoint_trace(
 
 def save_multipoint_trace_viz():
     print("Making and saving multipoint trace visualization.")
-    trace = n_datapoints.simulate((10,))
+    trace = npoint_curve.simulate((10,))
     fig = visualize_multipoint_trace(trace, yrange=(-1.5, 1.5))
     fig.savefig("examples/curvefit/figs/020_multipoint_trace.pdf")
 
@@ -163,7 +163,7 @@ def make_fig_with_centered_number(number):
 def save_four_multipoint_trace_vizs():
     print("Making and saving visualizations of traces generated from vmap(simulate).")
     traces = vmap(
-        lambda: n_datapoints.simulate((10,)),
+        lambda: npoint_curve.simulate((10,)),
         axis_size=4,
         in_axes=None,
     )()
@@ -178,7 +178,7 @@ def save_four_multipoint_trace_vizs():
 
     print("Making and saving visualizations of trace densities.")
     densities = vmap(
-        lambda chm: n_datapoints.log_density((10,), chm),
+        lambda chm: npoint_curve.log_density((10,), chm),
         in_axes=0,
     )(traces.get_choices())
     for i in range(4):
@@ -190,7 +190,7 @@ def save_four_multipoint_trace_vizs():
 
 ## Inference-related figures ##
 def get_points_for_inference():
-    trace = n_datapoints.simulate((10,))
+    trace = npoint_curve.simulate((10,))
     return trace.get_retval()
 
 
@@ -232,10 +232,11 @@ def get_inference_scaling_data():
         for _ in range(200):
             s = time.time()
             samples, weights = infer_latents(jrand.key(1), ys, n)
+            jax.block_until_ready(weights)
             times.append(time.time() - s)
             lml_ests.append(jax.scipy.special.logsumexp(weights) - jnp.log(n))
-        print(n, np.mean(times), np.std(times))
-        mean_times.append(np.mean(times) * 1000)
+        print(n, np.min(times), np.std(times))
+        mean_times.append(np.min(times) * 1000)
         mean_lml_ests.append(np.mean(lml_ests))
     return n_samples, mean_lml_ests, mean_times
 
@@ -267,13 +268,14 @@ def save_inference_scaling_viz():
 
     ## Plot 2: Inference quality scaling ##
     print("Making and saving inference quality scaling visualization.")
-    fig = plt.figure(figsize=(3, 1.5))
-    plt.plot(n_samples, lml_est_errors, marker="o", color="black")
+    fig = plt.figure(figsize=(3, 2.5))
+    plt.plot(mean_times, lml_est_errors, marker="o", color="black", label="IS")
     plt.xscale("log")
-    plt.xlabel("Number of samples")
+    plt.xlabel("Mean wall clock time (ms)")
     plt.ylabel("Error in est.\nof log P(obs)")
     plt.gca().spines["top"].set_visible(False)
     plt.gca().spines["right"].set_visible(False)
+    plt.legend()
     plt.tight_layout(pad=0.2)
     fig.savefig("examples/curvefit/figs/061_inference_quality_scaling.pdf")
 
