@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Codebase Commands
 
-The codebase is managed through [`pixi`](https://pixi.sh/latest/).
+The codebase is managed through [`pixi`](https://pixi.sh/latest/). All toplevel codebase commands should go through `pixi`.
 
 ### Environment Setup
 
@@ -70,29 +70,105 @@ The design of GenJAX is centered on programmable inference: automation which all
 ### Datatypes: Generative Functions & Traces
 
 - **Generative Function**: A probabilistic program that implements the Generative Function Interface (GFI)
-- **Trace**: A recording of execution containing random choices sampled durng the execution, the arguments of the execution, the return value of the execution, and the score of the execution (the score is $\log \frac{1}{P(\text{random choices})}$, the reciprocal of the density in logspace).
+- **Trace**: A recording of execution containing random choices sampled durng the execution, the arguments of the execution, the return value of the execution, and the score of the execution (the score is `log 1 / P(random choices)`, the reciprocal of the density in logspace).
 
 ### Generative Function Interface
 
-The generative function interface, or GFI consists of a set of interface methods for working with generative functions and traces.
+Generative functions are probabilistic programs which bundle together a set of probabilistic ingredients (measures and deterministic functions), and expose a computational interface that provides automation for doing computations with those ingredients.
 
-Below, we enumerate the list of interfaces, with their signatures. We use GenJAX Python types: `X` denotes the type of "random samples" and `R` denotes the type of "return values".
+In the following, we use tags:
 
-**Methods on the type `GFI`**
+- (**MATH**) indicates a description in terms of the abstract mathematical ingredients.
+- (**COMPUTATIONAL**) indicates a description in terms of Python types.
 
-- `GFI[X, R].simulate(args: tuple) -> Trace[X, R]` (sample a trace from the prior)
-- `GFI[X, R].assess(args: tuple, x: X) -> tuple[Density, R]` (evaluate the density at the sample `x: X` and)
-- `GFI[X, R].generate(args: tuple, x: X) -> tuple[Trace[X, R], Weight]`
-- `GFI[X, R].update(args: tuple, trace: Trace[X, R], x: X))`
-- `GFI[X, R].regenerate(args: tuple, trace: Trace[X, R], s: Sel)`
+The (**MATH**) ingredients of generative functions are as follows:
+
+- A measure kernel $P(dx; a \in A)$ over a measurable space $X$ given arguments $a \in A$ (informally called: the `P` distribution).
+- A measurable function $f(x, a \in A) \rightarrow R$ (informally called: the return value function).
+- An indexed family of measure kernels $Q(dX; a \in A, x' \in X')$ given arguments $A$ and sample $x' \in X' \subset X$ (informally called _the internal proposal distribution family_)
+
+**IMPORTANT**:
+
+- (**COMPUTATIONAL**) The **Computational Interface** provides access to computations using these ingredients, and is the primary set of methods you will be working with when using GenJAX.
+
+#### Computational Interface
+
+The generative function interface, or GFI, is the set of interface methods for working with generative functions and traces. The definition of `GFI` and `Trace` is given in `src/core.py`.
+
+Below, we enumerate the list of interfaces, with their signatures. We use GenJAX Python types: `X` is the Python type of "random samples" (**MATH**: the measurable space $X$) and `R` is the type of "return values" (**MATH**: the measurable space $R$).
+
+**Computational Interface on the type `GFI`**
+
+- **simulate**
+
+   ```python
+   GFI[X, R].simulate(args: tuple) -> Trace[X, R]
+   ```
+
+  (**COMPUTATIONAL**) Given `args: A`, sample a sample `x : X`, evaluate `log (1 / P(x; args))`, and the return value function `f(x, args)`. Store these values in a `Trace[X, R]` and return it.
+- **assess**
+
+   ```python
+   GFI[X, R].assess(args: tuple, x: X) -> tuple[Density, R]
+   ```
+
+  (**COMPUTATIONAL**): Given `args: A` and sample `x : X`, evaluate the log density `log P(x; args)` and the return value function. Returns the log density and the value of the return value function.
+- **generate**
+
+   ```python
+   GFI[X, R].generate(args: tuple, x: X_) -> tuple[Trace[X, R], Weight]
+   ```
+
+  (**COMPUTATIONAL**): Given `args: A` and sample `x_ : X_`, sample a complete sample `x : X` using `Q(dx; x_, args)` (the internal proposal distribution family) and evaluate the density for the `P` distribution at `x` and the density ratio `P(x; args) / Q(x; x_, args)`.
+- **update**
+
+   ```python
+   GFI[X, R].update(args: tuple, trace: Trace[X, R], x_: X_) -> tuple[Trace[X, R], Weight, X_]
+   ```
+
+- **regenerate**
+
+   ```python
+   GFI[X, R].regenerate(args: tuple, trace: Trace[X, R], s: Sel) -> tuple[Trace[X, R], Weight, X_]
+   ```
 
 **Methods on the type `Trace`**
 
-- `Trace[X, R].get_retval() -> R` (Get the return value for the execution that produced the trace)
-- `Trace[X, R].get_gen_fn() -> GFI[X, R]` (Get the GFI which the trace was created from)
-- `Trace[X, R].get_args() -> tuple` (Get the arguments for the execution which created the trace)
-- `Trace[X, R].get_score() -> Score` (Get the score of the execution)
-- `Trace[X, R].get_choices() -> X` (Get the traced random choices of the execution that produced the trace)
+- **get_retval**
+
+   ```python
+   Trace[X, R].get_retval() -> R
+   ```
+
+   (**COMPUTATIONAL**) Get the return value for the execution that produced the trace.
+- **get_gen_fn**
+
+   ```python
+   Trace[X, R].get_gen_fn() -> GFI[X, R]
+   ```
+
+  (**COMPUTATIONAL**) Get the GFI which the trace was created from.
+- **get_args**
+
+   ```python
+   Trace[X, R].get_args() -> tuple
+   ```
+
+  (**COMPUTATIONAL**) Get the arguments for the execution which created the trace.
+- **get_choices**
+
+   ```python
+   Trace[X, R].get_choices() -> X
+   ```
+
+  (**COMPUTATIONAL**) Get the traced random choices of the execution that produced the trace.
+- **get_score**
+
+   ```python
+   Trace[X, R].get_score() -> Score
+   ```
+
+  (**COMPUTATIONAL**) Get the score of the execution.
 
 ### Generative Function Languages
 
@@ -186,8 +262,6 @@ The codebase uses JAX extensively for automatic differentiation, vectorization, 
 
 ### High-level Compiler Reference
 
-This is a high-level sketch of how GenJAX (thought of as a compiler) works:
-
 - users author generative functions
 - users apply inference algorithms to their generative functions, written using the GFI
 - the algorithms lower to PJAX
@@ -195,8 +269,8 @@ This is a high-level sketch of how GenJAX (thought of as a compiler) works:
 
 ```raw
 GenJAX
-├── Generative functions: @gen decorator + Python DSL syntax
 ├── Inference algorithms implemented using GFI: Monte Carlo, Variational, MCMC
+├── Generative functions: @gen decorator + Python DSL syntax
 ├── PJAX: Probabilistic intermediate representation
 └── JAX Backend: Vectorization, JIT compilation
 ```
@@ -232,27 +306,66 @@ def model():
 
 ### 2. Basic Usage of the GFI
 
+#### Methods on `GFI`
+
 ```python
-# Sampling a trace.
+# Sample a trace.
 trace = model.simulate(args)
 
-# Evaluating the density and return value given fixed
+# Evaluate the density and return value given fixed
 # random choices.
 density, retval = model.assess(args, choices)
 
+trace, weight = model.generate(args, choices)
+
 # Updating a trace to be consistent with new random choices.
-new_trace, weight, _ = trace.update(new_args, new_choices)
+# The `discard` is any choices replaced.
+new_trace, weight, discard = trace.update(new_args, new_choices)
+
+# Updating a trace by asking a generative function to re-propose
+# some of the random choices.
+# The `discard` is any choices replaced.
+new_trace, weight, discard = trace.update(new_args, new_choices)
+```
+
+#### Methods on `Trace`
+
+```python
+# Get the arguments of the trace.
+args = trace.get_args()
 ```
 
 ### 3. Variational Inference
 
 ```python
+from genjax import gen, beta, bernoulli, expectation
+from genjax.vi import beta_implicit
+
+# Define a model.
+@gen
+def beta_ber(alpha, beta):
+   p = beta(1.0, 1.0) @ "p"
+   _ = flip(p) @ "f"
+
+# Define a variational guide.
+@gen
+def guide(alpha, beta):
+   _ = beta_implicit(alpha, beta) @ "p"
+
+# NOTE: model and guide should accept the same arguments.
+
+# Either define your own objective:
 @expectation
-def objective(params):
+def objective(alpha, beta):
     # Define ELBO or other VI objective
-    
+    # using the GFI.
+
+# Or use a standard library objective:
+objective = ELBO(beta_ber, guide)
+
 # Optimize with gradient estimation
-grad = objective.grad_estimate(params)
+init_params = (2.0, 2.0)
+params_grad = objective.grad_estimate(*params)
 ```
 
 ## Design Patterns
@@ -261,10 +374,9 @@ grad = objective.grad_estimate(params)
 
 #### High-level workflow
 
-1. Define generative model with `@gen`
-2. Use GFI methods for basic inference
-3. Implement custom algorithms using trace manipulation
-4. Optimize with ADEV for variational approaches
+1. Define generative functions using distributions, the `@gen` language, and generative function combinators.
+2. Use GFI methods for basic inference.
+3. Implement custom algorithms using trace manipulation.
 
 #### Generative Function Composition
 
@@ -283,7 +395,7 @@ grad = objective.grad_estimate(params)
 
 - Examine traces to understand model behavior
 - Use `assess()` to check density computations
-- Leverage JAX debugging tools (jax.debug)
+- Leverage JAX debugging tools (`jax.debug`) if you encounter NaN values or JAX runtime errors.
 
 ### Programmable variational inference
 
@@ -300,7 +412,7 @@ grad = objective.grad_estimate(params)
 
 - All GenJAX code is JAX-compatible. In general, you should only be writing code within "JAX Python", the subset of Python which is JAX compatible.
 - Can use `jax.jit`, `jax.vmap`, `jax.grad` _on GFI interface invocations_, but not on generative functions (as instances of `GFI`) themselves.
-- GenJAX provides a custom version of `vmap` called `modular_vmap` In general, you should use this version when working with probabilistic code.
+- (**IMPORTANT**) GenJAX provides a custom version of `vmap` called `modular_vmap`. You should use this version when working with any code which uses generative function interface methods.
 
 ### Vectorization
 
