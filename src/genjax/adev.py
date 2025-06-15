@@ -390,14 +390,21 @@ class Expectation(Pytree):
         def _invoke_closed_over(primals):
             return invoke_closed_over(self, primals)
 
-        return jax.grad(_invoke_closed_over)(primals)
+        grad_result = jax.grad(_invoke_closed_over)(primals)
+
+        # If only one argument was passed, return the single gradient
+        # If multiple arguments were passed, return the tuple of gradients
+        if len(primals) == 1:
+            return grad_result[0]
+        else:
+            return grad_result
 
     def estimate(self, args):
         tangents = jtu.tree_map(lambda _: 0.0, args)
         return self.jvp_estimate(tangents).primal
 
 
-def expectation(source: Callable[..., Any]):
+def expectation(source: Callable[..., Any]) -> Expectation:
     prog = ADEVProgram(source)
     return Expectation(prog)
 
