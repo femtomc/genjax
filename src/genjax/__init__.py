@@ -12,7 +12,6 @@ beartype_this_package(conf=conf)
 
 from .adev import (  # noqa: E402
     Dual,
-    add_cost,
     categorical_enum_parallel,
     expectation,
     flip_enum,
@@ -58,7 +57,6 @@ __all__ = [
     "Pytree",
     "Trace",
     "Vmap",
-    "add_cost",
     "bernoulli",
     "beta",
     "uniform",
