@@ -12,9 +12,9 @@ from genjax.core import (
     ElaboratedPrimitive,
     Environment,
     Pytree,
+    assume_binder,
     assume_p,
     distribution,
-    initial_style_bind,
     modular_vmap,
     stage,
 )
@@ -25,7 +25,13 @@ from jax.interpreters import ad as jax_autodiff
 from jaxtyping import ArrayLike
 from tensorflow_probability.substrates import jax as tfp
 
-from .distributions import bernoulli, categorical, geometric, normal
+from .distributions import (
+    bernoulli,
+    categorical,
+    geometric,
+    normal,
+    multivariate_normal,
+)
 
 tfd = tfp.distributions
 
@@ -75,10 +81,10 @@ class ADEVPrimitive(Pytree):
 
 
 def sample_primitive(adev_prim: ADEVPrimitive, *args):
-    def _adev_prim_call(adev_prim, *args):
+    def _adev_prim_call(key, adev_prim, *args, **kwargs):
         return adev_prim.sample(*args)
 
-    return initial_style_bind(assume_p)(_adev_prim_call)(adev_prim, *args)
+    return assume_binder(_adev_prim_call)(adev_prim, *args)
 
 
 ####################
@@ -657,6 +663,53 @@ normal_reparam = distribution(
 )
 
 
+@Pytree.dataclass
+class MultivariateNormalREPARAM(ADEVPrimitive):
+    def sample(self, *args):
+        loc, covariance_matrix = args
+        return multivariate_normal.sample(loc, covariance_matrix)
+
+    def prim_jvp_estimate(
+        self,
+        dual_tree: DualTree,
+        konts: tuple[Any, ...],
+    ):
+        _, kdual = konts
+        (loc_primal, cov_primal) = Dual.tree_primal(dual_tree)
+        (loc_tangent, cov_tangent) = Dual.tree_tangent(dual_tree)
+
+        # Sample standard multivariate normal
+        eps = multivariate_normal.sample(
+            jnp.zeros_like(loc_primal), jnp.eye(loc_primal.shape[-1])
+        )
+
+        # Compute Cholesky decomposition for reparameterization
+        def _inner(loc, cov):
+            L = jnp.linalg.cholesky(cov)
+            return loc + L @ eps
+
+        primal_out, tangent_out = jax.jvp(
+            _inner,
+            (loc_primal, cov_primal),
+            (loc_tangent, cov_tangent),
+        )
+        return kdual(Dual(primal_out, tangent_out))
+
+
+multivariate_normal_reparam = distribution(
+    MultivariateNormalREPARAM(),
+    multivariate_normal.logpdf,
+)
+
+multivariate_normal_reinforce = distribution(
+    reinforce(
+        multivariate_normal.sample,
+        multivariate_normal.logpdf,
+    ),
+    multivariate_normal.logpdf,
+)
+
+
 ##################
 # Loss primitive #
 ##################
@@ -693,4 +746,6 @@ __all__ = [
     "Dual",
     "expectation",
     "flip_enum",
+    "multivariate_normal_reparam",
+    "multivariate_normal_reinforce",
 ]

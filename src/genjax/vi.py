@@ -11,7 +11,11 @@ from jax.lax import scan
 from typing import Any
 
 from .core import GFI, Pytree, gen, X, R
-from .adev import expectation, normal_reinforce, normal_reparam
+from .adev import (
+    expectation,
+    multivariate_normal_reparam,
+    multivariate_normal_reinforce,
+)
 
 
 @Pytree.dataclass
@@ -152,9 +156,9 @@ def mean_field_normal_family(
     """
 
     if gradient_estimator == "reparam":
-        normal_fn = normal_reparam
+        mvnormal_fn = multivariate_normal_reparam
     elif gradient_estimator == "reinforce":
-        normal_fn = normal_reinforce
+        mvnormal_fn = multivariate_normal_reinforce
     else:
         raise ValueError(f"Unknown gradient estimator: {gradient_estimator}")
 
@@ -171,13 +175,12 @@ def mean_field_normal_family(
         log_stds = params[n_dims:]
         stds = jnp.exp(log_stds)
 
-        # Sample each dimension independently
-        samples = []
-        for i in range(n_dims):
-            sample = normal_fn(means[i], stds[i]) @ f"x_{i}"
-            samples.append(sample)
+        # Create diagonal covariance matrix for mean-field assumption
+        cov = jnp.diag(stds**2)
 
-        return jnp.array(samples)
+        # Single multivariate normal sample with static address
+        x = mvnormal_fn(means, cov) @ "x"
+        return x
 
     return variational_family
 
@@ -198,9 +201,9 @@ def full_covariance_normal_family(
     """
 
     if gradient_estimator == "reparam":
-        normal_fn = normal_reparam
+        mvnormal_fn = multivariate_normal_reparam
     elif gradient_estimator == "reinforce":
-        normal_fn = normal_reinforce
+        mvnormal_fn = multivariate_normal_reinforce
     else:
         raise ValueError(f"Unknown gradient estimator: {gradient_estimator}")
 
@@ -216,16 +219,12 @@ def full_covariance_normal_family(
         mean = params["mean"]
         chol_cov = params["chol_cov"]
 
-        # Sample standard normal and transform
-        z = []
-        for i in range(n_dims):
-            z_i = normal_fn(0.0, 1.0) @ f"z_{i}"
-            z.append(z_i)
-        z = jnp.array(z)
+        # Convert Cholesky factor to full covariance matrix
+        # Cov = L @ L^T where L is the Cholesky factor
+        cov = chol_cov @ chol_cov.T
 
-        # Transform: x = mean + L @ z where L is Cholesky factor
-        x = mean + chol_cov @ z
-
+        # Single multivariate normal sample with static address
+        x = mvnormal_fn(mean, cov) @ "x"
         return x
 
     return variational_family
