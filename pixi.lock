@@ -1844,7 +1844,7 @@ packages:
 - pypi: .
   name: genjax
   version: 0.1.0
-  sha256: f39b7efe5036cd6b97f0903e82cd96d523de892cca66bf5f9573dda16f63408d
+  sha256: ccad39fe4c19d819a186c694297769eda68fafd78fe5a2e46f8d3b818facb429
   requires_dist:
   - penzai>=0.2.5,<0.3
   - beartype>=0.21.0,<0.22

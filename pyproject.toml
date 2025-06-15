@@ -37,7 +37,7 @@ setup = "mkdir examples/betaber/figs"
 betaber-timing = "pixi run python examples/betaber/timing.py"
 gol-timing = "pixi run python examples/gol/time_scaling.py"
 gol-figs = "pixi run python examples/gol/figures.py"
-curvefit-figs = "pixi run python examples/curvefit/figures.py"
+curvefit-figs = "pixi run python examples/curvefit/main.py"
 
 [tool.pixi.feature.format.tasks]
 format = "ruff format . && ruff check . --fix"

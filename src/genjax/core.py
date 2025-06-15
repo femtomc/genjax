@@ -1356,7 +1356,7 @@ class GFI(Generic[X, R], Pytree):
         x: X,
     ) -> Score:
         logp, _ = self.assess(args, x)
-        return logp
+        return jnp.sum(logp) if jnp.shape(logp) else logp
 
 
 ########################
