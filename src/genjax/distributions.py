@@ -52,3 +52,8 @@ poisson = tfp_distribution(
     tfd.Poisson,
     name="Poisson",
 )
+
+multivariate_normal = tfp_distribution(
+    tfd.MultivariateNormalFullCovariance,
+    name="MultivariateNormal",
+)

@@ -117,6 +117,16 @@ def main():
                 )
                 estimated_poses.append(Pose(mean_x, mean_y, mean_theta))
 
+        # Convert vectorized poses to list for easier handling
+        if hasattr(true_poses, "x") and hasattr(true_poses.x, "__len__"):
+            # Vectorized pose from JAX Scan
+            true_pose_list = [
+                Pose(true_poses.x[i], true_poses.y[i], true_poses.theta[i])
+                for i in range(len(true_poses.x))
+            ]
+        else:
+            true_pose_list = true_poses
+
         # Display results
         print("\nResults Summary:")
         final_true_pose = true_pose_list[-1]
@@ -143,16 +153,6 @@ def main():
     # Generate visualizations
     print("\nGenerating visualizations...")
 
-    # Convert vectorized poses to list for easier handling
-    if hasattr(true_poses, "x") and hasattr(true_poses.x, "__len__"):
-        # Vectorized pose from JAX Scan
-        true_pose_list = [
-            Pose(true_poses.x[i], true_poses.y[i], true_poses.theta[i])
-            for i in range(len(true_poses.x))
-        ]
-    else:
-        true_pose_list = true_poses
-
     # Handle vectorized observations
     if hasattr(observations, "__len__") and not isinstance(observations, (int, float)):
         obs_list = list(observations)
@@ -168,7 +168,6 @@ def main():
     for i, (pose, obs) in enumerate(
         zip(true_pose_list[::2], obs_list[::2])
     ):  # Every other step
-        true_dist = distance_to_wall(pose, world)
         ax1.text(pose.x + 0.2, pose.y + 0.2, f"{obs:.1f}", fontsize=8, alpha=0.7)
 
     ax1.legend()

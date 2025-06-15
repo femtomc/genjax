@@ -10,7 +10,12 @@ import jax.random as jrand
 from jax.lax import scan
 
 from genjax.core import gen, seed
-from genjax.adev import expectation, normal_reinforce, normal_reparam
+from genjax.adev import (
+    expectation,
+    normal_reinforce,
+    normal_reparam,
+    multivariate_normal_reparam,
+)
 from genjax.vi import (
     VariationalApproximation,
     elbo_factory,
@@ -267,9 +272,11 @@ class TestCompleteVIPipeline:
         # Create a 2D target model
         @gen
         def target_2d():
-            x1 = normal_reparam(0.0, 1.0) @ "x_0"
-            x2 = normal_reparam(0.0, 1.0) @ "x_1"
-            normal_reparam(x1 + x2, 0.1) @ "y"
+            # Use multivariate normal with same addressing as variational family
+            loc = jnp.array([0.0, 0.0])
+            cov = jnp.eye(2)
+            x = multivariate_normal_reparam(loc, cov) @ "x"
+            normal_reparam(jnp.sum(x), 0.1) @ "y"
 
         # Use mean-field family
         variational_family = mean_field_normal_family(2, "reparam")

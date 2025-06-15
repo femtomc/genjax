@@ -579,6 +579,7 @@ def assume_binder(
                     keyful_sampler,
                     name=name,
                     batch_shape=new_batch_shape,
+                    support=support,
                 )(*vector_args)
                 return (v,), (0 if n or axis_size else None,)
             else:

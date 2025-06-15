@@ -10,7 +10,7 @@ conf = BeartypeConf(
 
 beartype_this_package(conf=conf)
 
-from .adev import (
+from .adev import (  # noqa: E402
     Dual,
     add_cost,
     categorical_enum_parallel,
@@ -22,13 +22,14 @@ from .adev import (
     geometric_reinforce,
     normal_reinforce,
     normal_reparam,
+    multivariate_normal_reparam,
+    multivariate_normal_reinforce,
 )
-from .core import (
+from .core import (  # noqa: E402
     GFI,
     Distribution,
     Fn,
     Pytree,
-    Tr,
     Vmap,
     gen,
     get_choices,
@@ -37,7 +38,7 @@ from .core import (
     tfp_distribution,
     trace,
 )
-from .distributions import (
+from .distributions import (  # noqa: E402
     bernoulli,
     beta,
     categorical,
@@ -46,6 +47,7 @@ from .distributions import (
     uniform,
     exponential,
     poisson,
+    multivariate_normal,
 )
 
 __all__ = [
@@ -77,6 +79,9 @@ __all__ = [
     "normal",
     "normal_reinforce",
     "normal_reparam",
+    "multivariate_normal",
+    "multivariate_normal_reparam",
+    "multivariate_normal_reinforce",
     "seed",
     "tfp_distribution",
     "trace",

@@ -152,8 +152,8 @@ isinstance(regression, GFI)
 
 # %%
 # Sample a trace.
-trace = regression.simulate((x_range,))
-trace
+sample_trace = regression.simulate((x_range,))
+sample_trace
 
 # %% [markdown]
 # A _trace_ is a recording of the execution of a
@@ -439,13 +439,13 @@ make_jaxpr(pjax_vmap(sampler, axis_size=10))()
 
 # %%
 @gen
-def model():
+def simple_model():
     x = normal(0.0, 1.0) @ "x"
     y = normal(0.0, 1.0) @ "y"
     return x + y
 
 
-make_jaxpr(model.simulate)(())
+make_jaxpr(simple_model.simulate)(())
 
 # %% [markdown]
 # Even ADEV's unbiased gradient estimator programs are implemented in terms of PJAX:
