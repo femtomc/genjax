@@ -51,7 +51,8 @@ deploy = "quarto publish gh-pages ./quarto"
 preview = "quarto preview ./quarto"
 
 [tool.pixi.feature.test.tasks]
-test = "pytest tests/ -v"
+test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"
+coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=term && echo 'Coverage report available at htmlcov/index.html'"
 
 [tool.pixi.environments]
 cuda = ["cuda"]
@@ -62,5 +63,28 @@ test = { features = ["test"], solve-group = "default" }
 [dependency-groups]
 format = ["ruff>=0.9.2,<0.10","vulture>=2.14,<3","pre-commit>=4.0,<5"]
 docs = ["jupyter"]
-test = ["pytest>=8.0,<9"]
+test = ["pytest>=8.0,<9", "pytest-cov>=6.0,<7", "coverage>=7.0,<8"]
 cuda = ["matplotlib", "seaborn", "numpyro"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/examples/*",
+    "*/quarto/*",
+    "*/docs/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

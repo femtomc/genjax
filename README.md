@@ -2,6 +2,10 @@
 <img width="450" src="./logo.png"/>
 </p>
 
+<p align="center">
+<a href="https://codecov.io/gh/probcomp/genjax"><img src="https://codecov.io/gh/probcomp/genjax/branch/main/graph/badge.svg" alt="codecov"></a>
+</p>
+
 > This is the research version of GenJAX, a [(more stable) community version can be found here](https://github.com/genjax-community/genjax).
 
 (**Probabilistic programming language**) GenJAX is a probabilistic programming language (PPL): a system which provides automation for writing programs which perform computations on probability distributions, including sampling, variational approximation, gradient estimation for expected values, and more.
