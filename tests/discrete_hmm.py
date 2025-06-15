@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 from typing import Tuple
 
-from genjax.core import gen, Pytree, get_choices
+from genjax.core import gen, Pytree, get_choices, Scan
 from genjax.distributions import categorical
 
 
@@ -23,6 +23,32 @@ class DiscreteHMMTrace(Pytree):
 
 
 @gen
+def hmm_step(carry, x):
+    """
+    Single step of HMM generation.
+
+    Args:
+        carry: Previous state and model parameters
+        x: Scan input (unused but required by Scan interface)
+
+    Returns:
+        (new_state, observation): Next state and observation
+    """
+    prev_state, transition_matrix, emission_matrix = carry
+
+    # Sample next state given previous state (using static addresses)
+    next_state = categorical(jnp.log(transition_matrix[prev_state])) @ "state"
+
+    # Sample observation given current state (using static addresses)
+    obs = categorical(jnp.log(emission_matrix[next_state])) @ "obs"
+
+    # New carry includes state and fixed matrices
+    new_carry = (next_state, transition_matrix, emission_matrix)
+
+    return new_carry, obs
+
+
+@gen
 def discrete_hmm_model(
     initial_probs: jnp.ndarray,  # Shape: (K,) - initial state probabilities
     transition_matrix: jnp.ndarray,  # Shape: (K, K) - transition probabilities
@@ -30,7 +56,7 @@ def discrete_hmm_model(
     T: int,  # Time steps
 ):
     """
-    Discrete HMM generative model.
+    Discrete HMM generative model using Scan combinator.
 
     Args:
         initial_probs: Initial state distribution (K states)
@@ -41,29 +67,24 @@ def discrete_hmm_model(
     Returns:
         Sequence of observations
     """
-    states = []
-    observations = []
-
     # Sample initial state
     initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
-    states.append(initial_state)
 
     # Sample initial observation
-    obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
-    observations.append(obs)
+    initial_obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
 
-    # Sample remaining states and observations
-    for t in range(1, T):
-        # Sample next state given previous state
-        prev_state = states[-1]
-        next_state = categorical(jnp.log(transition_matrix[prev_state])) @ f"state_{t}"
-        states.append(next_state)
+    if T == 1:
+        return jnp.array([initial_obs])
 
-        # Sample observation given current state
-        obs = categorical(jnp.log(emission_matrix[next_state])) @ f"obs_{t}"
-        observations.append(obs)
+    # Use Scan for remaining steps
+    scan_fn = Scan(hmm_step, length=T - 1)
+    init_carry = (initial_state, transition_matrix, emission_matrix)
 
-    return jnp.array(observations)
+    final_carry, remaining_obs = scan_fn((init_carry, None)) @ "scan_steps"
+
+    # Combine initial and remaining observations
+    all_obs = jnp.concatenate([jnp.array([initial_obs]), remaining_obs])
+    return all_obs
 
 
 def forward_filter(
@@ -222,7 +243,7 @@ def compute_sequence_log_prob(
     emission_matrix: jnp.ndarray,
 ) -> jnp.ndarray:
     """
-    Compute log probability of a state-observation sequence.
+    Compute log probability of a state-observation sequence using scan.
 
     Args:
         states: State sequence (T,)
@@ -236,18 +257,29 @@ def compute_sequence_log_prob(
     """
     T = len(states)
 
-    # Initial state probability
+    # Initial state and observation probabilities
     log_prob = jnp.log(initial_probs[states[0]])
-
-    # Initial observation probability
     log_prob += jnp.log(emission_matrix[states[0], observations[0]])
 
-    # Transition and emission probabilities
-    for t in range(1, T):
-        log_prob += jnp.log(transition_matrix[states[t - 1], states[t]])
-        log_prob += jnp.log(emission_matrix[states[t], observations[t]])
+    if T == 1:
+        return log_prob
 
-    return log_prob
+    # Use scan for remaining steps
+    def scan_step(carry_log_prob, t):
+        """Accumulate log probabilities for transition and emission."""
+        # Add transition probability
+        transition_log_prob = jnp.log(transition_matrix[states[t - 1], states[t]])
+        # Add emission probability
+        emission_log_prob = jnp.log(emission_matrix[states[t], observations[t]])
+
+        new_log_prob = carry_log_prob + transition_log_prob + emission_log_prob
+        return new_log_prob, new_log_prob
+
+    # Run scan over remaining time steps
+    time_indices = jnp.arange(1, T)
+    final_log_prob, _ = jax.lax.scan(scan_step, log_prob, time_indices)
+
+    return final_log_prob
 
 
 def sample_hmm_dataset(
@@ -274,7 +306,16 @@ def sample_hmm_dataset(
 
     # Extract states and observations from trace
     choices = get_choices(trace)
-    states = jnp.array([choices[f"state_{t}"] for t in range(T)])
     observations = trace.get_retval()
+
+    # Extract states: initial state + states from scan
+    initial_state = choices["state_0"]
+    if T == 1:
+        states = jnp.array([initial_state])
+    else:
+        # Get vectorized states from scan
+        scan_choices = choices["scan_steps"]
+        scan_states = scan_choices["state"]  # This will be a vector of states
+        states = jnp.concatenate([jnp.array([initial_state]), scan_states])
 
     return states, observations

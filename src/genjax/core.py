@@ -1375,6 +1375,37 @@ class Thunk(Generic[X, R], Pytree):
 
 @Pytree.dataclass
 class Vmap(Generic[X, R], GFI[X, R]):
+    """A `Vmap` is a generative function combinator that vectorizes another generative function.
+
+    `Vmap` applies a generative function across a batch dimension, similar to `jax.vmap`,
+    but preserves probabilistic semantics. It uses GenJAX's `modular_vmap` to handle
+    the vectorization of probabilistic computations correctly.
+
+    Mathematical ingredients:
+    - If callee has measure kernel P_callee(dx; args), then Vmap has kernel
+      P_vmap(dX; Args) = ∏_i P_callee(dx_i; args_i) where X = [x_1, ..., x_n]
+    - Return value function f_vmap(X, Args) = [f_callee(x_1, args_1), ..., f_callee(x_n, args_n)]
+    - Internal proposal family inherits from callee's proposal family
+
+    Attributes:
+        gen_fn: The generative function to vectorize
+        in_axes: Specifies which axes to vectorize over (same as jax.vmap)
+        axis_size: Size of the vectorized axis (if not inferrable from inputs)
+        axis_name: Optional name for the vectorized axis
+        spmd_axis_name: Optional SPMD axis name for distributed computation
+
+    Example:
+        >>> from genjax import normal
+        >>>
+        >>> # Vectorize a normal distribution
+        >>> vectorized_normal = normal.vmap(in_axes=(0, None))  # vectorize over first arg
+        >>>
+        >>> mus = jnp.array([0.0, 1.0, 2.0])
+        >>> sigma = 1.0
+        >>> trace = vectorized_normal.simulate((mus, sigma))
+        >>> samples = trace.get_choices()  # Array of 3 normal samples
+    """
+
     gen_fn: GFI[X, R]
     in_axes: int | tuple[int | None, ...] | Sequence[Any] | None = Pytree.static()
     axis_size: int | None = Pytree.static()
@@ -1461,6 +1492,38 @@ class Vmap(Generic[X, R], GFI[X, R]):
 
 @Pytree.dataclass
 class Distribution(Generic[X], GFI[X, X]):
+    """A `Distribution` is a generative function that implements a probability distribution.
+
+    Distributions are the fundamental building blocks of probabilistic programs.
+    They implement the Generative Function Interface (GFI) by wrapping a sampling
+    function and a log probability density function (logpdf).
+
+    Mathematical ingredients:
+    - A measure kernel P(dx; args) over a measurable space X given arguments args
+    - Return value function f(x, args) = x (identity function for distributions)
+    - Internal proposal distribution family Q(dx; args, x') = P(dx; args) (prior)
+
+    Attributes:
+        sample: A sampling function that takes distribution parameters and returns a sample
+        logpdf: A log probability density function that takes (value, *parameters)
+        name: Optional name for the distribution (used in pretty printing)
+
+    Example:
+        >>> import jax.numpy as jnp
+        >>> from genjax import Distribution
+        >>>
+        >>> # Create a custom normal distribution
+        >>> def sample_normal(mu, sigma):
+        ...     key = jax.random.PRNGKey(0)  # In practice, use proper key management
+        ...     return mu + sigma * jax.random.normal(key)
+        >>>
+        >>> def logpdf_normal(x, mu, sigma):
+        ...     return -0.5 * ((x - mu) / sigma)**2 - jnp.log(sigma) - 0.5 * jnp.log(2 * jnp.pi)
+        >>>
+        >>> normal = Distribution(sample_normal, logpdf_normal, name="normal")
+        >>> trace = normal.simulate((0.0, 1.0))  # mu=0.0, sigma=1.0
+    """
+
     sample: Callable[..., X] = Pytree.static()
     logpdf: Callable[..., Weight] = Pytree.static()
     name: str | None = Pytree.static(default=None)
@@ -1719,6 +1782,37 @@ class Fn(
     Generic[R],
     GFI[dict[str, Any], R],
 ):
+    """A `Fn` is a generative function created from a JAX Python function
+    using the `@gen` decorator.
+
+    `Fn` implements the GFI by executing the wrapped function in different execution contexts
+    (handlers) that intercept calls to other generative functions via the `@` addressing syntax.
+
+    Mathematical ingredients:
+    - Measure kernel P(dx; args) defined by the composition of distributions in the function
+    - Return value function f(x, args) defined by the function's logic and return statement
+    - Internal proposal distribution family Q(dx; args, x') defined by ancestral sampling
+
+    The choice space X is a dictionary mapping addresses (strings) to the choices made
+    at those addresses during execution.
+
+    Attributes:
+        source: The original Python function that defines the probabilistic computation
+
+    Example:
+        >>> from genjax import gen, normal
+        >>>
+        >>> @gen
+        >>> def linear_regression(xs):
+        ...     slope = normal(0.0, 1.0) @ "slope"
+        ...     intercept = normal(0.0, 1.0) @ "intercept"
+        ...     noise = normal(0.0, 0.1) @ "noise"
+        ...     return normal(slope * xs + intercept, noise) @ "y"
+        >>>
+        >>> trace = linear_regression.simulate((jnp.array([1.0, 2.0, 3.0]),))
+        >>> choices = trace.get_choices()  # dict with keys "slope", "intercept", "noise", "y"
+    """
+
     source: Callable[..., R] = Pytree.static()
 
     def simulate(
@@ -1840,8 +1934,41 @@ class ScanTr(Generic[X, R], Trace[X, R]):
 
 @Pytree.dataclass
 class Scan(Generic[X, R], GFI[X, R]):
+    """A `Scan` is a generative function combinator that implements sequential iteration.
+
+    `Scan` repeatedly applies a generative function in a sequential loop, similar to
+    `jax.lax.scan`, but preserves probabilistic semantics. The callee function should
+    take (carry, x) as input and return (new_carry, output).
+
+    Mathematical ingredients:
+    - If callee has measure kernel P_callee(dx; carry, x), then Scan has kernel
+      P_scan(dX; init_carry, xs) = ∏_i P_callee(dx_i; carry_i, xs_i)
+      where carry_{i+1} = f_callee(x_i, carry_i, xs_i)[0]
+    - Return value function returns (final_carry, [output_1, ..., output_n])
+    - Internal proposal family inherits from callee's proposal family
+
+    Attributes:
+        callee: The generative function to apply sequentially
+        length: Fixed length for the scan
+
+    Example:
+        >>> from genjax import gen, normal, Scan
+        >>>
+        >>> @gen
+        >>> def step(carry, x):
+        ...     noise = normal(0.0, 0.1) @ "noise"
+        ...     new_carry = carry + x + noise
+        ...     return new_carry, new_carry  # output equals new carry
+        >>>
+        >>> scan_fn = Scan(step)
+        >>> init_carry = 0.0
+        >>> xs = jnp.array([1.0, 2.0, 3.0])
+        >>> trace = scan_fn.simulate((init_carry, xs))
+        >>> final_carry, outputs = trace.get_retval()
+    """
+
     callee: GFI[X, R]
-    length: int | None = Pytree.static()
+    length: int = Pytree.static()
 
     def merge(self, x: X, x_: X):
         return self.callee.merge(x, x_)
@@ -2025,6 +2152,47 @@ class CondTr(Generic[X, R], Trace[X, R]):
 
 @Pytree.dataclass
 class Cond(Generic[X, R], GFI[X, R]):
+    """A `Cond` is a generative function combinator that implements conditional branching.
+
+    `Cond` takes a boolean condition and executes one of two generative functions
+    based on the condition, similar to `jax.lax.cond`, but preserves probabilistic
+    semantics by evaluating both branches and selecting the appropriate one.
+
+    Mathematical ingredients:
+    - If branches have measure kernels P_true(dx; args) and P_false(dx; args), then
+      Cond has kernel P_cond(dx; check, args) = P_true(dx; args) if check else P_false(dx; args)
+    - Return value function f_cond(x, check, args) = f_true(x, args) if check else f_false(x, args)
+    - Internal proposal family selects appropriate branch proposal based on condition
+
+    Note: Both branches are always evaluated during simulation/generation to maintain
+    JAX compatibility, but only the appropriate branch contributes to the final result.
+
+    Attributes:
+        callee: The generative function to execute when condition is True
+        callee_: The generative function to execute when condition is False
+
+    Example:
+        >>> from genjax import gen, normal, exponential, Cond
+        >>>
+        >>> @gen
+        >>> def positive_branch():
+        ...     return exponential(1.0) @ "value"
+        >>>
+        >>> @gen
+        >>> def negative_branch():
+        ...     return exponential(2.0) @ "value"
+        >>>
+        >>> cond_fn = Cond(positive_branch, negative_branch)
+        >>>
+        >>> # Use in a larger model
+        >>> @gen
+        >>> def conditional_model():
+        ...     x = normal(0.0, 1.0) @ "x"
+        ...     condition = x > 0
+        ...     result = cond_fn((condition,)) @ "conditional"
+        ...     return result
+    """
+
     callee: GFI[X, R]
     callee_: GFI[X, R]
 
