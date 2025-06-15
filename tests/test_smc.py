@@ -1,5 +1,5 @@
 """
-Test cases for GenJAX stdlib inference algorithms.
+Test cases for GenJAX SMC inference algorithms.
 
 These tests compare approximate inference algorithms against exact inference
 on discrete HMMs to validate correctness and accuracy.
@@ -10,7 +10,7 @@ import jax.random as jrand
 from genjax.core import Scan
 from genjax.distributions import categorical
 
-from genjax.stdlib import (
+from genjax.smc import (
     importance_sampling,
     default_importance_sampling,
 )
