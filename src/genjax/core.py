@@ -40,6 +40,7 @@ Array = jtyping.Array
 ArrayLike = jtyping.ArrayLike
 FloatArray = jtyping.Float[jtyping.Array, "..."]
 IntArray = jtyping.Int[jtyping.Array, "..."]
+BoolArray = jtyping.Bool[jtyping.Array, "..."]
 Callable = btyping.Callable
 TypeAlias = btyping.TypeAlias
 Sequence = btyping.Sequence
@@ -62,6 +63,7 @@ K = TypeVar("K")
 
 Weight = FloatArray
 Score = FloatArray
+Density = FloatArray
 
 ##########
 # Pytree #
@@ -585,7 +587,7 @@ def assume_binder(
         lowering_msg = (
             "JAX is attempting to lower the `pjax.assume_p` primitive to MLIR. "
             "This will bake a PRNG key into the MLIR code, resulting in deterministic behavior. "
-            "Instead, use `pjax.seed` to transform your function into one which allows keys to be passed in. "
+            "Instead, use `genjax.seed` to transform your function into one which allows keys to be passed in. "
             "You can do this at any level of your computation above the `assume_p` invocation."
         )
         lowering_exception = LoweringSamplePrimitiveToMLIRException(
@@ -1117,7 +1119,7 @@ class Tr(Trace[X, R], Pytree):
         return self._gen_fn
 
     def get_choices(self) -> X:
-        return self._choices
+        return get_choices(self._choices)
 
     def get_args(self) -> Any:
         return self._args
@@ -1136,7 +1138,7 @@ def get_choices(x: Trace[X, R] | X) -> X:
     x = x.get_choices() if isinstance(x, Trace) else x
 
     def _get_choices(x):
-        if isinstance(x, Tr):
+        if isinstance(x, Trace):
             return get_choices(x)
         else:
             return x
@@ -1299,7 +1301,7 @@ class GFI(Generic[X, R], Pytree):
         self,
         args,
         x: X,
-    ) -> Trace[X, R]:
+    ) -> tuple[Density, R]:
         pass
 
     @abstractmethod
@@ -1353,8 +1355,8 @@ class GFI(Generic[X, R], Pytree):
         args: tuple[Any, ...],
         x: X,
     ) -> Score:
-        tr = self.assess(args, x)
-        return -tr.get_score()
+        logp, _ = self.assess(args, x)
+        return logp
 
 
 ########################
@@ -1409,7 +1411,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
         self,
         args,
         x: X,
-    ) -> Tr[X, R]:
+    ) -> tuple[Density, R]:
         return modular_vmap(
             self.gen_fn.assess,
             in_axes=(self.in_axes, 0),
@@ -1480,16 +1482,16 @@ class Distribution(Generic[X], GFI[X, X]):
             tr = self.simulate(args)
             return tr, jnp.array(0.0)
         else:
-            tr = self.assess(args, x)
-            return tr, -tr.get_score()
+            logp, r = self.assess(args, x)
+            return Tr(self, args, x, x, -logp), logp
 
     def assess(
         self,
         args,
         x: X,
-    ) -> Tr[X, X]:
-        log_density = self.logpdf(x, *args)
-        return Tr(self, args, x, x, -log_density)
+    ) -> tuple[Density, X]:
+        logp = self.logpdf(x, *args)
+        return logp, x
 
     def update(
         self,
@@ -1628,8 +1630,7 @@ class Generate:
 @dataclass
 class Assess:
     choice_map: dict[str, Any]
-    trace_map: dict[str, Any]
-    score: Weight
+    logp: Density
 
     def __call__(
         self,
@@ -1639,10 +1640,9 @@ class Assess:
     ) -> R:
         x = self.choice_map[addr]
         x = get_choices(x)
-        tr = gen_fn.assess(args, x)
-        self.score += tr.get_score()
-        self.trace_map[addr] = tr
-        return tr.get_retval()
+        logp, r = gen_fn.assess(args, x)
+        self.logp += logp
+        return r
 
 
 @dataclass
@@ -1752,13 +1752,13 @@ class Fn(
         self,
         args,
         x: dict[str, Any],
-    ) -> Tr[dict[str, Any], R]:
-        handler_stack.append(Assess(x, {}, jnp.array(0.0)))
+    ) -> tuple[Density, R]:
+        handler_stack.append(Assess(x, jnp.array(0.0)))
         r = self.source(*args)
         handler = handler_stack.pop()
         assert isinstance(handler, Assess)
-        score, trace_map = handler.score, handler.trace_map
-        return Tr(self, args, trace_map, r, score)
+        logp = handler.logp
+        return logp, r
 
     def update(
         self,
@@ -1809,9 +1809,181 @@ def gen(fn: Callable[..., R]) -> Fn[R]:
     return Fn(source=fn)
 
 
-##########
-# Markov #
-##########
+########
+# Scan #
+########
+
+
+@Pytree.dataclass
+class ScanTr(Generic[X, R], Trace[X, R]):
+    gen_fn: "Scan[X, R]"
+    args: Any
+    traces: Trace[X, R]  # Vectorized trace
+    final_carry: Any
+    outs: Any
+
+    def get_gen_fn(self) -> "Scan[X, R]":
+        return self.gen_fn
+
+    def get_choices(self) -> X:
+        return self.traces.get_choices()
+
+    def get_args(self) -> Any:
+        return self.args
+
+    def get_retval(self) -> R:
+        return (self.final_carry, self.outs)
+
+    def get_score(self) -> Score:
+        return self.traces.get_score()
+
+
+@Pytree.dataclass
+class Scan(Generic[X, R], GFI[X, R]):
+    callee: GFI[X, R]
+    length: int | None = Pytree.static()
+
+    def merge(self, x: X, x_: X):
+        return self.callee.merge(x, x_)
+
+    def simulate(
+        self,
+        args,
+    ) -> ScanTr[X, R]:
+        init_carry, xs = args
+
+        def scan_fn(carry, x):
+            trace = self.callee.simulate((carry, x))
+            new_carry = trace.get_retval()[0]  # (C, Out) -> C
+            out = trace.get_retval()[1]  # (C, Out) -> Out
+            return new_carry, (trace, out)
+
+        final_carry, (traces, outs) = scan(
+            scan_fn,
+            init_carry,
+            xs,
+            length=self.length,
+        )
+
+        return ScanTr(self, args, traces, final_carry, outs)
+
+    def generate(
+        self,
+        args,
+        x: X | None,
+    ) -> tuple[ScanTr[X, R], Weight]:
+        carry_args, scanned_args = args
+
+        def scan_fn(carry, scanned):
+            (scanned_args, x) = scanned
+            trace, weight = self.callee.generate((carry, scanned_args), x)
+            new_carry = trace.get_retval()[0]
+            scanned_out = trace.get_retval()[1]
+            return new_carry, (trace, scanned_out, weight)
+
+        (final_carry, _), (traces, scanned_outs, weights) = scan(
+            scan_fn,
+            carry_args,
+            (scanned_args, x),
+            length=self.length,
+        )
+
+        total_weight = jnp.sum(weights)
+
+        return ScanTr(self, args, traces, final_carry, scanned_outs), total_weight
+
+    def assess(
+        self,
+        args,
+        x: X,
+    ) -> tuple[Density, R]:
+        carry_args, scanned_args = args
+
+        def scan_fn(carry, scanned):
+            (scanned_args, x) = scanned
+            density, (new_carry, scanned_out) = self.callee.assess(
+                (carry, scanned_args), x
+            )
+            return new_carry, (scanned_out, density)
+
+        final_carry, (scanned_outs, density) = scan(
+            scan_fn,
+            carry_args,
+            (scanned_args, x),
+            length=self.length,
+        )
+        return jnp.sum(density), (final_carry, scanned_outs)
+
+    def update(
+        self,
+        args_,
+        tr: ScanTr[X, R],
+        x_: X,
+    ) -> tuple[ScanTr[X, R], Weight, X | None]:
+        carry_args, scanned_args = args_
+        old_traces = tr.traces
+
+        def scan_fn(carry, scanned_in):
+            input_x, old_trace, new_choice = scanned_in
+            new_trace, weight, discard = self.callee.update(
+                (carry, input_x), old_trace, new_choice
+            )
+            new_carry = new_trace.get_retval()[0]
+            out = new_trace.get_retval()[1]
+            return new_carry, (new_trace, weight, discard, out)
+
+        # Pack xs, old_traces, and x_ together for scan
+        scan_inputs = (
+            (scanned_args, old_traces, x_)
+            if x_ is not None
+            else (scanned_args, old_traces, None)
+        )
+
+        final_carry, (new_traces, weights, discards, outs) = scan(
+            scan_fn,
+            carry_args,
+            scan_inputs,
+            length=self.length,
+        )
+
+        total_weight = jnp.sum(weights)
+
+        new_tr = ScanTr(self, args_, new_traces, final_carry, outs)
+        return new_tr, total_weight, discards
+
+    def regenerate(
+        self,
+        args_,
+        tr: ScanTr[X, R],
+        s: S,
+    ) -> tuple[ScanTr[X, R], Weight, X | None]:
+        init_carry, xs = args_
+        old_traces = tr.traces
+
+        def scan_fn(carry, xs_old_trace):
+            input_x, old_trace = xs_old_trace
+            new_trace, weight, discard = self.callee.regenerate(
+                (carry, input_x),
+                old_trace,
+                s,  # selection applies to all steps
+            )
+            new_carry = new_trace.get_retval()[0]
+            out = new_trace.get_retval()[1]
+            return new_carry, (new_trace, weight, discard, out)
+
+        # Pack xs and old_traces together for scan
+        scan_inputs = (xs, old_traces)
+
+        final_carry, (new_traces, weights, discards, outs) = scan(
+            scan_fn, init_carry, scan_inputs, length=self.length
+        )
+
+        total_weight = jnp.sum(weights)
+        # discards will be vectorized, so we need to handle them appropriately
+        any_discards = jnp.any(jtu.tree_map(lambda x: x is not None, discards))
+
+        new_tr = ScanTr(self, args_, new_traces, final_carry, outs)
+        return new_tr, total_weight, discards if any_discards else None
 
 
 ########
@@ -1822,30 +1994,33 @@ def gen(fn: Callable[..., R]) -> Fn[R]:
 @Pytree.dataclass
 class CondTr(Generic[X, R], Trace[X, R]):
     gen_fn: "Cond[X, R]"
-    idx: IntArray
+    check: BoolArray
     trs: list[Trace[X, R]]
 
     def get_gen_fn(self) -> "GFI[X, R]":
         return self.gen_fn
 
     def get_choices(self) -> X:
-        callee = self.gen_fn.callees[0]
+        callee = self.gen_fn.callee
         chm, chm_ = map(get_choices, self.trs)
-        chm, chm_ = jtu.tree_map(
-            lambda idx, v: jnp.select(idx == self.idx, v, jnp.nan),
-            (0, 1),
-            (chm, chm_),
+        chm = jtu.tree_map(
+            lambda v: jnp.where(self.check, v, jnp.nan),
+            chm,
+        )
+        chm_ = jtu.tree_map(
+            lambda v: jnp.where(self.check, jnp.nan, v),
+            chm_,
         )
         return callee.merge(chm, chm_)
 
     def get_args(self) -> Any:
-        return (self.idx, *self.trs[0].get_args())
+        return (self.check, *self.trs[0].get_args())
 
     def get_retval(self) -> R:
-        return jnp.select(self.idx, map(get_retval, self.trs))
+        return jnp.where(self.check, *map(get_retval, self.trs))
 
     def get_score(self) -> Score:
-        return jnp.select(self.idx, map(get_score, self.trs))
+        return jnp.where(self.check, *map(get_score, self.trs))
 
 
 @Pytree.dataclass
@@ -1853,24 +2028,45 @@ class Cond(Generic[X, R], GFI[X, R]):
     callee: GFI[X, R]
     callee_: GFI[X, R]
 
+    def merge(self, x: X, x_: X):
+        return self.callee.merge(x, x_)
+
     def simulate(
         self,
         args,
-    ) -> Tr[X, R]:
-        (idx, *args) = args
+    ) -> CondTr[X, R]:
+        (check, *args) = args
         tr = self.callee.simulate(args)
         tr_ = self.callee_.simulate(args)
-        return CondTr(self, idx, [tr, tr_])
+        return CondTr(self, check, [tr, tr_])
 
     def assess(
         self,
         args,
         x: X,
-    ) -> tuple[Score, R]:
-        (idx, *args) = args
-        tr = self.callee.assess(args, x)
-        tr_ = self.callee_.assess(args, x)
-        return CondTr(self, idx, [tr, tr_])
+    ) -> tuple[Density, R]:
+        (check, *args) = args
+        logp, r = self.callee.assess(args, x)
+        logp_, r_ = self.callee_.assess(args, x)
+        total_density = jnp.where(check, logp, logp_)
+        retval = jnp.where(check, r, r_)
+        return total_density, retval
+
+    def generate(
+        self,
+        args,
+        x: X | None,
+    ) -> tuple[CondTr[X, R], Weight]:
+        (check, *args) = args
+        if x is None:
+            tr = self.callee.simulate(args)
+            tr_ = self.callee_.simulate(args)
+            return CondTr(self, check, [tr, tr_]), jnp.array(0.0)
+        else:
+            tr, w = self.callee.generate(args, x)
+            tr_, w_ = self.callee_.generate(args, x)
+            total_weight = jnp.where(check, w, w_)
+            return CondTr(self, check, [tr, tr_]), total_weight
 
     def update(
         self,
@@ -1878,12 +2074,12 @@ class Cond(Generic[X, R], GFI[X, R]):
         tr: CondTr[X, R],
         x: X,
     ) -> tuple[Trace[X, R], Weight, X]:
-        (idx, *args) = args
+        (check, *args) = args
         tr, w, discard = self.callee.update(args, tr.trs[0], x)
         tr_, w_, discard_ = self.callee_.update(args, tr.trs[1], x)
         return (
-            CondTr(self, idx, [tr, tr_]),
-            jnp.select(idx, [w, w]),
+            CondTr(self, check, [tr, tr_]),
+            jnp.select(check, [w, w_]),
             self.callee.merge(discard, discard_),
         )
 
@@ -1893,7 +2089,7 @@ class Cond(Generic[X, R], GFI[X, R]):
         tr: CondTr[X, R],
         s: S,
     ) -> tuple[Trace[X, R], Weight, X | None]:
-        (idx, *args) = args
+        (check, *args) = args
         tr, w, discard = self.callee.regenerate(args, tr.trs[0], s)
         tr_, w_, discard_ = self.callee_.regenerate(args, tr.trs[1], s)
         discard = (
@@ -1904,7 +2100,7 @@ class Cond(Generic[X, R], GFI[X, R]):
             else self.callee.merge(discard, discard_)
         )
         return (
-            CondTr(self, idx, [tr, tr_]),
-            jnp.select(idx, [w, w]),
+            CondTr(self, check, [tr, tr_]),
+            jnp.where(check, [w, w_]),
             discard,
         )

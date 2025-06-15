@@ -70,7 +70,7 @@ The design of GenJAX is centered on programmable inference: automation which all
 ### Datatypes: Generative Functions & Traces
 
 - **Generative Function**: A probabilistic program that implements the Generative Function Interface (GFI)
-- **Trace**: A recording of execution containing random choices sampled durng the execution, the arguments of the execution, the return value of the execution, and the score of the execution (the score is `log 1 / P(random choices)`, the reciprocal of the density in logspace).
+- **Trace**: A recording of execution containing random choices sampled during the execution, the arguments of the execution, the return value of the execution, and the score of the execution (the score is `log 1 / P(random choices)`, the reciprocal of the density in logspace).
 
 ### Generative Function Interface
 
@@ -220,7 +220,23 @@ get_choices(trace)["x"]["s"]
 
 Nesting can be applied to arbitrary depths.
 
-#### Generative function combinators
+#### Generative Function Combinators
+
+**IMPORTANT**: Generative function combinators are higher-order generative functions that compose other generative functions (callees) to implement complex probabilistic computations. They implement the GFI by orchestrating calls to their callees' GFI methods.
+
+**Key Combinator Design Principles**:
+
+- **Composition over Implementation**: Combinators don't implement probabilistic primitives directly - they compose existing generative functions
+- **GFI Preservation**: Combinators maintain the GFI contract while transforming execution semantics
+- **JAX Transformation Integration**: Combinators in GenJAX leverage JAX transformations (scan, vmap, cond) while preserving probabilistic semantics
+
+**Examples in GenJAX**:
+
+- `Scan(callee)`: Sequential iteration using `jax.lax.scan`
+- `Vmap(callee)`: Vectorization using `modular_vmap`
+- `Cond(callee1, callee2)`: Conditional branching using `jax.lax.cond`
+
+**Pattern**: `Combinator(callees...).method(args) -> orchestrates callee.method() calls`
 
 ### Programmable inference algorithms
 
@@ -246,6 +262,15 @@ Nesting can be applied to arbitrary depths.
 The codebase uses JAX extensively for automatic differentiation, vectorization, and JIT compilation, with extensions to support generative functions through custom primitive operations.
 
 ## Development Overview
+
+### Code Development Constraints
+
+**IMPORTANT - Documentation Policy**:
+
+- **NEVER create documentation files (.md, README, etc.) unless explicitly requested by the user**
+- Focus on implementation tasks and working code
+- Existing documentation should only be modified when explicitly asked
+- Prefer code comments and docstrings over separate documentation files
 
 ### Key workflows
 
@@ -414,7 +439,105 @@ params_grad = objective.grad_estimate(*params)
 - Can use `jax.jit`, `jax.vmap`, `jax.grad` _on GFI interface invocations_, but not on generative functions (as instances of `GFI`) themselves.
 - (**IMPORTANT**) GenJAX provides a custom version of `vmap` called `modular_vmap`. You should use this version when working with any code which uses generative function interface methods.
 
-### Vectorization
+### GenJAX Constraints
+
+**CRITICAL**: When writing code with GenJAX (inside `@gen` functions, combinators, etc.), you must follow JAX Python restrictions:
+
+**Control Flow**:
+
+- **NEVER use Python `if...else` statements** - these are not JAX-compatible
+- **Use JAX control flow**: `jax.lax.cond`, `jax.lax.switch` for deterministic conditional logic, `jax.lax.scan` for deterministic iterative logic
+- **Use GenJAX combinators**: `Cond(branch1, branch2)` for conditional generative functions, `Scan(callee)` for iterative generative functions
+- **Example Pattern for Conditional Generative Functions**: Extract branches into separate `@gen` functions, then use combinators
+
+**Example - WRONG**:
+
+```python
+@gen
+def bad_conditional():
+    x = normal(0.0, 1.0) @ "x"
+    if x > 0:  # ❌ Python if statement
+        y = exponential(1.0) @ "y"
+    else:
+        y = exponential(2.0) @ "y"
+    return y
+```
+
+**Example - CORRECT**:
+
+```python
+@gen
+def high_branch():
+    return exponential(1.0) @ "y"
+
+@gen  
+def low_branch():
+    return exponential(2.0) @ "y"
+
+@gen
+def good_conditional():
+    x = normal(0.0, 1.0) @ "x"
+    condition = x > 0
+    cond_gf = Cond(high_branch, low_branch)
+    result = cond_gf((condition,)) @ "cond"  # ✅ Use Cond combinator
+    return result
+```
+
+### GenJAX API Patterns
+
+**CRITICAL**: GenJAX generative functionshave specific API patterns that must be followed exactly:
+
+**Generative Function Usage in `@gen` Functions**:
+
+```python
+# ✅ CORRECT: Use @ "address" syntax
+x = normal(mu, sigma) @ "x"
+y = exponential(rate) @ "y" 
+
+# ❌ WRONG: Don't call methods directly
+x = normal(mu, sigma)  # Won't be traced
+```
+
+**Generative Function Density Computations**:
+
+```python
+# ✅ CORRECT: Parameters in first argument as tuple
+log_density, retval = normal.assess((mu, sigma), sample_value)
+log_density, retval = exponential.assess((rate,), sample_value)
+
+# ❌ WRONG: Parameters as constructor arguments  
+log_density, retval = normal(mu, sigma).assess((), sample_value)  # Invalid
+log_density, retval = exponential(rate).assess((), sample_value)  # Invalid
+```
+
+**Testing Pattern**:
+
+```python
+# ✅ CORRECT: For validating densities in tests
+manual_log_density, _ = normal.assess((0.0, 1.0), sample)
+fn_density, _ = my_gen_fn.assess(args, choices)
+assert jnp.allclose(fn_density, manual_log_density)
+
+# ❌ WRONG: Manual density formulas
+manual_log_density = -(sample**2)/2.0 - 0.5*jnp.log(2*jnp.pi)  # Error-prone
+```
+
+### Vectorization and Pytree Usage
+
+**CRITICAL**: All GenJAX datatypes inherit from `Pytree`, enabling automatic JAX vectorization. When implementing combinators or working with collections of traces/choices:
+
+- **DO NOT use Python lists** for storing multiple instances of Pytree-inheriting types
+- **DO use JAX's automatic vectorization** - JAX will vectorize the "leaves" of any Pytree instance via transformations like `jax.vmap` (**IMPORTANT**: prefer `genjax.modular_vmap`) and primitives like `jax.lax.scan`.
+- **Example**: `jax.lax.scan` automatically handles vectorized `Trace` objects when passed in the `xs` argument
+- **Pattern**: Instead of `[trace1, trace2, ...]`, use a single vectorized `Trace` that JAX creates automatically
+
+**Key Principles**:
+
+- Leverage JAX's built-in Pytree vectorization rather than manual list management
+- Trust JAX transformations to handle vectorized probabilistic data structures
+- Avoid overcomplicating implementations that should use JAX's automatic capabilities
+
+### Vectorization Benefits
 
 - Native support for batched operations
 - Automatic vectorization of probabilistic programs
@@ -434,27 +557,100 @@ params_grad = objective.grad_estimate(*params)
 - Consider memory usage for large models
 - Use JAX memory profiling tools
 
-## Sharp Edges & Limitations
-
-### Known Issues
-
-- `vmap` within ADEV `@expectation` programs has undefined semantics
-- Not all gradient estimation strategies support batching
-- Some JAX transformations may not compose cleanly
-
-### Debugging Tips
-
-- Start with simple models and build complexity gradually
-- Use `jax.debug.print()` for debugging inside JIT-compiled code
-- Check trace consistency with `assess()` calls
-
 ## Testing Strategy
 
 ### Unit Tests
 
 - Test individual distributions and combinators
 - Verify GFI method implementations
-- Check gradient estimation accuracy
+
+### Testing Generative Functions
+
+**CRITICAL Testing Patterns**: Always validate probabilistic computations using these specific approaches:
+
+**1. Density Validation Pattern**:
+
+```python
+@gen
+def my_model():
+    x = normal(0.0, 1.0) @ "x"
+    y = exponential(x + 1.0) @ "y"
+    return x + y
+
+def test_my_model():
+    trace = my_model.simulate(())
+    choices = trace.get_choices()
+    
+   # ✅ CORRECT: Use Distribution.assess for access to distribution densities 
+    # Validate using distribution densities
+    x_density, _ = normal.assess((0.0, 1.0), choices["x"])
+    y_density, _ = exponential.assess((choices["x"] + 1.0,), choices["y"])
+    expected_total_density = x_density + y_density
+    
+    # Test assess
+    actual_density, _ = my_model.assess((), choices)
+    assert jnp.allclose(actual_density, expected_total_density)
+    
+    # Test simulate/assess consistency
+    assert jnp.allclose(trace.get_score(), -actual_density)
+```
+
+**2. Nested Function Testing**:
+
+```python
+# Test nested @gen functions with proper choice extraction
+def test_nested_functions():
+    trace = outer_fn.simulate(())
+    choices = trace.get_choices()
+    
+    # Access nested choices correctly
+    x_choice = choices["x"]
+    inner_result = choices["inner_fn_address"]  # Result from inner function
+    
+    # Validate each level separately
+    inner_density, _ = inner_fn.assess(inner_args, inner_choices)
+    outer_density, _ = outer_fn.assess(args, choices)
+```
+
+### Testing Generative Function Combinators
+
+**Key Testing Approach**: Compare combinator implementations against manual JAX implementations to validate correctness.
+
+**Combinator Testing Pattern**:
+
+```python
+# Test Scan against manual jax.lax.scan implementation
+def test_scan_vs_manual():
+    scan_gf = Scan(my_step_function)
+    trace = scan_gf.simulate(args)
+    
+    # Manual implementation using jax.lax.scan
+    def manual_scan_fn(carry, input_and_choice):
+        input_val, choice = input_and_choice
+        # Replicate same logic as my_step_function
+        density, _ = distribution.assess(params, choice)
+        return new_carry, (output, density)
+    
+    manual_carry, (manual_outputs, manual_densities) = jax.lax.scan(
+        manual_scan_fn, init_carry, (inputs, choices)
+    )
+    
+    # Compare results
+    assert jnp.allclose(trace.get_score(), -jnp.sum(manual_densities))
+```
+
+**For density computations**:
+
+- Test `simulate()`: Compare `trace.get_score()` (reciprocal density) against density computations using the `Distribution.logpdf` method
+- Test `assess()`: Compare combinator density against using the same probabilistic logic
+- Test consistency: Verify `simulate_score = -assess_density` for same choices
+
+**Key Principles**:
+
+- **Use `Distribution.assess()`** instead of manual density formulas
+- **Test consistency** between `simulate` and `assess` methods  
+- **Validate combinators** against equivalent JAX implementations
+- **Handle nested addressing** properly in choice extraction
 
 ### Integration Tests
 
@@ -467,6 +663,20 @@ params_grad = objective.grad_estimate(*params)
 - Benchmark against other PPLs
 - Memory usage profiling
 - JIT compilation overhead
+
+## Sharp Edges & Limitations of GenJAX
+
+### Known Issues
+
+- `vmap` within ADEV `@expectation` programs has undefined semantics
+- Not all gradient estimation strategies support batching
+- Some JAX transformations may not compose cleanly
+
+### Debugging Tips
+
+- Start with simple models and build complexity gradually
+- Use `jax.debug.print()` for debugging inside JIT-compiled code
+- Check trace consistency with `assess()` calls
 
 ## Glossary
 
