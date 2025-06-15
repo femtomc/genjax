@@ -23,7 +23,7 @@ beta = tfp_distribution(
 )
 
 categorical = tfp_distribution(
-    tfd.Categorical,
+    lambda logits: tfd.Categorical(logits),
     name="Categorical",
 )
 

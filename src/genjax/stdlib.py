@@ -103,6 +103,65 @@ class ParticleCollection(Pytree):
     def effective_sample_size(self) -> jnp.ndarray:
         return effective_sample_size(self.log_weights)
 
+    def log_marginal_likelihood(self) -> jnp.ndarray:
+        """
+        Estimate log marginal likelihood using importance sampling.
+
+        Returns:
+            Log marginal likelihood estimate using log-sum-exp of importance weights
+        """
+        return jax.scipy.special.logsumexp(self.log_weights) - jnp.log(self.n_samples)
+
+
+def default_importance_sampling(
+    target_gf: GFI[X, R],
+    target_args: tuple,
+    n_samples: int,
+    constraints: X,
+) -> ParticleCollection:
+    """
+    Importance sampling using the target's default internal proposal.
+
+    Uses the target generative function's built-in `generate` method, which
+    uses its default internal proposal to fill in unconstrained choices.
+
+    Args:
+        target_gf: Target generative function (model)
+        target_args: Arguments for target generative function
+        n_samples: Number of importance samples to draw
+        constraints: Dictionary of constrained random choices
+
+    Returns:
+        ParticleCollection with traces, weights, and diagnostics
+    """
+
+    def _single_default_importance_sample(
+        target_gf: GFI[X, R],
+        target_args: tuple,
+        constraints: X,
+    ) -> tuple[Trace[X, R], Weight]:
+        """Single importance sampling step using target's default proposal."""
+        # Use target's generate method with constraints
+        # This will use the target's internal proposal to fill in missing choices
+        target_trace, log_weight = target_gf.generate(target_args, constraints)
+        return target_trace, log_weight
+
+    # Vectorize the single importance sampling step
+    vectorized_sample = modular_vmap(
+        _single_default_importance_sample,
+        in_axes=(None, None, None),
+        axis_size=n_samples,
+    )
+
+    # Run vectorized importance sampling
+    traces, log_weights = vectorized_sample(target_gf, target_args, constraints)
+
+    return ParticleCollection(
+        traces=traces,  # vectorized
+        log_weights=log_weights,
+        n_samples=n_samples,
+    )
+
 
 def _single_importance_sample(
     target_gf: GFI[X, R],

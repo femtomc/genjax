@@ -85,10 +85,7 @@ def discrete_hmm_model_factory(T: int):
         # Use Scan for remaining steps (T is static)
         scan_fn = Scan(hmm_step, length=T - 1)
         init_carry = (initial_state, transition_matrix, emission_matrix)
-        # Create dummy input array for scan (hmm_step doesn't use the input parameter)
-        dummy_inputs = jnp.zeros(T - 1)
-
-        final_carry, remaining_obs = scan_fn(init_carry, dummy_inputs) @ "scan_steps"
+        final_carry, remaining_obs = scan_fn(init_carry, None) @ "scan_steps"
 
         # Combine initial and remaining observations
         all_obs = jnp.concatenate([jnp.array([initial_obs]), remaining_obs])
@@ -294,7 +291,7 @@ def sample_hmm_dataset(
     transition_matrix: jnp.ndarray,
     emission_matrix: jnp.ndarray,
     T: int,
-) -> Tuple[jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, dict]:
     """
     Sample a dataset from the discrete HMM model.
 
@@ -305,7 +302,7 @@ def sample_hmm_dataset(
         T: Number of time steps
 
     Returns:
-        Tuple of (true_states, observations)
+        Tuple of (true_states, observations, constraints)
     """
     # Create HMM model with static length T
     discrete_hmm_model = discrete_hmm_model_factory(T)
@@ -324,4 +321,13 @@ def sample_hmm_dataset(
     scan_states = scan_choices["state"]  # This will be a vector of states
     states = jnp.concatenate([jnp.array([initial_state]), scan_states])
 
-    return states, observations
+    # Create constraints from observations
+    if T == 1:
+        constraints = {"obs_0": observations[0]}
+    else:
+        constraints = {
+            "obs_0": observations[0],
+            "scan_steps": {"obs": observations[1:]},
+        }
+
+    return states, observations, constraints

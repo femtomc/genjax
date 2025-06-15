@@ -587,8 +587,8 @@ def assume_binder(
         lowering_msg = (
             "JAX is attempting to lower the `pjax.assume_p` primitive to MLIR. "
             "This will bake a PRNG key into the MLIR code, resulting in deterministic behavior. "
-            "Instead, use `genjax.seed` to transform your function into one which allows keys to be passed in. "
-            "You can do this at any level of your computation above the `assume_p` invocation."
+            "Instead, use `seed` to transform your function into one which allows keys to be passed in. "
+            "Try and do this as high in the computation graph as you can."
         )
         lowering_exception = LoweringSamplePrimitiveToMLIRException(
             lowering_msg,
@@ -1069,7 +1069,7 @@ def modular_vmap(
 # otherwise, keys are baked in, yielding deterministic results.
 # These flags send warnings / raise exceptions in case this happens.
 enforce_lowering_exception = True
-lowering_warning = True
+lowering_warning = False
 
 #######
 # GFI #
@@ -1684,8 +1684,8 @@ class Generate:
             else None
         )
         tr, weight = gen_fn.generate(args, x)
-        self.weight += weight
         self.score += tr.get_score()
+        self.weight += weight
         self.trace_map[addr] = tr
         return tr.get_retval()
 
@@ -1896,7 +1896,34 @@ class Fn(
         x: dict[str, Any],
         x_: dict[str, Any],
     ) -> dict[str, Any]:
-        return x | x_
+        # Handle recursive merge for nested dictionaries
+        result = {}
+        all_keys = set(x.keys()) | set(x_.keys())
+
+        for key in all_keys:
+            if key in x and key in x_:
+                # Both dictionaries have this key
+                val_x = x[key]
+                val_x_ = x_[key]
+
+                # If both values are dictionaries, recursively merge
+                if isinstance(val_x, dict) and isinstance(val_x_, dict):
+                    result[key] = self.merge(val_x, val_x_)
+                else:
+                    # Conflict: same key but values are not both dictionaries
+                    raise ValueError(
+                        f"Fn.merge detected conflicting values for key '{key}'. "
+                        f"Both proposal and constraints specify this key but values cannot be merged. "
+                        f"Proposal value type: {type(val_x)}, Constraint value type: {type(val_x_)}"
+                    )
+            elif key in x:
+                # Only in proposal
+                result[key] = x[key]
+            else:
+                # Only in constraints
+                result[key] = x_[key]
+
+        return result
 
 
 def gen(fn: Callable[..., R]) -> Fn[R]:
