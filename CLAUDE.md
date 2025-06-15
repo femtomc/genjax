@@ -48,14 +48,18 @@ Trace[X, R].get_gen_fn() -> GFI[X, R] # Source function
 
 ### Distributions
 
-Built-in distributions implement GFI and wrap TensorFlow Probability:
+Built-in distributions implement the GFI and wrap TensorFlow Probability distributions:
 
 ```python
 from genjax import normal, beta, exponential, categorical, flip
 
 # Usage: parameters as args, not constructor arguments
-normal(mu, sigma)  # ✅ CORRECT
-exponential(rate)  # ✅ CORRECT
+x = normal.sample(mu, sigma)        # ✅ CORRECT
+exponential.sample(rate)            # ✅ CORRECT
+logp = normal.logpdf(x, mu, sigma)  # ✅ CORRECT
+
+# Usage: GFI methods, same idea.
+normal.simulate((mu, sigma)) # ✅ CORRECT
 ```
 
 ### `@gen` Functions (`Fn` type)
@@ -71,7 +75,9 @@ def beta_ber():
 # Creates hierarchical addressing through composition
 @gen
 def nested_model():
-    result = simple_model() @ "sub"  # choices["sub"]["inner_address"]
+    result = beta_ber() @ "sub"
+    # choices["sub"]["fairness"]
+    # OR choices["sub"]["obs"]
 ```
 
 ### Combinators
@@ -90,7 +96,7 @@ scan_gf = Scan(step_fn, length=10)
 result = scan_gf((init_carry, None)) @ "scan"
 ```
 
-**Vmap** - Vectorization:
+**Vmap** - Vectorization (like `jax.vmap` for generative functions):
 
 ```python
 # Vectorize over parameters
@@ -123,7 +129,7 @@ x = normal(mu, sigma) @ "x"                    # In @gen functions
 log_density, retval = normal.assess((mu, sigma), sample)  # GFI calls with tuple args
 
 # ❌ WRONG patterns
-x = normal(mu, sigma)                          # Not traced
+x = normal(mu, sigma)                         # Not traced
 x = normal(mu=mu, sigma=sigma) @ "x"          # No kwargs
 normal(mu, sigma).assess((), sample)          # Wrong arg structure
 ```
