@@ -48,43 +48,53 @@ def hmm_step(carry, x):
     return new_carry, obs
 
 
-@gen
-def discrete_hmm_model(
-    initial_probs: jnp.ndarray,  # Shape: (K,) - initial state probabilities
-    transition_matrix: jnp.ndarray,  # Shape: (K, K) - transition probabilities
-    emission_matrix: jnp.ndarray,  # Shape: (K, M) - emission probabilities
-    T: int,  # Time steps
-):
+def discrete_hmm_model_factory(T: int):
     """
-    Discrete HMM generative model using Scan combinator.
+    Factory function to create HMM models with static length.
 
     Args:
-        initial_probs: Initial state distribution (K states)
-        transition_matrix: State transition probabilities (K x K)
-        emission_matrix: Observation emission probabilities (K x M observations)
-        T: Number of time steps
+        T: Number of time steps (must be static, > 1)
 
     Returns:
-        Sequence of observations
+        Generative function for HMM with fixed length T
     """
-    # Sample initial state
-    initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
 
-    # Sample initial observation
-    initial_obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
+    @gen
+    def discrete_hmm_model(
+        initial_probs: jnp.ndarray,  # Shape: (K,) - initial state probabilities
+        transition_matrix: jnp.ndarray,  # Shape: (K, K) - transition probabilities
+        emission_matrix: jnp.ndarray,  # Shape: (K, M) - emission probabilities
+    ):
+        """
+        Discrete HMM generative model using Scan combinator.
 
-    if T == 1:
-        return jnp.array([initial_obs])
+        Args:
+            initial_probs: Initial state distribution (K states)
+            transition_matrix: State transition probabilities (K x K)
+            emission_matrix: Observation emission probabilities (K x M observations)
 
-    # Use Scan for remaining steps
-    scan_fn = Scan(hmm_step, length=T - 1)
-    init_carry = (initial_state, transition_matrix, emission_matrix)
+        Returns:
+            Sequence of observations
+        """
+        # Sample initial state
+        initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
 
-    final_carry, remaining_obs = scan_fn((init_carry, None)) @ "scan_steps"
+        # Sample initial observation
+        initial_obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
 
-    # Combine initial and remaining observations
-    all_obs = jnp.concatenate([jnp.array([initial_obs]), remaining_obs])
-    return all_obs
+        # Use Scan for remaining steps (T is static)
+        scan_fn = Scan(hmm_step, length=T - 1)
+        init_carry = (initial_state, transition_matrix, emission_matrix)
+        # Create dummy input array for scan (hmm_step doesn't use the input parameter)
+        dummy_inputs = jnp.zeros(T - 1)
+
+        final_carry, remaining_obs = scan_fn(init_carry, dummy_inputs) @ "scan_steps"
+
+        # Combine initial and remaining observations
+        all_obs = jnp.concatenate([jnp.array([initial_obs]), remaining_obs])
+        return all_obs
+
+    return discrete_hmm_model
 
 
 def forward_filter(
@@ -261,10 +271,7 @@ def compute_sequence_log_prob(
     log_prob = jnp.log(initial_probs[states[0]])
     log_prob += jnp.log(emission_matrix[states[0], observations[0]])
 
-    if T == 1:
-        return log_prob
-
-    # Use scan for remaining steps
+    # Use scan for remaining steps (assume T > 1)
     def scan_step(carry_log_prob, t):
         """Accumulate log probabilities for transition and emission."""
         # Add transition probability
@@ -300,22 +307,21 @@ def sample_hmm_dataset(
     Returns:
         Tuple of (true_states, observations)
     """
+    # Create HMM model with static length T
+    discrete_hmm_model = discrete_hmm_model_factory(T)
     trace = discrete_hmm_model.simulate(
-        (initial_probs, transition_matrix, emission_matrix, T)
+        (initial_probs, transition_matrix, emission_matrix)
     )
 
     # Extract states and observations from trace
     choices = get_choices(trace)
     observations = trace.get_retval()
 
-    # Extract states: initial state + states from scan
+    # Extract states: initial state + states from scan (assume T > 1)
     initial_state = choices["state_0"]
-    if T == 1:
-        states = jnp.array([initial_state])
-    else:
-        # Get vectorized states from scan
-        scan_choices = choices["scan_steps"]
-        scan_states = scan_choices["state"]  # This will be a vector of states
-        states = jnp.concatenate([jnp.array([initial_state]), scan_states])
+    # Get vectorized states from scan
+    scan_choices = choices["scan_steps"]
+    scan_states = scan_choices["state"]  # This will be a vector of states
+    states = jnp.concatenate([jnp.array([initial_state]), scan_states])
 
     return states, observations

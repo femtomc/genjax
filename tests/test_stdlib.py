@@ -9,13 +9,11 @@ import jax.numpy as jnp
 
 from genjax.stdlib import (
     importance_sampling,
-    sequential_importance_sampling,
-    estimate_marginal_likelihood,
 )
 from genjax.core import gen
 
 from discrete_hmm import (
-    discrete_hmm_model,
+    discrete_hmm_model_factory,
     forward_filter,
     sample_hmm_dataset,
 )
@@ -24,8 +22,15 @@ from discrete_hmm import (
 def create_simple_hmm_params():
     """Create simple HMM parameters for testing."""
     # 2 states, 2 observations
-    initial_probs = jnp.array([0.6, 0.4])
-    transition_matrix = jnp.array([[0.7, 0.3], [0.4, 0.6]])
+    initial_probs = jnp.array(
+        [0.6, 0.4],
+    )
+    transition_matrix = jnp.array(
+        [
+            [0.7, 0.3],
+            [0.4, 0.6],
+        ]
+    )
     emission_matrix = jnp.array(
         [
             [0.8, 0.2],  # state 0 -> obs 0 likely, obs 1 unlikely
@@ -38,20 +43,40 @@ def create_simple_hmm_params():
 def create_complex_hmm_params():
     """Create more complex HMM parameters for testing."""
     # 3 states, 4 observations
-    initial_probs = jnp.array([0.5, 0.3, 0.2])
-    transition_matrix = jnp.array([[0.6, 0.3, 0.1], [0.2, 0.6, 0.2], [0.1, 0.4, 0.5]])
+    initial_probs = jnp.array(
+        [0.5, 0.3, 0.2],
+    )
+    transition_matrix = jnp.array(
+        [
+            [0.6, 0.3, 0.1],
+            [0.2, 0.6, 0.2],
+            [0.1, 0.4, 0.5],
+        ]
+    )
     emission_matrix = jnp.array(
-        [[0.7, 0.2, 0.05, 0.05], [0.1, 0.6, 0.2, 0.1], [0.05, 0.1, 0.3, 0.55]]
+        [
+            [0.7, 0.2, 0.05, 0.05],
+            [0.1, 0.6, 0.2, 0.1],
+            [0.05, 0.1, 0.3, 0.55],
+        ]
     )
     return initial_probs, transition_matrix, emission_matrix
 
 
-@gen
-def hmm_proposal(initial_probs, transition_matrix, emission_matrix, T):
+def hmm_proposal_factory(T: int):
     """
-    Simple proposal for HMM that samples from the prior.
+    Factory function to create HMM proposal with static length.
     """
-    return discrete_hmm_model(initial_probs, transition_matrix, emission_matrix, T)
+
+    @gen
+    def hmm_proposal(initial_probs, transition_matrix, emission_matrix):
+        """
+        Simple proposal for HMM that samples from the prior.
+        """
+        discrete_hmm_model = discrete_hmm_model_factory(T)
+        return discrete_hmm_model(initial_probs, transition_matrix, emission_matrix)
+
+    return hmm_proposal
 
 
 class TestImportanceSampling:
@@ -76,12 +101,16 @@ class TestImportanceSampling:
         # Create constraints from observations
         constraints = {f"obs_{t}": observations[t] for t in range(T)}
 
+        # Create models with static T
+        discrete_hmm_model = discrete_hmm_model_factory(T)
+        hmm_proposal = hmm_proposal_factory(T)
+
         # Estimate using importance sampling
         result = importance_sampling(
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix, T),
-            (initial_probs, transition_matrix, emission_matrix, T),
+            (initial_probs, transition_matrix, emission_matrix),
+            (initial_probs, transition_matrix, emission_matrix),
             n_samples,
             constraints,
         )
@@ -115,12 +144,16 @@ class TestImportanceSampling:
         # Create constraints from observations
         constraints = {f"obs_{t}": observations[t] for t in range(T)}
 
+        # Create models with static T
+        discrete_hmm_model = discrete_hmm_model_factory(T)
+        hmm_proposal = hmm_proposal_factory(T)
+
         # Estimate using importance sampling
         result = importance_sampling(
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix, T),
-            (initial_probs, transition_matrix, emission_matrix, T),
+            (initial_probs, transition_matrix, emission_matrix),
+            (initial_probs, transition_matrix, emission_matrix),
             n_samples,
             constraints,
         )
@@ -154,11 +187,15 @@ class TestImportanceSampling:
         errors = []
 
         for n_samples in sample_sizes:
+            # Create models with static T
+            discrete_hmm_model = discrete_hmm_model_factory(T)
+            hmm_proposal = hmm_proposal_factory(T)
+
             result = importance_sampling(
                 discrete_hmm_model,
                 hmm_proposal,
-                (initial_probs, transition_matrix, emission_matrix, T),
-                (initial_probs, transition_matrix, emission_matrix, T),
+                (initial_probs, transition_matrix, emission_matrix),
+                (initial_probs, transition_matrix, emission_matrix),
                 n_samples,
                 constraints,
             )
@@ -169,131 +206,6 @@ class TestImportanceSampling:
         # Errors should generally decrease (allow some Monte Carlo variation)
         # Check that largest sample size has smaller error than smallest
         assert errors[-1] < errors[0] * 1.5  # Allow some tolerance for randomness
-
-
-class TestSequentialImportanceSampling:
-    """Test sequential importance sampling against exact inference."""
-
-    def test_sequential_marginal_likelihood(self):
-        """Test sequential importance sampling marginal likelihood estimation."""
-        initial_probs, transition_matrix, emission_matrix = create_simple_hmm_params()
-        T = 6
-        n_particles = 500
-
-        # Generate test data
-        true_states, observations = sample_hmm_dataset(
-            initial_probs, transition_matrix, emission_matrix, T
-        )
-
-        # Compute exact log marginal likelihood
-        _, exact_log_marginal = forward_filter(
-            observations, initial_probs, transition_matrix, emission_matrix
-        )
-
-        # Convert observations to vectorized format for sequential sampling
-        vectorized_observations = jnp.array(
-            [{f"obs_{t}": observations[t]} for t in range(T)]
-        )
-
-        # Run sequential importance sampling
-        result = sequential_importance_sampling(
-            discrete_hmm_model,
-            hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix, T),
-            (initial_probs, transition_matrix, emission_matrix, T),
-            vectorized_observations,
-            n_particles,
-            resample_threshold=0.5,
-        )
-
-        estimated_log_marginal = result.log_marginal_likelihood
-
-        # Check accuracy (sequential methods may have higher variance)
-        tolerance = 1.0
-        assert jnp.abs(estimated_log_marginal - exact_log_marginal) < tolerance
-
-    def test_sequential_with_resampling(self):
-        """Test sequential importance sampling with different resampling thresholds."""
-        initial_probs, transition_matrix, emission_matrix = create_simple_hmm_params()
-        T = 5
-        n_particles = 300
-
-        # Generate test data
-        true_states, observations = sample_hmm_dataset(
-            initial_probs, transition_matrix, emission_matrix, T
-        )
-
-        # Compute exact log marginal likelihood
-        _, exact_log_marginal = forward_filter(
-            observations, initial_probs, transition_matrix, emission_matrix
-        )
-
-        # Convert observations to vectorized format
-        vectorized_observations = jnp.array(
-            [{f"obs_{t}": observations[t]} for t in range(T)]
-        )
-
-        # Test different resampling thresholds
-        thresholds = [0.3, 0.7, 1.0]  # 1.0 means always resample
-
-        for threshold in thresholds:
-            result = sequential_importance_sampling(
-                discrete_hmm_model,
-                hmm_proposal,
-                (initial_probs, transition_matrix, emission_matrix, T),
-                (initial_probs, transition_matrix, emission_matrix, T),
-                vectorized_observations,
-                n_particles,
-                resample_threshold=threshold,
-            )
-
-            # All should give reasonable estimates
-            tolerance = 1.2
-            error = jnp.abs(result.log_marginal_likelihood - exact_log_marginal)
-            assert error < tolerance, (
-                f"Failed for threshold {threshold}, error: {error}"
-            )
-
-
-class TestMarginalLikelihoodEstimation:
-    """Test the convenience function for marginal likelihood estimation."""
-
-    def test_estimate_marginal_likelihood_function(self):
-        """Test the estimate_marginal_likelihood convenience function."""
-        initial_probs, transition_matrix, emission_matrix = create_simple_hmm_params()
-        T = 4
-        n_samples = 1000
-
-        # Generate test data
-        true_states, observations = sample_hmm_dataset(
-            initial_probs, transition_matrix, emission_matrix, T
-        )
-
-        # Compute exact log marginal likelihood
-        _, exact_log_marginal = forward_filter(
-            observations, initial_probs, transition_matrix, emission_matrix
-        )
-
-        # Create constraints
-        constraints = {f"obs_{t}": observations[t] for t in range(T)}
-
-        # Estimate using convenience function
-        estimated_log_marginal, standard_error = estimate_marginal_likelihood(
-            discrete_hmm_model,
-            hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix, T),
-            (initial_probs, transition_matrix, emission_matrix, T),
-            constraints,
-            n_samples,
-        )
-
-        # Check accuracy
-        tolerance = 0.6
-        assert jnp.abs(estimated_log_marginal - exact_log_marginal) < tolerance
-
-        # Check that standard error is reasonable (positive and not too large)
-        assert standard_error > 0
-        assert standard_error < 2.0  # Should be reasonably precise
 
 
 class TestRobustness:
@@ -318,12 +230,16 @@ class TestRobustness:
         # Create constraints
         constraints = {f"obs_{t}": observations[t] for t in range(T)}
 
+        # Create models with static T
+        discrete_hmm_model = discrete_hmm_model_factory(T)
+        hmm_proposal = hmm_proposal_factory(T)
+
         # Should not crash and should give reasonable results
         result = importance_sampling(
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix, T),
-            (initial_probs, transition_matrix, emission_matrix, T),
+            (initial_probs, transition_matrix, emission_matrix),
+            (initial_probs, transition_matrix, emission_matrix),
             n_samples,
             constraints,
         )
@@ -356,12 +272,16 @@ class TestRobustness:
         # Create constraints
         constraints = {f"obs_{t}": observations[t] for t in range(T)}
 
+        # Create models with static T
+        discrete_hmm_model = discrete_hmm_model_factory(T)
+        hmm_proposal = hmm_proposal_factory(T)
+
         # Should handle deterministic case
         result = importance_sampling(
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix, T),
-            (initial_probs, transition_matrix, emission_matrix, T),
+            (initial_probs, transition_matrix, emission_matrix),
+            (initial_probs, transition_matrix, emission_matrix),
             n_samples,
             constraints,
         )

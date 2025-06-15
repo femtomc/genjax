@@ -2008,7 +2008,7 @@ class Scan(Generic[X, R], GFI[X, R]):
             scanned_out = trace.get_retval()[1]
             return new_carry, (trace, scanned_out, weight)
 
-        (final_carry, _), (traces, scanned_outs, weights) = scan(
+        final_carry, (traces, scanned_outs, weights) = scan(
             scan_fn,
             carry_args,
             (scanned_args, x),
