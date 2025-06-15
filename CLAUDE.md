@@ -251,7 +251,7 @@ def hierarchical_model(N):
 # Behind the scenes, when you call a GFI method on the Fn (e.g., hierarchical_model.simulate):
 # 1. Pushes a handler onto the handler stack
 # 2. Executes the function body
-# 3. Intercepts @ calls to invoke the GFI method on the callee 
+# 3. Intercepts @ calls to invoke the GFI method on the callee
 # 4. Records state into the handler
 # 5. Pops the handler and returns state associated with the GFI method
 ```
@@ -269,16 +269,16 @@ def hierarchical_model(N):
 def step_function(carry, x):
     """Single step for time series model."""
     prev_state, transition_noise, observation_noise = carry
-    
+
     # State transition
     state = normal(prev_state, transition_noise) @ "state"
-    
+
     # Observation (x is unused input)
     obs = normal(state, observation_noise) @ "obs"
-    
+
     # New carry
     new_carry = (state, transition_noise, observation_noise)
-    
+
     return new_carry, (state, obs)
 
 @gen
@@ -287,23 +287,23 @@ def time_series_model(T):
     initial_state = normal(0.0, 1.0) @ "initial_state"
     transition_noise = exponential(1.0) @ "transition_noise"
     observation_noise = exponential(1.0) @ "observation_noise"
-    
+
     # Initial observation
     initial_obs = normal(initial_state, observation_noise) @ "obs_0"
-    
+
     if T == 1:
         return jnp.array([initial_state]), jnp.array([initial_obs])
-    
+
     # Use Scan for remaining steps
     scan_fn = Scan(step_function, length=T-1)
     init_carry = (initial_state, transition_noise, observation_noise)
-    
+
     final_carry, (states, observations) = scan_fn((init_carry, None)) @ "time_steps"
-    
+
     # Combine initial and remaining
     all_states = jnp.concatenate([jnp.array([initial_state]), states])
     all_obs = jnp.concatenate([jnp.array([initial_obs]), observations])
-    
+
     return all_states, all_obs
 
 # ❌ WRONG: Never use Python for loops
@@ -471,7 +471,7 @@ def parameterized_model(mu, sigma):
 
 # When using axis_size, all arguments must be broadcast
 fixed_params_vmap = Vmap(
-    parameterized_model, 
+    parameterized_model,
     in_axes=(None, None),  # Broadcast both parameters
     axis_size=5            # Generate 5 samples with same parameters
 )
@@ -507,7 +507,7 @@ traces = mixed_vmap.simulate((mus, 1.0))
 def positive_branch():
     return exponential(1.0) @ "value"
 
-@gen  
+@gen
 def negative_branch():
     return exponential(2.0) @ "value"
 
@@ -535,7 +535,7 @@ def low_noise_branch(mu):
 def adaptive_noise_model(data_quality):
     mu = normal(0.0, 1.0) @ "mu"
     use_high_noise = data_quality < 0.5
-    
+
     cond_fn = Cond(high_noise_branch, low_noise_branch)
     observation = cond_fn((use_high_noise, mu)) @ "obs"
     return observation
@@ -606,7 +606,7 @@ vectorized_y = vectorized_choices["y"]  # Array: [y_1, y_2, y_3, ...]
 def branch_a():
     return exponential(1.0) @ "value"
 
-@gen  
+@gen
 def branch_b():
     return exponential(2.0) @ "value"
 
@@ -634,12 +634,12 @@ selected_value = cond_choices["value"]  # Value from whichever branch was select
 ```python
 # ✅ CORRECT: Use @ "address" syntax
 x = normal(mu, sigma) @ "x"
-y = exponential(rate) @ "y" 
+y = exponential(rate) @ "y"
 
 # ❌ WRONG: Don't call methods directly
 x = normal(mu, sigma)  # Won't be traced
 
-# ❌ WRONG: Can't use kwargs 
+# ❌ WRONG: Can't use kwargs
 x = normal(mu=mu, sigma=sigma) @ "x"
 ```
 
@@ -650,7 +650,7 @@ x = normal(mu=mu, sigma=sigma) @ "x"
 log_density, retval = normal.assess((mu, sigma), sample_value)
 log_density, retval = exponential.assess((rate,), sample_value)
 
-# ❌ WRONG: Argument parameters as constructor arguments  
+# ❌ WRONG: Argument parameters as constructor arguments
 log_density, retval = normal(mu, sigma).assess((), sample_value)  # Invalid
 log_density, retval = exponential(rate).assess((), sample_value)  # Invalid
 ```
@@ -668,7 +668,7 @@ def jax_compatible_function(x):
         lambda x: x * 2,      # true branch
         lambda x: x * -1      # false branch
     )
-    
+
     # Use JAX operations
     return jnp.exp(result) + jnp.log(jnp.abs(x) + 1e-8)
 
@@ -678,12 +678,12 @@ def non_jax_function(x):
         result = x * 2
     else:
         result = x * -1
-    
+
     # Python list operations - not JAX compatible
     results = []
     for i in range(len(x)):  # Python for loop with dynamic length
         results.append(x[i] * 2)
-    
+
     return results  # Python list, not JAX array
 ```
 
@@ -709,7 +709,7 @@ def my_model():
 
 trace = my_model.simulate(())
 
-# GenJAX compiles this to a program with PJAX primitives that 
+# GenJAX compiles this to a program with PJAX primitives that
 # looks conceptually like:
 def my_model_pjax():
     x = assume_p(normal_sampler, 0.0, 1.0)  # Sampling primitive
@@ -734,7 +734,7 @@ def my_model():
     y = normal(x, 0.5) @ "y"
     return y
 
-# Original function uses assume_p primitives 
+# Original function uses assume_p primitives
 # When executing this code, a global key is evolved
 # in the background
 trace = my_model.simulate(())
@@ -820,6 +820,100 @@ batch_model = modular_vmap(model.simulate, in_axes=(0,))
 - **Vmap Transformation**: The `modular_vmap` function handles PJAX primitives correctly during vectorization, unlike standard `jax.vmap` which doesn't understand probabilistic operations
 - **Seed Transformation**: The `seed` function eliminates `assume_p` primitives by providing explicit PRNG keys
 
+### PJAX Primitive Lowering and the `seed` Transformation
+
+**CRITICAL**: When PJAX primitives (`assume_p`, `log_density_p`) are used inside JAX transformations like `jax.lax.scan`, `jax.lax.cond`, or when JAX attempts to compile the code, you may encounter `LoweringSamplePrimitiveToMLIRException`:
+
+```
+genjax.core.LoweringSamplePrimitiveToMLIRException: JAX is attempting to lower the `pjax.assume_p` primitive to MLIR. This will bake a PRNG key into the MLIR code, resulting in deterministic behavior. Instead, use `seed` to transform your function into one which allows keys to be passed in.
+```
+
+**When This Occurs**:
+
+- Generative functions with PJAX primitives are called inside `jax.lax.scan`, `jax.lax.cond`, or other JAX control flow
+- JAX is trying to compile/JIT code containing PJAX primitives
+- Code with PJAX primitives is used in contexts where JAX needs to lower to MLIR
+
+**Solution Pattern**:
+
+```python
+# ❌ PROBLEMATIC: PJAX primitives inside JAX transformations
+@gen
+def model_with_scan():
+    scan_fn = Scan(step_function, length=T)  # Contains PJAX primitives
+    result = scan_fn(args) @ "scan"
+    return result
+
+# This will fail when JAX tries to compile:
+trace = model_with_scan.simulate(())
+
+# ✅ CORRECT: Use seed transformation
+seeded_model = seed(model_with_scan.simulate)
+key = jrand.key(42)
+trace = seeded_model(key, ())
+
+# ✅ CORRECT: Apply seed at the highest level possible
+def run_inference():
+    model = discrete_hmm_model_factory(T)
+    return default_importance_sampling(model, args, n_samples, constraints)
+
+seeded_inference = seed(run_inference)
+result = seeded_inference(key)
+```
+
+### Static vs Dynamic Arguments in JAX Transformations
+
+**CRITICAL**: JAX transformations like `seed` treat all function arguments as dynamic (traceable) by default. However, some GenJAX operations require static (compile-time constant) values:
+
+**Common Static Requirements**:
+
+- `Scan(callee, length=N)` - `length` must be a static integer
+- `Vmap(callee, axis_size=N)` - `axis_size` must be a static integer
+- Factory functions like `discrete_hmm_model_factory(T)` - `T` must be static
+
+**Problem Pattern**:
+
+```python
+# ❌ PROBLEMATIC: Static values become tracers
+def inference_function(T, n_samples, model_args):
+    model = discrete_hmm_model_factory(T)  # T becomes a tracer!
+    return default_importance_sampling(model, model_args, n_samples, constraints)
+
+# This will fail because T is now a DynamicJaxprTracer, not an int
+seeded_inference = seed(inference_function)
+result = seeded_inference(key, T, n_samples, model_args)
+```
+
+**Solution: Use Closures to Capture Static Values**:
+
+```python
+# ✅ CORRECT: Create closures that capture static values
+T = 5  # Static
+n_samples = 1000  # Static
+
+def inference_closure(model_args, constraints):
+    model = discrete_hmm_model_factory(T)  # T is captured as static
+    return default_importance_sampling(model, model_args, n_samples, constraints)
+
+# Now seed only sees the dynamic arguments
+seeded_inference = seed(inference_closure)
+result = seeded_inference(key, model_args, constraints)
+
+# Example with data generation:
+def sample_data_closure(initial_probs, transition_matrix, emission_matrix):
+    return sample_hmm_dataset(initial_probs, transition_matrix, emission_matrix, T)
+
+seeded_sampler = seed(sample_data_closure)
+data = seeded_sampler(key, initial_probs, transition_matrix, emission_matrix)
+```
+
+**Key Principles**:
+
+- Identify which arguments must remain static (typically array dimensions, loop lengths)
+- Create closures that capture static values from the enclosing scope
+- Apply `seed` to the closure, not the original function
+- Use separate keys for different seeded operations (`jrand.split(key)`)
+
 ### GenJAX Constraints
 
 **CRITICAL**: When writing code with GenJAX (inside `@gen` functions, combinators, etc.), you must follow JAX Python restrictions. Violating these constraints will typically cause compilation errors or incorrect behavior.
@@ -861,7 +955,7 @@ def bad_iteration(T):
 def high_branch():
     return exponential(1.0) @ "y"
 
-@gen  
+@gen
 def low_branch():
     return exponential(2.0) @ "y"
 
@@ -1031,17 +1125,17 @@ def my_model():
 def test_my_model():
     trace = my_model.simulate(())
     choices = trace.get_choices()
-    
-   # ✅ CORRECT: Use Distribution.assess for access to distribution densities 
+
+   # ✅ CORRECT: Use Distribution.assess for access to distribution densities
     # Validate using distribution densities
     x_density, _ = normal.assess((0.0, 1.0), choices["x"])
     y_density, _ = exponential.assess((choices["x"] + 1.0,), choices["y"])
     expected_total_density = x_density + y_density
-    
+
     # Test assess
     actual_density, _ = my_model.assess((), choices)
     assert jnp.allclose(actual_density, expected_total_density)
-    
+
     # Test simulate/assess consistency
     assert jnp.allclose(trace.get_score(), -actual_density)
 ```
@@ -1053,11 +1147,11 @@ def test_my_model():
 def test_nested_functions():
     trace = outer_fn.simulate(())
     choices = trace.get_choices()
-    
+
     # Access nested choices correctly
     x_choice = choices["x"]
     inner_result = choices["inner_fn_address"]  # Result from inner function
-    
+
     # Validate each level separately
     inner_density, _ = inner_fn.assess(inner_args, inner_choices)
     outer_density, _ = outer_fn.assess(args, choices)
@@ -1074,18 +1168,18 @@ def test_nested_functions():
 def test_scan_vs_manual():
     scan_gf = Scan(my_step_function)
     trace = scan_gf.simulate(args)
-    
+
     # Manual implementation using jax.lax.scan
     def manual_scan_fn(carry, input_and_choice):
         input_val, choice = input_and_choice
         # Replicate same logic as my_step_function
         density, _ = distribution.assess(params, choice)
         return new_carry, (output, density)
-    
+
     manual_carry, (manual_outputs, manual_densities) = jax.lax.scan(
         manual_scan_fn, init_carry, (inputs, choices)
     )
-    
+
     # Compare results
     assert jnp.allclose(trace.get_score(), -jnp.sum(manual_densities))
 ```
@@ -1099,7 +1193,7 @@ def test_scan_vs_manual():
 **Key Principles**:
 
 - **Use `Distribution.assess()`** instead of manual density formulas
-- **Test consistency** between `simulate` and `assess` methods  
+- **Test consistency** between `simulate` and `assess` methods
 - **Validate combinators** against equivalent JAX implementations
 - **Handle nested addressing** properly in choice extraction
 
@@ -1110,6 +1204,32 @@ def test_scan_vs_manual():
 - `vmap` within ADEV `@expectation` programs has undefined semantics
 - Not all gradient estimation strategies support batching
 - Some JAX transformations may not compose cleanly
+
+### Common GenJAX Error Patterns and Solutions
+
+**1. `LoweringSamplePrimitiveToMLIRException`**
+
+```
+genjax.core.LoweringSamplePrimitiveToMLIRException: JAX is attempting to lower the `pjax.assume_p` primitive to MLIR.
+```
+
+**Cause**: PJAX primitives inside JAX control flow (`jax.lax.scan`, `jax.lax.cond`) or JIT compilation.
+
+**Solution**: Apply `seed` transformation to eliminate PJAX primitives:
+
+```python
+# Instead of: problematic_function()
+seeded_function = seed(problematic_function)
+result = seeded_function(key, *args)
+```
+
+**General Debugging Strategy**:
+
+1. Identify where PJAX primitives are used (inside `@gen` functions, distribution calls)
+2. Trace the call stack to find JAX transformations (`scan`, `cond`, `vmap`, `jit`)
+3. Apply `seed` at the highest level that encompasses the problematic code
+4. Use closures for any static values that must not become tracers
+5. Split keys appropriately for multiple seeded operations
 
 ## Glossary
 
