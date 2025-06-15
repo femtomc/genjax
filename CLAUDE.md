@@ -2,1252 +2,248 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation Policy
+
+- **NEVER create documentation files** unless explicitly requested
+- Focus on implementation tasks and working code
+
 ## Overview
 
-GenJAX is a probabilistic programming language embedded in Python centered on programmable inference: automation which allows users of GenJAX to express and customize Bayesian inference algorithms.
+GenJAX is a probabilistic programming language embedded in Python centered on programmable inference.
 
-## Development Constraints
+## Core Concepts
 
-### Documentation Policy
+### Generative Functions & Traces
 
-**CRITICAL - Documentation Policy**:
+- **Generative Function**: Probabilistic program implementing the Generative Function Interface (GFI)
+- **Trace**: Execution record containing random choices, arguments, return value, and score (`log 1/P(choices)`)
 
-- **NEVER create documentation files (.md, README, etc.) unless explicitly requested by the user**
-- **NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User**
-- Focus on implementation tasks and working code
-- Existing documentation should only be modified when explicitly asked
-- Prefer code comments and docstrings over separate documentation files
+### Generative Function Interface (GFI)
 
-## Key concepts
+**Mathematical Foundation**: Generative functions bundle:
 
-### Datatypes: Generative Functions & Traces
+- Measure kernel $P(dx; a \in A)$ over measurable space $X$ (the model distribution)
+- Function $f(x, a \in A) \rightarrow R$ (return value function)
+- Proposal family $Q(dx; a \in A, x' \in X')$ (internal proposals)
 
-- **Generative Function**: A probabilistic program that implements the Generative Function Interface (GFI)
-- **Trace**: A recording of execution containing random choices sampled during the execution, the arguments of the execution, the return value of the execution, and the score of the execution (the score is `log 1 / P(random choices)`, the reciprocal of the density in logspace).
-
-### Generative Function Interface
-
-Generative functions are probabilistic programs which bundle together a set of probabilistic ingredients (measures and deterministic functions), and expose a computational interface that provides automation for doing computations with those ingredients.
-
-In the following, we use tags:
-
-- (**MATH**) indicates a description in terms of the abstract mathematical ingredients.
-
-The (**MATH**) ingredients of generative functions are as follows:
-
-- A measure kernel $P(dx; a \in A)$ over a measurable space $X$ given arguments $a \in A$ (informally called: the `P` distribution).
-- A measurable function $f(x, a \in A) \rightarrow R$ (informally called: the return value function).
-- An indexed family of measure kernels $Q(dX; a \in A, x' \in X')$ given arguments $A$ and sample $x' \in X' \subset X$ (informally called _the internal proposal distribution family_)
-
-#### Computational Interface
-
-The generative function interface, or GFI, is the set of interface methods for working with generative functions and traces. The definition of `GFI` and `Trace` is given in `src/core.py`.
-
-Below, we enumerate the list of interfaces, with their signatures. We use GenJAX Python types: `X` is the Python type of "random samples" (**MATH**: the measurable space $X$) and `R` is the type of "return values" (**MATH**: the measurable space $R$).
-
-**Computational Interface on the type `GFI`**
-
-- **simulate**
-
-   ```python
-   GFI[X, R].simulate(args: tuple) -> Trace[X, R]
-   ```
-
-  Given `args: A`, sample a sample `x : X`, evaluate `log (1 / P(x; args))`, and the return value function `f(x, args)`. Store these values in a `Trace[X, R]` and return it.
-- **assess**
-
-   ```python
-   GFI[X, R].assess(args: tuple, x: X) -> tuple[Density, R]
-   ```
-
-  Given `args: A` and sample `x : X`, evaluate the log density `log P(x; args)` and the return value function. Returns the log density and the value of the return value function.
-- **generate**
-
-   ```python
-   GFI[X, R].generate(args: tuple, x: X_) -> tuple[Trace[X, R], Weight]
-   ```
-
-  Given `args: A` and sample `x_ : X_`, sample a complete sample `x : X` using `Q(dx; x_, args)` (the internal proposal distribution family) and evaluate the density for the `P` distribution at `x` and the density ratio `P(x; args) / Q(x; x_, args)`.
-- **update**
-
-   ```python
-   GFI[X, R].update(args: tuple, trace: Trace[X, R], x_: X_) -> tuple[Trace[X, R], Weight, X_]
-   ```
-
-- **regenerate**
-
-   ```python
-   GFI[X, R].regenerate(args: tuple, trace: Trace[X, R], s: Sel) -> tuple[Trace[X, R], Weight, X_]
-   ```
-
-**Methods on the type `Trace`**
-
-- **get_retval**
-
-   ```python
-   Trace[X, R].get_retval() -> R
-   ```
-
-   Get the return value for the execution that produced the trace.
-- **get_gen_fn**
-
-   ```python
-   Trace[X, R].get_gen_fn() -> GFI[X, R]
-   ```
-
-  Get the GFI which the trace was created from.
-- **get_args**
-
-   ```python
-   Trace[X, R].get_args() -> tuple
-   ```
-
-  Get the arguments for the execution which created the trace.
-- **get_choices**
-
-   ```python
-   Trace[X, R].get_choices() -> X
-   ```
-
-  Get the traced random choices of the execution that produced the trace.
-- **get_score**
-
-   ```python
-   Trace[X, R].get_score() -> Score
-   ```
-
-  Get the score of the execution.
-
-### Generative Function Languages
-
-#### Distributions: Probabilistic Building Blocks
-
-**IMPORTANT**: Distributions are generative functions that implement a `sample` and `logpdf` interface (the interface of probability distributions). They are the fundamental building blocks of probabilistic programs in GenJAX.
-
-**Key Concepts**:
-
-- **Distributions are Generative Functions**: Every distribution implements the GFI (simulate, assess, generate, update, regenerate)
-- **Wrapper for TensorFlow Probability distributions**: Most distributions wrap TensorFlow Probability distributions for robustness and reliability
-- **Parameter Convention**: Distribution parameters are passed as arguments to the GFI methods, not as constructor arguments
-
-**Common Distributions**:
+**GFI Methods**:
 
 ```python
-from genjax import normal, beta, categorical, exponential, uniform, bernoulli
+# Core interface (defined in src/core.py)
+GFI[X, R].simulate(args: tuple) -> Trace[X, R]                    # Sample execution
+GFI[X, R].assess(args: tuple, x: X) -> tuple[Density, R]          # Evaluate density
+GFI[X, R].generate(args: tuple, x: X_) -> tuple[Trace[X, R], Weight]
+GFI[X, R].update(args: tuple, trace: Trace[X, R], x_: X_) -> tuple[Trace[X, R], Weight, X_]
+GFI[X, R].regenerate(args: tuple, trace: Trace[X, R], s: Sel) -> tuple[Trace[X, R], Weight, X_]
 
-# Continuous distributions
-normal(mu, sigma)              # Normal(mu, sigma)
-beta(alpha, beta_param)        # Beta(alpha, beta)
-exponential(rate)              # Exponential(rate)
-uniform(low, high)             # Uniform(low, high)
-
-# Discrete distributions
-flip(p)                        # Bernoulli(p)
-categorical(logits)            # Categorical(logits)
+# Trace methods
+Trace[X, R].get_retval() -> R         # Return value
+Trace[X, R].get_choices() -> X        # Random choices
+Trace[X, R].get_score() -> Score      # log(1/P(choices))
+Trace[X, R].get_args() -> tuple       # Arguments
+Trace[X, R].get_gen_fn() -> GFI[X, R] # Source function
 ```
 
-**Custom Distributions**:
+## Generative Function Types
+
+### Distributions
+
+Built-in distributions implement GFI and wrap TensorFlow Probability:
 
 ```python
-from genjax import distribution, tfp_distribution
-import tensorflow_probability.substrates.jax as tfp
+from genjax import normal, beta, exponential, categorical, flip
 
-# Method 1: Using tfp_distribution wrapper
-student_t = tfp_distribution(
-    lambda df, loc, scale: tfp.distributions.StudentT(df, loc, scale),
-    name="student_t"
-)
-
-# Method 2: Custom distribution from scratch
-def custom_sampler(key, a, b):
-    # Custom sampling logic
-    return a + b * jax.random.normal(key)
-
-def custom_logpdf(x, a, b):
-    # Custom log probability density
-    return -0.5 * ((x - a) / b)**2 - jnp.log(b)
-
-custom_dist = distribution(custom_sampler, custom_logpdf, name="custom")
-
-# Usage in @gen functions
-@gen
-def model_with_custom():
-    x = student_t(3.0, 0.0, 1.0) @ "x"
-    y = custom_dist(0.0, 1.0) @ "y"
-    return x + y
+# Usage: parameters as args, not constructor arguments
+normal(mu, sigma)  # ✅ CORRECT
+exponential(rate)  # ✅ CORRECT
 ```
 
-#### `Fn` Generative Functions
+### `@gen` Functions (`Fn` type)
 
-**IMPORTANT**: The `@gen` decorator is GenJAX's primary mechanism for creating `Fn` generative functions from JAX-compatible Python programs. `Fn` is the core generative function type that implements complex probabilistic models through function composition.
-
-**What `@gen` Does**:
-
-- **Transforms JAX Python Functions**: Converts ordinary JAX-compatible Python functions into `Fn` generative functions that implement the full GFI
-- **Enables Probabilistic Addressing**: Adds the `@` operator for addressing the random choices made by distributions and other generative functions
-
-##### `@gen` Decorator: Transform JAX-Compatible Python Functions into `Fn`
+Transform JAX-compatible Python functions into generative functions:
 
 ```python
-import jax.numpy as jnp
-from genjax import beta, flip, gen
-
-# Example: beta-bernoulli model
 @gen
 def beta_ber():
-    # define the hyperparameters that control the Beta prior
-    alpha0 = jnp.array(10.0)
-    beta0 = jnp.array(10.0)
-    # sample f from the Beta prior
-    f = beta(alpha0, beta0) @ "latent_fairness"
+    f = beta(10.0, 10.0) @ "fairness"  # @ operator for addressing
     return flip(f) @ "obs"
 
-# The @gen decorator creates an Fn generative function
-print(type(beta_ber))  # <class 'genjax.core.Fn'>
-```
-
-**More on String Addressing**
-
-Within `@gen` functions, the `@` operator creates addressed random choices. This addressing system enables generative functions to communicate (as proposals or variational guides) via dictionary samples.
-
-```python
-from genjax import gen, normal
-
-# Example: 1-level addressing
-@gen
-def simple_model():
-   # The @ operator creates an addressed random choice
-   x = normal(0.0, 1.0) @ "x"  # "x" is the address
-   return x
-
-# Example: nested addressing through function composition
+# Creates hierarchical addressing through composition
 @gen
 def nested_model():
-   # Calling another @gen function creates nested addressing
-   v = simple_model() @ "s" # "s" is the address for the sub-model
-
-# Get a trace by using the Fn's simulate method
-trace = nested_model.simulate(())
-
-# The nesting creates hierarchical addressing
-# Access: choices["address_in_outer"]["address_in_inner"]
-choices = get_choices(trace)
-inner_x = choices["s"]  # This gets the sample from simple_model, a choice map
-# For the actual value: choices["s"]["x"] gives the value
+    result = simple_model() @ "sub"  # choices["sub"]["inner_address"]
 ```
 
-**How `Fn` Works Internally**:
+### Combinators
 
-```python
-# When you call a @gen function, it uses handler stacks to intercept @ calls
-@gen
-def hierarchical_model(N):
-    # Handler intercepts these @ calls and manages the trace
-    mu = normal(0.0, 1.0) @ "mu"
-    sigma = exponential(1.0) @ "sigma"
-    obs = normal.repeat(n=10)(mu, sigma) @ "obs"
-    return obs
+Higher-order generative functions that compose other generative functions:
 
-# Behind the scenes, when you call a GFI method on the Fn (e.g., hierarchical_model.simulate):
-# 1. Pushes a handler onto the handler stack
-# 2. Executes the function body
-# 3. Intercepts @ calls to invoke the GFI method on the callee
-# 4. Records state into the handler
-# 5. Pops the handler and returns state associated with the GFI method
-```
-
-**Advanced `Fn` Patterns**:
-
-```python
-# CRITICAL: Prioritize never using Python for loops in @gen functions
-# Use `jax.vmap` for deterministic vectorization
-# Use Vmap combinator for generative vectorization
-# Use `jax.lax.scan` for deterministic iteration
-# Use Scan combinator for any generative iteration
-
-@gen
-def step_function(carry, x):
-    """Single step for time series model."""
-    prev_state, transition_noise, observation_noise = carry
-
-    # State transition
-    state = normal(prev_state, transition_noise) @ "state"
-
-    # Observation (x is unused input)
-    obs = normal(state, observation_noise) @ "obs"
-
-    # New carry
-    new_carry = (state, transition_noise, observation_noise)
-
-    return new_carry, (state, obs)
-
-@gen
-def time_series_model(T):
-    # Priors
-    initial_state = normal(0.0, 1.0) @ "initial_state"
-    transition_noise = exponential(1.0) @ "transition_noise"
-    observation_noise = exponential(1.0) @ "observation_noise"
-
-    # Initial observation
-    initial_obs = normal(initial_state, observation_noise) @ "obs_0"
-
-    if T == 1:
-        return jnp.array([initial_state]), jnp.array([initial_obs])
-
-    # Use Scan for remaining steps
-    scan_fn = Scan(step_function, length=T-1)
-    init_carry = (initial_state, transition_noise, observation_noise)
-
-    final_carry, (states, observations) = scan_fn((init_carry, None)) @ "time_steps"
-
-    # Combine initial and remaining
-    all_states = jnp.concatenate([jnp.array([initial_state]), states])
-    all_obs = jnp.concatenate([jnp.array([initial_obs]), observations])
-
-    return all_states, all_obs
-
-# ❌ WRONG: Never use Python for loops
-@gen
-def bad_time_series(T):
-    states = []
-    for t in range(T):  # This will typically break JAX compilation!
-        state = normal(0.0, 1.0) @ f"state_{t}"
-        states.append(state)
-    return states
-
-# ✅ CORRECT: Always use Scan for iteration
-# (See time_series_model above)
-```
-
-**`Fn` Trace Structure**:
-
-```python
-# Fn traces have choice_type X = dict[str, Any]
-trace = time_series_model.simulate((5,))  # 5 time steps
-choices = get_choices(trace)
-
-# Choices is a dictionary with string keys
-initial = choices["initial_state"]      # Float
-transition = choices["transition_noise"] # Float
-states = [choices["time_steps"]["state"][t] for t in range(1, 5)]  # List of floats
-observations = [choices["time_steps"]["obs"][t] for t in range(1, 5)]  # List of floats
-```
-
-**Key Principles**:
-
-- **Static Structure**: The addressing structure must be statically determinable
-- **JAX Compatibility**: Use JAX operations, not Python operations for dynamic computation
-- **Deterministic Execution**: The function should execute the same sequence of @ calls given the same arguments (before randomness)
-
-Nesting can be applied to arbitrary depths, creating complex hierarchical models while maintaining the benefits of JAX transformations.
-
-#### Generative Function Combinators
-
-**IMPORTANT**: Generative function combinators are higher-order generative functions that compose other generative functions (callees) to implement complex probabilistic computations. They implement the GFI by orchestrating calls to their callees' GFI methods.
-
-**Key Combinator Design Principles**:
-
-- **Composition over Implementation**: Combinators don't implement probabilistic primitives directly - they compose existing generative functions
-- **GFI Preservation**: Combinators maintain the GFI contract while transforming execution semantics
-- **JAX Transformation Integration**: Combinators in GenJAX leverage JAX transformations (scan, vmap, cond) while preserving probabilistic semantics
-
-**Examples in GenJAX**:
-
-- `Scan`: Sequential iteration for generative functions akin to `jax.lax.scan`
-- `Vmap`: Vectorization for generative functions using `genjax.modular_vmap`
-- `Cond`: Conditional branching for generative functions akin to `jax.lax.cond`
-
-**Pattern**: `Combinator(*callees, **kwargs).method(args) -> orchestrates callee.method() calls`
-
-##### Scan Combinator Usage
-
-**CRITICAL**: The `Scan` combinator has specific addressing and input requirements that must be followed exactly:
-
-**Static Addressing Only**:
-
-```python
-# ❌ WRONG: Dynamic addressing in scan
-@gen
-def bad_scan_step(carry, t):
-    x = normal(0.0, 1.0) @ f"x_{t}"  # Dynamic address - will break!
-    return carry + x, x
-
-# Will break!
-# bad_scan_step.scan(length=10).simulate((1.0, jnp.arange(10)))
-
-# ✅ CORRECT: Static addressing in scan
-@gen
-def good_scan_step(carry, _):
-    x = normal(0.0, 1.0) @ "x"  # Static address - will be vectorized
-    return carry + x, x
-
-# Will work!
-good_scan_step.scan(length=10).simulate((1.0, None))
-```
-
-**Scan Input Requirements**:
-
-```python
-# Use None for unused scan inputs
-scan_fn = Scan(step_function, length=10)
-result = scan_fn((init_carry, None)) @ "scan_result"
-
-# Or use meaningful inputs if needed by the step function
-scan_fn = Scan(step_function, length=len(data))
-result = scan_fn((init_carry, data)) @ "scan_result"
-```
-
-##### Vmap Combinator Usage
-
-**IMPORTANT**: The `Vmap` combinator vectorizes generative functions across batch dimensions while preserving probabilistic semantics.
-
-**Basic Vectorization Patterns**:
-
-```python
-# Vectorize a distribution over multiple parameters
-vectorized_normal = normal.vmap(in_axes=(0, None))  # vectorize over first parameter
-mus = jnp.array([0.0, 1.0, 2.0])
-traces = vectorized_normal.simulate((mus, 1.0))  # sigma=1.0 broadcast to all
-
-# Vectorize a generative function
-@gen
-def single_observation(mu):
-    return normal(mu, 1.0) @ "obs"
-
-# Create vectorized version
-batch_observations = Vmap(single_observation)
-vectorized_traces = batch_observations.simulate((mus,))
-```
-
-**Advanced Vmap Patterns**:
-
-```python
-# Multiple parameter vectorization
-@gen
-def regression_point(x, slope, intercept):
-    noise = normal(0.0, 0.1) @ "noise"
-    y = slope * x + intercept + noise
-    return y
-
-# Vectorize over data points (x values)
-x_data = jnp.array([1.0, 2.0, 3.0, 4.0])
-vectorized_regression = Vmap(regression_point, in_axes=(0, None, None))
-traces = vectorized_regression.simulate((x_data, 2.0, 1.0))
-```
-
-**Vmap In-Axes Specification**:
-
-```python
-# in_axes controls which arguments get vectorized
-# 0 = vectorize over first dimension
-# None = broadcast (don't vectorize)
-# (0, None, 1) = vectorize arg1 over dim 0, broadcast arg2, vectorize arg3 over dim 1
-
-vectorized_fn = Vmap(my_function, in_axes=(0, None, 0))
-```
-
-**Repeat and Axis Size**:
-
-```python
-# .repeat() - Convenient method for independent sampling
-@gen
-def single_sample():
-    return normal(0.0, 1.0) @ "x"
-
-# Generate 10 independent samples (no input vectorization)
-batch_sampler = single_sample.repeat(10)
-traces = batch_sampler.simulate(())  # Empty args since no inputs needed
-choices = get_choices(traces)
-samples = choices["x"]  # Array of 10 independent normal samples
-
-# Equivalent to:
-manual_vmap = Vmap(single_sample, in_axes=None, axis_size=10)
-traces = manual_vmap.simulate(())
-
-# axis_size parameter - specify batch size when not inferrable from inputs
-@gen
-def parameterized_model(mu, sigma):
-    return normal(mu, sigma) @ "sample"
-
-# When using axis_size, all arguments must be broadcast
-fixed_params_vmap = Vmap(
-    parameterized_model,
-    in_axes=(None, None),  # Broadcast both parameters
-    axis_size=5            # Generate 5 samples with same parameters
-)
-traces = fixed_params_vmap.simulate((0.0, 1.0))
-choices = get_choices(traces)
-samples = choices["sample"]  # Array of 5 independent samples with mu=0.0, sigma=1.0
-
-# axis_size with mixed vectorization
-mixed_vmap = Vmap(
-    parameterized_model,
-    in_axes=(0, None),     # Vectorize mu, broadcast sigma
-    axis_size=3            # Must match length of vectorized inputs
-)
-mus = jnp.array([0.0, 1.0, 2.0])  # Length must equal axis_size
-traces = mixed_vmap.simulate((mus, 1.0))
-```
-
-**Key Points**:
-
-- **`.repeat(n)`**: Shorthand for `Vmap(gen_fn, in_axes=None, axis_size=n)` - generates n independent samples
-- **`axis_size`**: Explicitly specifies batch dimension size when not inferrable from inputs
-- **Consistency requirement**: When using `axis_size` with vectorized inputs, array lengths must match `axis_size`
-- **Broadcasting**: Use `in_axes=None` with `axis_size` to broadcast the same parameters across all samples
-
-##### Cond Combinator Usage
-
-**IMPORTANT**: The `Cond` combinator implements conditional branching in generative functions using JAX-compatible control flow.
-
-**Basic Conditional Pattern**:
+**Scan** - Sequential iteration (like `jax.lax.scan`):
 
 ```python
 @gen
-def positive_branch():
-    return exponential(1.0) @ "value"
+def step_fn(carry, _):
+    x = normal(carry, 1.0) @ "x"  # ✅ Static addressing only
+    return x, x
 
-@gen
-def negative_branch():
-    return exponential(2.0) @ "value"
-
-@gen
-def conditional_model():
-    x = normal(0.0, 1.0) @ "x"
-    condition = x > 0
-    cond_fn = Cond(positive_branch, negative_branch)
-    result = cond_fn((condition,)) @ "conditional"
-    return result
+scan_gf = Scan(step_fn, length=10)
+result = scan_gf((init_carry, None)) @ "scan"
 ```
 
-**Parameterized Branches**:
+**Vmap** - Vectorization:
+
+```python
+# Vectorize over parameters
+vectorized_normal = normal.vmap(in_axes=(0, None))
+traces = vectorized_normal.simulate((mus_array, sigma_scalar))
+
+# Independent sampling
+batch_sampler = single_sample.repeat(n=10)  # axis_size=10
+```
+
+**Cond** - Conditional branching:
 
 ```python
 @gen
-def high_noise_branch(mu):
-    return normal(mu, 2.0) @ "obs"
-
+def branch_a(): return exponential(1.0) @ "value"
 @gen
-def low_noise_branch(mu):
-    return normal(mu, 0.1) @ "obs"
+def branch_b(): return exponential(2.0) @ "value"
 
-@gen
-def adaptive_noise_model(data_quality):
-    mu = normal(0.0, 1.0) @ "mu"
-    use_high_noise = data_quality < 0.5
-
-    cond_fn = Cond(high_noise_branch, low_noise_branch)
-    observation = cond_fn((use_high_noise, mu)) @ "obs"
-    return observation
+cond_gf = Cond(branch_a, branch_b)
+result = cond_gf((condition,)) @ "conditional"
 ```
 
-**Key Cond Constraints**:
+## Critical API Patterns
 
-- Both branches are always evaluated during simulation (JAX requirement)
-- Branches must have compatible return types
-- Use same addressing within branches for proper trace merging
-- Condition must be a JAX-compatible boolean expression
-
-##### Combinator Trace Structures
-
-**Understanding Combinator Operations**: Combinators operate on their callees' trace structures in specific ways - they don't create new nested structures, but transform existing ones.
-
-**Scan: Vectorizes Leaves, Preserves Addressing**:
+**Generative Function Usage**:
 
 ```python
-# Callee trace structure (single step):
-# {"state": scalar, "obs": scalar}
+# ✅ CORRECT patterns
+x = normal(mu, sigma) @ "x"                    # In @gen functions
+log_density, retval = normal.assess((mu, sigma), sample)  # GFI calls with tuple args
 
-# Scan vectorizes the leaves while keeping addresses unchanged
+# ❌ WRONG patterns
+x = normal(mu, sigma)                          # Not traced
+x = normal(mu=mu, sigma=sigma) @ "x"          # No kwargs
+normal(mu, sigma).assess((), sample)          # Wrong arg structure
+```
+
+## JAX Integration & Constraints
+
+### CRITICAL JAX Python Restrictions
+
+**NEVER use Python control flow in `@gen` functions**:
+
+```python
+# ❌ WRONG - These break JAX compilation
 @gen
-def step_fn(carry, x):
-    state = normal(carry, 1.0) @ "state"
-    obs = normal(state, 0.1) @ "obs"
-    return state, obs
+def bad_model():
+    if condition:        # Python if
+        x = normal(0, 1) @ "x"
+    for i in range(n):   # Python for loop
+        y = normal(0, 1) @ f"y_{i}"  # Dynamic addressing
 
-scan_fn = Scan(step_fn, length=5)
-trace = scan_fn.simulate(args)
-choices = get_choices(trace)
-
-# Scan result: addresses stay the same, values become vectors
-scan_results = choices["scan_steps"]
-all_states = scan_results["state"]     # Array: [state_1, state_2, state_3, state_4, state_5]
-all_observations = scan_results["obs"] # Array: [obs_1, obs_2, obs_3, obs_4, obs_5]
-```
-
-**Vmap: Vectorizes Leaves, Preserves Addressing**:
-
-```python
-# Callee trace structure (single instance):
-# {"x": scalar, "y": scalar}
-
+# ✅ CORRECT - Use JAX-compatible patterns
 @gen
-def single_model():
-    x = normal(0.0, 1.0) @ "x"
-    y = exponential(x + 1.0) @ "y"
-    return y
+def good_model():
+    # Use Cond combinator for conditionals
+    cond_gf = Cond(branch_a, branch_b)
+    x = cond_gf((condition,)) @ "x"
 
-vmap_fn = Vmap(single_model)
-vectorized_trace = vmap_fn.simulate(args)
-vectorized_choices = get_choices(vectorized_trace)
-
-# Vmap result: addresses stay the same, values become vectors
-vectorized_x = vectorized_choices["x"]  # Array: [x_1, x_2, x_3, ...]
-vectorized_y = vectorized_choices["y"]  # Array: [y_1, y_2, y_3, ...]
-```
-
-**Cond: Combines Trace Structures**:
-
-```python
-# Branch A trace structure: {"value": scalar}
-# Branch B trace structure: {"value": scalar}
-
-@gen
-def branch_a():
-    return exponential(1.0) @ "value"
-
-@gen
-def branch_b():
-    return exponential(2.0) @ "value"
-
-cond_fn = Cond(branch_a, branch_b)
-cond_trace = cond_fn.simulate(args)
-cond_choices = get_choices(cond_trace)
-
-# Cond result: combines both branch structures, selects based on condition
-# Addresses from both branches are present, but values reflect the selected branch
-selected_value = cond_choices["value"]  # Value from whichever branch was selected
-```
-
-**Key Principles**:
-
-- **Scan/Vmap**: Keep callee addressing unchanged, vectorize the leaf values
-- **Cond**: Merge callee trace structures, use condition to select appropriate values
-- **Nested Combinators**: Composition follows the same rules recursively
-
-## GenJAX API Patterns
-
-**CRITICAL**: GenJAX generative functions specific API patterns that must be followed exactly:
-
-**Generative Function Usage in `@gen` Functions**:
-
-```python
-# ✅ CORRECT: Use @ "address" syntax
-x = normal(mu, sigma) @ "x"
-y = exponential(rate) @ "y"
-
-# ❌ WRONG: Don't call methods directly
-x = normal(mu, sigma)  # Won't be traced
-
-# ❌ WRONG: Can't use kwargs
-x = normal(mu=mu, sigma=sigma) @ "x"
-```
-
-**Generative Function Interface APIs**:
-
-```python
-# ✅ CORRECT: Argument parameters as tuple
-log_density, retval = normal.assess((mu, sigma), sample_value)
-log_density, retval = exponential.assess((rate,), sample_value)
-
-# ❌ WRONG: Argument parameters as constructor arguments
-log_density, retval = normal(mu, sigma).assess((), sample_value)  # Invalid
-log_density, retval = exponential(rate).assess((), sample_value)  # Invalid
-```
-
-## JAX Integration
-
-### JAX Python Restrictions
-
-```python
-# ✅ CORRECT: JAX-compatible patterns
-def jax_compatible_function(x):
-    # Use JAX control flow
-    result = jax.lax.cond(
-        x > 0,
-        lambda x: x * 2,      # true branch
-        lambda x: x * -1      # false branch
-    )
-
-    # Use JAX operations
-    return jnp.exp(result) + jnp.log(jnp.abs(x) + 1e-8)
-
-# ❌ WRONG: Non-JAX patterns that break compilation
-def non_jax_function(x):
-    if x > 0:  # Python if - not typically JAX compatible
-        result = x * 2
-    else:
-        result = x * -1
-
-    # Python list operations - not JAX compatible
-    results = []
-    for i in range(len(x)):  # Python for loop with dynamic length
-        results.append(x[i] * 2)
-
-    return results  # Python list, not JAX array
+    # Use Scan combinator for iteration
+    scan_gf = Scan(step_fn, length=n)
+    results = scan_gf((init, None)) @ "scan"
 ```
 
 ### PJAX: Probabilistic JAX
 
-**IMPORTANT**: PJAX (Probabilistic JAX) is GenJAX's intermediate representation that extends JAX with custom primitives for probabilistic programming. Understanding PJAX helps explain how GenJAX works under the hood.
+PJAX extends JAX with probabilistic primitives (`assume_p`, `log_density_p`).
 
-**Core PJAX Primitives**:
+**Key Transformations**:
 
-PJAX adds two new probabilistic primitives to JAX:
-
-- **`assume_p`**: Represents probabilistic sampling operations
-- **`log_density_p`**: Represents log probability density computations
-
-**How PJAX Works**:
+- **`seed`**: Eliminates PJAX primitives → enables standard JAX transformations → requires explicit keys
+- **`modular_vmap`**: Preserves PJAX primitives → specialized vectorization → automatic key management
 
 ```python
-# When you write GenJAX code:
-@gen
-def my_model():
-    x = normal(0.0, 1.0) @ "x"
-    return x
-
-trace = my_model.simulate(())
-
-# GenJAX compiles this to a program with PJAX primitives that
-# looks conceptually like:
-def my_model_pjax():
-    x = assume_p(normal_sampler, 0.0, 1.0)  # Sampling primitive
-    log_density = log_density_p(normal_logpdf, x, 0.0, 1.0)  # Density primitive
-    return Trace(my_model, (), x, x, log_density)
-```
-
-**PJAX Transformations**:
-
-**IMPORTANT:** PJAX introduces two transformations: `modular_vmap` and `seed`.
-
-**1. `seed` Transformation**:
-
-The `seed` transformation eliminates `assume_p` primitives by providing explicit PRNG keys, making the resulting function compatible with standard JAX transformations.
-
-```python
-from genjax import seed
-
-@gen
-def my_model():
-    x = normal(0.0, 1.0) @ "x"
-    y = normal(x, 0.5) @ "y"
-    return y
-
-# Original function uses assume_p primitives
-# When executing this code, a global key is evolved
-# in the background
-trace = my_model.simulate(())
-
-# seed transformation eliminates assume_p by threading PRNG keys
-# giving users control over keys
-seeded_model = seed(my_model.simulate)
-
-# Now we can use JAX transformations
-import jax
-import jax.random as jrand
-
-key = jrand.key(42)
-result = seeded_model(key, ())  # Explicit key required
-
-# JAX transformations work on seeded functions
+# Use seed for JAX transformations
+seeded_model = seed(model.simulate)
+result = seeded_model(key, args)
 jit_model = jax.jit(seeded_model)
-vmap_model = jax.vmap(seeded_model, in_axes=(0, None))
 
-# Vectorize over multiple keys
-keys = jrand.split(key, 10)
-batch_results = vmap_model(keys, ())
+# Use modular_vmap for probabilistic vectorization
+vmap_model = modular_vmap(model.simulate, in_axes=(0,))
 ```
 
-**2. `modular_vmap` Transformation**:
+### Static vs Dynamic Arguments
 
-The `modular_vmap` transformation extends `jax.vmap` to work directly with PJAX primitives, enabling vectorization of probabilistic programs without requiring `seed`.
+JAX transformations make all arguments dynamic, but some GenJAX operations need static values:
 
 ```python
-from genjax import modular_vmap
+# ❌ PROBLEMATIC - T becomes a tracer
+def inference_fn(T, args):
+    model = model_factory(T)  # T must be static!
 
-@gen
-def single_observation(mu):
-    return normal(mu, 1.0) @ "obs"
+# ✅ CORRECT - Use closures for static values
+T = 5  # Static
+def inference_closure(args):
+    model = model_factory(T)  # Captured as static
+    return inference_logic(model, args)
 
-# Standard jax.vmap doesn't understand PJAX primitives
-# vmap_fn = jax.vmap(single_observation.simulate)  # Would fail or give non-intuitive results
-
-# modular_vmap handles PJAX primitives correctly
-vmap_fn = modular_vmap(single_observation.simulate, in_axes=(0,))
-
-# Works with vectorized arguments
-mus = jnp.array([0.0, 1.0, 2.0])
-vectorized_traces = vmap_fn((mus,))
-
-# modular_vmap preserves probabilistic semantics
-choices = get_choices(vectorized_traces)
-samples = choices["obs"]  # Array of 3 samples
-
-# Can compose modular_vmap with seed
-vectorized_traces = seed(vmap_fn)(key, (mus, ))
+seeded_inference = seed(inference_closure)
 ```
 
-**Key Differences**:
+### Pytree Usage
 
-- **`seed`**: Eliminates PJAX primitives → enables standard JAX transformations → requires explicit key management
-- **`modular_vmap`**: Preserves PJAX primitives → specialized for vectorization → maintains GenJAX's automatic key management
+**CRITICAL**: All GenJAX datatypes inherit from `Pytree` for automatic JAX vectorization:
 
-**When to Use Each**:
+- **DO NOT use Python lists** for multiple Pytree instances
+- **DO use JAX transformations** - they automatically vectorize Pytree leaves
+- **Pattern**: Use single vectorized `Trace`, not `[trace1, trace2, ...]`
+
+## Common Error Patterns
+
+### `LoweringSamplePrimitiveToMLIRException`
+
+**Cause**: PJAX primitives inside JAX control flow or JIT compilation.
+
+**Solution**: Apply `seed` transformation:
 
 ```python
-# Use seed when:
-# 1. You need to use JAX transformations other than vmap, such as jit
-# 2. You're implementing low-level inference algorithms
-# 3. You need explicit control over randomness
-
-seeded_fn = seed(model.simulate)
-grad_fn = jax.grad(lambda key, args: seeded_fn(key, args).get_score())
-
-# Use modular_vmap when:
-# 1. You need vectorization of probabilistic programs
-# 2. You want to maintain GenJAX's probabilistic semantics
-# 3. You're working within GenJAX's high-level APIs
-
-batch_model = modular_vmap(model.simulate, in_axes=(0,))
-```
-
-**Key PJAX Concepts**:
-
-- **Staged Execution**: PJAX separates the "what" (probabilistic operations) from the "how" (execution strategy)
-- **Primitive Binding**: GFI methods (simulate, assess, generate) bind primitives as part of their implementations
-- **JAX Integration**: PJAX primitives are proper JAX primitives, so they work with all JAX transformations
-- **Vmap Transformation**: The `modular_vmap` function handles PJAX primitives correctly during vectorization, unlike standard `jax.vmap` which doesn't understand probabilistic operations
-- **Seed Transformation**: The `seed` function eliminates `assume_p` primitives by providing explicit PRNG keys
-
-### PJAX Primitive Lowering and the `seed` Transformation
-
-**CRITICAL**: When PJAX primitives (`assume_p`, `log_density_p`) are used inside JAX transformations like `jax.lax.scan`, `jax.lax.cond`, or when JAX attempts to compile the code, you may encounter `LoweringSamplePrimitiveToMLIRException`:
-
-```
-genjax.core.LoweringSamplePrimitiveToMLIRException: JAX is attempting to lower the `pjax.assume_p` primitive to MLIR. This will bake a PRNG key into the MLIR code, resulting in deterministic behavior. Instead, use `seed` to transform your function into one which allows keys to be passed in.
-```
-
-**When This Occurs**:
-
-- Generative functions with PJAX primitives are called inside `jax.lax.scan`, `jax.lax.cond`, or other JAX control flow
-- JAX is trying to compile/JIT code containing PJAX primitives
-- Code with PJAX primitives is used in contexts where JAX needs to lower to MLIR
-
-**Solution Pattern**:
-
-```python
-# ❌ PROBLEMATIC: PJAX primitives inside JAX transformations
-@gen
-def model_with_scan():
-    scan_fn = Scan(step_function, length=T)  # Contains PJAX primitives
-    result = scan_fn(args) @ "scan"
-    return result
-
-# This will fail when JAX tries to compile:
+# ❌ Problematic
 trace = model_with_scan.simulate(())
 
-# ✅ CORRECT: Use seed transformation
+# ✅ Fixed
 seeded_model = seed(model_with_scan.simulate)
-key = jrand.key(42)
 trace = seeded_model(key, ())
-
-# ✅ CORRECT: Apply seed at the highest level possible
-def run_inference():
-    model = discrete_hmm_model_factory(T)
-    return default_importance_sampling(model, args, n_samples, constraints)
-
-seeded_inference = seed(run_inference)
-result = seeded_inference(key)
 ```
 
-### Static vs Dynamic Arguments in JAX Transformations
+## Testing Patterns
 
-**CRITICAL**: JAX transformations like `seed` treat all function arguments as dynamic (traceable) by default. However, some GenJAX operations require static (compile-time constant) values:
-
-**Common Static Requirements**:
-
-- `Scan(callee, length=N)` - `length` must be a static integer
-- `Vmap(callee, axis_size=N)` - `axis_size` must be a static integer
-- Factory functions like `discrete_hmm_model_factory(T)` - `T` must be static
-
-**Problem Pattern**:
+**Density Validation**:
 
 ```python
-# ❌ PROBLEMATIC: Static values become tracers
-def inference_function(T, n_samples, model_args):
-    model = discrete_hmm_model_factory(T)  # T becomes a tracer!
-    return default_importance_sampling(model, model_args, n_samples, constraints)
-
-# This will fail because T is now a DynamicJaxprTracer, not an int
-seeded_inference = seed(inference_function)
-result = seeded_inference(key, T, n_samples, model_args)
-```
-
-**Solution: Use Closures to Capture Static Values**:
-
-```python
-# ✅ CORRECT: Create closures that capture static values
-T = 5  # Static
-n_samples = 1000  # Static
-
-def inference_closure(model_args, constraints):
-    model = discrete_hmm_model_factory(T)  # T is captured as static
-    return default_importance_sampling(model, model_args, n_samples, constraints)
-
-# Now seed only sees the dynamic arguments
-seeded_inference = seed(inference_closure)
-result = seeded_inference(key, model_args, constraints)
-
-# Example with data generation:
-def sample_data_closure(initial_probs, transition_matrix, emission_matrix):
-    return sample_hmm_dataset(initial_probs, transition_matrix, emission_matrix, T)
-
-seeded_sampler = seed(sample_data_closure)
-data = seeded_sampler(key, initial_probs, transition_matrix, emission_matrix)
-```
-
-**Key Principles**:
-
-- Identify which arguments must remain static (typically array dimensions, loop lengths)
-- Create closures that capture static values from the enclosing scope
-- Apply `seed` to the closure, not the original function
-- Use separate keys for different seeded operations (`jrand.split(key)`)
-
-### GenJAX Constraints
-
-**CRITICAL**: When writing code with GenJAX (inside `@gen` functions, combinators, etc.), you must follow JAX Python restrictions. Violating these constraints will typically cause compilation errors or incorrect behavior.
-
-**Control Flow - NEVER USE PYTHON CONTROL FLOW**:
-
-- **ABSOLUTELY NEVER use Python `if...else` statements** - these are fundamentally incompatible with JAX compilation
-- **ABSOLUTELY NEVER use Python `for` loops** - these break JAX vectorization and compilation
-- **ABSOLUTELY NEVER use Python `while` loops** - these are not supported in JAX
-- **ALWAYS use JAX control flow**: `jax.lax.cond`, `jax.lax.switch` for deterministic conditional logic, `jax.lax.scan` for deterministic iterative logic
-- **ALWAYS use GenJAX combinators**: `Cond(branch1, branch2)` for conditional generative functions, `Scan(callee)` for iterative generative functions
-- **Pattern for Conditional Generative Functions**: Extract branches into separate `@gen` functions, then use combinators
-
-**WRONG - These patterns will break**:
-
-```python
-@gen
-def bad_conditional():
-    x = normal(0.0, 1.0) @ "x"
-    if x > 0:  # ❌ CRITICAL ERROR: Python if statement
-        y = exponential(1.0) @ "y"
-    else:
-        y = exponential(2.0) @ "y"
-    return y
-
-@gen
-def bad_iteration(T):
-    results = []
-    for t in range(T):  # ❌ CRITICAL ERROR: Python for loop
-        x = normal(0.0, 1.0) @ f"x_{t}"  # ❌ CRITICAL ERROR: Dynamic addressing
-        results.append(x)
-    return results
-```
-
-**CORRECT - Always use these patterns**:
-
-```python
-@gen
-def high_branch():
-    return exponential(1.0) @ "y"
-
-@gen
-def low_branch():
-    return exponential(2.0) @ "y"
-
-@gen
-def good_conditional():
-    x = normal(0.0, 1.0) @ "x"
-    condition = x > 0
-    cond_gf = Cond(high_branch, low_branch)
-    result = cond_gf((condition,)) @ "cond"  # ✅ Use Cond combinator
-    return result
-
-@gen
-def step_function(carry, x):
-    state = normal(carry, 1.0) @ "state"  # ✅ Static addressing
-    return state, state
-
-@gen
-def good_iteration(T):
-    scan_fn = Scan(step_function, length=T)
-    final_carry, results = scan_fn((0.0, None)) @ "scan"  # ✅ Use Scan combinator
-    return results
-```
-
-**Why These Constraints Exist**:
-
-- Python control flow prevents JAX from compiling and vectorizing code
-- Dynamic addressing breaks GenJAX's trace structure requirements
-- GenJAX combinators provide JAX-compatible alternatives for all control flow needs
-- Violating these constraints typically results in cryptic JAX compilation errors
-
-### Vectorization and Pytree Usage
-
-**CRITICAL**: All GenJAX datatypes inherit from `Pytree`, enabling automatic JAX vectorization. When implementing combinators or working with collections of traces/choices:
-
-- **DO NOT use Python lists** for storing multiple instances of Pytree-inheriting types
-- **DO use JAX's automatic vectorization** - JAX will vectorize the "leaves" of any Pytree instance via transformations like `jax.vmap` (**IMPORTANT**: prefer `genjax.modular_vmap`) and primitives like `jax.lax.scan`.
-- **Example**: `jax.lax.scan` automatically handles vectorized `Trace` objects when passed in the `xs` argument
-- **Pattern**: Instead of `[trace1, trace2, ...]`, use a single vectorized `Trace` that JAX creates automatically
-
-**Key Principles**:
-
-- Leverage JAX's built-in Pytree vectorization rather than manual list management
-- Trust JAX transformations to handle vectorized probabilistic data structures
-- Avoid overcomplicating implementations that should use JAX's automatic capabilities
-
-## Development Overview
-
-### Codebase Commands
-
-The codebase is managed through [`pixi`](https://pixi.sh/latest/). All toplevel codebase commands should go through `pixi`.
-
-#### Environment Setup
-
-```bash
-# Install dependencies using pixi (a package manager)
-pixi install
-```
-
-#### Running Examples
-
-```bash
-# Run examples (via pixi)
-pixi run python examples/simple.py
-pixi run python examples/regression.py
-pixi run python examples/marginal.py
-pixi run python examples/vi.py
-```
-
-#### Generating Figures
-
-```bash
-# Generate figures for the beta-bernoulli benchmark
-pixi run betaber-timing
-
-# Generate figures for Game of Life simulations
-pixi run gol-timing
-pixi run gol-figs
-
-# Generate figures for curve fitting
-pixi run curvefit-figs
-```
-
-#### Development
-
-```bash
-# Format code
-pixi run format
-
-# Check for unused code
-pixi run vulture
-```
-
-#### Documentation
-
-```bash
-# Preview documentation
-pixi run preview
-
-# Deploy documentation to GitHub Pages
-pixi run deploy
-```
-
-### Codebase Architecture
-
-```raw
-genjax/
-├── src/genjax/                   # Core GenJAX library
-│   ├── __init__.py                # Package exports and main API
-│   ├── core.py                    # PJAX, GFI, Trace, Distribution, Fn, combinators
-│   ├── distributions.py           # Standard probability distributions as generative functions
-│   ├── adev.py                    # Automatic differentiation of expected values (ADEV)
-│   └── stdlib.py                  # Standard inference library functions and utilities
-├── examples/                     # Examples, tutorials, and performance benchmarks
-├── tests/                        # Test suite
-│   ├── test_core.py               # Core functionality tests
-│   ├── test_stdlib.py             # Standard library tests
-│   └── discrete_hmm.py            # Hidden Markov Model test cases
-├── quarto/                       # Documentation source files for website generation
-├── docs/                         # Generated documentation (GitHub Pages)
-├── pixi.lock                     # Pixi lock file for reproducible environments
-├── pyproject.toml                # Python project configuration
-├── README.md                     # Project overview and quick start
-├── LICENSE.md                    # License information
-├── CLAUDE.md                     # Claude Code instructions (this file)
-└── logo.png                      # Project logo
-```
-
-### Development Workflow
-
-**IMPORTANT**: When working on GenJAX development tasks, follow this structured approach to ensure consistency and quality:
-
-1. **Understand First**: Use Read and search tools (Grep, Glob) to understand existing code patterns and conventions before making changes
-2. **Research Context**: Use search tools to find similar implementations and understand codebase patterns
-3. **Follow Conventions**: Mimic existing code style, library usage, and architectural patterns
-4. **Implement Changes**: Make changes that follow established patterns and JAX/GenJAX constraints
-5. **Test and Verify**: Run appropriate pixi commands (`pixi run format`, `pixi run test`) to verify functionality
-6. **Validate Results**: Ensure changes work as expected and follow GenJAX semantics before concluding
-
-**Key Workflow Principles**:
-
-- Never assume patterns - always research existing code first
-- Prioritize consistency with existing codebase over personal preferences
-- Always run formatter and linting tools before concluding work
-- Test both basic functionality and edge cases
-- Verify JAX compilation compatibility
-
-### Testing Strategy
-
-#### Unit Tests
-
-- Test individual distributions and combinators
-- Verify GFI method implementations
-
-#### Testing Generative Functions
-
-**CRITICAL Testing Patterns**: Always validate probabilistic computations using these specific approaches:
-
-**1. Density Validation Pattern**:
-
-```python
-@gen
-def my_model():
-    x = normal(0.0, 1.0) @ "x"
-    y = exponential(x + 1.0) @ "y"
-    return x + y
-
-def test_my_model():
-    trace = my_model.simulate(())
+def test_model():
+    trace = model.simulate(())
     choices = trace.get_choices()
 
-   # ✅ CORRECT: Use Distribution.assess for access to distribution densities
-    # Validate using distribution densities
-    x_density, _ = normal.assess((0.0, 1.0), choices["x"])
-    y_density, _ = exponential.assess((choices["x"] + 1.0,), choices["y"])
-    expected_total_density = x_density + y_density
-
-    # Test assess
-    actual_density, _ = my_model.assess((), choices)
-    assert jnp.allclose(actual_density, expected_total_density)
-
-    # Test simulate/assess consistency
+    # Use Distribution.assess for validation
+    expected_density = sum(dist.assess(params, choice)[0] for dist, params, choice in distributions)
+    actual_density, _ = model.assess((), choices)
+    assert jnp.allclose(actual_density, expected_density)
     assert jnp.allclose(trace.get_score(), -actual_density)
 ```
 
-**2. Nested Function Testing**:
+## Development Commands
 
-```python
-# Test nested @gen functions with proper choice extraction
-def test_nested_functions():
-    trace = outer_fn.simulate(())
-    choices = trace.get_choices()
-
-    # Access nested choices correctly
-    x_choice = choices["x"]
-    inner_result = choices["inner_fn_address"]  # Result from inner function
-
-    # Validate each level separately
-    inner_density, _ = inner_fn.assess(inner_args, inner_choices)
-    outer_density, _ = outer_fn.assess(args, choices)
+```bash
+pixi install              # Setup
+pixi run format          # Format code
+pixi run python examples/simple.py  # Run examples
 ```
-
-### Testing Generative Function Combinators
-
-**Key Testing Approach**: Compare combinator implementations against manual JAX implementations to validate correctness.
-
-**Combinator Testing Pattern**:
-
-```python
-# Test Scan against manual jax.lax.scan implementation
-def test_scan_vs_manual():
-    scan_gf = Scan(my_step_function)
-    trace = scan_gf.simulate(args)
-
-    # Manual implementation using jax.lax.scan
-    def manual_scan_fn(carry, input_and_choice):
-        input_val, choice = input_and_choice
-        # Replicate same logic as my_step_function
-        density, _ = distribution.assess(params, choice)
-        return new_carry, (output, density)
-
-    manual_carry, (manual_outputs, manual_densities) = jax.lax.scan(
-        manual_scan_fn, init_carry, (inputs, choices)
-    )
-
-    # Compare results
-    assert jnp.allclose(trace.get_score(), -jnp.sum(manual_densities))
-```
-
-**For density computations**:
-
-- Test `simulate()`: Compare `trace.get_score()` (reciprocal density) against density computations using the `Distribution.logpdf` method
-- Test `assess()`: Compare combinator density against using the same probabilistic logic
-- Test consistency: Verify `simulate_score = -assess_density` for same choices
-
-**Key Principles**:
-
-- **Use `Distribution.assess()`** instead of manual density formulas
-- **Test consistency** between `simulate` and `assess` methods
-- **Validate combinators** against equivalent JAX implementations
-- **Handle nested addressing** properly in choice extraction
-
-## Sharp Edges & Limitations of GenJAX
-
-### Known Issues
-
-- `vmap` within ADEV `@expectation` programs has undefined semantics
-- Not all gradient estimation strategies support batching
-- Some JAX transformations may not compose cleanly
-
-### Common GenJAX Error Patterns and Solutions
-
-**1. `LoweringSamplePrimitiveToMLIRException`**
-
-```
-genjax.core.LoweringSamplePrimitiveToMLIRException: JAX is attempting to lower the `pjax.assume_p` primitive to MLIR.
-```
-
-**Cause**: PJAX primitives inside JAX control flow (`jax.lax.scan`, `jax.lax.cond`) or JIT compilation.
-
-**Solution**: Apply `seed` transformation to eliminate PJAX primitives:
-
-```python
-# Instead of: problematic_function()
-seeded_function = seed(problematic_function)
-result = seeded_function(key, *args)
-```
-
-**General Debugging Strategy**:
-
-1. Identify where PJAX primitives are used (inside `@gen` functions, distribution calls)
-2. Trace the call stack to find JAX transformations (`scan`, `cond`, `vmap`, `jit`)
-3. Apply `seed` at the highest level that encompasses the problematic code
-4. Use closures for any static values that must not become tracers
-5. Split keys appropriately for multiple seeded operations
 
 ## Glossary
 
 - **GFI**: Generative Function Interface (simulate, assess, generate, update, regenerate)
-- **PJAX**: stands for _Probabilistic_ JAX, an extension of JAX with custom primitives (`sample_p`, `log_density_p`) which GenJAX uses as an intermediate representation of its probabilistic computations.
-- **ADEV**: Automatic Differentiation of Expected Values
-- **Trace**: Recording of the execution of a generative function.
-- **Address**: String identifier for random variables (e.g., `"x"`, `"alpha"`, etc)
-- **Score**: Negative log probability (log of the reciprocal `1/P(choices)`)
-- **Programmable Inference**: Ability to customize inference algorithms
-
-## Further Reading
-
-- [GenJAX Documentation](https://probcomp.github.io/genjax/)
-- [ADEV Paper](https://dl.acm.org/doi/10.1145/3571198) - Automatic differentiation of expected values
-- [Programmable VI Paper](https://dl.acm.org/doi/10.1145/3656463) - Programmable variational inference
-- [Gen Paper](https://dl.acm.org/doi/10.1145/3314221.3314642) - Original Gen system (Julia version)
-
----
-
-_This codebase implements cutting-edge research in vectorized probabilistic programming. The design prioritizes flexibility and performance while maintaining mathematical correctness._
+- **PJAX**: Probabilistic extension to JAX with primitives `assume_p`, `log_density_p`
+- **Trace**: Execution record with choices, args, return value, score
+- **Score**: `log(1/P(choices))` - negative log probability
