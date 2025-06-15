@@ -5,3 +5,8 @@ __pycache__
 .ruff_cache
 docs
 .vscode
+
+# Coverage files
+htmlcov/
+coverage.xml
+.coverage
