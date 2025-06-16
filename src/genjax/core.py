@@ -215,7 +215,15 @@ def cached_stage_dynamic(flat_fun, in_avals):
 
 
 def stage(f, **params):
-    """Returns a function that stages a function to a ClosedJaxpr."""
+    """Returns a function that stages a function to a ClosedJaxpr.
+
+    Args:
+        f: Function to stage to JAX representation.
+        **params: Additional parameters to pass to the wrapped function.
+
+    Returns:
+        Callable that returns a tuple of ClosedJaxpr and execution metadata.
+    """
 
     @wraps(f)
     def wrapped(
@@ -242,7 +250,15 @@ def stage(f, **params):
 
 
 class InitialStylePrimitive(Primitive):
-    """Contains default implementations of transformations."""
+    """JAX primitive with default transformation implementations.
+
+    This class provides a convenient way to define custom JAX primitives
+    with standard implementations for common transformations like JVP,
+    batching, and MLIR lowering.
+
+    Args:
+        name: Name of the primitive.
+    """
 
     def __init__(self, name):
         super(InitialStylePrimitive, self).__init__(name)
@@ -287,12 +303,15 @@ class InitialStylePrimitive(Primitive):
 
 
 class ElaboratedPrimitive(Primitive):
-    """
-    An `ElaboratedPrimitive` is a primitive which wraps an underlying
-    primitive, but is elaborated with additional parameters that only show up
-    in the pretty printing of a `Jaxpr`.
-    In addition, `ElaboratedPrimitive` instances hide excess metadata in
-    pretty printing.
+    """A primitive wrapper that adds elaboration for pretty printing.
+
+    An `ElaboratedPrimitive` wraps an underlying primitive with additional
+    parameters that only appear in the pretty printing of a `Jaxpr`. It also
+    hides excess metadata during pretty printing for cleaner output.
+
+    Args:
+        prim: The underlying InitialStylePrimitive to wrap.
+        **params: Additional elaboration parameters.
     """
 
     def __init__(self, prim: InitialStylePrimitive, **params):
@@ -862,6 +881,32 @@ class SeedInterpreter:
 def seed(
     f: Callable[..., Any],
 ):
+    """Transform a function to accept an explicit PRNG key.
+
+    This transformation eliminates probabilistic primitives by providing
+    explicit randomness through a PRNG key, enabling the use of standard
+    JAX transformations like jit and vmap.
+
+    Args:
+        f: Function containing probabilistic computations to transform.
+
+    Returns:
+        Function that takes a PRNGKey as first argument followed by
+        the original function arguments.
+
+    Example:
+        >>> import jax.random as jrand
+        >>> from genjax import gen, normal, seed
+        >>>
+        >>> @gen
+        ... def model():
+        ...     return normal(0.0, 1.0) @ "x"
+        >>>
+        >>> seeded_model = seed(model.simulate)
+        >>> key = jrand.key(0)
+        >>> trace = seeded_model(key, ())
+    """
+
     @wraps(f)
     def wrapped(key: PRNGKey, *args):
         interpreter = SeedInterpreter(key)
@@ -880,10 +925,11 @@ def seed(
 
 @dataclass
 class ModularVmapInterpreter:
-    """
-    `ModularVmapInterpreter` is an interpreter which piggybacks off of
-    `jax.vmap`,
-    but is aware of probability distributions as first class citizens.
+    """JAX vmap interpreter with probabilistic primitive awareness.
+
+    This interpreter extends `jax.vmap` to handle probability distributions
+    as first class citizens, allowing vectorization over probabilistic
+    computations while preserving their semantic meaning.
     """
 
     @staticmethod
@@ -1038,9 +1084,20 @@ def modular_vmap(
     axis_name: str | None = None,
     spmd_axis_name: str | None = None,
 ) -> Callable[..., R]:
-    """
-    `modular_vmap` extends `jax.vmap` to be "aware of probability distributions"
-    as a first class citizen.
+    """Vectorize a function while preserving probabilistic semantics.
+
+    Extends `jax.vmap` to handle probability distributions as first class
+    citizens, enabling vectorization over probabilistic computations.
+
+    Args:
+        f: Function to vectorize.
+        in_axes: Axis specification for input arguments.
+        axis_size: Size of the mapped axis.
+        axis_name: Name for the mapped axis.
+        spmd_axis_name: SPMD axis name for parallel computation.
+
+    Returns:
+        Vectorized function that preserves probabilistic semantics.
     """
 
     @wraps(f)
@@ -1112,6 +1169,19 @@ class Trace(Generic[X, R], Pytree):
 
 @Pytree.dataclass
 class Tr(Trace[X, R], Pytree):
+    """Concrete implementation of the Trace interface.
+
+    Stores all components of an execution trace including the generative
+    function, arguments, random choices, return value, and score.
+
+    Args:
+        _gen_fn: The generative function that produced this trace.
+        _args: Arguments passed to the generative function.
+        _choices: Random choices made during execution.
+        _retval: Return value of the execution.
+        _score: Log probability score of the choices.
+    """
+
     _gen_fn: "GFI[X, R]"
     _args: Any
     _choices: X
@@ -1139,6 +1209,14 @@ class Tr(Trace[X, R], Pytree):
 
 
 def get_choices(x: Trace[X, R] | X) -> X:
+    """Extract choices from a trace or nested structure containing traces.
+
+    Args:
+        x: A trace object or nested structure that may contain traces.
+
+    Returns:
+        The random choices, with any nested traces recursively unwrapped.
+    """
     x = x.get_choices() if isinstance(x, Trace) else x
 
     def _get_choices(x):
@@ -1155,10 +1233,26 @@ def get_choices(x: Trace[X, R] | X) -> X:
 
 
 def get_score(x: Trace[X, R]) -> Weight:
+    """Extract the log probability score from a trace.
+
+    Args:
+        x: Trace object to extract score from.
+
+    Returns:
+        The log probability score of the trace.
+    """
     return x.get_score()
 
 
 def get_retval(x: Trace[X, R]) -> R:
+    """Extract the return value from a trace.
+
+    Args:
+        x: Trace object to extract return value from.
+
+    Returns:
+        The return value of the trace.
+    """
     return x.get_retval()
 
 
@@ -1169,18 +1263,28 @@ def get_retval(x: Trace[X, R]) -> R:
 
 @Pytree.dataclass
 class AllSel(Pytree):
+    """Selection that matches all addresses."""
+
     def match(self, addr) -> "tuple[bool, AllSel]":
         return True, self
 
 
 @Pytree.dataclass
 class NoneSel(Pytree):
+    """Selection that matches no addresses."""
+
     def match(self, addr) -> "tuple[bool, NoneSel]":
         return False, self
 
 
 @Pytree.dataclass
 class StrSel(Pytree):
+    """Selection that matches a specific string address.
+
+    Args:
+        s: The string address to match.
+    """
+
     s: str = Pytree.static()
 
     def match(self, addr) -> tuple[bool, AllSel | NoneSel]:
@@ -1190,6 +1294,12 @@ class StrSel(Pytree):
 
 @Pytree.dataclass
 class DictSel(Pytree):
+    """Selection that matches addresses using a dictionary mapping.
+
+    Args:
+        d: Dictionary mapping addresses to nested selections.
+    """
+
     d: "dict[str, Any]"
 
     def match(self, addr) -> "tuple[bool, Any]":
@@ -1199,6 +1309,12 @@ class DictSel(Pytree):
 
 @Pytree.dataclass
 class ComplSel(Pytree):
+    """Selection that matches the complement of another selection.
+
+    Args:
+        s: The selection to complement.
+    """
+
     s: "S"
 
     def match(self, addr) -> "tuple[bool, ComplSel]":
@@ -1208,6 +1324,13 @@ class ComplSel(Pytree):
 
 @Pytree.dataclass
 class InSel(Pytree):
+    """Selection representing intersection of two selections.
+
+    Args:
+        s1: First selection.
+        s2: Second selection.
+    """
+
     s1: "S"
     s2: "S"
 
@@ -1274,6 +1397,25 @@ def match(addr: Addr, sel: S):
 
 
 class GFI(Generic[X, R], Pytree):
+    """Generative Function Interface - the core abstraction for probabilistic programs.
+
+    The GFI defines the standard interface that all generative functions must
+    implement. It provides methods for simulation, assessment, generation,
+    updating, and regeneration of probabilistic computations.
+
+    Type Parameters:
+        X: Type of the random choices (trace space).
+        R: Type of the return value.
+
+    Methods:
+        simulate: Sample an execution trace.
+        assess: Compute log density of choices.
+        generate: Generate trace with partial constraints.
+        update: Update trace with new arguments/constraints.
+        regenerate: Regenerate selected parts of trace.
+        merge: Merge two choice records.
+    """
+
     def __call__(self, *args) -> "Thunk[X, R] | R":
         if handler_stack:
             return Thunk(self, args)
@@ -1370,6 +1512,16 @@ class GFI(Generic[X, R], Pytree):
 
 @Pytree.dataclass
 class Thunk(Generic[X, R], Pytree):
+    """Delayed evaluation wrapper for generative functions.
+
+    A thunk represents a generative function call that has not yet been
+    executed. It captures the function and its arguments for later evaluation.
+
+    Args:
+        gen_fn: The generative function to call.
+        args: Arguments to pass to the generative function.
+    """
+
     gen_fn: GFI[X, R]
     args: tuple
 
@@ -1613,6 +1765,16 @@ def distribution[X](
     /,
     name: str | None = None,
 ) -> Distribution[Any]:
+    """Create a Distribution from sampling and log probability functions.
+
+    Args:
+        sampler: Function that takes parameters and returns a sample.
+        logpdf: Function that takes (value, *parameters) and returns log probability.
+        name: Optional name for the distribution.
+
+    Returns:
+        A Distribution instance implementing the Generative Function Interface.
+    """
     return Distribution(
         sampler,
         logpdf,
@@ -1627,6 +1789,26 @@ def tfp_distribution[X](
     /,
     name: str | None = None,
 ) -> Distribution[Any]:
+    """Create a Distribution from a TensorFlow Probability distribution.
+
+    Wraps a TFP distribution constructor to create a GenJAX Distribution
+    that properly handles PJAX's `assume_p` primitive.
+
+    Args:
+        dist: TFP distribution constructor function.
+        name: Optional name for the distribution.
+
+    Returns:
+        A Distribution that wraps the TFP distribution.
+
+    Example:
+        >>> import tensorflow_probability.substrates.jax as tfp
+        >>> from genjax import tfp_distribution
+        >>>
+        >>> # Create a normal distribution from TFP
+        >>> normal = tfp_distribution(tfp.distributions.Normal, name="normal")
+    """
+
     def keyful_sampler(key, *args, sample_shape=(), **kwargs):
         d = dist(*args, **kwargs)
         return d.sample(seed=key, sample_shape=sample_shape)
@@ -1652,6 +1834,15 @@ def tfp_distribution[X](
 
 @dataclass
 class Simulate:
+    """Handler for simulating generative function executions.
+
+    Tracks the accumulated score and trace map during simulation.
+
+    Args:
+        score: Cumulative log probability score.
+        trace_map: Mapping from addresses to trace objects.
+    """
+
     score: Weight
     trace_map: dict[str, Any]
 
@@ -1931,6 +2122,30 @@ class Fn(
 
 
 def gen(fn: Callable[..., R]) -> Fn[R]:
+    """Convert a function into a generative function.
+
+    The decorated function can use the `@` operator to make addressed
+    random choices from distributions and other generative functions.
+
+    Args:
+        fn: Function to convert into a generative function.
+
+    Returns:
+        A Fn instance that implements the Generative Function Interface.
+
+    Example:
+        >>> from genjax import gen, normal
+        >>>
+        >>> @gen
+        ... def model(mu, sigma):
+        ...     x = normal(mu, sigma) @ "x"
+        ...     y = normal(x, 0.1) @ "y"
+        ...     return x + y
+        >>>
+        >>> trace = model.simulate((0.0, 1.0))
+        >>> choices = trace.get_choices()
+        >>> # choices will contain {"x": <value>, "y": <value>}
+    """
     return Fn(source=fn)
 
 
