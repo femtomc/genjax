@@ -2,7 +2,8 @@
 <img width="450" src="./logo.png"/>
 </p>
 
-[![codecov](https://codecov.io/gh/probcomp/genjax/branch/main/graph/badge.svg?token=AGORyvyVeu)](https://codecov.io/gh/probcomp/genjax)
+<a href="https://codecov.io/gh/probcomp/genjax">
+<img src="https://codecov.io/gh/probcomp/genjax/graph/badge.svg?token=AGORyvyVeu"/></a>
 
 > This is the research version of GenJAX, a [(more stable) community version can be found here](https://github.com/genjax-community/genjax).
 
