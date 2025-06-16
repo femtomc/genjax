@@ -81,27 +81,42 @@ def timing_comparison_fig(
     # Calculate percentage relative to handcoded baseline
     relative_times = [(t / hc_mu) * 100 for t in times]
 
-    # Create horizontal bar plot
-    fig, ax = plt.subplots(figsize=(8, 4), dpi=240)
+    # Create horizontal bar plot with larger fonts for research paper
+    plt.rcParams.update({"font.size": 14})  # Set base font size
+    fig, ax = plt.subplots(figsize=(10, 5), dpi=300)  # Larger figure and higher DPI
 
     y_pos = range(len(frameworks))
     bars = ax.barh(
-        y_pos, relative_times, color=colors, alpha=0.8, edgecolor="black", linewidth=0.5
+        y_pos, relative_times, color=colors, alpha=0.8, edgecolor="black", linewidth=0.8
     )
 
-    # Customize the plot
+    # Customize the plot with larger fonts
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(frameworks)
-    ax.set_xlabel("Relative Performance (% of Handcoded JAX time)")
-    ax.set_title(
-        "Probabilistic Programming Framework Performance\n(Beta-Bernoulli Importance Sampling)"
+    ax.set_yticklabels(frameworks, fontsize=16)
+    ax.set_xlabel("Relative Performance (% of Handcoded JAX time)", fontsize=16)
+
+    # Add clarification in top right corner
+    ax.text(
+        0.98,
+        0.98,
+        "Smaller bar is better",
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=12,
+        style="italic",
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
     )
+
+    # Customize tick labels
+    ax.tick_params(axis="x", labelsize=14)
+    ax.tick_params(axis="y", labelsize=16)
 
     # Add a vertical line at 100% (handcoded baseline)
-    ax.axvline(x=100, color="black", linestyle="--", alpha=0.7, linewidth=1)
-    ax.text(102, len(frameworks) - 0.5, "Handcoded\nBaseline", fontsize=9, alpha=0.7)
+    ax.axvline(x=100, color="black", linestyle="--", alpha=0.7, linewidth=2)
+    ax.text(102, len(frameworks) - 0.5, "Handcoded\nBaseline", fontsize=14, alpha=0.8)
 
-    # Add percentage labels on bars
+    # Add percentage labels on bars with larger font
     for i, (bar, rel_time, abs_time) in enumerate(zip(bars, relative_times, times)):
         width = bar.get_width()
         label = f"{rel_time:.1f}% ({abs_time * 1000:.2f}ms)"
@@ -111,7 +126,8 @@ def timing_comparison_fig(
             label,
             ha="left",
             va="center",
-            fontsize=9,
+            fontsize=12,
+            weight="bold",
         )
 
     # Set x-axis limits with some padding
@@ -122,11 +138,9 @@ def timing_comparison_fig(
 
     plt.tight_layout()
 
-    # Save with appropriate filename
-    filename = (
-        "examples/faircoin/figs/comparison_with_pyro.pdf"
-        if (include_pyro and pyro_results)
-        else "examples/faircoin/figs/comparison.pdf"
-    )
-    plt.savefig(filename)
+    # Save with parametrized filename and research paper quality settings
+    pyro_suffix = "_with_pyro" if (include_pyro and pyro_results) else ""
+    filename = f"examples/faircoin/figs/comparison_obs{num_obs}_samples{num_samples}_repeats{repeats}{pyro_suffix}.pdf"
+
+    plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved comparison plot to {filename}")

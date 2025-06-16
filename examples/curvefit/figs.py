@@ -8,7 +8,7 @@ import jax
 
 from core import (
     onepoint_curve,
-    npoint_curve,
+    npoint_curve_factory,
     infer_latents,
     get_points_for_inference,
     vmap,
@@ -78,7 +78,8 @@ def visualize_multipoint_trace(
 
 def save_multipoint_trace_viz():
     print("Making and saving multipoint trace visualization.")
-    trace = npoint_curve.simulate((10,))
+    npoint_curve = npoint_curve_factory(10)
+    trace = npoint_curve.simulate(())
     fig = visualize_multipoint_trace(trace, yrange=(-1.5, 1.5))
     fig.savefig("examples/curvefit/figs/020_multipoint_trace.pdf")
 
@@ -94,8 +95,9 @@ def make_fig_with_centered_number(number):
 
 def save_four_multipoint_trace_vizs():
     print("Making and saving visualizations of traces generated from vmap(simulate).")
+    npoint_curve = npoint_curve_factory(10)
     traces = vmap(
-        lambda: npoint_curve.simulate((10,)),
+        lambda: npoint_curve.simulate(()),
         axis_size=4,
         in_axes=None,
     )()
@@ -110,7 +112,7 @@ def save_four_multipoint_trace_vizs():
 
     print("Making and saving visualizations of trace densities.")
     densities = vmap(
-        lambda chm: npoint_curve.log_density((10,), chm),
+        lambda chm: npoint_curve.log_density((), chm),
         in_axes=0,
     )(traces.get_choices())
     for i in range(4):
