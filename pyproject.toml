@@ -55,9 +55,19 @@ faircoin-comparison = "pixi run python -m examples.faircoin.main --comparison"
 matplotlib = "*"
 numpy = "*"
 
+[tool.pixi.feature.curvefit.pypi-dependencies]
+torch = "*"
+numpyro = "*"
+pyro-ppl = "*"
+
 [tool.pixi.feature.curvefit.tasks]
 setup = "mkdir -p examples/curvefit/figs"
 curvefit = "pixi run python examples/curvefit/main.py"
+curvefit-data = "pixi run python examples/curvefit/data.py"
+curvefit-genjax = "pixi run python examples/curvefit/core.py"
+curvefit-pyro = "pixi run python examples/curvefit/pyro_impl.py"
+curvefit-numpyro = "pixi run python examples/curvefit/numpyro_impl.py"
+curvefit-all = "pixi run curvefit-genjax && pixi run curvefit-pyro && pixi run curvefit-numpyro"
 
 [tool.pixi.feature.format.tasks]
 format = "ruff format . && ruff check . --fix"
