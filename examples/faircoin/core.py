@@ -1,3 +1,5 @@
+"""Core model definitions and timing utilities for fair coin case study."""
+
 import jax
 import jax.numpy as jnp
 import jax.random as jrand
@@ -8,6 +10,17 @@ from genjax import beta, flip, gen
 
 
 def timing(fn, repeats=200, inner_repeats=200, number=100):
+    """Benchmark function execution time with multiple runs.
+
+    Args:
+        fn: Function to benchmark
+        repeats: Number of outer timing runs
+        inner_repeats: Number of inner timing runs per outer run
+        number: Legacy parameter for compatibility
+
+    Returns:
+        Tuple of (times_array, (mean_time, std_time))
+    """
     times = []
     for i in range(repeats):
         possible = []
@@ -23,6 +36,10 @@ def timing(fn, repeats=200, inner_repeats=200, number=100):
 
 @gen
 def beta_ber():
+    """Beta-Bernoulli model for fair coin inference.
+
+    Models coin fairness with Beta(10, 10) prior and Bernoulli likelihood.
+    """
     # define the hyperparameters that control the Beta prior
     alpha0 = jnp.array(10.0)
     beta0 = jnp.array(10.0)
@@ -36,6 +53,7 @@ def genjax_timing(
     repeats=50,
     num_samples=1000,
 ):
+    """Time GenJAX importance sampling implementation."""
     data = {"obs": jnp.ones(num_obs)}
 
     def importance_(data):
@@ -66,6 +84,7 @@ def numpyro_timing(
     repeats=200,
     num_samples=1000,
 ):
+    """Time NumPyro importance sampling implementation."""
     import numpyro
     import numpyro.distributions as dist
     from numpyro.handlers import block, replay, seed
@@ -134,6 +153,7 @@ def handcoded_timing(
     repeats=50,
     num_samples=1000,
 ):
+    """Time handcoded JAX importance sampling implementation."""
     data = jnp.ones(num_obs)
 
     def importance_(data):
@@ -163,103 +183,76 @@ def handcoded_timing(
     return times, (time_mu, time_std)
 
 
-def timing_comparison_fig(
+def pyro_timing(
     num_obs=50,
     repeats=200,
     num_samples=1000,
 ):
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+    """Time Pyro importance sampling implementation."""
+    import torch
+    import pyro
+    import pyro.distributions as dist
 
-    sns.set_style("white")
+    # Set PyTorch to use CPU for fair comparison with JAX CPU
+    if hasattr(torch, "set_default_device"):
+        torch.set_default_device("cpu")
 
-    gj_times, (gj_mu, gj_std) = genjax_timing(
+    # Convert JAX data to PyTorch tensor
+    data = torch.ones(num_obs, dtype=torch.float32)
+
+    def model(data):
+        # Define hyperparameters for Beta prior
+        alpha0 = torch.tensor(10.0, dtype=torch.float32)
+        beta0 = torch.tensor(10.0, dtype=torch.float32)
+
+        # Sample fairness parameter from Beta prior
+        f = pyro.sample("latent_fairness", dist.Beta(alpha0, beta0))
+
+        # Observe data using Bernoulli likelihood
+        with pyro.plate("data", len(data)):
+            pyro.sample("obs", dist.Bernoulli(f), obs=data)
+
+    def guide(data):
+        # Prior as guide (importance sampling)
+        alpha0 = torch.tensor(10.0, dtype=torch.float32)
+        beta0 = torch.tensor(10.0, dtype=torch.float32)
+        pyro.sample("latent_fairness", dist.Beta(alpha0, beta0))
+
+    def single_importance_sample():
+        """Single importance sampling step."""
+        pyro.clear_param_store()
+
+        # Sample from guide and compute weight
+        guide_trace = pyro.poutine.trace(guide).get_trace(data)
+        model_trace = pyro.poutine.trace(
+            pyro.poutine.replay(model, trace=guide_trace)
+        ).get_trace(data)
+
+        # Compute importance weight (log space)
+        weight = model_trace.log_prob_sum() - guide_trace.log_prob_sum()
+        return weight
+
+    # Vectorized importance sampling
+    def run_inference():
+        weights = []
+        for _ in range(num_samples):
+            weight = single_importance_sample()
+            weights.append(weight)
+        return torch.tensor(weights)
+
+    # Warm up
+    try:
+        _ = run_inference()
+        _ = run_inference()
+    except Exception as e:
+        print(f"Pyro warmup failed: {e}")
+        raise
+
+    # Time the inference
+    times, (time_mu, time_std) = timing(
+        lambda: run_inference(),
         repeats=repeats,
-        num_obs=num_obs,
-        num_samples=num_samples,
-    )
-    np_times, (np_mu, np_std) = numpyro_timing(
-        repeats=repeats,
-        num_obs=num_obs,
-        num_samples=num_samples,
-    )
-    hc_times, (hc_mu, hc_std) = handcoded_timing(
-        repeats=repeats,
-        num_obs=num_obs,
-        num_samples=num_samples,
-    )
-    print(gj_mu, hc_mu, np_mu)
-
-    fig, ax = plt.subplots(figsize=(5, 3), dpi=240)
-    ax.ticklabel_format(style="sci", scilimits=(-3, 4), axis="both")
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Counts")
-
-    # GenJAX
-    ax.hist(
-        gj_times,
-        bins=20,
-        color="deepskyblue",
-        label="GenJAX",
-    )
-    ax.axvline(
-        x=gj_mu,
-        color="black",
-        linestyle="-",
-        linewidth=2,
-    )  # Outline
-    ax.axvline(
-        x=gj_mu,
-        color="deepskyblue",
-        linestyle="--",
-        linewidth=1,
+        inner_repeats=5,  # Fewer inner repeats for Pyro as it's typically slower
     )
 
-    # NumPyro
-    ax.hist(
-        np_times,
-        bins=20,
-        color="coral",
-        label="NumPyro",
-    )
-    ax.axvline(
-        x=np_mu,
-        color="black",
-        linestyle="-",
-        linewidth=2,
-    )  # Outline
-    ax.axvline(
-        x=np_mu,
-        color="coral",
-        linestyle="--",
-        linewidth=1,
-    )
-
-    # Handcoded
-    ax.hist(
-        hc_times,
-        bins=20,
-        color="gold",
-        label="Handcoded",
-    )
-    ax.axvline(
-        x=hc_mu,
-        color="black",
-        linestyle="-",
-        linewidth=2,
-    )  # Outline
-    ax.axvline(
-        x=hc_mu,
-        color="gold",
-        linestyle="--",
-        linewidth=1,
-    )
-
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels)
-    plt.tight_layout()
-    plt.savefig("examples/betaber/figs/comparison.pdf")
-
-
-if __name__ == "__main__":
-    timing_comparison_fig()
+    return times, (time_mu, time_std)
