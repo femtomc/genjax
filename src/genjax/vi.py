@@ -20,7 +20,14 @@ from .adev import (
 
 @Pytree.dataclass
 class VariationalApproximation(Pytree):
-    """Result of variational inference containing parameters, history, and diagnostics."""
+    """Result of variational inference containing parameters, history, and diagnostics.
+
+    Args:
+        final_params: Final optimized variational parameters.
+        param_history: History of parameter values during optimization.
+        loss_history: History of loss values during optimization.
+        n_iterations: Number of optimization iterations performed.
+    """
 
     final_params: jnp.ndarray
     param_history: jnp.ndarray
@@ -46,17 +53,16 @@ def elbo_factory(
     constraint: X,
     target_args: tuple = (),
 ) -> Any:
-    """
-    Factory function to create ELBO objective for variational inference.
+    """Factory function to create ELBO objective for variational inference.
 
     Args:
-        target_gf: Target generative function (model)
-        variational_family: Variational family (parameterized by theta, with access to constraints)
-        constraint: Observed data/constraints
-        target_args: Arguments for target generative function
+        target_gf: Target generative function (model).
+        variational_family: Variational family (parameterized by theta, with access to constraints).
+        constraint: Observed data/constraints.
+        target_args: Arguments for target generative function.
 
     Returns:
-        ELBO function that takes variational parameters and returns expectation
+        ELBO function that takes variational parameters and returns expectation.
     """
 
     @expectation
@@ -91,13 +97,12 @@ def optimize_vi(
     n_iterations: int = 1000,
     track_history: bool = True,
 ) -> VariationalApproximation:
-    """
-    Optimize variational parameters using gradient ascent on ELBO.
+    """Optimize variational parameters using gradient ascent on ELBO.
 
     Args:
-        elbo_fn: ELBO expectation function (from elbo_factory, constraints already bound)
-        init_params: Initial variational parameters
-        learning_rate: Step size for gradient ascent
+        elbo_fn: ELBO expectation function (from elbo_factory, constraints already bound).
+        init_params: Initial variational parameters.
+        learning_rate: Step size for gradient ascent.
         n_iterations: Number of optimization iterations
         track_history: Whether to track parameter and loss history
 
