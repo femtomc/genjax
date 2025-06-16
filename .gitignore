@@ -5,6 +5,7 @@ __pycache__
 .ruff_cache
 docs
 .vscode
+.pytest_cache
 
 # Coverage files
 htmlcov/
