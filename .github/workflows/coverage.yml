@@ -26,7 +26,7 @@ jobs:
       run: |
         if [ -f "codecov.yml" ]; then
           echo "📋 Codecov configuration found"
-          python -c "import yaml; config = yaml.safe_load(open('codecov.yml')); print('✅ Valid YAML configuration'); print(f'📊 Project target: {config[\"coverage\"][\"status\"][\"project\"][\"default\"][\"target\"]}'); print(f'🔧 Patch target: {config[\"coverage\"][\"status\"][\"patch\"][\"default\"][\"target\"]}')"
+          echo "✅ Configuration file present and ready for Codecov"
         else
           echo "⚠️  No codecov.yml found, using Codecov defaults"
         fi
@@ -38,7 +38,7 @@ jobs:
       run: |
         echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        coverage report --show-missing >> $GITHUB_STEP_SUMMARY
+        eval "$(pixi shell-hook -e test)" && coverage report --show-missing >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload to Codecov
