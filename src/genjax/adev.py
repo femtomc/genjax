@@ -645,18 +645,23 @@ class Expectation(Pytree):
         prog: Internal ADEVProgram containing the source computation
 
     Example:
-        ```python
-        @expectation
-        def loss_function(theta):
-            x = normal_reparam(theta, 1.0)
-            return x**2
-
-        # Compute gradient estimate
-        grad = loss_function.grad_estimate(0.5)
-
-        # Compute expectation value
-        value = loss_function.estimate(0.5)
-        ```
+        >>> from genjax.adev import expectation, normal_reparam
+        >>> import jax.numpy as jnp
+        >>>
+        >>> @expectation
+        ... def loss_function(theta):
+        ...     x = normal_reparam(theta, 1.0)
+        ...     return x**2
+        >>>
+        >>> # Compute gradient estimate
+        >>> grad = loss_function.grad_estimate(0.5)
+        >>> jnp.isfinite(grad)  # doctest: +ELLIPSIS
+        Array(True, dtype=bool...)
+        >>>
+        >>> # Compute expectation value
+        >>> value = loss_function.estimate(0.5)
+        >>> jnp.isfinite(value)  # doctest: +ELLIPSIS
+        Array(True, dtype=bool...)
     """
 
     prog: ADEVProgram
@@ -700,18 +705,20 @@ class Expectation(Pytree):
             If multiple arguments: Tuple of gradient estimates
 
         Example:
-            ```python
-            @expectation
-            def objective(mu, sigma):
-                x = normal_reparam(mu, sigma)
-                return x**2
-
-            # Single argument - returns single gradient
-            grad_mu = objective.grad_estimate(1.0, 0.5)  # Returns single array
-
-            # Multiple arguments - returns tuple
-            grad_mu, grad_sigma = objective.grad_estimate(1.0, 0.5)
-            ```
+            >>> from genjax.adev import expectation, normal_reparam
+            >>> import jax.numpy as jnp
+            >>>
+            >>> @expectation
+            ... def objective(mu, sigma):
+            ...     x = normal_reparam(mu, sigma)
+            ...     return x**2
+            >>>
+            >>> # Compute gradient with respect to both parameters
+            >>> grad_mu, grad_sigma = objective.grad_estimate(1.0, 0.5)
+            >>> jnp.isfinite(grad_mu)  # doctest: +ELLIPSIS
+            Array(True, dtype=bool...)
+            >>> jnp.isfinite(grad_sigma)  # doctest: +ELLIPSIS
+            Array(True, dtype=bool...)
 
         Note:
             The gradient estimates are unbiased, meaning E[∇̂f] = ∇E[f], but they
@@ -743,15 +750,20 @@ class Expectation(Pytree):
             The expectation value E[f(X)] as computed by the stochastic program
 
         Example:
-            ```python
-            @expectation
-            def mean_squared(mu):
-                x = normal_reparam(mu, 1.0)
-                return x**2
-
-            # Just compute E[X^2] where X ~ Normal(mu, 1)
-            expectation_value = mean_squared.estimate(2.0)
-            ```
+            >>> from genjax.adev import expectation, normal_reparam
+            >>> import jax.numpy as jnp
+            >>>
+            >>> @expectation
+            ... def mean_squared(mu):
+            ...     x = normal_reparam(mu, 1.0)
+            ...     return x**2
+            >>>
+            >>> # Just compute E[X^2] where X ~ Normal(mu, 1)
+            >>> expectation_value = mean_squared.estimate(2.0)
+            >>> jnp.isfinite(expectation_value)  # doctest: +ELLIPSIS
+            Array(True, dtype=bool...)
+            >>> expectation_value > 0  # Should be positive for squared values  # doctest: +ELLIPSIS
+            Array(True, dtype=bool...)
 
         Note:
             This method uses zero tangents in the dual number computation,
@@ -777,20 +789,26 @@ def expectation(source: Callable[..., Any]) -> Expectation:
         Expectation object with grad_estimate, jvp_estimate, and estimate methods
 
     Example:
-        ```python
-        # Basic usage
-        @expectation
-        def quadratic_loss(theta):
-            x = normal_reparam(theta, 1.0)  # Reparameterizable distribution
-            return (x - 2.0)**2
+        >>> from genjax.adev import expectation, normal_reparam
+        >>>
+        >>> # Basic usage
+        >>> @expectation
+        ... def quadratic_loss(theta):
+        ...     x = normal_reparam(theta, 1.0)  # Reparameterizable distribution
+        ...     return (x - 2.0)**2
+        >>>
+        >>> # Compute gradient
+        >>> gradient = quadratic_loss.grad_estimate(1.0)
+        >>> import jax.numpy as jnp
+        >>> jnp.isfinite(gradient)  # doctest: +ELLIPSIS
+        Array(True, dtype=bool...)
+        >>>
+        >>> # Compute expectation value
+        >>> loss_value = quadratic_loss.estimate(1.0)
+        >>> jnp.isfinite(loss_value)  # doctest: +ELLIPSIS
+        Array(True, dtype=bool...)
 
-        # Compute gradient
-        gradient = quadratic_loss.grad_estimate(1.0)
-
-        # Compute expectation value
-        loss_value = quadratic_loss.estimate(1.0)
-
-        # More complex example with multiple variables
+        More complex example with multiple variables:
         @expectation
         def complex_objective(mu, sigma):
             x = normal_reparam(mu, sigma)

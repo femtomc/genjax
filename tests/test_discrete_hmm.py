@@ -32,39 +32,6 @@ tfd = tfp.distributions
 class TestDiscreteHMMAgainstTFP:
     """Test suite comparing GenJAX discrete HMM against TFP's HiddenMarkovModel."""
 
-    @pytest.fixture
-    def simple_hmm_params(self):
-        """Simple 2-state, 2-observation HMM parameters for testing."""
-        initial_probs = jnp.array([0.6, 0.4])
-        transition_matrix = jnp.array([[0.7, 0.3], [0.4, 0.6]])
-        emission_matrix = jnp.array(
-            [
-                [0.9, 0.1],  # State 0 emits obs 0 with prob 0.9
-                [0.2, 0.8],  # State 1 emits obs 1 with prob 0.8
-            ]
-        )
-        return initial_probs, transition_matrix, emission_matrix
-
-    @pytest.fixture
-    def complex_hmm_params(self):
-        """More complex 3-state, 4-observation HMM parameters."""
-        initial_probs = jnp.array([0.5, 0.3, 0.2])
-        transition_matrix = jnp.array(
-            [
-                [0.5, 0.3, 0.2],
-                [0.2, 0.6, 0.2],
-                [0.1, 0.3, 0.6],
-            ]
-        )
-        emission_matrix = jnp.array(
-            [
-                [0.4, 0.3, 0.2, 0.1],  # State 0
-                [0.1, 0.4, 0.4, 0.1],  # State 1
-                [0.1, 0.1, 0.2, 0.6],  # State 2
-            ]
-        )
-        return initial_probs, transition_matrix, emission_matrix
-
     def create_tfp_hmm(
         self, initial_probs, transition_matrix, emission_matrix, num_steps
     ):
@@ -82,7 +49,9 @@ class TestDiscreteHMMAgainstTFP:
 
     def test_marginal_log_prob_simple_case(self, simple_hmm_params):
         """Test marginal log probability against TFP for simple case."""
-        initial_probs, transition_matrix, emission_matrix = simple_hmm_params
+        initial_probs = simple_hmm_params["initial_probs"]
+        transition_matrix = simple_hmm_params["transition_matrix"]
+        emission_matrix = simple_hmm_params["emission_matrix"]
 
         # Test observations of different lengths
         test_sequences = [
@@ -119,7 +88,9 @@ class TestDiscreteHMMAgainstTFP:
 
     def test_marginal_log_prob_complex_case(self, complex_hmm_params):
         """Test marginal log probability against TFP for complex case."""
-        initial_probs, transition_matrix, emission_matrix = complex_hmm_params
+        initial_probs = complex_hmm_params["initial_probs"]
+        transition_matrix = complex_hmm_params["transition_matrix"]
+        emission_matrix = complex_hmm_params["emission_matrix"]
 
         # Test with longer sequences and different observations
         test_sequences = [
@@ -153,7 +124,9 @@ class TestDiscreteHMMAgainstTFP:
 
     def test_sequence_log_prob_computation(self, simple_hmm_params):
         """Test the compute_sequence_log_prob function against manual calculation."""
-        initial_probs, transition_matrix, emission_matrix = simple_hmm_params
+        initial_probs = simple_hmm_params["initial_probs"]
+        transition_matrix = simple_hmm_params["transition_matrix"]
+        emission_matrix = simple_hmm_params["emission_matrix"]
 
         # Simple test case: states=[0, 1], observations=[0, 1]
         states = jnp.array([0, 1])
@@ -181,7 +154,9 @@ class TestDiscreteHMMAgainstTFP:
 
     def test_forward_filter_normalization(self, simple_hmm_params):
         """Test that forward filter probabilities are properly normalized."""
-        initial_probs, transition_matrix, emission_matrix = simple_hmm_params
+        initial_probs = simple_hmm_params["initial_probs"]
+        transition_matrix = simple_hmm_params["transition_matrix"]
+        emission_matrix = simple_hmm_params["emission_matrix"]
 
         observations = jnp.array([0, 1, 0, 1])
         alpha, _ = forward_filter(
@@ -200,7 +175,9 @@ class TestDiscreteHMMAgainstTFP:
 
     def test_sample_vs_tfp_statistics(self, simple_hmm_params):
         """Test that sampling statistics roughly match between GenJAX and TFP."""
-        initial_probs, transition_matrix, emission_matrix = simple_hmm_params
+        initial_probs = simple_hmm_params["initial_probs"]
+        transition_matrix = simple_hmm_params["transition_matrix"]
+        emission_matrix = simple_hmm_params["emission_matrix"]
         key = jrand.key(42)
         T = 10
         n_samples = 1000
@@ -234,7 +211,9 @@ class TestDiscreteHMMAgainstTFP:
     @pytest.mark.parametrize("T", [1, 2, 5, 10])
     def test_different_sequence_lengths(self, simple_hmm_params, T):
         """Test marginal log probability for different sequence lengths."""
-        initial_probs, transition_matrix, emission_matrix = simple_hmm_params
+        initial_probs = simple_hmm_params["initial_probs"]
+        transition_matrix = simple_hmm_params["transition_matrix"]
+        emission_matrix = simple_hmm_params["emission_matrix"]
         key = jrand.key(123)
 
         # Generate random observation sequence
@@ -264,7 +243,9 @@ class TestDiscreteHMMAgainstTFP:
 
     def test_edge_case_single_timestep(self, simple_hmm_params):
         """Test edge case of single time step (T=1)."""
-        initial_probs, transition_matrix, emission_matrix = simple_hmm_params
+        initial_probs = simple_hmm_params["initial_probs"]
+        transition_matrix = simple_hmm_params["transition_matrix"]
+        emission_matrix = simple_hmm_params["emission_matrix"]
 
         for obs in [0, 1]:
             observations = jnp.array([obs])
@@ -305,7 +286,9 @@ class TestDiscreteHMMAgainstTFP:
 
     def test_ffbs_consistency(self, simple_hmm_params):
         """Test that FFBS produces valid samples with correct log probabilities."""
-        initial_probs, transition_matrix, emission_matrix = simple_hmm_params
+        initial_probs = simple_hmm_params["initial_probs"]
+        transition_matrix = simple_hmm_params["transition_matrix"]
+        emission_matrix = simple_hmm_params["emission_matrix"]
         key = jrand.key(42)
 
         # Generate test observations

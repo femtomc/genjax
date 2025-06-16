@@ -53,6 +53,9 @@ preview = "quarto preview ./quarto"
 [tool.pixi.feature.test.tasks]
 test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"
 coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=term && echo 'Coverage report available at htmlcov/index.html'"
+doctest = "xdoctest src/genjax --verbose=2"
+doctest-module = "xdoctest src/genjax/{module} --verbose=2"
+test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"
 
 [tool.pixi.environments]
 cuda = ["cuda"]
@@ -63,7 +66,7 @@ test = { features = ["test"], solve-group = "default" }
 [dependency-groups]
 format = ["ruff>=0.9.2,<0.10","vulture>=2.14,<3","pre-commit>=4.0,<5"]
 docs = ["jupyter"]
-test = ["pytest>=8.0,<9", "pytest-cov>=6.0,<7", "coverage>=7.0,<8"]
+test = ["pytest>=8.0,<9", "pytest-cov>=6.0,<7", "coverage>=7.0,<8", "xdoctest>=1.1.0,<2"]
 cuda = ["matplotlib", "seaborn", "numpyro"]
 
 [tool.coverage.run]
@@ -88,3 +91,47 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",  # Show short test summary for all results
+    "--strict-markers",  # Require all markers to be defined
+    "--strict-config",  # Strict configuration parsing
+    "--cov=src/genjax",  # Coverage for source code
+    "--cov-report=term-missing",  # Show missing lines in terminal
+    "--cov-report=html",  # Generate HTML coverage report
+    "--cov-report=xml",  # Generate XML coverage for CI
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (taking >5 seconds)",
+    "fast: marks tests as fast (taking <1 second)",
+    "integration: marks tests as integration tests (cross-component)",
+    "unit: marks tests as unit tests (single component)",
+    "regression: marks tests as regression tests (bug prevention)",
+    "adev: marks tests for ADEV gradient estimators",
+    "smc: marks tests for Sequential Monte Carlo",
+    "vi: marks tests for Variational Inference",
+    "hmm: marks tests for Hidden Markov Models",
+    "core: marks tests for core GenJAX functionality",
+    "tfp: marks tests requiring TensorFlow Probability",
+    "requires_gpu: marks tests that need GPU acceleration",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:jax.*",
+    "ignore::DeprecationWarning:tensorflow_probability.*",
+    "error::UserWarning",  # Turn UserWarnings into errors to catch issues
+]
+
+[tool.xdoctest]
+# Configure xdoctest for running doctests
+modname = "genjax"
+command = "list"
+verbose = 2
+durations = 10
+style = "google"
+options = "+ELLIPSIS"

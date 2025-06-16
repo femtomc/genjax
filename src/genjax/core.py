@@ -139,21 +139,20 @@ class Pytree(pz.Struct):
         Examples
         --------
 
-        ```{python}
-        from genjax import Pytree
-        from jaxtyping import ArrayLike
-        import jax.numpy as jnp
-
-
-        @Pytree.dataclass
-        # Enforces type annotations on instantiation.
-        class MyClass(Pytree):
-            my_static_field: int = Pytree.static()
-            my_dynamic_field: ArrayLike
-
-
-        MyClass(10, jnp.array(5.0))
-        ```
+        >>> from genjax import Pytree
+        >>> from jaxtyping import ArrayLike
+        >>> import jax.numpy as jnp
+        >>>
+        >>> @Pytree.dataclass
+        ... class MyClass(Pytree):
+        ...     my_static_field: int = Pytree.static()
+        ...     my_dynamic_field: ArrayLike
+        >>>
+        >>> instance = MyClass(10, jnp.array(5.0))
+        >>> instance.my_static_field
+        10
+        >>> instance.my_dynamic_field  # doctest: +ELLIPSIS
+        Array(5., dtype=float32...)
         """
 
         return pz.pytree_dataclass(
@@ -174,16 +173,20 @@ class Pytree(pz.Struct):
         Examples
         --------
 
-        ```{python}
-        @Pytree.dataclass
-        # Enforces type annotations on instantiation.
-        class MyClass(Pytree):
-            my_dynamic_field: ArrayLike
-            my_static_field: int = Pytree.static(default=0)
-
-
-        MyClass(jnp.array(5.0))
-        ```
+        >>> from genjax import Pytree
+        >>> from jaxtyping import ArrayLike
+        >>> import jax.numpy as jnp
+        >>>
+        >>> @Pytree.dataclass
+        ... class MyClass(Pytree):
+        ...     my_dynamic_field: ArrayLike
+        ...     my_static_field: int = Pytree.static(default=0)
+        >>>
+        >>> instance = MyClass(jnp.array(5.0))
+        >>> instance.my_static_field
+        0
+        >>> instance.my_dynamic_field  # doctest: +ELLIPSIS
+        Array(5., dtype=float32...)
 
         """
         return field(metadata={"pytree_node": False}, **kwargs)
@@ -1980,7 +1983,9 @@ class Scan(Generic[X, R], GFI[X, R]):
         length: Fixed length for the scan
 
     Example:
-        >>> from genjax import gen, normal, Scan
+        >>> from genjax import gen, normal, Scan, seed
+        >>> import jax.numpy as jnp
+        >>> import jax.random as jrand
         >>>
         >>> @gen
         >>> def step(carry, x):
@@ -1988,11 +1993,14 @@ class Scan(Generic[X, R], GFI[X, R]):
         ...     new_carry = carry + x + noise
         ...     return new_carry, new_carry  # output equals new carry
         >>>
-        >>> scan_fn = Scan(step)
+        >>> scan_fn = Scan(step, length=3)
         >>> init_carry = 0.0
         >>> xs = jnp.array([1.0, 2.0, 3.0])
-        >>> trace = scan_fn.simulate((init_carry, xs))
+        >>> # Use seed transformation for PJAX primitives
+        >>> key = jrand.key(0)
+        >>> trace = seed(scan_fn.simulate)(key, (init_carry, xs))
         >>> final_carry, outputs = trace.get_retval()
+        >>> assert len(outputs) == 3  # Should have 3 outputs
     """
 
     callee: GFI[X, R]
