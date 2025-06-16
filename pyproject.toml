@@ -35,7 +35,7 @@ jaxlib = { version = "*", extras = ["cuda"] }
 [tool.pixi.feature.cuda.tasks]
 gol-timing = "pixi run python examples/gol/time_scaling.py"
 gol = "pixi run python examples/gol/figures.py"
-localization = "pixi run python examples/localization/main.py"
+localization = "pixi run python -m examples.localization.main"
 
 [tool.pixi.feature.faircoin.dependencies]
 matplotlib = "*"
