@@ -35,7 +35,6 @@ jaxlib = { version = "*", extras = ["cuda"] }
 [tool.pixi.feature.cuda.tasks]
 gol-timing = "pixi run python examples/gol/time_scaling.py"
 gol = "pixi run python examples/gol/figures.py"
-curvefit = "pixi run python examples/curvefit/main.py"
 localization = "pixi run python examples/localization/main.py"
 
 [tool.pixi.feature.faircoin.dependencies]
@@ -51,6 +50,14 @@ pyro-ppl = "*"
 setup = "mkdir -p examples/faircoin/figs"
 faircoin-timing = "pixi run python -m examples.faircoin.main"
 faircoin-comparison = "pixi run python -m examples.faircoin.main --comparison"
+
+[tool.pixi.feature.curvefit.dependencies]
+matplotlib = "*"
+numpy = "*"
+
+[tool.pixi.feature.curvefit.tasks]
+setup = "mkdir -p examples/curvefit/figs"
+curvefit = "pixi run python examples/curvefit/main.py"
 
 [tool.pixi.feature.format.tasks]
 format = "ruff format . && ruff check . --fix"
@@ -75,6 +82,7 @@ format = { features = ["format"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "docs" }
 test = { features = ["test"], solve-group = "default" }
 faircoin = { features = ["faircoin"], solve-group = "default" }
+curvefit = { features = ["curvefit"], solve-group = "default" }
 
 [dependency-groups]
 format = ["ruff>=0.9.2,<0.10","vulture>=2.14,<3","pre-commit>=4.0,<5"]
