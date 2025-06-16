@@ -999,6 +999,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/ff/b2/83a6ddf56cdcbad4e3d841fcc55d6ba7d19aeb89c50f24dd7e859ec0805f/websockets-15.0.1-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/ca/51/5447876806d1088a0f8f71e16542bf350918128d0a69437df26047c8e46f/widgetsnbextension-4.0.14-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d5/66/5d973e9f3e7370fd686fb47a9af3319418ed925c27d72ce16b791231576d/wrapt-1.17.2-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/58/b8/e4722f5e5f592a665cc8e55a334ea721c359f09574e6b987dc551a1e1f4c/xdoctest-1.2.0-py3-none-any.whl
       - pypi: .
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/bzip2-1.0.8-h99b78c6_7.conda
@@ -1083,6 +1084,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/ff/0b/33cef55ff24f2d92924923c99926dcce78e7bd922d649467f0eda8368923/websockets-15.0.1-cp313-cp313-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/ca/51/5447876806d1088a0f8f71e16542bf350918128d0a69437df26047c8e46f/widgetsnbextension-4.0.14-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/36/89/0aae34c10fe524cce30fe5fc433210376bce94cf74d05b0d68344c8ba46e/wrapt-1.17.2-cp313-cp313-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/58/b8/e4722f5e5f592a665cc8e55a334ea721c359f09574e6b987dc551a1e1f4c/xdoctest-1.2.0-py3-none-any.whl
       - pypi: .
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -1908,7 +1910,7 @@ packages:
 - pypi: .
   name: genjax
   version: 0.1.0
-  sha256: 3fbade208153736eada1cece7dd7390bd6c293c9b9503e34a8af221ae2d027b7
+  sha256: 076a83f65152cb3749caa98aac547ec0482189663edfc65acbcc89fccca998f9
   requires_dist:
   - penzai>=0.2.5,<0.3
   - beartype>=0.21.0,<0.22
@@ -4983,6 +4985,166 @@ packages:
   name: wrapt
   version: 1.17.2
   sha256: 8112e52c5822fc4253f3901b676c55ddf288614dc7011634e2719718eaa187dc
+  requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/58/b8/e4722f5e5f592a665cc8e55a334ea721c359f09574e6b987dc551a1e1f4c/xdoctest-1.2.0-py3-none-any.whl
+  name: xdoctest
+  version: 1.2.0
+  sha256: 0f1ecf5939a687bd1fc8deefbff1743c65419cce26dff908f8b84c93fbe486bc
+  requires_dist:
+  - jupyter-client>=7.0.0 ; extra == 'all'
+  - ipython>=7.23.1 ; extra == 'all'
+  - jedi>=0.16 ; extra == 'all'
+  - attrs>=19.2.0 ; extra == 'all'
+  - jupyter-core>=4.7.0 ; extra == 'all'
+  - pyflakes>=2.2.0 ; extra == 'all'
+  - jupyter-client==7.0.0 ; extra == 'all-strict'
+  - ipython==7.23.1 ; extra == 'all-strict'
+  - jedi==0.16 ; extra == 'all-strict'
+  - attrs==19.2.0 ; extra == 'all-strict'
+  - jupyter-core==4.7.0 ; extra == 'all-strict'
+  - pyflakes==2.2.0 ; extra == 'all-strict'
+  - colorama==0.4.1 ; sys_platform == 'win32' and extra == 'all-strict'
+  - debugpy==1.3.0 ; python_full_version == '3.9.*' and extra == 'all-strict'
+  - pytest==4.6.0 ; python_full_version >= '3.7' and python_full_version < '3.10' and extra == 'all-strict'
+  - tomli==0.2.0 ; python_full_version >= '3.6' and python_full_version < '3.11' and extra == 'all-strict'
+  - ipykernel==6.0.0 ; (python_full_version >= '3.7' and python_full_version < '3.12' and platform_python_implementation != 'PyPy' and extra == 'all-strict') or (python_full_version >= '3.7' and python_full_version < '3.12' and sys_platform != 'win32' and extra == 'all-strict')
+  - pygments==2.0.0 ; python_full_version >= '2.7' and python_full_version < '3.5' and extra == 'all-strict'
+  - nbconvert==6.0.0 ; python_full_version == '3.6.*' and platform_python_implementation != 'PyPy' and extra == 'all-strict'
+  - debugpy==1.0.0 ; python_full_version == '3.8.*' and extra == 'all-strict'
+  - ipykernel==6.11.0 ; (python_full_version >= '3.12' and python_full_version < '4.0' and platform_python_implementation != 'PyPy' and extra == 'all-strict') or (python_full_version >= '3.12' and python_full_version < '4.0' and sys_platform != 'win32' and extra == 'all-strict')
+  - debugpy==1.6.0 ; python_full_version >= '3.10' and extra == 'all-strict'
+  - pytest==6.2.5 ; python_full_version >= '3.10' and extra == 'all-strict'
+  - pygments==2.4.1 ; python_full_version >= '3.5' and extra == 'all-strict'
+  - jinja2==3.0.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'all-strict'
+  - ipython-genutils==0.2.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'all-strict'
+  - pytest-cov==3.0.0 ; python_full_version >= '3.6' and extra == 'all-strict'
+  - nbconvert==6.1.0 ; python_full_version >= '3.7' and platform_python_implementation != 'PyPy' and extra == 'all-strict'
+  - colorama>=0.4.1 ; sys_platform == 'win32' and extra == 'all'
+  - debugpy>=1.3.0 ; python_full_version == '3.9.*' and extra == 'all'
+  - pytest>=4.6.0 ; python_full_version >= '3.7' and python_full_version < '3.10' and extra == 'all'
+  - tomli>=0.2.0 ; python_full_version >= '3.6' and python_full_version < '3.11' and extra == 'all'
+  - ipykernel>=6.0.0 ; (python_full_version >= '3.7' and python_full_version < '3.12' and platform_python_implementation != 'PyPy' and extra == 'all') or (python_full_version >= '3.7' and python_full_version < '3.12' and sys_platform != 'win32' and extra == 'all')
+  - pygments>=2.0.0 ; python_full_version >= '2.7' and python_full_version < '3.5' and extra == 'all'
+  - nbconvert>=6.0.0 ; python_full_version == '3.6.*' and platform_python_implementation != 'PyPy' and extra == 'all'
+  - debugpy>=1.0.0 ; python_full_version == '3.8.*' and extra == 'all'
+  - ipykernel>=6.11.0 ; (python_full_version >= '3.12' and python_full_version < '4.0' and platform_python_implementation != 'PyPy' and extra == 'all') or (python_full_version >= '3.12' and python_full_version < '4.0' and sys_platform != 'win32' and extra == 'all')
+  - debugpy>=1.6.0 ; python_full_version >= '3.10' and extra == 'all'
+  - pytest>=6.2.5 ; python_full_version >= '3.10' and extra == 'all'
+  - pygments>=2.4.1 ; python_full_version >= '3.5' and extra == 'all'
+  - jinja2>=3.0.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'all'
+  - ipython-genutils>=0.2.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'all'
+  - pytest-cov>=3.0.0 ; python_full_version >= '3.6' and extra == 'all'
+  - nbconvert>=6.1.0 ; python_full_version >= '3.7' and platform_python_implementation != 'PyPy' and extra == 'all'
+  - colorama==0.4.1 ; sys_platform == 'win32' and extra == 'colors-strict'
+  - pygments==2.0.0 ; python_full_version >= '2.7' and python_full_version < '3.5' and extra == 'colors-strict'
+  - pygments==2.4.1 ; python_full_version >= '3.5' and extra == 'colors-strict'
+  - colorama>=0.4.1 ; sys_platform == 'win32' and extra == 'colors'
+  - pygments>=2.0.0 ; python_full_version >= '2.7' and python_full_version < '3.5' and extra == 'colors'
+  - pygments>=2.4.1 ; python_full_version >= '3.5' and extra == 'colors'
+  - sphinx>=5.0.1 ; extra == 'docs'
+  - sphinx-autobuild>=2021.3.14 ; extra == 'docs'
+  - sphinx-rtd-theme>=1.0.0 ; extra == 'docs'
+  - sphinxcontrib-napoleon>=0.7 ; extra == 'docs'
+  - sphinx-autoapi>=1.8.4 ; extra == 'docs'
+  - pygments>=2.9.0 ; extra == 'docs'
+  - myst-parser>=0.18.0 ; extra == 'docs'
+  - sphinx-reredirects>=0.0.1 ; extra == 'docs'
+  - sphinx==5.0.1 ; extra == 'docs-strict'
+  - sphinx-autobuild==2021.3.14 ; extra == 'docs-strict'
+  - sphinx-rtd-theme==1.0.0 ; extra == 'docs-strict'
+  - sphinxcontrib-napoleon==0.7 ; extra == 'docs-strict'
+  - sphinx-autoapi==1.8.4 ; extra == 'docs-strict'
+  - pygments==2.9.0 ; extra == 'docs-strict'
+  - myst-parser==0.18.0 ; extra == 'docs-strict'
+  - sphinx-reredirects==0.0.1 ; extra == 'docs-strict'
+  - jupyter-client>=7.0.0 ; extra == 'jupyter'
+  - ipython>=7.23.1 ; extra == 'jupyter'
+  - jedi>=0.16 ; extra == 'jupyter'
+  - attrs>=19.2.0 ; extra == 'jupyter'
+  - jupyter-core>=4.7.0 ; extra == 'jupyter'
+  - jupyter-client==7.0.0 ; extra == 'jupyter-strict'
+  - ipython==7.23.1 ; extra == 'jupyter-strict'
+  - jedi==0.16 ; extra == 'jupyter-strict'
+  - attrs==19.2.0 ; extra == 'jupyter-strict'
+  - jupyter-core==4.7.0 ; extra == 'jupyter-strict'
+  - debugpy==1.3.0 ; python_full_version == '3.9.*' and extra == 'jupyter-strict'
+  - ipykernel==6.0.0 ; (python_full_version >= '3.7' and python_full_version < '3.12' and platform_python_implementation != 'PyPy' and extra == 'jupyter-strict') or (python_full_version >= '3.7' and python_full_version < '3.12' and sys_platform != 'win32' and extra == 'jupyter-strict')
+  - nbconvert==6.0.0 ; python_full_version == '3.6.*' and platform_python_implementation != 'PyPy' and extra == 'jupyter-strict'
+  - debugpy==1.0.0 ; python_full_version == '3.8.*' and extra == 'jupyter-strict'
+  - ipykernel==6.11.0 ; (python_full_version >= '3.12' and python_full_version < '4.0' and platform_python_implementation != 'PyPy' and extra == 'jupyter-strict') or (python_full_version >= '3.12' and python_full_version < '4.0' and sys_platform != 'win32' and extra == 'jupyter-strict')
+  - debugpy==1.6.0 ; python_full_version >= '3.10' and extra == 'jupyter-strict'
+  - jinja2==3.0.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'jupyter-strict'
+  - ipython-genutils==0.2.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'jupyter-strict'
+  - nbconvert==6.1.0 ; python_full_version >= '3.7' and platform_python_implementation != 'PyPy' and extra == 'jupyter-strict'
+  - debugpy>=1.3.0 ; python_full_version == '3.9.*' and extra == 'jupyter'
+  - ipykernel>=6.0.0 ; (python_full_version >= '3.7' and python_full_version < '3.12' and platform_python_implementation != 'PyPy' and extra == 'jupyter') or (python_full_version >= '3.7' and python_full_version < '3.12' and sys_platform != 'win32' and extra == 'jupyter')
+  - nbconvert>=6.0.0 ; python_full_version == '3.6.*' and platform_python_implementation != 'PyPy' and extra == 'jupyter'
+  - debugpy>=1.0.0 ; python_full_version == '3.8.*' and extra == 'jupyter'
+  - ipykernel>=6.11.0 ; (python_full_version >= '3.12' and python_full_version < '4.0' and platform_python_implementation != 'PyPy' and extra == 'jupyter') or (python_full_version >= '3.12' and python_full_version < '4.0' and sys_platform != 'win32' and extra == 'jupyter')
+  - debugpy>=1.6.0 ; python_full_version >= '3.10' and extra == 'jupyter'
+  - jinja2>=3.0.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'jupyter'
+  - ipython-genutils>=0.2.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'jupyter'
+  - nbconvert>=6.1.0 ; python_full_version >= '3.7' and platform_python_implementation != 'PyPy' and extra == 'jupyter'
+  - jupyter-client>=7.0.0 ; extra == 'optional'
+  - ipython>=7.23.1 ; extra == 'optional'
+  - jedi>=0.16 ; extra == 'optional'
+  - attrs>=19.2.0 ; extra == 'optional'
+  - jupyter-core>=4.7.0 ; extra == 'optional'
+  - pyflakes>=2.2.0 ; extra == 'optional'
+  - jupyter-client==7.0.0 ; extra == 'optional-strict'
+  - ipython==7.23.1 ; extra == 'optional-strict'
+  - jedi==0.16 ; extra == 'optional-strict'
+  - attrs==19.2.0 ; extra == 'optional-strict'
+  - jupyter-core==4.7.0 ; extra == 'optional-strict'
+  - pyflakes==2.2.0 ; extra == 'optional-strict'
+  - colorama==0.4.1 ; sys_platform == 'win32' and extra == 'optional-strict'
+  - debugpy==1.3.0 ; python_full_version == '3.9.*' and extra == 'optional-strict'
+  - tomli==0.2.0 ; python_full_version >= '3.6' and python_full_version < '3.11' and extra == 'optional-strict'
+  - ipykernel==6.0.0 ; (python_full_version >= '3.7' and python_full_version < '3.12' and platform_python_implementation != 'PyPy' and extra == 'optional-strict') or (python_full_version >= '3.7' and python_full_version < '3.12' and sys_platform != 'win32' and extra == 'optional-strict')
+  - pygments==2.0.0 ; python_full_version >= '2.7' and python_full_version < '3.5' and extra == 'optional-strict'
+  - nbconvert==6.0.0 ; python_full_version == '3.6.*' and platform_python_implementation != 'PyPy' and extra == 'optional-strict'
+  - debugpy==1.0.0 ; python_full_version == '3.8.*' and extra == 'optional-strict'
+  - ipykernel==6.11.0 ; (python_full_version >= '3.12' and python_full_version < '4.0' and platform_python_implementation != 'PyPy' and extra == 'optional-strict') or (python_full_version >= '3.12' and python_full_version < '4.0' and sys_platform != 'win32' and extra == 'optional-strict')
+  - debugpy==1.6.0 ; python_full_version >= '3.10' and extra == 'optional-strict'
+  - pygments==2.4.1 ; python_full_version >= '3.5' and extra == 'optional-strict'
+  - jinja2==3.0.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'optional-strict'
+  - ipython-genutils==0.2.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'optional-strict'
+  - nbconvert==6.1.0 ; python_full_version >= '3.7' and platform_python_implementation != 'PyPy' and extra == 'optional-strict'
+  - colorama>=0.4.1 ; sys_platform == 'win32' and extra == 'optional'
+  - debugpy>=1.3.0 ; python_full_version == '3.9.*' and extra == 'optional'
+  - tomli>=0.2.0 ; python_full_version >= '3.6' and python_full_version < '3.11' and extra == 'optional'
+  - ipykernel>=6.0.0 ; (python_full_version >= '3.7' and python_full_version < '3.12' and platform_python_implementation != 'PyPy' and extra == 'optional') or (python_full_version >= '3.7' and python_full_version < '3.12' and sys_platform != 'win32' and extra == 'optional')
+  - pygments>=2.0.0 ; python_full_version >= '2.7' and python_full_version < '3.5' and extra == 'optional'
+  - nbconvert>=6.0.0 ; python_full_version == '3.6.*' and platform_python_implementation != 'PyPy' and extra == 'optional'
+  - debugpy>=1.0.0 ; python_full_version == '3.8.*' and extra == 'optional'
+  - ipykernel>=6.11.0 ; (python_full_version >= '3.12' and python_full_version < '4.0' and platform_python_implementation != 'PyPy' and extra == 'optional') or (python_full_version >= '3.12' and python_full_version < '4.0' and sys_platform != 'win32' and extra == 'optional')
+  - debugpy>=1.6.0 ; python_full_version >= '3.10' and extra == 'optional'
+  - pygments>=2.4.1 ; python_full_version >= '3.5' and extra == 'optional'
+  - jinja2>=3.0.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'optional'
+  - ipython-genutils>=0.2.0 ; python_full_version >= '3.6' and platform_python_implementation != 'PyPy' and extra == 'optional'
+  - nbconvert>=6.1.0 ; python_full_version >= '3.7' and platform_python_implementation != 'PyPy' and extra == 'optional'
+  - scikit-build==0.11.1 ; python_full_version < '3.11' and extra == 'tests-binary-strict'
+  - ninja==1.10.2 ; python_full_version < '3.11' and extra == 'tests-binary-strict'
+  - pybind11==2.7.1 ; python_full_version < '3.11' and extra == 'tests-binary-strict'
+  - cmake==3.21.2 ; python_full_version < '3.11' and extra == 'tests-binary-strict'
+  - scikit-build==0.16.1 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary-strict'
+  - ninja==1.11.1 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary-strict'
+  - pybind11==2.10.3 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary-strict'
+  - cmake==3.25.0 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary-strict'
+  - scikit-build>=0.11.1 ; python_full_version < '3.11' and extra == 'tests-binary'
+  - ninja>=1.10.2 ; python_full_version < '3.11' and extra == 'tests-binary'
+  - pybind11>=2.7.1 ; python_full_version < '3.11' and extra == 'tests-binary'
+  - cmake>=3.21.2 ; python_full_version < '3.11' and extra == 'tests-binary'
+  - scikit-build>=0.16.1 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary'
+  - ninja>=1.11.1 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary'
+  - pybind11>=2.10.3 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary'
+  - cmake>=3.25.0 ; python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tests-binary'
+  - pytest==4.6.0 ; python_full_version >= '3.7' and python_full_version < '3.10' and extra == 'tests-strict'
+  - pytest==6.2.5 ; python_full_version >= '3.10' and extra == 'tests-strict'
+  - pytest-cov==3.0.0 ; python_full_version >= '3.6' and extra == 'tests-strict'
+  - pytest>=4.6.0 ; python_full_version >= '3.7' and python_full_version < '3.10' and extra == 'tests'
+  - pytest>=6.2.5 ; python_full_version >= '3.10' and extra == 'tests'
+  - pytest-cov>=3.0.0 ; python_full_version >= '3.6' and extra == 'tests'
   requires_python: '>=3.8'
 - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-3.23.0-pyhd8ed1ab_0.conda
   sha256: 7560d21e1b021fd40b65bfb72f67945a3fcb83d78ad7ccf37b8b3165ec3b68ad

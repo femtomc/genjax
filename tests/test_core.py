@@ -1,31 +1,38 @@
 """
-Test cases for GenJAX core functionality, particularly the Scan generative function.
+Test cases for GenJAX core functionality.
 
-These tests compare density computations using the Scan GFI against pure JAX
-implementations to validate correctness.
+These tests validate the core GenJAX components including:
+- Generative functions (@gen)
+- Scan and other combinators
+- Distribution classes
+- Pytree functionality
+- Trace operations
 """
 
+import jax
 import jax.numpy as jnp
 import jax.random as jrand
+import pytest
 from jax.lax import scan
 
 from genjax.core import gen, Scan, Cond, seed
 from genjax.distributions import normal, exponential
 
 
-def test_fn_simulate_vs_manual_density():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_fn_simulate_vs_manual_density(
+    bivariate_normal_model, standard_tolerance, helpers
+):
     """Test that @gen Fn.simulate produces correct densities compared to manual computation."""
-
-    @gen
-    def simple_fn():
-        x = normal(0.0, 1.0) @ "x"
-        y = normal(x, 0.5) @ "y"
-        return x + y
-
     # Generate trace
-    trace = simple_fn.simulate(())
+    trace = bivariate_normal_model.simulate(())
     choices = trace.get_choices()
     fn_score = trace.get_score()
+
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
 
     # Extract individual choices
     x_choice = choices["x"]
@@ -38,16 +45,27 @@ def test_fn_simulate_vs_manual_density():
     manual_total_log_density = x_log_density + y_log_density
     expected_fn_score = -manual_total_log_density
 
-    assert jnp.allclose(fn_score, expected_fn_score, rtol=1e-6), (
-        f"Fn score {fn_score} != expected {expected_fn_score}"
+    helpers.assert_finite_and_close(
+        fn_score,
+        expected_fn_score,
+        rtol=standard_tolerance,
+        msg="Fn score does not match manual computation",
     )
 
     # Verify return value
-    expected_retval = x_choice + y_choice
-    assert jnp.allclose(trace.get_retval(), expected_retval, rtol=1e-6)
+    expected_retval = (x_choice, y_choice)
+    assert jnp.allclose(
+        trace.get_retval()[0], expected_retval[0], rtol=standard_tolerance
+    )
+    assert jnp.allclose(
+        trace.get_retval()[1], expected_retval[1], rtol=standard_tolerance
+    )
 
 
-def test_fn_assess_vs_manual_density():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_fn_assess_vs_manual_density(standard_tolerance, helpers):
     """Test that @gen Fn.assess produces correct densities compared to manual computation."""
 
     @gen
@@ -79,13 +97,24 @@ def test_fn_assess_vs_manual_density():
     manual_total_log_density = x_log_density + y_log_density
     manual_retval = x_val * y_val
 
-    assert jnp.allclose(fn_density, manual_total_log_density, rtol=1e-6), (
-        f"Fn density {fn_density} != manual {manual_total_log_density}"
+    helpers.assert_finite_and_close(
+        fn_density,
+        manual_total_log_density,
+        rtol=standard_tolerance,
+        msg="Fn density does not match manual computation",
     )
-    assert jnp.allclose(fn_retval, manual_retval, rtol=1e-6)
+    helpers.assert_finite_and_close(
+        fn_retval,
+        manual_retval,
+        rtol=standard_tolerance,
+        msg="Fn return value does not match manual computation",
+    )
 
 
-def test_fn_simulate_assess_consistency():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_fn_simulate_assess_consistency(standard_tolerance, helpers):
     """Test that @gen Fn simulate and assess are consistent."""
 
     @gen
@@ -104,22 +133,47 @@ def test_fn_simulate_assess_consistency():
     simulate_score = trace.get_score()
     simulate_retval = trace.get_retval()
 
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
+
     # Assess same choices
     assess_density, assess_retval = complex_fn.assess(args, choices)
+    helpers.assert_valid_density(assess_density)
 
     # Should be consistent
     expected_score = -assess_density
-    assert jnp.allclose(simulate_score, expected_score, rtol=1e-6), (
-        f"Simulate score {simulate_score} != -assess density {expected_score}"
+    helpers.assert_finite_and_close(
+        simulate_score,
+        expected_score,
+        rtol=standard_tolerance,
+        msg="Simulate score inconsistent with assess density",
     )
 
     # Return values should match
-    assert jnp.allclose(simulate_retval[0], assess_retval[0], rtol=1e-6)
-    assert jnp.allclose(simulate_retval[1], assess_retval[1], rtol=1e-6)
-    assert jnp.allclose(simulate_retval[2], assess_retval[2], rtol=1e-6)
+    helpers.assert_finite_and_close(
+        simulate_retval[0],
+        assess_retval[0],
+        rtol=standard_tolerance,
+        msg="Return value x component mismatch",
+    )
+    helpers.assert_finite_and_close(
+        simulate_retval[1],
+        assess_retval[1],
+        rtol=standard_tolerance,
+        msg="Return value y component mismatch",
+    )
+    helpers.assert_finite_and_close(
+        simulate_retval[2],
+        assess_retval[2],
+        rtol=standard_tolerance,
+        msg="Return value z component mismatch",
+    )
 
 
-def test_fn_nested_addressing():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_fn_nested_addressing(standard_tolerance, helpers):
     """Test @gen functions with nested addressing and data flow."""
 
     @gen
@@ -137,6 +191,9 @@ def test_fn_nested_addressing():
     trace = outer_fn.simulate(())
     choices = trace.get_choices()
     fn_score = trace.get_score()
+
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
 
     # Extract nested choices
     x_choice = choices["x"]
@@ -157,16 +214,27 @@ def test_fn_nested_addressing():
     manual_total_log_density = x_log_density + y_log_density + z_log_density
     expected_fn_score = -manual_total_log_density
 
-    assert jnp.allclose(fn_score, expected_fn_score, rtol=1e-6), (
-        f"Nested Fn score {fn_score} != expected {expected_fn_score}"
+    helpers.assert_finite_and_close(
+        fn_score,
+        expected_fn_score,
+        rtol=standard_tolerance,
+        msg="Nested Fn score does not match manual computation",
     )
 
     # Verify return value
     expected_retval = x_choice + y_choice + z_choice
-    assert jnp.allclose(trace.get_retval(), expected_retval, rtol=1e-6)
+    helpers.assert_finite_and_close(
+        trace.get_retval(),
+        expected_retval,
+        rtol=standard_tolerance,
+        msg="Nested function return value mismatch",
+    )
 
 
-def test_fn_with_deterministic_computation():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_fn_with_deterministic_computation(standard_tolerance, helpers):
     """Test @gen functions with deterministic computations mixed with sampling."""
 
     @gen
@@ -192,16 +260,31 @@ def test_fn_with_deterministic_computation():
     trace = mixed_fn.simulate(args)
     choices = trace.get_choices()
 
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
+
     assess_density, assess_retval = mixed_fn.assess(args, choices)
+    helpers.assert_valid_density(assess_density)
     simulate_score = trace.get_score()
 
-    assert jnp.allclose(simulate_score, -assess_density, rtol=1e-6), (
-        f"Mixed Fn inconsistent: score={simulate_score}, density={assess_density}"
+    helpers.assert_finite_and_close(
+        simulate_score,
+        -assess_density,
+        rtol=standard_tolerance,
+        msg="Mixed function simulate/assess inconsistency",
     )
-    assert jnp.allclose(trace.get_retval(), assess_retval, rtol=1e-6)
+    helpers.assert_finite_and_close(
+        trace.get_retval(),
+        assess_retval,
+        rtol=standard_tolerance,
+        msg="Mixed function return value mismatch",
+    )
 
 
-def test_fn_empty_program():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_fn_empty_program(standard_tolerance, helpers):
     """Test @gen function with no probabilistic choices."""
 
     @gen
@@ -221,15 +304,28 @@ def test_fn_empty_program():
 
     # Should compute same result deterministically
     expected_result = 2.0 * 3.0 + jnp.sin(2.0) - jnp.cos(3.0)
-    assert jnp.allclose(trace.get_retval(), expected_result, rtol=1e-6)
+    helpers.assert_finite_and_close(
+        trace.get_retval(),
+        expected_result,
+        rtol=standard_tolerance,
+        msg="Deterministic function return value mismatch",
+    )
 
     # Assess should also work
     density, retval = deterministic_fn.assess(args, {})
     assert density == 0.0, "Deterministic assess should have zero density"
-    assert jnp.allclose(retval, expected_result, rtol=1e-6)
+    helpers.assert_finite_and_close(
+        retval,
+        expected_result,
+        rtol=standard_tolerance,
+        msg="Deterministic assess return value mismatch",
+    )
 
 
-def test_fn_conditional_sampling():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_fn_conditional_sampling(standard_tolerance, helpers):
     """Test @gen function with conditional sampling patterns using Cond combinator."""
 
     # Define the two branches as separate @gen functions
@@ -261,15 +357,32 @@ def test_fn_conditional_sampling():
         trace = conditional_fn.simulate(args)
         choices = trace.get_choices()
 
+        # Validate trace structure
+        helpers.assert_valid_trace(trace)
+
         # Should be consistent between simulate and assess
         assess_density, assess_retval = conditional_fn.assess(args, choices)
+        helpers.assert_valid_density(assess_density)
         simulate_score = trace.get_score()
 
-        assert jnp.allclose(-simulate_score, assess_density, rtol=1e-6)
-        assert jnp.allclose(trace.get_retval(), assess_retval, rtol=1e-6)
+        helpers.assert_finite_and_close(
+            -simulate_score,
+            assess_density,
+            rtol=standard_tolerance,
+            msg="Conditional function simulate/assess inconsistency",
+        )
+        helpers.assert_finite_and_close(
+            trace.get_retval(),
+            assess_retval,
+            rtol=standard_tolerance,
+            msg="Conditional function return value mismatch",
+        )
 
 
-def test_scan_simulate_vs_manual_density():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_scan_simulate_vs_manual_density(base_key, standard_tolerance, helpers):
     """Test that Scan.simulate produces correct densities compared to manual computation."""
 
     # Create a simple callee that adds a normal sample to the carry
@@ -289,10 +402,12 @@ def test_scan_simulate_vs_manual_density():
     args = (init_carry, xs)
 
     # Generate a trace using simulate with seed transformation
-    key = jrand.key(42)
-    trace = seed(scan_gf.simulate)(key, args)
+    trace = seed(scan_gf.simulate)(base_key, args)
     choices = trace.get_choices()
     scan_score = trace.get_score()  # This is log(1/density), so negative log density
+
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
 
     # Manually compute the density using the same choices
     def manual_scan_fn(carry, input_and_choice):
@@ -320,18 +435,27 @@ def test_scan_simulate_vs_manual_density():
     expected_scan_score = -manual_total_log_density
 
     # Compare with tolerance for numerical precision
-    assert jnp.allclose(scan_score, expected_scan_score, rtol=1e-6), (
-        f"Scan score {scan_score} != expected {expected_scan_score}"
+    helpers.assert_finite_and_close(
+        scan_score,
+        expected_scan_score,
+        rtol=standard_tolerance,
+        msg="Scan score does not match manual computation",
     )
 
     # Also verify the outputs match
     trace_outputs = trace.get_retval()[1]
-    assert jnp.allclose(trace_outputs, outputs, rtol=1e-6), (
-        f"Trace outputs {trace_outputs} != manual outputs {outputs}"
+    helpers.assert_finite_and_close(
+        trace_outputs,
+        outputs,
+        rtol=standard_tolerance,
+        msg="Scan outputs do not match manual computation",
     )
 
 
-def test_scan_assess_vs_manual_density():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_scan_assess_vs_manual_density(standard_tolerance, helpers):
     """Test that Scan.assess produces correct densities compared to manual computation."""
 
     # Create a callee that uses exponential distribution
@@ -356,6 +480,7 @@ def test_scan_assess_vs_manual_density():
 
     # Assess using Scan
     scan_density, scan_retval = scan_gf.assess(args, choices)
+    helpers.assert_valid_density(scan_density)
 
     # Manually compute density
     def manual_assess_fn(carry, input_and_choice):
@@ -381,20 +506,32 @@ def test_scan_assess_vs_manual_density():
     manual_retval = (final_carry, outputs)
 
     # Compare densities (scan_density should equal manual_total_log_density)
-    assert jnp.allclose(scan_density, manual_total_log_density, rtol=1e-6), (
-        f"Scan density {scan_density} != manual density {manual_total_log_density}"
+    helpers.assert_finite_and_close(
+        scan_density,
+        manual_total_log_density,
+        rtol=standard_tolerance,
+        msg="Scan density does not match manual computation",
     )
 
     # Compare return values
-    assert jnp.allclose(scan_retval[0], manual_retval[0], rtol=1e-6), (
-        f"Final carry {scan_retval[0]} != manual {manual_retval[0]}"
+    helpers.assert_finite_and_close(
+        scan_retval[0],
+        manual_retval[0],
+        rtol=standard_tolerance,
+        msg="Scan final carry does not match manual computation",
     )
-    assert jnp.allclose(scan_retval[1], manual_retval[1], rtol=1e-6), (
-        f"Outputs {scan_retval[1]} != manual {manual_retval[1]}"
+    helpers.assert_finite_and_close(
+        scan_retval[1],
+        manual_retval[1],
+        rtol=standard_tolerance,
+        msg="Scan outputs do not match manual computation",
     )
 
 
-def test_scan_simulate_assess_consistency():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_scan_simulate_assess_consistency(base_key, standard_tolerance, helpers):
     """Test that simulate and assess are consistent for the same choices."""
 
     # Create a more complex callee
@@ -420,35 +557,53 @@ def test_scan_simulate_assess_consistency():
     args = (init_carry, xs)
 
     # Generate trace with simulate using seed transformation
-    key = jrand.key(42)
-    trace = seed(scan_gf.simulate)(key, args)
+    trace = seed(scan_gf.simulate)(base_key, args)
     choices = trace.get_choices()
     simulate_score = trace.get_score()
     simulate_retval = trace.get_retval()
 
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
+
     # Assess the same choices
     assess_density, assess_retval = scan_gf.assess(args, choices)
+    helpers.assert_valid_density(assess_density)
 
     # simulate_score should be -assess_density (score is log(1/density))
     expected_score = -assess_density
 
-    assert jnp.allclose(simulate_score, expected_score, rtol=1e-6), (
-        f"Simulate score {simulate_score} != -assess density {expected_score}"
+    helpers.assert_finite_and_close(
+        simulate_score,
+        expected_score,
+        rtol=standard_tolerance,
+        msg="Scan simulate/assess score inconsistency",
     )
 
     # Return values should be identical
-    assert jnp.allclose(simulate_retval[0], assess_retval[0], rtol=1e-6), (
-        f"Final carries don't match: {simulate_retval[0]} vs {assess_retval[0]}"
+    helpers.assert_finite_and_close(
+        simulate_retval[0],
+        assess_retval[0],
+        rtol=standard_tolerance,
+        msg="Scan final carries do not match",
     )
-    assert jnp.allclose(simulate_retval[1][0], assess_retval[1][0], rtol=1e-6), (
-        "Normal outputs don't match"
+    helpers.assert_finite_and_close(
+        simulate_retval[1][0],
+        assess_retval[1][0],
+        rtol=standard_tolerance,
+        msg="Scan normal outputs do not match",
     )
-    assert jnp.allclose(simulate_retval[1][1], assess_retval[1][1], rtol=1e-6), (
-        "Exponential outputs don't match"
+    helpers.assert_finite_and_close(
+        simulate_retval[1][1],
+        assess_retval[1][1],
+        rtol=standard_tolerance,
+        msg="Scan exponential outputs do not match",
     )
 
 
-def test_empty_scan():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_empty_scan(helpers):
     """Test scan with empty input sequence."""
 
     @gen
@@ -467,6 +622,9 @@ def test_empty_scan():
     trace = scan_gf.simulate(args)
     final_carry, outputs = trace.get_retval()
 
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
+
     assert jnp.allclose(final_carry, init_carry), (
         "Final carry should equal initial carry"
     )
@@ -474,7 +632,10 @@ def test_empty_scan():
     assert trace.get_score() == 0.0, "Score should be 0 for empty scan"
 
 
-def test_single_step_scan():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+def test_single_step_scan(base_key, standard_tolerance, helpers):
     """Test scan with single step."""
 
     @gen
@@ -491,23 +652,33 @@ def test_single_step_scan():
     args = (init_carry, xs)
 
     # Test simulate with seed transformation
-    key = jrand.key(42)
-    trace = seed(scan_gf.simulate)(key, args)
+    trace = seed(scan_gf.simulate)(base_key, args)
     choices = trace.get_choices()
+
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
 
     # Test assess with same choice
     density, retval = scan_gf.assess(args, choices)
+    helpers.assert_valid_density(density)
 
     # Compute expected density using Distribution.assess
     sample = choices["sample"][0]
     expected_log_density, _ = normal.assess((1.5, 0.5), sample)
 
-    assert jnp.allclose(density, expected_log_density, rtol=1e-6), (
-        f"Density {density} != expected {expected_log_density}"
+    helpers.assert_finite_and_close(
+        density,
+        expected_log_density,
+        rtol=standard_tolerance,
+        msg="Single step scan density mismatch",
     )
 
 
-def test_scan_with_different_lengths():
+@pytest.mark.core
+@pytest.mark.unit
+@pytest.mark.fast
+@pytest.mark.parametrize("length", [1, 3, 5, 10])
+def test_scan_with_different_lengths(length, base_key, standard_tolerance, helpers):
     """Test scan with various sequence lengths."""
 
     @gen
@@ -516,37 +687,43 @@ def test_scan_with_different_lengths():
         new_carry = carry + input_val + sample
         return new_carry, new_carry
 
-    lengths = [1, 3, 5, 10]
+    scan_gf = Scan(accumulating_step, length=length)
+    init_carry = 0.0
+    xs = jnp.ones(length) * 0.1  # Small constant inputs
+    args = (init_carry, xs)
 
-    for length in lengths:
-        scan_gf = Scan(accumulating_step, length=length)
-        init_carry = 0.0
-        xs = jnp.ones(length) * 0.1  # Small constant inputs
-        args = (init_carry, xs)
+    # Test that simulate and assess are consistent
+    # Use different key for each length to ensure varied test conditions
+    key_list = jrand.split(base_key, 2)
+    test_key = key_list[0] if length % 2 == 0 else key_list[1]
+    trace = seed(scan_gf.simulate)(test_key, args)
+    choices = trace.get_choices()
 
-        # Test that simulate and assess are consistent
-        key = jrand.key(42 + length)  # Use different key for each length
-        trace = seed(scan_gf.simulate)(key, args)
-        choices = trace.get_choices()
+    # Validate trace structure
+    helpers.assert_valid_trace(trace)
 
-        assess_density, assess_retval = scan_gf.assess(args, choices)
-        simulate_score = trace.get_score()
+    assess_density, assess_retval = scan_gf.assess(args, choices)
+    helpers.assert_valid_density(assess_density)
+    simulate_score = trace.get_score()
 
-        assert jnp.allclose(simulate_score, -assess_density, rtol=1e-6), (
-            f"Inconsistency at length {length}: score={simulate_score}, density={assess_density}"
-        )
+    helpers.assert_finite_and_close(
+        simulate_score,
+        -assess_density,
+        rtol=standard_tolerance,
+        msg=f"Scan length {length} simulate/assess inconsistency",
+    )
 
-        # Check that we have the right number of choices and outputs
-        assert choices["sample"].shape[0] == length, (
-            f"Wrong number of choices: {choices.shape[0]} != {length}"
-        )
-        assert trace.get_retval()[1].shape[0] == length, "Wrong number of outputs"
+    # Check that we have the right number of choices and outputs
+    assert choices["sample"].shape[0] == length, (
+        f"Wrong number of choices: {choices['sample'].shape[0]} != {length}"
+    )
+    assert trace.get_retval()[1].shape[0] == length, "Wrong number of outputs"
 
 
 class TestGenerateConsistency:
     """Test that generate method is consistent with assess when given full samples."""
 
-    def test_distribution_generate_assess_consistency(self):
+    def test_distribution_generate_assess_consistency(self, strict_tolerance, helpers):
         """Test that Distribution.generate weight equals assess density for full samples."""
         # Test with normal distribution
         args = (0.0, 1.0)  # mu=0.0, sigma=1.0
@@ -554,23 +731,43 @@ class TestGenerateConsistency:
 
         # Test generate with full sample
         trace, weight = normal.generate(args, sample_value)
+        helpers.assert_valid_trace(trace)
 
         # Test assess with same sample
         density, retval = normal.assess(args, sample_value)
+        helpers.assert_valid_density(density)
 
         # For distributions: generate weight should equal assess density
-        assert jnp.allclose(weight, density, rtol=1e-10), (
-            f"Generate weight {weight} != assess density {density}"
+        helpers.assert_finite_and_close(
+            weight,
+            density,
+            rtol=strict_tolerance,
+            msg="Generate weight does not match assess density",
         )
 
         # Check that trace score equals negative density
-        assert jnp.allclose(trace.get_score(), -density, rtol=1e-10)
+        helpers.assert_finite_and_close(
+            trace.get_score(),
+            -density,
+            rtol=strict_tolerance,
+            msg="Trace score inconsistent with density",
+        )
 
         # Check return values match
-        assert jnp.allclose(retval, sample_value, rtol=1e-10)
-        assert jnp.allclose(trace.get_retval(), sample_value, rtol=1e-10)
+        helpers.assert_finite_and_close(
+            retval,
+            sample_value,
+            rtol=strict_tolerance,
+            msg="Assess return value mismatch",
+        )
+        helpers.assert_finite_and_close(
+            trace.get_retval(),
+            sample_value,
+            rtol=strict_tolerance,
+            msg="Trace return value mismatch",
+        )
 
-    def test_fn_generate_assess_consistency_simple(self):
+    def test_fn_generate_assess_consistency_simple(self, strict_tolerance, helpers):
         """Test that Fn.generate weight equals assess density for full samples."""
 
         @gen
@@ -585,23 +782,46 @@ class TestGenerateConsistency:
 
         # Test generate with full sample
         trace, weight = simple_model.generate(args, full_sample)
+        helpers.assert_valid_trace(trace)
 
         # Test assess with same sample
         density, retval = simple_model.assess(args, full_sample)
+        helpers.assert_valid_density(density)
 
         # Generate weight should equal assess density for full samples
-        assert jnp.allclose(weight, density, rtol=1e-10), (
-            f"Generate weight {weight} != assess density {density}"
+        helpers.assert_finite_and_close(
+            weight,
+            density,
+            rtol=strict_tolerance,
+            msg="Generate weight does not match assess density for simple model",
         )
 
         # Check that trace score equals negative density
-        assert jnp.allclose(trace.get_score(), -density, rtol=1e-10)
+        helpers.assert_finite_and_close(
+            trace.get_score(),
+            -density,
+            rtol=strict_tolerance,
+            msg="Trace score inconsistent with density for simple model",
+        )
 
         # Check return values match
-        assert jnp.allclose(retval, 1.0 + 2.0, rtol=1e-10)
-        assert jnp.allclose(trace.get_retval(), 1.0 + 2.0, rtol=1e-10)
+        expected_retval = 1.0 + 2.0
+        helpers.assert_finite_and_close(
+            retval,
+            expected_retval,
+            rtol=strict_tolerance,
+            msg="Assess return value mismatch for simple model",
+        )
+        helpers.assert_finite_and_close(
+            trace.get_retval(),
+            expected_retval,
+            rtol=strict_tolerance,
+            msg="Trace return value mismatch for simple model",
+        )
 
-    def test_fn_generate_assess_consistency_hierarchical(self):
+    def test_fn_generate_assess_consistency_hierarchical(
+        self, strict_tolerance, helpers
+    ):
         """Test generate/assess consistency for hierarchical model."""
 
         @gen
@@ -618,17 +838,27 @@ class TestGenerateConsistency:
 
         # Test generate with full sample
         trace, weight = hierarchical_model.generate(args, full_sample)
+        helpers.assert_valid_trace(trace)
 
         # Test assess with same sample
         density, retval = hierarchical_model.assess(args, full_sample)
+        helpers.assert_valid_density(density)
 
         # Generate weight should equal assess density
-        assert jnp.allclose(weight, density, rtol=1e-10), (
-            f"Generate weight {weight} != assess density {density}"
+        helpers.assert_finite_and_close(
+            weight,
+            density,
+            rtol=strict_tolerance,
+            msg="Generate weight does not match assess density for hierarchical model",
         )
 
         # Check consistency of scores
-        assert jnp.allclose(trace.get_score(), -density, rtol=1e-10)
+        helpers.assert_finite_and_close(
+            trace.get_score(),
+            -density,
+            rtol=strict_tolerance,
+            msg="Trace score inconsistent with density for hierarchical model",
+        )
 
     def test_fn_generate_assess_consistency_with_scan(self):
         """Test generate/assess consistency for model with Scan combinator."""
@@ -716,10 +946,12 @@ class TestGenerateConsistency:
 class TestPytreeAndDataClasses:
     """Test Pytree functionality and dataclass integration."""
 
-    def test_pytree_dataclass_basic(self):
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_pytree_dataclass_basic(self, helpers):
         """Test basic Pytree dataclass functionality."""
         from genjax.core import Pytree
-        import jax
 
         @Pytree.dataclass
         class SimpleModel(Pytree):
@@ -741,11 +973,12 @@ class TestPytreeAndDataClasses:
         assert reconstructed.param2 == model.param2
         assert reconstructed.param3 == model.param3
 
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
     def test_pytree_static_vs_dynamic_fields(self):
         """Test distinction between static and dynamic fields."""
         from genjax.core import Pytree
-        import jax
-        import jax.numpy as jnp
 
         @Pytree.dataclass
         class MixedModel(Pytree):
@@ -777,10 +1010,12 @@ class TestPytreeAndDataClasses:
         assert scaled_models.learning_rate == 0.01
         assert scaled_models.name == "test"
 
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
     def test_pytree_field_vs_static_annotations(self):
         """Test different field annotation types."""
         from genjax.core import Pytree
-        import jax
 
         @Pytree.dataclass
         class AnnotationTest(Pytree):

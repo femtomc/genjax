@@ -21,3 +21,6 @@ jobs:
 
     - name: Run tests
       run: pixi run test
+
+    - name: Run doctests
+      run: pixi run doctest
