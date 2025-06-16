@@ -1599,13 +1599,14 @@ class Vmap(Generic[X, R], GFI[X, R]):
         args,
         x: X,
     ) -> tuple[Density, R]:
-        return modular_vmap(
+        density, retval = modular_vmap(
             self.gen_fn.assess,
             in_axes=(self.in_axes, 0),
             axis_size=self.axis_size,
             axis_name=self.axis_name,
             spmd_axis_name=self.spmd_axis_name,
         )(args, x)
+        return jnp.sum(density), retval
 
     def update(
         self,

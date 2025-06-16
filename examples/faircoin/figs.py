@@ -82,8 +82,8 @@ def timing_comparison_fig(
     relative_times = [(t / hc_mu) * 100 for t in times]
 
     # Create horizontal bar plot with larger fonts for research paper
-    plt.rcParams.update({"font.size": 16})  # Set base font size
-    fig, ax = plt.subplots(figsize=(10, 5), dpi=300)  # Larger figure and higher DPI
+    plt.rcParams.update({"font.size": 20})  # Set base font size
+    fig, ax = plt.subplots(figsize=(10, 3), dpi=300)  # Reduced height for thinner bars
 
     y_pos = range(len(frameworks))
     bars = ax.barh(
@@ -92,8 +92,8 @@ def timing_comparison_fig(
 
     # Customize the plot with larger fonts
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(frameworks, fontsize=18)
-    ax.set_xlabel("Relative Performance (% of Handcoded JAX time)", fontsize=18)
+    ax.set_yticklabels(frameworks, fontsize=22)
+    ax.set_xlabel("Relative Performance (% of Handcoded JAX time)", fontsize=22)
 
     # Add clarification in top right corner
     ax.text(
@@ -103,18 +103,33 @@ def timing_comparison_fig(
         transform=ax.transAxes,
         ha="right",
         va="top",
-        fontsize=12,
+        fontsize=16,
         style="italic",
         bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
     )
 
     # Customize tick labels
-    ax.tick_params(axis="x", labelsize=16)
-    ax.tick_params(axis="y", labelsize=18)
+    ax.tick_params(axis="x", labelsize=20)
+    ax.tick_params(axis="y", labelsize=22)
 
-    # Add a vertical line at 100% (handcoded baseline)
-    ax.axvline(x=100, color="black", linestyle="--", alpha=0.7, linewidth=2)
-    ax.text(102, len(frameworks) - 0.5, "Handcoded\nBaseline", fontsize=16, alpha=0.8)
+    # Add a vertical line at 100% (handcoded baseline) - truncated to bar height
+    ax.plot(
+        [100, 100],
+        [-0.5, len(frameworks) - 0.1],
+        color="black",
+        linestyle="--",
+        alpha=0.7,
+        linewidth=2,
+    )
+    ax.text(
+        100,
+        len(frameworks),
+        "Handcoded Baseline",
+        fontsize=20,
+        alpha=0.8,
+        ha="center",
+        va="top",
+    )
 
     # Add percentage labels on bars with larger font
     for i, (bar, rel_time, abs_time) in enumerate(zip(bars, relative_times, times)):
@@ -126,15 +141,22 @@ def timing_comparison_fig(
             label,
             ha="left",
             va="center",
-            fontsize=16,
+            fontsize=20,
             weight="bold",
         )
 
     # Set x-axis limits with some padding
     ax.set_xlim(0, max(relative_times) * 1.2)
 
-    # Invert y-axis so handcoded is at the top
-    ax.invert_yaxis()
+    # Add padding below bars for baseline label and increase tick spacing
+    ax.set_ylim(len(frameworks) + 0.8, -0.5)  # Extra space below for label
+    ax.tick_params(axis="x", pad=15)  # Add separation between ticks and bars
+
+    # Remove axis frame
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(False)
 
     plt.tight_layout()
 
