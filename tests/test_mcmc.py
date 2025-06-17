@@ -11,7 +11,8 @@ import jax.numpy as jnp
 import jax.random as jrand
 import pytest
 
-import genjax as gx
+from genjax.core import gen, seed, sel, Const
+from genjax.distributions import beta, flip, exponential
 from genjax.mcmc import (
     MCMCResult,
     metropolis_hastings,
@@ -26,19 +27,19 @@ from genjax.mcmc import (
 @pytest.fixture
 def mcmc_steps_small():
     """Small number of MCMC steps for fast tests."""
-    return gx.Const(100)
+    return Const(100)
 
 
 @pytest.fixture
 def mcmc_steps_medium():
     """Medium number of MCMC steps for balanced speed/accuracy."""
-    return gx.Const(5000)
+    return Const(5000)
 
 
 @pytest.fixture
 def mcmc_steps_large():
     """Large number of MCMC steps for convergence tests."""
-    return gx.Const(50000)
+    return Const(50000)
 
 
 @pytest.fixture
@@ -51,10 +52,10 @@ def mcmc_key(base_key):
 def beta_bernoulli_model():
     """Beta-Bernoulli conjugate model for exact posterior testing."""
 
-    @gx.gen
+    @gen
     def model():
-        p = gx.beta(2.0, 5.0) @ "p"
-        obs = gx.flip(p) @ "obs"
+        p = beta(2.0, 5.0) @ "p"
+        obs = flip(p) @ "obs"
         return obs
 
     return model
@@ -64,9 +65,9 @@ def beta_bernoulli_model():
 def gamma_exponential_model():
     """Simple exponential model for testing."""
 
-    @gx.gen
+    @gen
     def model():
-        return gx.exponential(2.0) @ "x"
+        return exponential(2.0) @ "x"
 
     return model
 
@@ -172,10 +173,10 @@ def exact_normal_normal_posterior_moments(
 def test_mcmc_result_creation(simple_normal_model, mcmc_steps_small, mcmc_key, helpers):
     """Test MCMCResult creation and field access."""
     initial_trace = simple_normal_model.simulate((0.0, 1.0))
-    selection = gx.sel("x")
+    selection = sel("x")
 
     # Apply seed transformation to eliminate PJAX primitives
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_small)
 
     # Validate result structure
@@ -205,10 +206,10 @@ def test_mh_beta_bernoulli_obs_true(
     initial_trace, _ = beta_bernoulli_model.generate((), constraints)
 
     # Run MCMC
-    selection = gx.sel("p")
+    selection = sel("p")
 
     # Apply seed transformation
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
 
     # Apply burn-in post-processing
@@ -254,10 +255,10 @@ def test_mh_beta_bernoulli_obs_false(
     initial_trace, _ = beta_bernoulli_model.generate((), constraints)
 
     # Run MCMC
-    selection = gx.sel("p")
+    selection = sel("p")
 
     # Apply seed transformation
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
 
     # Apply burn-in post-processing
@@ -306,10 +307,10 @@ def test_mh_hierarchical_normal(
     initial_trace, _ = hierarchical_normal_model.generate((0.0, 1.0, 0.5), constraints)
 
     # Run MCMC
-    selection = gx.sel("mu")
+    selection = sel("mu")
 
     # Apply seed transformation
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
 
     # Apply burn-in post-processing
@@ -361,9 +362,9 @@ def test_mh_bivariate_normal_marginal(
     initial_trace, _ = bivariate_normal_model.generate((), constraints)
 
     # Run MCMC to sample x | y
-    selection = gx.sel("x")
+    selection = sel("x")
 
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_medium)
 
     # Apply burn-in post-processing
@@ -412,9 +413,9 @@ def test_mh_bivariate_normal_marginal(
 def test_acceptance_rates(gamma_exponential_model, mcmc_steps_medium, mcmc_key):
     """Test that acceptance rates are reasonable."""
     initial_trace = gamma_exponential_model.simulate(())
-    selection = gx.sel("x")
+    selection = sel("x")
 
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_medium)
 
     # Acceptance rate should be reasonable (not too high or low)
@@ -434,9 +435,9 @@ def test_chain_stationarity(
 ):
     """Test basic stationarity of MCMC chains."""
     initial_trace = simple_normal_model.simulate((0.0, 1.0))
-    selection = gx.sel("x")
+    selection = sel("x")
 
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_medium)
 
     samples = result.traces.get_choices()["x"]
@@ -467,10 +468,10 @@ def test_exponential_moments(
     """Test MCMC samples match exponential distribution moments."""
     rate = 2.0
     initial_trace = gamma_exponential_model.simulate(())
-    selection = gx.sel("x")
+    selection = sel("x")
 
     # Apply seed transformation
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
 
     # Apply burn-in post-processing
@@ -507,14 +508,14 @@ def test_exponential_moments(
 @pytest.mark.mcmc
 @pytest.mark.regression
 @pytest.mark.fast
-@pytest.mark.parametrize("seed", [42, 123, 456, 789])
-def test_mcmc_deterministic_with_seed(simple_normal_model, mcmc_steps_small, seed):
+@pytest.mark.parametrize("seed_val", [42, 123, 456, 789])
+def test_mcmc_deterministic_with_seed(simple_normal_model, mcmc_steps_small, seed_val):
     """Test that MCMC is deterministic given the same seed."""
-    key = jrand.key(seed)
+    key = jrand.key(seed_val)
     initial_trace = simple_normal_model.simulate((0.0, 1.0))
-    selection = gx.sel("x")
+    selection = sel("x")
 
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
 
     # Run twice with same key
     result1 = seeded_mh(key, initial_trace, selection, mcmc_steps_small)
@@ -537,10 +538,10 @@ def test_mcmc_deterministic_with_seed(simple_normal_model, mcmc_steps_small, see
 def test_mcmc_result_structure(simple_normal_model, base_key, n_steps_val, helpers):
     """Test MCMC result structure with different step counts."""
     initial_trace = simple_normal_model.simulate((0.0, 1.0))
-    selection = gx.sel("x")
-    n_steps = gx.Const(n_steps_val)
+    selection = sel("x")
+    n_steps = Const(n_steps_val)
 
-    seeded_mh = gx.seed(metropolis_hastings)
+    seeded_mh = seed(metropolis_hastings)
     result = seeded_mh(base_key, initial_trace, selection, n_steps)
 
     # Check result structure

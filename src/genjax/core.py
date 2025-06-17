@@ -2013,7 +2013,10 @@ class Update(Generic[R]):
         gen_fn: GFI[X, R],
         args_,
     ) -> R:
-        subtrace = self.trace.get_choices()[addr]
+        # Get the full subtrace (Tr object) from the trace structure
+        subtrace = self.trace._choices[
+            addr
+        ]  # This is the Tr object, not just the value
         x = (
             self.choice_map[addr]
             if addr in self.choice_map

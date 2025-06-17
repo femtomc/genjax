@@ -242,7 +242,7 @@ class GibbsSampler(Pytree):
                 )
 
             init_q_trace = proposal.simulate(())
-            p_trace = generate_state_pair.assess(
+            p_trace, _ = generate_state_pair.generate(
                 (n_x, n_y, p_flip),
                 {**init_q_trace.get_choices(), **step},
             )
