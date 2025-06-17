@@ -99,7 +99,7 @@ class StateInterpreter(Pytree):
 
         return safe_map(env.read, jaxpr.outvars)
 
-    def run_interpreter(self, fn, *args):
+    def eval(self, fn, *args):
         """Run the interpreter on a function with given arguments."""
         closed_jaxpr, (flat_args, _, out_tree) = stage(fn)(*args)
         jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.literals
@@ -142,7 +142,7 @@ def state(f: Callable[..., Any]):
     @wraps(f)
     def wrapped(*args):
         interpreter = StateInterpreter()
-        return interpreter.run_interpreter(f, *args)
+        return interpreter.eval(f, *args)
 
     return wrapped
 
