@@ -64,7 +64,7 @@ from genjax.core import (
     distribution,
 )
 from genjax.pjax import (
-    ElaboratedPrimitive,
+    PPPrimitive,
     Environment,
     assume_binder,
     assume_p,
@@ -422,7 +422,7 @@ class ADEVInterpreter(Pytree):
                     subfuns, params = eqn.primitive.get_bind_params(eqn.params)
                     duals = subfuns + in_vals
 
-                    primitive, inner_params = ElaboratedPrimitive.unwrap(eqn.primitive)
+                    primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
                     # Our assume_p primitive.
                     if primitive is assume_p:
                         dual_env = dual_env.copy()
