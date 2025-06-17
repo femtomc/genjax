@@ -265,22 +265,6 @@ seeded_model = seed(model_with_scan.simulate)
 trace = seeded_model(key, ())
 ```
 
-## Testing Patterns
-
-**Density Validation**:
-
-```python
-def test_model():
-    trace = model.simulate(())
-    choices = trace.get_choices()
-
-    # Use Distribution.assess for validation
-    expected_density = sum(dist.assess(params, choice)[0] for dist, params, choice in distributions)
-    actual_density, _ = model.assess((), choices)
-    assert jnp.allclose(actual_density, expected_density)
-    assert jnp.allclose(trace.get_score(), -actual_density)
-```
-
 ## Glossary
 
 - **GFI**: Generative Function Interface (simulate, assess, generate, update, regenerate)
