@@ -224,6 +224,26 @@ class Const(Generic[A], Pytree):
     value: A = Pytree.static()
 
 
+def const(a: A) -> Const[A]:
+    """Create a Const wrapper for a static value.
+
+    Args:
+        a: The Python literal to wrap as static.
+
+    Returns:
+        A Const wrapper that keeps the value static in JAX transformations.
+
+    Example:
+        >>> length = const(10)  # Static length for scan
+        >>> @gen
+        ... def model(n: Const[int]):
+        ...     scan_gf = Scan(step_fn, length=n.value)
+        ...     return scan_gf(args)
+        >>> trace = model((length, other_args))
+    """
+    return Const(a)
+
+
 ############################################
 # Staging utilities for Jaxpr interpreters #
 ############################################
@@ -1837,8 +1857,7 @@ class Distribution(Generic[X], GFI[X, X]):
     ) -> tuple[Tr[X, X], Weight, X | None]:
         if () in s:
             tr_ = self.simulate(args_)
-            w = -tr_.get_score() + tr.get_score()
-            return tr_, w, get_choices(tr)
+            return tr_, jnp.array(0.0), get_choices(tr)
         else:
             x_ = get_choices(tr)
             log_density_ = self.logpdf(get_choices(tr), *args_)
@@ -2052,18 +2071,12 @@ class Regenerate(Generic[R]):
         ]  # This is the Tr object, not just the value
         # Use Selection.match to check if this address is selected
         should_regenerate, subsel = self.s.match(addr)
-        if should_regenerate:
-            tr, w, discard = gen_fn.regenerate(args_, subtrace, subsel)
-            self.trace_map[addr] = tr
-            self.discard[addr] = discard
-            self.score += tr.get_score()
-            self.weight += w
-            return tr.get_retval()
-        else:
-            # Address not selected, use existing trace
-            self.trace_map[addr] = subtrace
-            self.score += subtrace.get_score()
-            return subtrace.get_retval()
+        tr, w, discard = gen_fn.regenerate(args_, subtrace, subsel)
+        self.trace_map[addr] = tr
+        self.discard[addr] = discard
+        self.score += tr.get_score()
+        self.weight += w
+        return tr.get_retval()
 
 
 handler_stack: list[Simulate | Assess | Generate | Update | Regenerate] = []
