@@ -146,6 +146,7 @@ markers = [
     "regression: marks tests as regression tests (bug prevention)",
     "adev: marks tests for ADEV gradient estimators",
     "smc: marks tests for Sequential Monte Carlo",
+    "mcmc: marks tests for Markov Chain Monte Carlo",
     "vi: marks tests for Variational Inference",
     "hmm: marks tests for Hidden Markov Models",
     "core: marks tests for core GenJAX functionality",

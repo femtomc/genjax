@@ -29,6 +29,7 @@ from .core import (  # noqa: E402
     Distribution,
     Fn,
     Pytree,
+    Const,
     Vmap,
     Scan,
     Cond,
@@ -38,6 +39,8 @@ from .core import (  # noqa: E402
     seed,
     tfp_distribution,
     trace,
+    sel,
+    Selection,
 )
 from .distributions import (  # noqa: E402
     bernoulli,
@@ -50,6 +53,12 @@ from .distributions import (  # noqa: E402
     poisson,
     multivariate_normal,
 )
+from .mcmc import (  # noqa: E402
+    MCMCResult,
+    metropolis_hastings,
+    hmc,
+    metropolis_hastings_vectorized,
+)
 
 __all__ = [
     "GFI",
@@ -57,6 +66,7 @@ __all__ = [
     "Dual",
     "Fn",
     "Pytree",
+    "Const",
     "Trace",
     "Vmap",
     "Scan",
@@ -77,6 +87,10 @@ __all__ = [
     "gen",
     "geometric_reinforce",
     "get_choices",
+    "hmc",
+    "MCMCResult",
+    "metropolis_hastings",
+    "metropolis_hastings_vectorized",
     "modular_vmap",
     "normal",
     "normal_reinforce",
@@ -85,6 +99,8 @@ __all__ = [
     "multivariate_normal_reparam",
     "multivariate_normal_reinforce",
     "seed",
+    "sel",
+    "Selection",
     "tfp_distribution",
     "trace",
 ]
