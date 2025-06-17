@@ -15,7 +15,7 @@ import jax.random as jrand
 import pytest
 from jax.lax import scan
 
-from genjax.core import gen, Scan, Cond, seed
+from genjax.core import gen, Scan, Cond, seed, sel
 from genjax.distributions import normal, exponential
 
 
@@ -1293,3 +1293,468 @@ class TestErrorHandlingAndEdgeCases:
         # Test with empty args
         trace = dist.simulate(())
         assert jnp.allclose(trace.get_retval(), jnp.array(1.0))
+
+
+class TestUpdateAndRegenerate:
+    """Test update and regenerate methods for GFI implementations."""
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_distribution_update_weight_invariant(self, standard_tolerance, helpers):
+        """Test that Distribution.update weight equals -(new_score) + old_score."""
+        args = (1.0, 0.5)  # mu=1.0, sigma=0.5
+
+        # Create initial trace
+        initial_trace = normal.simulate(args)
+        old_score = initial_trace.get_score()
+        helpers.assert_valid_trace(initial_trace)
+
+        # Update with new choice
+        new_choice = 2.5
+        new_trace, weight, discarded = normal.update(args, initial_trace, new_choice)
+        new_score = new_trace.get_score()
+
+        # Test weight invariant: weight = -(new_score) + old_score
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight,
+            expected_weight,
+            rtol=standard_tolerance,
+            msg="Update weight does not satisfy invariant",
+        )
+
+        # Test that new trace has the new choice
+        assert jnp.allclose(
+            new_trace.get_choices(), new_choice, rtol=standard_tolerance
+        )
+        assert jnp.allclose(new_trace.get_retval(), new_choice, rtol=standard_tolerance)
+
+        # Test that discarded value is the old choice
+        assert jnp.allclose(
+            discarded, initial_trace.get_choices(), rtol=standard_tolerance
+        )
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_distribution_update_with_same_choice(self, standard_tolerance, helpers):
+        """Test Distribution.update when new choice equals old choice."""
+        args = (0.0, 1.0)
+
+        # Create initial trace
+        initial_trace = normal.simulate(args)
+        old_choice = initial_trace.get_choices()
+        old_score = initial_trace.get_score()
+
+        # Update with same choice
+        new_trace, weight, discarded = normal.update(args, initial_trace, old_choice)
+        new_score = new_trace.get_score()
+
+        # Weight should still satisfy invariant
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight, expected_weight, rtol=standard_tolerance
+        )
+
+        # Scores should be equal (or very close due to numerical precision)
+        helpers.assert_finite_and_close(old_score, new_score, rtol=standard_tolerance)
+
+        # Weight should be approximately zero
+        helpers.assert_finite_and_close(weight, 0.0, rtol=standard_tolerance)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_fn_update_weight_invariant_simple(self, standard_tolerance, helpers):
+        """Test that Fn.update weight satisfies invariant for simple model."""
+
+        @gen
+        def simple_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(x, 0.5) @ "y"
+            return x + y
+
+        # Create initial trace
+        initial_trace = simple_model.simulate(())
+        old_score = initial_trace.get_score()
+        old_choices = initial_trace.get_choices()
+        helpers.assert_valid_trace(initial_trace)
+
+        # Update y choice
+        new_choices = {"y": 3.0}
+        new_trace, weight, discarded = simple_model.update(
+            (), initial_trace, new_choices
+        )
+        new_score = new_trace.get_score()
+
+        # Test weight invariant
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight,
+            expected_weight,
+            rtol=standard_tolerance,
+            msg="Update weight does not satisfy invariant for Fn",
+        )
+
+        # Test that y was updated but x remained the same
+        assert jnp.allclose(new_trace.get_choices()["y"], 3.0, rtol=standard_tolerance)
+        assert jnp.allclose(
+            new_trace.get_choices()["x"], old_choices["x"], rtol=standard_tolerance
+        )
+
+        # Test that discarded contains old y
+        assert jnp.allclose(discarded["y"], old_choices["y"], rtol=standard_tolerance)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_fn_update_multiple_choices(self, standard_tolerance, helpers):
+        """Test Fn.update with multiple choice updates."""
+
+        @gen
+        def multi_choice_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(1.0, 1.0) @ "y"
+            z = normal(x + y, 0.5) @ "z"
+            return x + y + z
+
+        # Create initial trace
+        initial_trace = multi_choice_model.simulate(())
+        old_score = initial_trace.get_score()
+        old_choices = initial_trace.get_choices()
+
+        # Update multiple choices
+        new_choices = {"x": 2.0, "z": -1.0}
+        new_trace, weight, discarded = multi_choice_model.update(
+            (), initial_trace, new_choices
+        )
+        new_score = new_trace.get_score()
+
+        # Test weight invariant
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight, expected_weight, rtol=standard_tolerance
+        )
+
+        # Test that specified choices were updated
+        assert jnp.allclose(new_trace.get_choices()["x"], 2.0, rtol=standard_tolerance)
+        assert jnp.allclose(new_trace.get_choices()["z"], -1.0, rtol=standard_tolerance)
+
+        # Test that unspecified choice remained the same
+        assert jnp.allclose(
+            new_trace.get_choices()["y"], old_choices["y"], rtol=standard_tolerance
+        )
+
+        # Test discarded choices
+        assert jnp.allclose(discarded["x"], old_choices["x"], rtol=standard_tolerance)
+        assert jnp.allclose(discarded["z"], old_choices["z"], rtol=standard_tolerance)
+        # Note: discarded may contain all choices, not just updated ones
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_fn_regenerate_weight_invariant(self, standard_tolerance, helpers):
+        """Test that Fn.regenerate weight satisfies invariant."""
+
+        @gen
+        def hierarchical_model():
+            mu = normal(0.0, 2.0) @ "mu"
+            sigma = exponential(1.0) @ "sigma"
+            x = normal(mu, sigma) @ "x"
+            y = normal(x, 0.1) @ "y"
+            return y
+
+        # Create initial trace
+        initial_trace = hierarchical_model.simulate(())
+        old_score = initial_trace.get_score()
+        old_choices = initial_trace.get_choices()
+        helpers.assert_valid_trace(initial_trace)
+
+        # Regenerate a subset of choices
+        selection = sel("mu") | sel("x")  # Regenerate mu and x, keep sigma and y
+        new_trace, weight, discarded = hierarchical_model.regenerate(
+            (), initial_trace, selection
+        )
+        new_score = new_trace.get_score()
+
+        # Test weight invariant
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight,
+            expected_weight,
+            rtol=standard_tolerance,
+            msg="Regenerate weight does not satisfy invariant",
+        )
+
+        # Test that selected addresses were regenerated (likely different)
+        # Note: These could be the same by chance, but very unlikely
+        mu_changed = not jnp.allclose(
+            new_trace.get_choices()["mu"], old_choices["mu"], rtol=1e-10
+        )
+        x_changed = not jnp.allclose(
+            new_trace.get_choices()["x"], old_choices["x"], rtol=1e-10
+        )
+        # At least one should have changed (very high probability)
+        assert mu_changed or x_changed, "Regenerated choices should likely be different"
+
+        # Test that non-selected addresses remained the same
+        assert jnp.allclose(
+            new_trace.get_choices()["sigma"],
+            old_choices["sigma"],
+            rtol=standard_tolerance,
+        )
+        assert jnp.allclose(
+            new_trace.get_choices()["y"], old_choices["y"], rtol=standard_tolerance
+        )
+
+        # Test that discarded contains old values for regenerated addresses
+        assert "mu" in discarded
+        assert "x" in discarded
+        assert jnp.allclose(discarded["mu"], old_choices["mu"], rtol=standard_tolerance)
+        assert jnp.allclose(discarded["x"], old_choices["x"], rtol=standard_tolerance)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_fn_regenerate_empty_selection(self, standard_tolerance, helpers):
+        """Test Fn.regenerate with empty selection."""
+
+        @gen
+        def simple_model():
+            x = normal(0.0, 1.0) @ "x"
+            return x
+
+        # Create initial trace
+        initial_trace = simple_model.simulate(())
+        old_score = initial_trace.get_score()
+        old_choices = initial_trace.get_choices()
+
+        # Regenerate with empty selection
+        empty_selection = sel()  # No addresses selected
+        new_trace, weight, discarded = simple_model.regenerate(
+            (), initial_trace, empty_selection
+        )
+        new_score = new_trace.get_score()
+
+        # Test weight invariant (should be zero since nothing changed)
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight, expected_weight, rtol=standard_tolerance
+        )
+        helpers.assert_finite_and_close(weight, 0.0, rtol=standard_tolerance)
+
+        # Test that nothing changed
+        assert jnp.allclose(
+            new_trace.get_choices()["x"], old_choices["x"], rtol=standard_tolerance
+        )
+        assert jnp.allclose(new_score, old_score, rtol=standard_tolerance)
+
+        # Test that discarded is empty
+        assert len(discarded) == 0
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_fn_regenerate_all_choices(self, standard_tolerance, helpers):
+        """Test Fn.regenerate with all choices selected."""
+
+        @gen
+        def multi_var_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = exponential(2.0) @ "y"
+            z = normal(x + y, 0.5) @ "z"
+            return z
+
+        # Create initial trace
+        initial_trace = multi_var_model.simulate(())
+        old_score = initial_trace.get_score()
+        old_choices = initial_trace.get_choices()
+
+        # Regenerate all choices
+        full_selection = sel("x") | sel("y") | sel("z")
+        new_trace, weight, discarded = multi_var_model.regenerate(
+            (), initial_trace, full_selection
+        )
+        new_score = new_trace.get_score()
+
+        # Test weight invariant
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight, expected_weight, rtol=standard_tolerance
+        )
+
+        # Test that discarded contains all old values
+        assert "x" in discarded
+        assert "y" in discarded
+        assert "z" in discarded
+        assert jnp.allclose(discarded["x"], old_choices["x"], rtol=standard_tolerance)
+        assert jnp.allclose(discarded["y"], old_choices["y"], rtol=standard_tolerance)
+        assert jnp.allclose(discarded["z"], old_choices["z"], rtol=standard_tolerance)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_update_regenerate_consistency(self, standard_tolerance, helpers):
+        """Test that update and regenerate are consistent when applicable."""
+
+        @gen
+        def simple_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(x, 0.5) @ "y"
+            return x + y
+
+        # Create initial trace
+        initial_trace = simple_model.simulate(())
+        old_score = initial_trace.get_score()
+
+        # Method 1: Use update to change x
+        new_x_value = 3.0
+        new_choices = {"x": new_x_value}
+        update_trace, update_weight, update_discarded = simple_model.update(
+            (), initial_trace, new_choices
+        )
+
+        # Method 2: Use regenerate with constrained generation
+        # This is more complex - we'd need to condition the model
+        # For now, let's test that both methods satisfy the weight invariant independently
+
+        # Test update weight invariant - use standard tolerance for floating point
+        update_expected_weight = -update_trace.get_score() + old_score
+        helpers.assert_finite_and_close(
+            update_weight, update_expected_weight, rtol=standard_tolerance
+        )
+
+        # Now test regenerate on the same initial trace
+        selection = sel("x")  # Regenerate just x
+        regen_trace, regen_weight, regen_discarded = simple_model.regenerate(
+            (), initial_trace, selection
+        )
+
+        # Test regenerate weight invariant
+        regen_expected_weight = -regen_trace.get_score() + old_score
+        helpers.assert_finite_and_close(
+            regen_weight, regen_expected_weight, rtol=standard_tolerance
+        )
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_scan_update_weight_invariant(self, base_key, standard_tolerance, helpers):
+        """Test that Scan.update weight satisfies invariant."""
+
+        @gen
+        def scan_step(carry, x):
+            noise = normal(0.0, 0.1) @ "noise"
+            new_carry = carry + noise + x
+            return new_carry, noise
+
+        scan_gf = Scan(scan_step, length=3)
+        init_carry = 1.0
+        xs = jnp.array([0.1, 0.2, 0.3])
+        args = (init_carry, xs)
+
+        # Create initial trace with seed
+        initial_trace = seed(scan_gf.simulate)(base_key, args)
+        old_score = initial_trace.get_score()
+        old_choices = initial_trace.get_choices()
+        helpers.assert_valid_trace(initial_trace)
+
+        # Update some scan choices
+        new_choices = {"noise": jnp.array([0.5, old_choices["noise"][1], -0.2])}
+        new_trace, weight, discarded = scan_gf.update(args, initial_trace, new_choices)
+        new_score = new_trace.get_score()
+
+        # Test weight invariant
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight, expected_weight, rtol=standard_tolerance
+        )
+
+        # Test that specified indices were updated
+        assert jnp.allclose(
+            new_trace.get_choices()["noise"][0], 0.5, rtol=standard_tolerance
+        )
+        assert jnp.allclose(
+            new_trace.get_choices()["noise"][2], -0.2, rtol=standard_tolerance
+        )
+
+        # Test that unspecified index remained the same
+        assert jnp.allclose(
+            new_trace.get_choices()["noise"][1],
+            old_choices["noise"][1],
+            rtol=standard_tolerance,
+        )
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_distribution_update_with_different_args(self, standard_tolerance, helpers):
+        """Test Distribution.update with different arguments."""
+        old_args = (0.0, 1.0)  # mu=0.0, sigma=1.0
+        new_args = (2.0, 0.5)  # mu=2.0, sigma=0.5
+
+        # Create initial trace with old args
+        initial_trace = normal.simulate(old_args)
+        old_score = initial_trace.get_score()
+        old_choice = initial_trace.get_choices()
+
+        # Update with new args and same choice value
+        new_trace, weight, discarded = normal.update(
+            new_args, initial_trace, old_choice
+        )
+        new_score = new_trace.get_score()
+
+        # Test weight invariant: weight = -(new_score) + old_score
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight, expected_weight, rtol=standard_tolerance
+        )
+
+        # The choice should be the same, but the score should be different
+        # because we're evaluating the same choice under different parameters
+        assert jnp.allclose(
+            new_trace.get_choices(), old_choice, rtol=standard_tolerance
+        )
+
+        # Verify the new score is correct for the new parameters
+        expected_new_density, _ = normal.assess(new_args, old_choice)
+        expected_new_score = -expected_new_density
+        helpers.assert_finite_and_close(
+            new_score, expected_new_score, rtol=standard_tolerance
+        )
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_weight_invariant_numerical_stability(self, standard_tolerance, helpers):
+        """Test weight invariant holds under numerical edge cases."""
+
+        @gen
+        def edge_case_model():
+            # Use parameters that might cause numerical issues
+            x = normal(0.0, 1e-6) @ "x"  # Very small variance
+            y = normal(x * 1e6, 1e-6) @ "y"  # Large mean, small variance
+            return y
+
+        # Create initial trace
+        initial_trace = edge_case_model.simulate(())
+        old_score = initial_trace.get_score()
+
+        # Update with value that should have very low probability
+        new_choices = {"y": 1000.0}  # Very unlikely given the model
+        new_trace, weight, discarded = edge_case_model.update(
+            (), initial_trace, new_choices
+        )
+        new_score = new_trace.get_score()
+
+        # Test weight invariant even for extreme cases
+        expected_weight = -new_score + old_score
+        helpers.assert_finite_and_close(
+            weight, expected_weight, rtol=standard_tolerance
+        )
+
+        # All values should be finite
+        assert jnp.isfinite(weight)
+        assert jnp.isfinite(new_score)
+        assert jnp.isfinite(old_score)
