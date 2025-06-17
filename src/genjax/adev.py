@@ -60,12 +60,14 @@ import jax.tree_util as jtu
 from beartype.typing import Annotated, Any, Callable
 from beartype.vale import Is
 from genjax.core import (
+    Pytree,
+    distribution,
+)
+from genjax.pjax import (
     ElaboratedPrimitive,
     Environment,
-    Pytree,
     assume_binder,
     assume_p,
-    distribution,
     modular_vmap,
     stage,
 )
