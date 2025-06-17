@@ -37,10 +37,10 @@ Usage:
     ```
 
 Technical Details:
-    PJAX works by representing probabilistic operations as JAX primitives that can be
+    PJAX works by representing sampling and density evaluation as JAX primitives that can be
     interpreted differently depending on the transformation applied. The `seed`
-    transformation eliminates these primitives by providing explicit randomness,
-    while `modular_vmap` preserves them for probability-aware vectorization.
+    transformation eliminates the sampling primitive by providing explicit randomness,
+    while `modular_vmap` preserves both primitives for probability-aware vectorization.
 
 References:
     - JAX Primitives: https://jax.readthedocs.io/en/latest/notebooks/How_JAX_primitives_work.html
@@ -174,38 +174,48 @@ class InitialStylePrimitive(Primitive):
     """JAX primitive with configurable transformation implementations.
 
     This class extends JAX's `Primitive` to provide a convenient way to define
-    custom primitives with parameterizable implementations for all JAX
-    transformations. Instead of requiring separate registration of each
-    transformation rule, this primitive accepts transformation implementations
-    as parameters, making it ideal for PJAX's dynamic primitive creation.
+    custom primitives where transformation semantics are provided at the binding
+    site rather than registration time. This is essential for PJAX's dynamic
+    primitive creation where the same primitive can have different behaviors
+    depending on the probabilistic context.
 
-    The primitive supports all core JAX transformations:
-    - `impl`: Concrete implementation for evaluation
-    - `abstract`: Abstract evaluation for shape/dtype inference
-    - `jvp`: Jacobian-vector product for forward-mode autodiff
-    - `batch`: Batching rule for vmap
-    - `lowering`: MLIR compilation for XLA
+    The primitive expects implementations for JAX transformations to be provided
+    as parameters during `initial_style_bind(...)` calls using these keys:
+
+    Transformation Keys:
+        - `impl`: Evaluation semantics - the concrete implementation that executes
+                 when the primitive is evaluated with concrete values
+        - `abstract`: Abstract semantics - used by JAX when tracing a Python program
+                     to a Jaxpr; determines output shapes and dtypes from input abstract values
+        - `jvp`: Forward-mode automatic differentiation - defines how to compute
+                Jacobian-vector products for this primitive
+        - `batch`: Vectorization semantics for `vmap` - defines how the primitive
+                  behaves when vectorized over a batch dimension
+        - `lowering`: Compilation semantics for `jit` - defines how to lower the
+                     primitive to MLIR for XLA compilation
 
     Args:
         name: Name of the primitive (used in Jaxpr pretty-printing).
 
-    Note:
-        All transformation rules are passed as parameters when the primitive
-        is bound, allowing the same primitive to have different behaviors
-        in different contexts. This is essential for PJAX's ability to
-        reinterpret probabilistic operations.
+    Technical Details:
+        Unlike standard JAX primitives where transformation rules are registered
+        once, InitialStylePrimitive defers all rule definitions to binding time.
+        The primitive acts as a parameterizable template where transformation
+        semantics are injected dynamically, enabling PJAX's context-dependent
+        reinterpretation of probabilistic operations.
 
     Example:
         ```python
         my_primitive = InitialStylePrimitive("my_op")
 
-        # When binding, provide transformation implementations
+        # Transformation semantics provided at binding time
         result = my_primitive.bind(
-            args,
-            impl=my_impl_function,
-            abstract=my_abstract_function,
-            jvp=my_jvp_function,
-            batch=my_batch_function
+            inputs,
+            impl=lambda x: x + 1,                    # Evaluation: add 1
+            abstract=lambda aval: aval,              # Same shape/dtype
+            jvp=lambda primals, tangents: (primals[0] + 1, tangents[0]),
+            batch=lambda args, dim: (args[0] + 1,),  # Vectorized add
+            lowering=my_lowering_rule
         )
         ```
     """
@@ -252,49 +262,49 @@ class InitialStylePrimitive(Primitive):
         mlir.register_lowering(self, lowering)
 
 
-class ElaboratedPrimitive(Primitive):
-    """A primitive wrapper that enhances debugging and introspection.
+class PPPrimitive(Primitive):
+    """A primitive wrapper that hides metadata from JAX's Jaxpr pretty printer.
 
-    `ElaboratedPrimitive` wraps an underlying primitive with additional metadata
-    that improves Jaxpr pretty-printing and debugging without affecting the
-    computation. This is crucial for PJAX because probabilistic primitives often
-    carry complex metadata (samplers, distributions, etc.) that would clutter
-    the Jaxpr representation if shown in full.
+    `PPPrimitive` (Pretty Print Primitive) wraps an underlying InitialStylePrimitive
+    and stores metadata parameters in a hidden field to prevent them from cluttering
+    JAX's Jaxpr pretty printer output. This is essential for PJAX because probabilistic
+    primitives often carry complex metadata (samplers, distributions, transformation
+    rules, etc.) that would make Jaxpr representations unreadable if displayed.
 
-    The elaboration includes:
-    - Simplified pretty-printing names for probabilistic operations
-    - Metadata hiding for cleaner Jaxpr visualization
-    - Enhanced debugging information for probabilistic computations
-    - Preservation of all original transformation behavior
+    The wrapper:
+    - Stores the underlying primitive and its parameters in a private field
+    - Hides metadata from JAX's Jaxpr pretty printer
+    - Acts as a transparent proxy for all JAX transformations
+    - Preserves all transformation behavior of the wrapped primitive
 
     Args:
         prim: The underlying InitialStylePrimitive to wrap.
-        **params: Additional elaboration parameters that will be merged
-                 with parameters passed during binding.
+        **params: Metadata parameters to hide from pretty printer.
+                 These will be merged with parameters passed during binding.
 
     Technical Details:
-        The elaborated primitive acts as a transparent proxy that forwards
-        all transformation calls to the underlying primitive while injecting
-        the elaboration parameters. This allows the same primitive to behave
-        differently based on the elaboration context.
+        When JAX creates a Jaxpr representation, it only shows the primitive name
+        and visible parameters. By storing metadata in the PPPrimitive's internal
+        state rather than as binding parameters, we get clean Jaxpr output while
+        preserving all the functionality and metadata needed for transformations.
 
     Example:
         ```python
         base_prim = InitialStylePrimitive("sample")
-        elaborated = ElaboratedPrimitive(
-            base_prim,
-            distribution="normal",
-            name="x"
-        )
 
-        # The elaborated primitive will show as "normal @ x" in Jaxpr
-        # but maintain all the transformation behavior of base_prim
-        result = elaborated.bind(args, mu=0.0, sigma=1.0)
+        # Without PPPrimitive: cluttered Jaxpr with all metadata visible
+        # sample[impl=<function>, abstract=<function>, distribution="normal", ...]
+
+        # With PPPrimitive: clean Jaxpr output
+        pretty_prim = PPPrimitive(base_prim, distribution="normal", name="x")
+        # Jaxpr shows: sample
+
+        result = pretty_prim.bind(args, mu=0.0, sigma=1.0)
         ```
     """
 
     def __init__(self, prim: InitialStylePrimitive, **params):
-        super(ElaboratedPrimitive, self).__init__(prim.name)
+        super(PPPrimitive, self).__init__(prim.name)
         self.prim = prim
         self.multiple_results = self.prim.multiple_results
         self.params = params
@@ -322,11 +332,11 @@ class ElaboratedPrimitive(Primitive):
 
     @staticmethod
     def unwrap(v):
-        return (v.prim, v.params) if isinstance(v, ElaboratedPrimitive) else (v, {})
+        return (v.prim, v.params) if isinstance(v, PPPrimitive) else (v, {})
 
     @staticmethod
     def check(primitive, other):
-        if isinstance(primitive, ElaboratedPrimitive):
+        if isinstance(primitive, PPPrimitive):
             return primitive.prim == other
         else:
             return primitive == other
@@ -339,7 +349,7 @@ class ElaboratedPrimitive(Primitive):
         *args,
     ):
         if isinstance(primitive, InitialStylePrimitive):
-            return ElaboratedPrimitive(primitive, **inner_params).bind(*args, **params)
+            return PPPrimitive(primitive, **inner_params).bind(*args, **params)
         else:
             return primitive.bind(*args, **params)
 
@@ -363,7 +373,7 @@ def initial_style_bind(
         information."""
 
         def wrapped(*args, **kwargs):
-            """Runs a function and binds it to an `ElaboratedPrimitive`
+            """Runs a function and binds it to a `PPPrimitive`
             primitive, hiding the implementation details of the eval
             (impl) rule, abstract rule, batch rule, and jvp rule."""
             jaxpr, (flat_args, in_tree, out_tree) = stage(f)(*args, **kwargs)
@@ -421,7 +431,7 @@ def initial_style_bind(
                 jvp = params["jvp"]
                 params.pop("jvp")
 
-            elaborated_prim = ElaboratedPrimitive(
+            elaborated_prim = PPPrimitive(
                 prim,
                 impl=impl,
                 abstract=abstract,
@@ -865,7 +875,7 @@ class SeedInterpreter:
             invals = safe_map(env.read, eqn.invars)
             subfuns, params = eqn.primitive.get_bind_params(eqn.params)
             args = subfuns + invals
-            primitive, inner_params = ElaboratedPrimitive.unwrap(eqn.primitive)
+            primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
 
             if primitive == assume_p:
                 invals = safe_map(env.read, eqn.invars)
@@ -1050,7 +1060,7 @@ class ModularVmapInterpreter:
             args = subfuns + invals
 
             # Probabilistic.
-            if ElaboratedPrimitive.check(eqn.primitive, assume_p):
+            if PPPrimitive.check(eqn.primitive, assume_p):
                 outvals = eqn.primitive.bind(
                     dummy_arg,
                     *args,

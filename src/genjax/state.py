@@ -18,7 +18,7 @@ from genjax.core import (
     Any,
 )
 from genjax.pjax import (
-    ElaboratedPrimitive,
+    PPPrimitive,
     Environment,
     Pytree,
     InitialStylePrimitive,
@@ -75,7 +75,7 @@ class StateInterpreter(Pytree):
             invals = safe_map(env.read, eqn.invars)
             subfuns, params = eqn.primitive.get_bind_params(eqn.params)
             args = subfuns + invals
-            primitive, inner_params = ElaboratedPrimitive.unwrap(eqn.primitive)
+            primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
 
             if primitive == state_p:
                 # Collect the tagged value
