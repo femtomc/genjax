@@ -1,5 +1,6 @@
 from genjax import gen, uniform, normal
 from genjax import seed
+from genjax.core import Const
 import jax.numpy as jnp
 import jax.random as jrand
 
@@ -44,12 +45,12 @@ exponential = tfp_distribution(tfd.Exponential)
 
 @Pytree.dataclass
 class Lambda(Pytree):
-    f: any = Pytree.static()
+    f: Const[any]
     dynamic_vals: jnp.ndarray
-    static_vals: tuple = Pytree.static(default=())
+    static_vals: Const[tuple] = Const(())
 
     def __call__(self, *x):
-        return self.f(*x, *self.static_vals, self.dynamic_vals)
+        return self.f.value(*x, *self.static_vals.value, self.dynamic_vals)
 
 
 ### Model + inference code ###
@@ -68,7 +69,7 @@ def sinfn(x, a):
 def sine():
     freq = exponential(10.0) @ "freq"
     offset = uniform(0.0, 2.0 * pi) @ "off"
-    return Lambda(sinfn, jnp.array([freq, offset]))
+    return Lambda(Const(sinfn), jnp.array([freq, offset]))
 
 
 @gen
@@ -78,33 +79,25 @@ def onepoint_curve(x):
     return curve, (x, y)
 
 
-def npoint_curve_factory(n: int):
-    """Factory function to create npoint_curve with static n parameter."""
-
-    @gen
-    def npoint_curve():
-        curve = sine() @ "curve"
-        xs = jnp.linspace(0, n / 4, n)  # n is now static from factory closure
-        ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
-        return curve, (xs, ys)
-
-    return npoint_curve
+@gen
+def npoint_curve(n: Const[int]):
+    """N-point curve model with static n parameter using Const."""
+    curve = sine() @ "curve"
+    xs = jnp.linspace(0, n.value / 4, n.value)  # n.value is static int
+    ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
+    return curve, (xs, ys)
 
 
 def _infer_latents(key, ys, n_samples):
     """
     Infer latent curve parameters using genjax.smc.default_importance_sampling.
 
-    Uses factory pattern for npoint_curve to handle static n parameter, and proper
-    closure pattern from test_smc.py for default_importance_sampling with seed.
+    Uses Const[int] for static n parameter instead of factory pattern.
     """
     from genjax.smc import default_importance_sampling
 
     constraints = {"ys": {"obs": ys}}
-    n_points = len(ys)
-
-    # Create model with static n using factory pattern
-    npoint_curve_model = npoint_curve_factory(n_points)
+    n_points = Const(len(ys))  # Wrap n_points as static parameter
 
     # Create closure for default_importance_sampling that captures static arguments
     # This pattern follows test_smc.py lines 242-248
@@ -119,8 +112,8 @@ def _infer_latents(key, ys, n_samples):
     # Apply seed to the closure - pattern from test_smc.py lines 251-256
     result = seed(default_importance_sampling_closure)(
         key,
-        npoint_curve_model,  # target generative function (from factory)
-        (),  # target args (empty since n is captured in factory)
+        npoint_curve,  # target generative function
+        (n_points,),  # target args with Const[int] parameter
         constraints,  # constraints
     )
 
@@ -133,8 +126,8 @@ infer_latents = jax.jit(_infer_latents, static_argnums=(2,))
 
 
 def get_points_for_inference(n_points=20):
-    npoint_curve_model = npoint_curve_factory(n_points)
-    trace = npoint_curve_model.simulate(())
+    n_points_const = Const(n_points)
+    trace = npoint_curve.simulate((n_points_const,))
     return trace.get_retval()
 
 

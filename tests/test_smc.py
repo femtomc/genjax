@@ -7,7 +7,7 @@ on discrete HMMs to validate correctness and accuracy.
 
 import jax.numpy as jnp
 import jax.random as jrand
-from genjax.core import Scan
+from genjax.core import Scan, Const
 from genjax.distributions import categorical
 
 from genjax.smc import (
@@ -97,39 +97,58 @@ def create_complex_hmm_params():
     return initial_probs, transition_matrix, emission_matrix
 
 
+@gen
+def hmm_proposal(T: Const[int], initial_probs, transition_matrix, emission_matrix):
+    """
+    HMM proposal that only samples latent states using Const parameters.
+
+    Args:
+        T: Number of time steps wrapped in Const
+        initial_probs: Initial state probabilities
+        transition_matrix: State transition probabilities
+        emission_matrix: Emission probabilities (unused but kept for compatibility)
+
+    Returns:
+        Sequence of latent states
+    """
+    # Sample initial state only
+    initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
+
+    # Define step function that only samples states
+    @gen
+    def state_step(carry, x):
+        prev_state, transition_matrix = carry
+        next_state = categorical(jnp.log(transition_matrix[prev_state])) @ "state"
+        new_carry = (next_state, transition_matrix)
+        return new_carry, next_state
+
+    # Use Scan for remaining states (T.value is static)
+    scan_fn = Scan(state_step, length=T.value - 1)
+    init_carry = (initial_state, transition_matrix)
+    final_carry, remaining_states = scan_fn(init_carry, None) @ "scan_steps"
+
+    # Return all states
+    all_states = jnp.concatenate([jnp.array([initial_state]), remaining_states])
+    return all_states
+
+
 def hmm_proposal_factory(T: int):
     """
     Factory function to create HMM proposal that only samples latent states.
+
+    Deprecated: Use hmm_proposal() with Const[int] parameter instead.
     """
 
+    # Create a generative function that uses the new proposal with Const parameter
     @gen
-    def hmm_proposal(initial_probs, transition_matrix, emission_matrix):
-        """
-        Proposal for HMM that only samples latent states (not observations).
-        This avoids proposing values for constrained variables.
-        Assumes T > 1 like discrete_hmm_model.
-        """
-        # Sample initial state only
-        initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
+    def hmm_proposal_closure(initial_probs, transition_matrix, emission_matrix):
+        result = (
+            hmm_proposal(Const(T), initial_probs, transition_matrix, emission_matrix)
+            @ "proposal"
+        )
+        return result
 
-        # Define step function that only samples states
-        @gen
-        def state_step(carry, x):
-            prev_state, transition_matrix = carry
-            next_state = categorical(jnp.log(transition_matrix[prev_state])) @ "state"
-            new_carry = (next_state, transition_matrix)
-            return new_carry, next_state
-
-        # Use Scan for remaining states (matching target model addressing)
-        scan_fn = Scan(state_step, length=T - 1)
-        init_carry = (initial_state, transition_matrix)
-        final_carry, remaining_states = scan_fn(init_carry, None) @ "scan_steps"
-
-        # Return all states
-        all_states = jnp.concatenate([jnp.array([initial_state]), remaining_states])
-        return all_states
-
-    return hmm_proposal
+    return hmm_proposal_closure
 
 
 class TestImportanceSampling:
