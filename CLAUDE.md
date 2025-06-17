@@ -2,11 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Documentation Policy
-
-- **NEVER create documentation files** unless explicitly requested
-- Focus on implementation tasks and working code
-
 ## Overview
 
 GenJAX is a probabilistic programming language embedded in Python centered on programmable inference.
@@ -54,11 +49,47 @@ genjax/
    - `src/genjax/mcmc.py` → `tests/test_mcmc.py`
    - `src/genjax/smc.py` → `tests/test_smc.py`
 
-### Communication Guidelines
+### CRITICAL Claude Code Workflow
+
+Follow this four-step workflow for effective development:
+
+### 1. Explore
+
+- Read relevant files and context first
+- Explicitly state "don't write code yet" to focus on understanding
+- Use subagents for complex problems requiring extensive exploration
+
+### 2. Plan
+
+- Ask Claude to create a detailed plan before coding
+- Use "think" to trigger extended thinking mode for complex solutions
+- Ensure the plan addresses all requirements and edge cases
+
+### 3. Code
+
+- Implement the solution in code based on the plan
+- Verify the solution's reasonableness during implementation
+- Test and validate the implementation works correctly
+
+### 4. Commit
+
+- Commit the result and create pull requests when appropriate
+- Update documentation (READMEs, changelogs) as needed
+- Ensure all tests pass before committing
+
+**Key insight**: Steps 1-2 are crucial - without them, Claude tends to jump straight to coding without proper understanding.
+
+### CRITICAL Communication Guidelines
 
 - **Be concise** - avoid unnecessary explanation or elaboration
 - **Eliminate sycophancy** - no "I'd be happy to help" or similar pleasantries
 - **Ask questions** - clarify requirements rather than making assumptions
+- **Don't commit failures** - if you fail to solve a problem, don't commit partial/broken solutions
+
+### CRITICAL Documentation Policy
+
+- **NEVER create documentation files** unless explicitly requested
+- Focus on implementation tasks and working code
 
 ### Workflow Tips
 

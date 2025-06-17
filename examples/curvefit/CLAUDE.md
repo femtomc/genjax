@@ -23,6 +23,7 @@ examples/curvefit/
 
 ### `core.py` - Model Implementations
 
+**GenJAX Models:**
 - **`point(x, curve)`**: Single data point model with outlier handling
 - **`sine()`**: Sine wave parameter prior model
 - **`onepoint_curve(x)`**: Single point curve fitting model
@@ -30,6 +31,18 @@ examples/curvefit/
 - **`_infer_latents()`**: SMC-based parameter inference using proper factory/closure patterns
 - **`infer_latents()`**: JIT-compiled inference function
 - **`get_points_for_inference()`**: Test data generation utility
+
+**NumPyro Implementations (if numpyro available):**
+- **`numpyro_npoint_model()`**: Equivalent NumPyro model with Gaussian likelihood
+- **`numpyro_run_importance_sampling()`**: Importance sampling inference
+- **`numpyro_run_hmc_inference()`**: Hamiltonian Monte Carlo inference
+- **`numpyro_hmc_summary_statistics()`**: HMC diagnostics and summary stats
+
+**Pyro Implementations (if torch and pyro-ppl available):**
+- **`pyro_npoint_model()`**: Equivalent Pyro model with Gaussian likelihood
+- **`pyro_run_importance_sampling()`**: Importance sampling inference
+- **`pyro_run_variational_inference()`**: Stochastic variational inference (SVI)
+- **`pyro_sample_from_variational_posterior()`**: Posterior sampling from fitted guide
 
 ### `figs.py` - Visualization
 
@@ -163,10 +176,31 @@ class Lambda(Pytree):
 
 ### Basic Inference
 
+**GenJAX:**
 ```python
 key = jrand.key(42)
 curve, (xs, ys) = get_points_for_inference()
 samples, weights = infer_latents(key, ys, 1000)
+```
+
+**NumPyro (if available):**
+```python
+# Importance sampling
+result = numpyro_run_importance_sampling(key, xs, ys, num_samples=5000)
+
+# Hamiltonian Monte Carlo
+hmc_result = numpyro_run_hmc_inference(key, xs, ys, num_samples=2000, num_warmup=1000)
+summary = numpyro_hmc_summary_statistics(hmc_result)
+```
+
+**Pyro (if available):**
+```python
+# Importance sampling
+result = pyro_run_importance_sampling(xs, ys, num_samples=5000)
+
+# Variational inference
+vi_result = pyro_run_variational_inference(xs, ys, num_iterations=500, learning_rate=0.01)
+samples = pyro_sample_from_variational_posterior(xs, num_samples=1000)
 ```
 
 ### Custom Model Creation
@@ -177,10 +211,20 @@ model = npoint_curve_factory(15)
 trace = model.simulate(())
 ```
 
-### Visualization Generation
+### Running Examples
 
 ```bash
+# Generate all figures
 pixi run -e curvefit curvefit
+
+# Run core implementation with all frameworks
+pixi run -e curvefit curvefit-core
+
+# Generate visualization figures only
+pixi run -e curvefit curvefit-figs
+
+# Run all components
+pixi run -e curvefit curvefit-all
 ```
 
 ## Development Guidelines
