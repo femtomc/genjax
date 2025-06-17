@@ -345,6 +345,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.vi)
         elif "test_hmm" in item.fspath.basename:
             item.add_marker(pytest.mark.hmm)
+        elif "test_mcmc" in item.fspath.basename:
+            item.add_marker(pytest.mark.mcmc)
         elif "test_core" in item.fspath.basename:
             item.add_marker(pytest.mark.core)
 

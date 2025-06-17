@@ -198,6 +198,32 @@ class Pytree(pz.Struct):
         return field(**kwargs)
 
 
+@Pytree.dataclass
+class Const(Generic[A], Pytree):
+    """A Pytree wrapper for Python literals that should remain static.
+
+    This class wraps Python values that need to stay as literals (not become
+    JAX tracers) when used inside JAX transformations. The wrapped value is
+    marked as static, ensuring it's embedded in the PyTreeDef rather than
+    becoming a traced value.
+
+    Example:
+        ```python
+        # Instead of: n_steps: int (becomes tracer in JAX transforms)
+        # Use: n_steps: Const[int] (stays as Python int)
+
+        def my_function(n_steps: Const[int]):
+            for i in range(n_steps.value):  # n_steps.value is Python int
+                ...
+        ```
+
+    Args:
+        value: The Python literal to wrap as static
+    """
+
+    value: A = Pytree.static()
+
+
 ############################################
 # Staging utilities for Jaxpr interpreters #
 ############################################
@@ -1315,7 +1341,7 @@ class ComplSel(Pytree):
         s: The selection to complement.
     """
 
-    s: "S"
+    s: "Selection"
 
     def match(self, addr) -> "tuple[bool, ComplSel]":
         check, rest = self.s.match(addr)
@@ -1331,8 +1357,8 @@ class InSel(Pytree):
         s2: Second selection.
     """
 
-    s1: "S"
-    s2: "S"
+    s1: "Selection"
+    s2: "Selection"
 
     def match(self, addr) -> "tuple[bool, InSel]":
         check1, r1 = self.s1.match(addr)
@@ -1342,8 +1368,8 @@ class InSel(Pytree):
 
 @Pytree.dataclass
 class OrSel(Pytree):
-    s1: "S"
-    s2: "S"
+    s1: "Selection"
+    s2: "Selection"
 
     def match(self, addr) -> "tuple[bool, OrSel]":
         check1, r1 = self.s1.match(addr)
@@ -1352,47 +1378,115 @@ class OrSel(Pytree):
 
 
 @Pytree.dataclass
-class S(Pytree):
+class Selection(Pytree):
+    """A Selection acts as a filter to specify which random choices in a trace should
+    be regenerated during the `regenerate` method call.
+
+    Selections are used in inference algorithms like MCMC to specify which subset of
+    random choices should be updated while keeping others fixed. The Selection determines
+    which addresses (random choice names) match the selection criteria.
+
+    A Selection wraps one of several concrete selection types:
+    - StrSel: Matches a specific string address
+    - DictSel: Matches addresses using a dictionary mapping
+    - AllSel: Matches all addresses
+    - NoneSel: Matches no addresses
+    - ComplSel: Matches the complement of another selection
+    - InSel: Matches the intersection of two selections
+    - OrSel: Matches the union of two selections
+
+    Example:
+        ```python
+        from genjax.core import sel
+
+        # Select a specific address
+        selection = sel("x")  # Matches address "x"
+
+        # Select all addresses
+        selection = sel(())   # Matches all addresses
+
+        # Select nested addresses
+        selection = sel({"outer": sel("inner")})  # Matches "outer"/"inner"
+
+        # Use in regenerate
+        new_trace, weight, discard = gen_fn.regenerate(args, trace, selection)
+        ```
+
+    Args:
+        s: The underlying selection implementation (one of the concrete selection types)
+    """
+
     s: NoneSel | AllSel | StrSel | DictSel | ComplSel | InSel | OrSel
 
-    def match(self, addr) -> "tuple[bool, S]":
+    def match(self, addr) -> "tuple[bool, Selection]":
         check, rest = self.s.match(addr)
-        return check, S(rest) if not isinstance(rest, S) else rest
+        return check, Selection(rest) if not isinstance(rest, Selection) else rest
 
-    def __xor__(self, other: "S") -> "S":
-        return S(InSel(self, other))
+    def __xor__(self, other: "Selection") -> "Selection":
+        return Selection(InSel(self, other))
 
-    def __invert__(self) -> "S":
-        return S(ComplSel(self))
+    def __invert__(self) -> "Selection":
+        return Selection(ComplSel(self))
 
     def __contains__(self, addr) -> bool:
         check, _ = self.match(addr)
         return check
 
-    def __or__(self, other) -> "S":
-        return S(OrSel(self, other))
+    def __or__(self, other) -> "Selection":
+        return Selection(OrSel(self, other))
 
-    def __call__(self, addr) -> "tuple[bool, S]":
+    def __call__(self, addr) -> "tuple[bool, Selection]":
         return self.match(addr)
 
 
-def sel(*v: tuple[()] | str | dict[str, Any] | None) -> S:
+def sel(*v: tuple[()] | str | dict[str, Any] | None) -> Selection:
+    """Create a Selection from various input types.
+
+    This is a convenience function to create Selection objects from common patterns.
+    Selections specify which random choices in a trace should be regenerated during
+    inference operations like MCMC.
+
+    Args:
+        *v: Variable arguments specifying the selection pattern:
+            - str: Select a specific address (e.g., sel("x"))
+            - (): Select all addresses (e.g., sel(()))
+            - dict: Select nested addresses (e.g., sel({"outer": sel("inner")}))
+            - None or no args: Select no addresses (e.g., sel() or sel(None))
+
+    Returns:
+        Selection object that can be used with regenerate methods
+
+    Examples:
+        ```python
+        # Select specific address
+        sel("x")                    # Matches address "x"
+
+        # Select all addresses
+        sel(())                     # Matches all addresses
+
+        # Select no addresses
+        sel() or sel(None)          # Matches no addresses
+
+        # Select nested addresses
+        sel({"outer": sel("inner")}) # Matches "outer"/"inner"
+        ```
+    """
     assert len(v) <= 1
     if len(v) == 1:
         if v[0] is None:
-            return S(NoneSel())
+            return Selection(NoneSel())
         if v[0] == ():
-            return S(AllSel())
+            return Selection(AllSel())
         elif isinstance(v[0], dict):
-            return S(DictSel(v[0]))
+            return Selection(DictSel(v[0]))
         else:
             assert isinstance(v[0], str)
-            return S(StrSel(v[0]))
+            return Selection(StrSel(v[0]))
     else:
-        return S(NoneSel())
+        return Selection(NoneSel())
 
 
-def match(addr: Addr, sel: S):
+def match(addr: Addr, sel: Selection):
     return sel.match(addr)
 
 
@@ -1464,7 +1558,7 @@ class GFI(Generic[X, R], Pytree):
         self,
         args_,
         tr: Trace[X, R],
-        sel: S,
+        sel: Selection,
     ) -> tuple[Tr[X, R], Weight, X | None]:
         pass
 
@@ -1627,7 +1721,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
         self,
         args_,
         tr: Tr[X, R],
-        s: S,
+        s: Selection,
     ) -> tuple[Tr[X, R], Weight, X | None]:
         new_tr, w, discard = modular_vmap(
             self.gen_fn.update,
@@ -1739,7 +1833,7 @@ class Distribution(Generic[X], GFI[X, X]):
         self,
         args_,
         tr: Tr[X, X],
-        s: S,
+        s: Selection,
     ) -> tuple[Tr[X, X], Weight, X | None]:
         if () in s:
             tr_ = self.simulate(args_)
@@ -1760,8 +1854,8 @@ class Distribution(Generic[X], GFI[X, X]):
         )
 
 
-def distribution[X](
-    sampler: Callable[..., X],
+def distribution(
+    sampler: Callable[..., Any],
     logpdf: Callable[..., Any],
     /,
     name: str | None = None,
@@ -1785,7 +1879,7 @@ def distribution[X](
 
 # Mostly, just use TFP.
 # This wraps PJAX's `assume_p` correctly.
-def tfp_distribution[X](
+def tfp_distribution(
     dist: Callable[..., "tfd.Distribution"],
     /,
     name: str | None = None,
@@ -1937,7 +2031,7 @@ class Update(Generic[R]):
 @dataclass
 class Regenerate(Generic[R]):
     trace: Tr[dict[str, Any], R]
-    s: S
+    s: Selection
     trace_map: dict[str, Any]
     discard: dict[str, Any]
     score: Score
@@ -1949,14 +2043,25 @@ class Regenerate(Generic[R]):
         gen_fn: GFI[X, R],
         args_,
     ) -> R:
-        subtrace = self.trace.get_choices()[addr]
-        subs = self.s[addr]
-        tr, w, discard = gen_fn.regenerate(args_, subtrace, subs)
-        self.trace_map[addr] = tr
-        self.discard[addr] = discard
-        self.score += tr.get_score()
-        self.weight += w
-        return tr.get_retval()
+        # Get the full subtrace (Tr object) from the trace structure
+        subtrace = self.trace._choices[
+            addr
+        ]  # This is the Tr object, not just the value
+        # Use Selection.match to check if this address is selected
+        should_regenerate, subsel = self.s.match(addr)
+
+        if should_regenerate:
+            tr, w, discard = gen_fn.regenerate(args_, subtrace, subsel)
+            self.trace_map[addr] = tr
+            self.discard[addr] = discard
+            self.score += tr.get_score()
+            self.weight += w
+            return tr.get_retval()
+        else:
+            # Address not selected, use existing trace
+            self.trace_map[addr] = subtrace
+            self.score += subtrace.get_score()
+            return subtrace.get_retval()
 
 
 handler_stack: list[Simulate | Assess | Generate | Update | Regenerate] = []
@@ -2073,12 +2178,12 @@ class Fn(
         self,
         args_,
         tr: Tr[dict[str, Any], R],
-        s: S,
+        s: Selection,
     ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any] | None]:
         handler_stack.append(Regenerate(tr, s, {}, {}, jnp.array(0.0), jnp.array(0.0)))
         r = self.source(*args_)
         handler = handler_stack.pop()
-        assert isinstance(handler, Update)
+        assert isinstance(handler, Regenerate)
         trace_map, score, w, discard = (
             handler.trace_map,
             handler.score,
@@ -2334,7 +2439,7 @@ class Scan(Generic[X, R], GFI[X, R]):
         self,
         args_,
         tr: ScanTr[X, R],
-        s: S,
+        s: Selection,
     ) -> tuple[ScanTr[X, R], Weight, X | None]:
         init_carry, xs = args_
         old_traces = tr.traces
@@ -2507,7 +2612,7 @@ class Cond(Generic[X, R], GFI[X, R]):
         self,
         args,
         tr: CondTr[X, R],
-        s: S,
+        s: Selection,
     ) -> tuple[Trace[X, R], Weight, X | None]:
         (check, *args) = args
         tr, w, discard = self.callee.regenerate(args, tr.trs[0], s)
