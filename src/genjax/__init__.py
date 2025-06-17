@@ -56,8 +56,6 @@ from .distributions import (  # noqa: E402
 from .mcmc import (  # noqa: E402
     MCMCResult,
     metropolis_hastings,
-    hmc,
-    metropolis_hastings_vectorized,
 )
 
 __all__ = [
@@ -87,10 +85,8 @@ __all__ = [
     "gen",
     "geometric_reinforce",
     "get_choices",
-    "hmc",
     "MCMCResult",
     "metropolis_hastings",
-    "metropolis_hastings_vectorized",
     "modular_vmap",
     "normal",
     "normal_reinforce",

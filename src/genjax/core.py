@@ -1498,8 +1498,8 @@ class GFI(Generic[X, R], Pytree):
     updating, and regeneration of probabilistic computations.
 
     Type Parameters:
-        X: Type of the random choices (trace space).
-        R: Type of the return value.
+        X: The type of the random choices.
+        R: The type of the return value.
 
     Methods:
         simulate: Sample an execution trace.
@@ -1507,7 +1507,7 @@ class GFI(Generic[X, R], Pytree):
         generate: Generate trace with partial constraints.
         update: Update trace with new arguments/constraints.
         regenerate: Regenerate selected parts of trace.
-        merge: Merge two choice records.
+        merge: Merge two choices.
     """
 
     def __call__(self, *args) -> "Thunk[X, R] | R":
@@ -2049,7 +2049,6 @@ class Regenerate(Generic[R]):
         ]  # This is the Tr object, not just the value
         # Use Selection.match to check if this address is selected
         should_regenerate, subsel = self.s.match(addr)
-
         if should_regenerate:
             tr, w, discard = gen_fn.regenerate(args_, subtrace, subsel)
             self.trace_map[addr] = tr
