@@ -23,9 +23,39 @@ Key Concepts:
     - **Modular Vmap**: Vectorizes probabilistic functions while preserving semantics
     - **Elaborated Primitives**: Enhanced primitives with metadata for pretty printing
 
+Keyful Sampler Contract:
+    All samplers used with PJAX must follow this signature contract:
+
+    ```python
+    def keyful_sampler(key: PRNGKey, *args, sample_shape: tuple[int, ...], **kwargs) -> Array:
+        '''Sample from a distribution.
+
+        Args:
+            key: JAX PRNGKey for randomness
+            *args: Distribution parameters (positional)
+            sample_shape: REQUIRED keyword argument specifying sample shape
+            **kwargs: Additional distribution parameters (keyword)
+
+        Returns:
+            Array with shape sample_shape + distribution.event_shape
+        '''
+    ```
+
+    The sample_shape parameter is REQUIRED and must be accepted as a keyword argument.
+    This ensures compatibility with JAX/TensorFlow Probability conventions.
+
 Usage:
     ```python
     from genjax.pjax import seed, modular_vmap, sample_binder
+    import tensorflow_probability.substrates.jax as tfp
+
+    # Create a keyful sampler following the contract
+    def normal_sampler(key, loc, scale, sample_shape=(), **kwargs):
+        dist = tfp.distributions.Normal(loc, scale)
+        return dist.sample(seed=key, sample_shape=sample_shape)
+
+    # Bind to PJAX primitive
+    normal = sample_binder(normal_sampler, name="normal")
 
     # Transform probabilistic function to accept explicit keys
     seeded_fn = seed(probabilistic_function)
@@ -48,6 +78,7 @@ References:
 """
 
 import itertools as it
+import traceback
 import warnings
 from dataclasses import dataclass, field
 from functools import partial, wraps
@@ -537,24 +568,144 @@ Used primarily in:
 """
 
 
-# Zero-cost, just staging.
-def make_flat(f):
-    @wraps(f)
-    def _make_flat(*args, **kwargs):
-        debug_info = api_util.debug_info("_make_flat", f, args, kwargs)
-        jaxpr, *_ = stage(f)(*args, **kwargs)
-
-        def flat(*flat_args, **params):
-            consts, args = split_list(flat_args, [params["num_consts"]])
-            return eval_jaxpr(jaxpr.jaxpr, consts, *args)
-
-        return flat, debug_info
-
-    return _make_flat
-
-
 class LoweringSamplePrimitiveToMLIRException(Exception):
-    pass
+    """Exception raised when PJAX sample_p primitives reach MLIR lowering.
+
+    This exception occurs when probabilistic functions containing sample_p primitives
+    are passed to JAX transformations (like jit, grad, vmap) without first applying
+    the `seed()` transformation. This prevents silent errors where PRNG keys get
+    baked into compiled code, leading to deterministic behavior.
+
+    The exception includes execution context to help identify where the problematic
+    binding occurred in the user's code.
+    """
+
+    def __init__(self, lowering_msg: str, binding_context: dict | None = None):
+        """Initialize the exception with lowering message and binding context.
+
+        Args:
+            lowering_msg: The core error message about why this is problematic
+            binding_context: Dictionary containing execution context information
+        """
+        self.lowering_msg = lowering_msg
+        self.binding_context = binding_context or {}
+
+        # Create a comprehensive error message
+        full_message = self._format_full_message()
+        super().__init__(full_message)
+
+    def _format_full_message(self) -> str:
+        """Format a comprehensive error message with context."""
+        lines = [
+            "PJAX Sample Primitive Lowering Error",
+            "=" * 40,
+            "",
+            self.lowering_msg,
+            "",
+        ]
+
+        if self.binding_context:
+            lines.extend(
+                [
+                    "Execution Context:",
+                    "-" * 18,
+                ]
+            )
+
+            # Add sampler information
+            if "sampler_name" in self.binding_context:
+                lines.append(f"Sampler Name: {self.binding_context['sampler_name']}")
+
+            # Add binding location if available
+            if "binding_location" in self.binding_context:
+                location = self.binding_context["binding_location"]
+                lines.append(f"Binding Location: {location}")
+
+            # Add call stack context
+            if "call_stack" in self.binding_context:
+                lines.append("")
+                lines.append("Call Stack (most recent first):")
+                for i, frame_info in enumerate(self.binding_context["call_stack"]):
+                    if i >= 5:  # Limit to 5 most recent frames
+                        break
+                    lines.append(f"  {frame_info}")
+
+            lines.append("")
+
+        lines.extend(
+            [
+                "Solution:",
+                "-" * 9,
+                "Transform your function with `seed()` before applying JAX transformations:",
+                "",
+                "  # Instead of:",
+                "  jit_fn = jax.jit(my_probabilistic_function)",
+                "",
+                "  # Do this:",
+                "  seeded_fn = seed(my_probabilistic_function)",
+                "  jit_fn = jax.jit(seeded_fn)",
+                "",
+                "See: https://github.com/probcomp/genjax for more details.",
+            ]
+        )
+
+        return "\n".join(lines)
+
+
+def _capture_binding_context(sampler_name: str | None = None) -> dict:
+    """Capture execution context for debugging PJAX primitive bindings.
+
+    This captures the call stack to help users identify where problematic
+    bindings are occurring in their code.
+
+    Args:
+        sampler_name: Optional name of the sampler being bound
+
+    Returns:
+        Dictionary containing execution context information
+    """
+    # Get the current call stack
+    stack = traceback.extract_stack()
+
+    # Filter out internal PJAX frames to focus on user code
+    user_frames = []
+    for frame in reversed(stack[:-1]):  # Skip current frame
+        # Skip internal PJAX/JAX implementation frames
+        if any(
+            skip_pattern in frame.filename
+            for skip_pattern in [
+                "/genjax/pjax.py",
+                "/jax/",
+                "/site-packages/jax/",
+                "beartype",  # Skip beartype decorator frames
+            ]
+        ):
+            continue
+
+        # Format frame information for display
+        frame_info = f"{frame.filename}:{frame.lineno} in {frame.name}()"
+        if frame.line:
+            frame_info += f"\n    {frame.line.strip()}"
+
+        user_frames.append(frame_info)
+
+        # Stop after collecting a reasonable number of user frames
+        if len(user_frames) >= 5:
+            break
+
+    # Find the most relevant binding location (first user frame)
+    binding_location = None
+    if user_frames:
+        # Extract just the file:line info from the first user frame
+        first_frame = user_frames[0]
+        if ":" in first_frame and " in " in first_frame:
+            binding_location = first_frame.split(" in ")[0]
+
+    return {
+        "sampler_name": sampler_name,
+        "binding_location": binding_location,
+        "call_stack": user_frames,
+    }
 
 
 # This is very cheeky.
@@ -569,126 +720,405 @@ global_counter = GlobalKeyCounter()
 _fake_key = jrand.key(1)
 
 
-def sample_binder(
-    keyful_sampler: Callable[..., Any],
-    name: str | None = None,
-    batch_shape: tuple[int, ...] = (),
-    support: Callable[..., Any] | None = None,
-):
-    keyful_with_batch_shape = partial(
-        keyful_sampler,
-        sample_shape=batch_shape,
-    )
+##########################################################
+# Refactored Sample Binding: Separation of Concerns    #
+##########################################################
 
-    def sample(*args, **kwargs):
-        # We're playing a trick here by allowing users to invoke sample_p
-        # without a key. So we hide it inside, and we pass this as the
-        # impl of `sample_p`.
-        #
-        # This is problematic for JIT, which will cache the statically
-        # generated key. But it's obvious to the user - their returned
-        # random choices won't change!
-        #
-        # The `seed` transformation below solves the JIT problem directly.
-        def keyless(*args, **kwargs):
-            global_counter.count += 1
-            return keyful_with_batch_shape(
-                jrand.key(global_counter.count),
-                *args,
-                **kwargs,
+
+@dataclass
+class SamplerConfig:
+    """Configuration for a probabilistic sampler.
+
+    Encapsulates all the information needed to create and execute a sampler,
+    making the relationships between different components explicit.
+
+    Keyful Sampler Contract:
+        The keyful_sampler must follow this exact signature:
+
+        def keyful_sampler(key: PRNGKey, *args, sample_shape: tuple[int, ...], **kwargs) -> Array:
+            '''Sample from a distribution.
+
+            Args:
+                key: JAX PRNGKey for randomness
+                *args: Distribution parameters (positional)
+                sample_shape: REQUIRED keyword argument specifying sample shape
+                **kwargs: Additional distribution parameters (keyword)
+
+            Returns:
+                Array with shape sample_shape + distribution.event_shape
+            '''
+
+        The sample_shape parameter is REQUIRED and must be accepted as a keyword argument.
+        This ensures compatibility with JAX/TensorFlow Probability conventions and
+        enables proper vectorization under PJAX's modular_vmap.
+    """
+
+    keyful_sampler: Callable[
+        ..., Any
+    ]  # Must follow contract: (key, *args, sample_shape=..., **kwargs) -> sample
+    name: str | None = None
+    sample_shape: tuple[int, ...] = ()
+    support: Callable[..., Any] | None = None
+
+    def with_sample_shape(self, new_sample_shape: tuple[int, ...]) -> "SamplerConfig":
+        """Create a new config with updated sample shape."""
+        return SamplerConfig(
+            keyful_sampler=self.keyful_sampler,
+            name=self.name,
+            sample_shape=new_sample_shape,
+            support=self.support,
+        )
+
+    def get_keyful_sampler_with_shape(self) -> Callable[..., Any]:
+        """Get the keyful sampler with sample_shape pre-applied."""
+        return partial(self.keyful_sampler, sample_shape=self.sample_shape)
+
+
+class KeylessWrapper:
+    """Wrapper that provides keyless sampling interface using global counter.
+
+    This encapsulates the "cheeky" global counter pattern and makes it
+    explicit that this is a convenience wrapper with known limitations.
+    """
+
+    def __init__(self, config: SamplerConfig):
+        self.config = config
+        self._keyful_with_shape = config.get_keyful_sampler_with_shape()
+
+    def __call__(self, *args, **kwargs):
+        """Sample without providing a key (uses global counter)."""
+        global_counter.count += 1
+        return self._keyful_with_shape(
+            jrand.key(global_counter.count),
+            *args,
+            **kwargs,
+        )
+
+
+class FlatSamplerCache:
+    """Manages the flattened version of samplers for JAX interpretation.
+
+    JAX interpreters work with flattened argument lists, so we need to
+    pre-compute a flattened version of the sampler for efficiency.
+    """
+
+    def __init__(self, config: SamplerConfig):
+        self.config = config
+        self._flat_sampler = None
+        self._cached_args_signature = None
+
+    def _make_flat(self, f):
+        """Create a flattened version of a function for JAX interpretation.
+
+        This is used internally to convert keyful samplers into a form that
+        JAX interpreters can work with efficiently.
+        """
+
+        @wraps(f)
+        def _make_flat_inner(*args, **kwargs):
+            debug_info = api_util.debug_info("_make_flat", f, args, kwargs)
+            jaxpr, *_ = stage(f)(*args, **kwargs)
+
+            def flat(*flat_args, **params):
+                consts, args = split_list(flat_args, [params["num_consts"]])
+                return eval_jaxpr(jaxpr.jaxpr, consts, *args)
+
+            return flat, debug_info
+
+        return _make_flat_inner
+
+    def get_flat_sampler(self, *args, **kwargs):
+        """Get or create the flattened sampler for these arguments."""
+        # Simple caching based on argument signature
+        args_sig = (len(args), tuple(kwargs.keys()))
+        if self._cached_args_signature != args_sig:
+            keyful_with_shape = self.config.get_keyful_sampler_with_shape()
+            flat_sampler, _ = self._make_flat(keyful_with_shape)(
+                _fake_key, *args, **kwargs
             )
+            self._flat_sampler = flat_sampler
+            self._cached_args_signature = args_sig
+        return self._flat_sampler
 
-        # Zero-cost, just staging.
-        flat_keyful_sampler, _ = make_flat(keyful_with_batch_shape)(
-            _fake_key, *args, **kwargs
-        )
 
-        # Overload batching so that the primitive is retained
-        # in the Jaxpr under vmap.
-        # Holy smokes recursion.
-        def batch(vector_args, batch_axes, **params):
+class VmapBatchHandler:
+    """Handles the complex vmap batching logic for probabilistic primitives.
+
+    This encapsulates the logic for how sample shapes change under vmap
+    and how primitives get rebound with new sample shapes.
+    """
+
+    def __init__(self, config: SamplerConfig):
+        self.config = config
+
+    def create_batch_rule(self):
+        """Create the batch rule function for this sampler."""
+
+        def batch_rule(vector_args, batch_axes, **params):
             if "ctx" in params and params["ctx"] == "modular_vmap":
-                axis_size = params["axis_size"]
-                vector_args = tuple(vector_args[1:])  # ignore dummy
-                batch_axes = tuple(batch_axes[1:])  # ignore dummy
-                n = static_dim_length(batch_axes, vector_args)
-                outer_batch_dim = (
-                    () if n is not None else (axis_size,) if axis_size else ()
-                )
-                assert isinstance(outer_batch_dim, tuple)
-                new_batch_shape = outer_batch_dim + batch_shape
-                v = sample_binder(
-                    keyful_sampler,
-                    name=name,
-                    batch_shape=new_batch_shape,
-                    support=support,
-                )(*vector_args)
-                return (v,), (0 if n or axis_size else None,)
+                return self._handle_modular_vmap(vector_args, batch_axes, **params)
             else:
-                raise NotImplementedError()
+                raise NotImplementedError("Only modular_vmap context supported")
 
-        lowering_msg = (
-            "JAX is attempting to lower the `pjax.sample_p` primitive to MLIR. "
-            "This will bake a PRNG key into the MLIR code, resulting in deterministic behavior. "
-            "Instead, use `seed` to transform your function into one which allows keys to be passed in. "
-            "Try and do this as high in the computation graph as you can."
-        )
-        lowering_exception = LoweringSamplePrimitiveToMLIRException(
-            lowering_msg,
-        )
+        return batch_rule
 
-        return initial_style_bind(
-            sample_p,
-            keyful_sampler=keyful_sampler,
-            flat_keyful_sampler=flat_keyful_sampler,
-            batch=batch,
-            support=support,
-            lowering_warning=lowering_msg,
-            lowering_exception=lowering_exception,
-        )(keyless, name=name)(*args, **kwargs)
+    def _handle_modular_vmap(self, vector_args, batch_axes, **params):
+        """Handle batching in modular_vmap context."""
+        axis_size = params["axis_size"]
+        # Remove dummy argument that modular_vmap injects
+        vector_args = tuple(vector_args[1:])
+        batch_axes = tuple(batch_axes[1:])
 
-    return sample
+        # Compute new sample shape
+        n = static_dim_length(batch_axes, vector_args)
+        outer_batch_dim = self._compute_outer_batch_dim(n, axis_size)
+        new_sample_shape = outer_batch_dim + self.config.sample_shape
+
+        # Create new sampler with updated sample shape
+        new_config = self.config.with_sample_shape(new_sample_shape)
+        result = create_sample_primitive(new_config)(*vector_args)
+
+        # Return with appropriate output axes
+        out_axes = (0 if n or axis_size else None,)
+        return (result,), out_axes
+
+    def _compute_outer_batch_dim(self, n, axis_size):
+        """Compute the additional sample dimension from vmap."""
+        if n is not None:
+            return ()  # Input arrays have the batch dimension
+        elif axis_size:
+            return (axis_size,)  # Need to add batch dimension
+        else:
+            return ()
+
+
+##########################################################
+# Log Density Binding: Component-Based Architecture    #
+##########################################################
+
+
+@dataclass
+class LogDensityConfig:
+    """Configuration for a log density function.
+
+    Encapsulates all the information needed to create and execute a log density
+    primitive, following the same component-based architecture as SamplerConfig.
+
+    Log Density Function Contract:
+        The log_density_impl must follow this signature:
+
+        def log_density_impl(value, *args, **kwargs) -> float:
+            '''Compute log probability density.
+
+            Args:
+                value: The value to evaluate density at
+                *args: Distribution parameters (positional)
+                **kwargs: Additional distribution parameters (keyword)
+
+            Returns:
+                Scalar log probability density
+            '''
+
+        Log density functions always return scalars - there is no sample_shape concept.
+    """
+
+    log_density_impl: Callable[..., Any]  # (value, *args, **kwargs) -> scalar
+    name: str | None = None
+
+
+class LogDensityVmapHandler:
+    """Handles the complex vmap batching logic for log density primitives.
+
+    This encapsulates the logic for how log density functions get vectorized
+    under vmap, handling both args-only and args+kwargs cases.
+    """
+
+    def __init__(self, config: LogDensityConfig):
+        self.config = config
+
+    def create_batch_rule(self):
+        """Create the batch rule function for this log density function."""
+
+        def batch_rule(vector_args, batch_axes, **params):
+            n = static_dim_length(batch_axes, tuple(vector_args))
+            num_consts = params["num_consts"]
+            in_tree = jtu.tree_unflatten(params["in_tree"], vector_args[num_consts:])
+            batch_tree = jtu.tree_unflatten(params["in_tree"], batch_axes[num_consts:])
+
+            if params["yes_kwargs"]:
+                args = in_tree[0]
+                kwargs = in_tree[1]
+                v = create_log_density_primitive(
+                    LogDensityConfig(
+                        log_density_impl=jax.vmap(
+                            lambda args, kwargs: self.config.log_density_impl(
+                                *args, **kwargs
+                            ),
+                            in_axes=batch_tree,
+                        ),
+                        name=self.config.name,
+                    )
+                )(args, kwargs)
+            else:
+                v = create_log_density_primitive(
+                    LogDensityConfig(
+                        log_density_impl=jax.vmap(
+                            self.config.log_density_impl,
+                            in_axes=batch_tree,
+                        ),
+                        name=self.config.name,
+                    )
+                )(*in_tree)
+
+            outvals = (v,)
+            out_axes = (0 if n else None,)
+            return outvals, out_axes
+
+        return batch_rule
+
+
+def create_log_density_primitive(config: LogDensityConfig):
+    """Create a log density primitive from a log density configuration.
+
+    This is the main entry point that orchestrates all the log density components.
+    """
+    # Create the vmap batch handler
+    batch_handler = LogDensityVmapHandler(config)
+
+    def log_density(*args, **kwargs):
+        # Create batch rule
+        batch_rule = batch_handler.create_batch_rule()
+
+        return initial_style_bind(log_density_p, batch=batch_rule)(
+            config.log_density_impl, name=config.name
+        )(*args, **kwargs)
+
+    return log_density
 
 
 def log_density_binder(
     log_density_impl: Callable[..., Any],
     name: str | None = None,
 ):
-    def log_density(*args, **kwargs):
-        # TODO: really not sure if this is right if you
-        # nest vmaps...
-        def batch(vector_args, batch_axes, **params):
-            n = static_dim_length(batch_axes, tuple(vector_args))
-            num_consts = params["num_consts"]
-            in_tree = jtu.tree_unflatten(params["in_tree"], vector_args[num_consts:])
-            batch_tree = jtu.tree_unflatten(params["in_tree"], batch_axes[num_consts:])
-            if params["yes_kwargs"]:
-                args = in_tree[0]
-                kwargs = in_tree[1]
-                v = log_density_binder(
-                    jax.vmap(
-                        lambda args, kwargs: log_density_impl(*args, **kwargs),
-                        in_axes=batch_tree,
-                    ),
-                    name=name,
-                )(args, kwargs)
-            else:
-                v = log_density_binder(
-                    jax.vmap(
-                        log_density_impl,
-                        in_axes=batch_tree,
-                    ),
-                    name=name,
-                )(*in_tree)
-            outvals = (v,)
-            out_axes = (0 if n else None,)
-            return outvals, out_axes
+    """Create a log density primitive using component-based architecture.
 
-        return initial_style_bind(log_density_p, batch=batch)(
-            log_density_impl, name=name
-        )(*args, **kwargs)
+    Args:
+        log_density_impl: A function that computes log probability density:
 
-    return log_density
+            def log_density_impl(value, *args, **kwargs) -> float:
+                # Returns scalar log probability density
+
+            Log density functions always return scalars (no sample_shape concept).
+
+        name: Optional name for the primitive (for debugging)
+
+    Returns:
+        A callable that implements log density interface compatible with PJAX primitives.
+    """
+    config = LogDensityConfig(
+        log_density_impl=log_density_impl,
+        name=name,
+    )
+    return create_log_density_primitive(config)
+
+
+def create_sample_primitive(config: SamplerConfig):
+    """Create a sample primitive from a sampler configuration.
+
+    This is the main entry point that orchestrates all the components.
+    Replaces the current sample_binder function with clearer separation of concerns.
+    """
+    # Create the keyless wrapper for user convenience
+    keyless_sampler = KeylessWrapper(config)
+
+    # Create the flat sampler cache for JAX interpretation
+    flat_cache = FlatSamplerCache(config)
+
+    # Create the vmap batch handler
+    batch_handler = VmapBatchHandler(config)
+
+    def sample(*args, **kwargs):
+        # Get flat sampler for these arguments
+        flat_keyful_sampler = flat_cache.get_flat_sampler(*args, **kwargs)
+
+        # Create batch rule
+        batch_rule = batch_handler.create_batch_rule()
+
+        # Create lowering warning/exception
+        lowering_msg = (
+            "JAX is attempting to lower the `pjax.sample_p` primitive to MLIR. "
+            "This will bake a PRNG key into the MLIR code, resulting in deterministic behavior. "
+            "Instead, use `seed` to transform your function into one which allows keys to be passed in. "
+            "Try and do this as high in the computation graph as you can."
+        )
+
+        # Capture execution context to help identify where the binding occurred
+        binding_context = _capture_binding_context(sampler_name=config.name)
+        lowering_exception = LoweringSamplePrimitiveToMLIRException(
+            lowering_msg, binding_context
+        )
+
+        # Bind to the primitive
+        return initial_style_bind(
+            sample_p,
+            keyful_sampler=config.keyful_sampler,
+            flat_keyful_sampler=flat_keyful_sampler,
+            batch=batch_rule,
+            support=config.support,
+            lowering_warning=lowering_msg,
+            lowering_exception=lowering_exception,
+        )(keyless_sampler, name=config.name)(*args, **kwargs)
+
+    return sample
+
+
+##########################################################
+# Sample Binding (Component-Based Implementation)       #
+##########################################################
+
+
+def sample_binder(
+    keyful_sampler: Callable[..., Any],
+    name: str | None = None,
+    sample_shape: tuple[int, ...] = (),
+    support: Callable[..., Any] | None = None,
+):
+    """Create a sample primitive that binds a keyful sampler to PJAX's sample_p primitive.
+
+    Uses a component-based architecture to handle the complex interactions between
+    keyless sampling, sample shapes, JAX flattening, and vmap transformations.
+
+    Args:
+        keyful_sampler: A function that follows the keyful sampler contract:
+
+            def keyful_sampler(key: PRNGKey, *args, sample_shape: tuple[int, ...], **kwargs) -> Array:
+                # Must accept sample_shape as a REQUIRED keyword argument
+                # Returns array with shape: sample_shape + distribution.event_shape
+
+            Examples of valid keyful samplers:
+            - TFP distribution: lambda key, *args, sample_shape=(), **kw: dist(*args, **kw).sample(seed=key, sample_shape=sample_shape)
+            - JAX function: jax.random.normal with appropriate signature adaptation
+
+        name: Optional name for the primitive (for debugging)
+        sample_shape: Default sample shape to use if not overridden
+        support: Optional support function for the distribution
+
+    Returns:
+        A callable that implements keyless sampling interface compatible with PJAX primitives.
+        The returned function can be called as: sampler(*args, **kwargs) and will use
+        the global key counter for randomness.
+
+    Note:
+        The keyful_sampler MUST accept sample_shape as a keyword argument. This is
+        required for compatibility with JAX transformations and proper vectorization.
+    """
+    config = SamplerConfig(
+        keyful_sampler=keyful_sampler,
+        name=name,
+        sample_shape=sample_shape,
+        support=support,
+    )
+    return create_sample_primitive(config)
 
 
 def wrap_sampler(
@@ -697,13 +1127,13 @@ def wrap_sampler(
     support=None,
 ):
     def _(*args, **kwargs):
-        batch_shape = kwargs.get("shape", ())
-        if "shape" in kwargs:
-            kwargs.pop("shape")
+        sample_shape = kwargs.get("sample_shape", ())
+        if "sample_shape" in kwargs:
+            kwargs.pop("sample_shape")
         return sample_binder(
             keyful_sampler,
             name=name,
-            batch_shape=batch_shape,
+            sample_shape=sample_shape,
             support=support,
         )(
             *args,
@@ -1015,10 +1445,9 @@ class ModularVmapInterpreter:
 
     Key Capabilities:
     - **Probabilistic vectorization**: Correctly handles `sample_p` under vmap
-    - **Batch shape inference**: Automatically adjusts distribution batch shapes
+    - **Sample shape inference**: Automatically adjusts distribution sample shapes
     - **Control flow support**: Handles cond/scan within vectorized computations
     - **Semantic preservation**: Maintains probabilistic meaning across batches
-    - **Performance**: Avoids explicit loops for better efficiency
 
     How It Works:
         The interpreter uses a "dummy argument" technique to track the vectorization
@@ -1205,7 +1634,7 @@ def modular_vmap(
 
     Key Differences from `jax.vmap`:
     - **Probabilistic awareness**: Handles `sample_p` and `log_density_p` primitives
-    - **Batch shape handling**: Automatically adjusts distribution batch shapes
+    - **Sample shape handling**: Automatically adjusts distribution sample shapes
     - **Independent sampling**: Each vectorized element gets independent randomness
     - **Semantic correctness**: Maintains probabilistic meaning across batches
 
