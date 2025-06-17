@@ -1527,7 +1527,7 @@ class GFI(Generic[X, R], Pytree):
     - Forward sampling (simulate)
     - Density evaluation (assess)
     - Constrained generation (generate)
-    - Incremental updates (update, regenerate)
+    - SMCP3 moves (update, regenerate)
 
     All density computations are in log space for numerical stability.
     Weights from generate/update/regenerate enable importance sampling and MCMC.
@@ -1540,8 +1540,8 @@ class GFI(Generic[X, R], Pytree):
         simulate: Sample (choices, retval) ~ P(·; args)
         assess: Compute log P(choices; args)
         generate: Sample with constraints, return importance weight
-        update: Update trace arguments/choices, return weight ratio
-        regenerate: Resample selected choices, return weight ratio
+        update: Update trace arguments/choices, return incremental importance weight
+        regenerate: Resample selected choices, return incremental importance weight
 
     Additional Methods:
         merge: Combine choice maps (for compositional functions)
@@ -1660,7 +1660,7 @@ class GFI(Generic[X, R], Pytree):
 
         Mathematical specification:
         - Transforms trace from (old_args, old_choices) to (new_args, new_choices)
-        - Computes weight difference enabling incremental inference:
+        - Computes incremental importance weight (SMCP3 move):
 
         weight = log [P(new_choices; new_args) / Q(new_choices; new_args, old_choices, constraints)]
                - log [P(old_choices; old_args) / Q(old_choices; old_args)]
@@ -1675,7 +1675,7 @@ class GFI(Generic[X, R], Pytree):
         Returns:
             A tuple (new_trace, weight, discarded_choices) where:
             - new_trace: updated trace with new arguments and choices
-            - weight: log probability ratio for the update (enables MCMC, SMC)
+            - weight: incremental importance weight for the update (enables MCMC, SMC)
             - discarded_choices: old choice values that were changed
 
         Example:
@@ -1697,7 +1697,7 @@ class GFI(Generic[X, R], Pytree):
         Mathematical specification:
         - Resamples choices at addresses selected by 'sel' from their conditional distribution
         - Keeps non-selected choices unchanged
-        - Computes weight for the regeneration:
+        - Computes incremental importance weight (SMCP3 move):
 
         weight = log P(new_selected_choices | non_selected_choices; args)
                - log P(old_selected_choices | non_selected_choices; args)
@@ -1713,7 +1713,7 @@ class GFI(Generic[X, R], Pytree):
         Returns:
             A tuple (new_trace, weight, discarded_choices) where:
             - new_trace: trace with selected choices resampled
-            - weight: log probability ratio for the regeneration
+            - weight: incremental importance weight for the regeneration
             - discarded_choices: old values of the regenerated choices
 
         Example:

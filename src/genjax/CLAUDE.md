@@ -31,19 +31,19 @@ log_density, retval = model.assess(args, choices)  # Compute log P(choices; args
 trace, weight = model.generate(args, constraints)
 # weight = log[P(all_choices; args) / Q(unconstrained; constrained, args)]
 
-# Incremental updates (MCMC, SMC)
+# SMCP3 moves (MCMC, SMC)
 new_trace, weight, discarded = model.update(new_args, trace, constraints)
 # weight = log[P(new_choices; new_args)/Q(new; old, constraints)] - log[P(old_choices; old_args)/Q(old)]
 
-# Selective regeneration
+# Selective regeneration (SMCP3 move)
 new_trace, weight, discarded = model.regenerate(args, trace, selection)
 # weight = log P(new_selected | non_selected; args) - log P(old_selected | non_selected; args)
 ```
 
 **Mathematical Properties**:
 - **Importance weights** enable unbiased Monte Carlo estimation
-- **Weight ratios** from update/regenerate enable MCMC acceptance probabilities
-- **Incremental computation** allows efficient inference on large models
+- **Incremental importance weights** from update/regenerate enable MCMC acceptance probabilities
+- **SMCP3 moves** (update, regenerate) provide efficient inference transitions
 - **Selection interface** enables fine-grained control over which choices to modify
 
 **Trace Interface**:
