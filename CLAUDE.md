@@ -39,10 +39,12 @@ genjax/
 ### CRITICAL Guidelines
 
 1. **🔥 HIGH PRIORITY: Always read CLAUDE.md files** in directories you're working in
+
    - Each directory may contain specific guidance and patterns
    - These files contain essential context for that module/example
 
 2. **Always run tests after changes** to `src/genjax/`
+
    - Run the full test suite: `pixi run test`
    - Or run specific test file: `pixi run python -m pytest tests/test_<module>.py`
    - Example: after changing `src/genjax/mcmc.py`, run `tests/test_mcmc.py`
@@ -84,7 +86,9 @@ pixi run coverage         # Generate coverage report
 ### Code Quality
 
 ```bash
-pixi run format           # Format and lint code with ruff
+pixi run format           # Format and lint Python code with ruff
+pixi run format-md        # Format Markdown files with prettier
+pixi run format-all       # Format both Python and Markdown files
 pixi run vulture          # Find unused code
 pixi run precommit-run    # Run pre-commit hooks
 ```

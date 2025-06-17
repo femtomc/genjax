@@ -9,7 +9,7 @@ from jax.nn import softmax
 from matplotlib import animation
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
-from genjax import Pytree, Tr, flip, gen, get_choices, seed, trace
+from genjax import Pytree, Trace, flip, gen, get_choices, seed, trace
 from genjax import modular_vmap as vmap
 
 neighbors_filter = jnp.array(
@@ -201,7 +201,7 @@ def full_gibbs_sweep(
 
 @Pytree.dataclass
 class GibbsSamplerState(Pytree):
-    inferred_trace: Tr
+    inferred_trace: Trace
 
     def trace_score(self):
         return self.inferred_trace.get_score()

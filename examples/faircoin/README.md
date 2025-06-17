@@ -5,6 +5,7 @@ This case study compares the performance of importance sampling for a simple Bet
 ## Model
 
 The model is a simple hierarchical Beta-Bernoulli representing fair coin inference:
+
 - Prior: `f ~ Beta(10, 10)` (coin fairness parameter)
 - Likelihood: `obs[i] ~ Bernoulli(f)` for each coin flip observation
 
@@ -55,6 +56,7 @@ pixi run -e faircoin python -m examples.faircoin.main --comparison
 ## Output
 
 The script will:
+
 1. Run timing benchmarks for each framework
 2. Print timing statistics to the console
 3. Generate a horizontal bar chart comparison saved to `examples/faircoin/figs/`

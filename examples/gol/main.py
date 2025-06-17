@@ -6,7 +6,7 @@ from jax import block_until_ready
 import jax.numpy as jnp
 import numpy as np
 import jax.random as jrand
-from dataloading import get_blinker_n
+from data import get_blinker_n
 import matplotlib.pyplot as plt
 import matplotlib
 
