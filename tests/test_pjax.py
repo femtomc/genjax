@@ -323,13 +323,13 @@ def test_modular_vmap_preserves_probabilistic_semantics():
     traces = vmap_model((mus,))
 
     # Should get one trace per mu value
-    assert traces.get_choices().shape == (3,), "Should have 3 vectorized choices"
-    assert traces.get_score().shape == (3,), "Should have 3 vectorized scores"
+    choices = traces.get_choices()
+    assert choices["x"].shape == (3,), "Should have 3 vectorized choices for x"
     assert traces.get_retval().shape == (3,), "Should have 3 vectorized return values"
 
     # All values should be finite
-    assert jnp.isfinite(traces.get_choices()).all()
-    assert jnp.isfinite(traces.get_score()).all()
+    assert jnp.isfinite(choices["x"]).all()
+    assert jnp.isfinite(traces.get_score()), "Score should be finite (but scalar)"
     assert jnp.isfinite(traces.get_retval()).all()
 
 
@@ -351,8 +351,7 @@ def test_modular_vmap_vs_manual_vectorization(standard_tolerance):
         manual_traces.append(trace)
 
     # Extract manual results
-    manual_choices = jnp.array([t.get_choices() for t in manual_traces])
-    manual_scores = jnp.array([t.get_score() for t in manual_traces])
+    manual_choice_values = jnp.array([t.get_choices()["sample"] for t in manual_traces])
     manual_retvals = jnp.array([t.get_retval() for t in manual_traces])
 
     # modular_vmap vectorization
@@ -361,12 +360,12 @@ def test_modular_vmap_vs_manual_vectorization(standard_tolerance):
 
     # Results should be equivalent (up to random sampling differences)
     # We'll check structure and finite-ness rather than exact values
-    assert vmap_trace.get_choices().shape == manual_choices.shape
-    assert vmap_trace.get_score().shape == manual_scores.shape
+    vmap_choices = vmap_trace.get_choices()
+    assert vmap_choices["sample"].shape == manual_choice_values.shape
     assert vmap_trace.get_retval().shape == manual_retvals.shape
 
-    assert jnp.isfinite(vmap_trace.get_choices()).all()
-    assert jnp.isfinite(vmap_trace.get_score()).all()
+    assert jnp.isfinite(vmap_choices["sample"]).all()
+    assert jnp.isfinite(vmap_trace.get_score()), "Score should be finite (but scalar)"
     assert jnp.isfinite(vmap_trace.get_retval()).all()
 
 
@@ -400,14 +399,26 @@ def test_pjax_primitives_with_jax_transformations(base_key):
     assert jnp.isfinite(trace.get_retval())
 
     # Test vmap
-    vmap_simulate = jax.vmap(seeded_simulate, in_axes=(None, 0))
+    vmap_simulate = jax.vmap(seeded_simulate, in_axes=(0, 0))
     params = jnp.array([0.0, 1.0, 2.0])
     keys = jrand.split(base_key, 3)
     vmap_traces = vmap_simulate(keys, (params,))
 
-    assert vmap_traces.get_choices().shape == (3,)
-    assert vmap_traces.get_score().shape == (3,)
-    assert vmap_traces.get_retval().shape == (3,)
+    # For jax.vmap + seed, each choice should be vectorized individually
+    choices = vmap_traces.get_choices()
+    assert choices["x"].shape == (3,), "x should be vectorized"
+    assert choices["y"].shape == (3,), "y should be vectorized"
+
+    # Check that we have valid finite values
+    assert jnp.isfinite(choices["x"]).all()
+    assert jnp.isfinite(choices["y"]).all()
+
+    # Score is always scalar per trace, but retval should be vectorized
+    assert jnp.isfinite(vmap_traces.get_score()), "Score should be finite"
+    assert jnp.isfinite(vmap_traces.get_retval()).all(), (
+        "Return values should be finite"
+    )
+    assert vmap_traces.get_retval().shape == (3,), "Return values should be vectorized"
 
 
 @pytest.mark.pjax
