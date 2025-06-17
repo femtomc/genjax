@@ -30,6 +30,7 @@ from .core import (  # noqa: E402
     Fn,
     Pytree,
     Const,
+    Trace,
     Vmap,
     Scan,
     Cond,

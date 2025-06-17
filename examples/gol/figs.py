@@ -3,7 +3,7 @@ import time
 import core
 import jax.numpy as jnp
 import jax.random as jrand
-from dataloading import get_blinker_4x4, get_mit_logo
+from data import get_blinker_4x4, get_mit_logo
 
 
 blinker_small = get_blinker_4x4()

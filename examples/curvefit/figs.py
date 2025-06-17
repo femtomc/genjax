@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import time
-from genjax import get_choices
 import jax.numpy as jnp
 import jax.random as jrand
 import jax
@@ -11,8 +10,8 @@ from core import (
     npoint_curve_factory,
     infer_latents,
     get_points_for_inference,
-    vmap,
 )
+from jax import vmap
 
 
 ## Onepoint trace visualization ##
@@ -21,7 +20,7 @@ def visualize_onepoint_trace(trace, ylim=(-1.5, 1.5)):
     xvals = jnp.linspace(-1, 10, 300)
     fig = plt.figure(figsize=(2, 2))
     plt.plot(xvals, jax.vmap(curve)(xvals), color="black")
-    color = "red" if get_choices(trace)["y"]["is_out"] else "green"
+    color = "green"  # Point color for visualization
     plt.scatter(pt[0], pt[1], color=color, s=10)
     plt.gca().spines["top"].set_visible(False)
     plt.gca().spines["right"].set_visible(False)
@@ -58,10 +57,7 @@ def visualize_multipoint_trace(
     ax.scatter(
         xs,
         ys,
-        color=[
-            "red" if get_choices(trace)["ys"]["is_out"][i] else "green"
-            for i in range(len(xs))
-        ],
+        color="green",  # Consistent point color for visualization
         s=10,
     )
     ax.spines["top"].set_visible(False)
