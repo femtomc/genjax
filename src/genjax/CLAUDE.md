@@ -205,7 +205,7 @@ def good_model():
 
 ### PJAX: Probabilistic JAX
 
-PJAX extends JAX with probabilistic primitives (`assume_p`, `log_density_p`).
+PJAX extends JAX with probabilistic primitives (`sample_p`, `log_density_p`).
 
 **Key Transformations**:
 
@@ -294,7 +294,7 @@ trace = seeded_model(key, ())
 ## Glossary
 
 - **GFI**: Generative Function Interface (simulate, assess, generate, update, regenerate)
-- **PJAX**: Probabilistic extension to JAX with primitives `assume_p`, `log_density_p`
+- **PJAX**: Probabilistic extension to JAX with primitives `sample_p`, `log_density_p`
 - **Trace**: Execution record with choices, args, return value, score
 - **Score**: `log(1/P(choices))` - negative log probability
 

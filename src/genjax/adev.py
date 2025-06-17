@@ -67,7 +67,7 @@ from genjax.pjax import (
     PPPrimitive,
     Environment,
     assume_binder,
-    assume_p,
+    sample_p,
     modular_vmap,
     stage,
 )
@@ -362,7 +362,7 @@ class ADEVInterpreter(Pytree):
 
     Key responsibilities:
     1. Propagate dual numbers through deterministic JAX operations
-    2. Apply CPS transformation at stochastic operations (assume_p primitives)
+    2. Apply CPS transformation at stochastic operations (sample_p primitives)
     3. Create continuation closures for gradient estimation strategies
     4. Handle control flow (conditionals, loops) within the AD system
 
@@ -397,7 +397,7 @@ class ADEVInterpreter(Pytree):
                 in_vals = jax_util.safe_map(pure_env.read, eqn.invars)
                 subfuns, params = eqn.primitive.get_bind_params(eqn.params)
                 args = subfuns + in_vals
-                if eqn.primitive is assume_p:
+                if eqn.primitive is sample_p:
                     pass
                 else:
                     outs = eqn.primitive.bind(*args, **params)
@@ -423,8 +423,8 @@ class ADEVInterpreter(Pytree):
                     duals = subfuns + in_vals
 
                     primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
-                    # Our assume_p primitive.
-                    if primitive is assume_p:
+                    # Our sample_p primitive.
+                    if primitive is sample_p:
                         dual_env = dual_env.copy()
                         pure_env = Dual.tree_primal(dual_env)
 
