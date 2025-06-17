@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 from typing import Tuple
 
-from genjax.core import gen, Pytree, get_choices, Scan
+from genjax.core import gen, Pytree, get_choices, Scan, Const
 from genjax.distributions import categorical
 
 
@@ -48,9 +48,46 @@ def hmm_step(carry, x):
     return new_carry, obs
 
 
+@gen
+def discrete_hmm_model(
+    T: Const[int],  # Number of time steps (static parameter)
+    initial_probs: jnp.ndarray,  # Shape: (K,) - initial state probabilities
+    transition_matrix: jnp.ndarray,  # Shape: (K, K) - transition probabilities
+    emission_matrix: jnp.ndarray,  # Shape: (K, M) - emission probabilities
+):
+    """
+    Discrete HMM generative model using Scan combinator with Const parameters.
+
+    Args:
+        T: Number of time steps wrapped in Const (must be > 1)
+        initial_probs: Initial state distribution (K states)
+        transition_matrix: State transition probabilities (K x K)
+        emission_matrix: Observation emission probabilities (K x M observations)
+
+    Returns:
+        Sequence of observations
+    """
+    # Sample initial state
+    initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
+
+    # Sample initial observation
+    initial_obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
+
+    # Use Scan for remaining steps (T.value is static)
+    scan_fn = Scan(hmm_step, length=T.value - 1)
+    init_carry = (initial_state, transition_matrix, emission_matrix)
+    final_carry, remaining_obs = scan_fn(init_carry, None) @ "scan_steps"
+
+    # Combine initial and remaining observations
+    all_obs = jnp.concatenate([jnp.array([initial_obs]), remaining_obs])
+    return all_obs
+
+
 def discrete_hmm_model_factory(T: int):
     """
     Factory function to create HMM models with static length.
+
+    Deprecated: Use discrete_hmm_model() with Const[int] parameter instead.
 
     Args:
         T: Number of time steps (must be static, > 1)
@@ -59,39 +96,18 @@ def discrete_hmm_model_factory(T: int):
         Generative function for HMM with fixed length T
     """
 
+    # Create a generative function that uses the new model with Const parameter
     @gen
-    def discrete_hmm_model(
-        initial_probs: jnp.ndarray,  # Shape: (K,) - initial state probabilities
-        transition_matrix: jnp.ndarray,  # Shape: (K, K) - transition probabilities
-        emission_matrix: jnp.ndarray,  # Shape: (K, M) - emission probabilities
-    ):
-        """
-        Discrete HMM generative model using Scan combinator.
+    def hmm_model_closure(initial_probs, transition_matrix, emission_matrix):
+        result = (
+            discrete_hmm_model(
+                Const(T), initial_probs, transition_matrix, emission_matrix
+            )
+            @ "model"
+        )
+        return result
 
-        Args:
-            initial_probs: Initial state distribution (K states)
-            transition_matrix: State transition probabilities (K x K)
-            emission_matrix: Observation emission probabilities (K x M observations)
-
-        Returns:
-            Sequence of observations
-        """
-        # Sample initial state
-        initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
-
-        # Sample initial observation
-        initial_obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
-
-        # Use Scan for remaining steps (T is static)
-        scan_fn = Scan(hmm_step, length=T - 1)
-        init_carry = (initial_state, transition_matrix, emission_matrix)
-        final_carry, remaining_obs = scan_fn(init_carry, None) @ "scan_steps"
-
-        # Combine initial and remaining observations
-        all_obs = jnp.concatenate([jnp.array([initial_obs]), remaining_obs])
-        return all_obs
-
-    return discrete_hmm_model
+    return hmm_model_closure
 
 
 def forward_filter(
