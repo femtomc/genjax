@@ -320,10 +320,11 @@ def sample_hmm_dataset(
     Returns:
         Tuple of (true_states, observations, constraints)
     """
-    # Create HMM model with static length T
-    discrete_hmm_model = discrete_hmm_model_factory(T)
+    # Use the new discrete_hmm_model with Const[...] pattern directly
+    from genjax.core import const
+
     trace = discrete_hmm_model.simulate(
-        (initial_probs, transition_matrix, emission_matrix)
+        (const(T), initial_probs, transition_matrix, emission_matrix)
     )
 
     # Extract states and observations from trace
@@ -332,10 +333,13 @@ def sample_hmm_dataset(
 
     # Extract states: initial state + states from scan (assume T > 1)
     initial_state = choices["state_0"]
-    # Get vectorized states from scan
-    scan_choices = choices["scan_steps"]
-    scan_states = scan_choices["state"]  # This will be a vector of states
-    states = jnp.concatenate([jnp.array([initial_state]), scan_states])
+    if T > 1:
+        # Get vectorized states from scan
+        scan_choices = choices["scan_steps"]
+        scan_states = scan_choices["state"]  # This will be a vector of states
+        states = jnp.concatenate([jnp.array([initial_state]), scan_states])
+    else:
+        states = jnp.array([initial_state])
 
     # Create constraints from observations
     if T == 1:

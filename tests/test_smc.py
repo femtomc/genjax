@@ -14,10 +14,10 @@ from genjax.smc import (
     importance_sampling,
     default_importance_sampling,
 )
-from genjax.core import gen, seed
+from genjax.core import gen, seed, const
 
 from discrete_hmm import (
-    discrete_hmm_model_factory,
+    discrete_hmm_model,
     forward_filter,
     sample_hmm_dataset,
 )
@@ -132,25 +132,6 @@ def hmm_proposal(T: Const[int], initial_probs, transition_matrix, emission_matri
     return all_states
 
 
-def hmm_proposal_factory(T: int):
-    """
-    Factory function to create HMM proposal that only samples latent states.
-
-    Deprecated: Use hmm_proposal() with Const[int] parameter instead.
-    """
-
-    # Create a generative function that uses the new proposal with Const parameter
-    @gen
-    def hmm_proposal_closure(initial_probs, transition_matrix, emission_matrix):
-        result = (
-            hmm_proposal(Const(T), initial_probs, transition_matrix, emission_matrix)
-            @ "proposal"
-        )
-        return result
-
-    return hmm_proposal_closure
-
-
 class TestImportanceSampling:
     """Test importance sampling against exact inference."""
 
@@ -169,7 +150,7 @@ class TestImportanceSampling:
         result = default_importance_sampling(
             hierarchical_normal_model,
             (),  # no arguments for this simple model
-            n_samples,
+            const(n_samples),
             constraints,
         )
 
@@ -212,7 +193,7 @@ class TestImportanceSampling:
             hierarchical_normal_proposal,
             (),  # target args
             (),  # proposal args
-            n_samples,
+            const(n_samples),
             constraints,
         )
 
@@ -255,22 +236,13 @@ class TestImportanceSampling:
             observations, initial_probs, transition_matrix, emission_matrix
         )
 
-        # Create target model
-        discrete_hmm_model = discrete_hmm_model_factory(T)
-
-        # Create closure for default_importance_sampling that captures n_samples as static
-        def default_importance_sampling_closure(
-            discrete_hmm_model, target_args, constraints
-        ):
-            return default_importance_sampling(
-                discrete_hmm_model, target_args, n_samples, constraints
-            )
-
-        # Estimate using default importance sampling (no custom proposal) with seeded closure
-        result = seed(default_importance_sampling_closure)(
+        # Use discrete_hmm_model directly with Const[...] passed as argument
+        # Estimate using default importance sampling with seeded function
+        result = seed(default_importance_sampling)(
             key2,
             discrete_hmm_model,
-            (initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            const(n_samples),
             constraints,
         )
 
@@ -311,30 +283,15 @@ class TestImportanceSampling:
             observations, initial_probs, transition_matrix, emission_matrix
         )
 
-        # Create models with static T
-        discrete_hmm_model = discrete_hmm_model_factory(T)
-        hmm_proposal = hmm_proposal_factory(T)
-
-        # Create closure for importance_sampling that captures n_samples as static
-        def importance_sampling_closure(
-            discrete_hmm_model, hmm_proposal, target_args, proposal_args, constraints
-        ):
-            return importance_sampling(
-                discrete_hmm_model,
-                hmm_proposal,
-                target_args,
-                proposal_args,
-                n_samples,
-                constraints,
-            )
-
-        # Estimate using importance sampling with seeded closure
-        result = seed(importance_sampling_closure)(
+        # Use models directly with Const[...] passed as arguments
+        # Estimate using importance sampling with seeded function
+        result = seed(importance_sampling)(
             key2,
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix),
-            (initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            const(n_samples),
             constraints,
         )
 
@@ -375,30 +332,15 @@ class TestImportanceSampling:
             observations, initial_probs, transition_matrix, emission_matrix
         )
 
-        # Create models with static T
-        discrete_hmm_model = discrete_hmm_model_factory(T)
-        hmm_proposal = hmm_proposal_factory(T)
-
-        # Create closure for importance_sampling that captures n_samples as static
-        def importance_sampling_closure(
-            discrete_hmm_model, hmm_proposal, target_args, proposal_args, constraints
-        ):
-            return importance_sampling(
-                discrete_hmm_model,
-                hmm_proposal,
-                target_args,
-                proposal_args,
-                n_samples,
-                constraints,
-            )
-
-        # Estimate using importance sampling with seeded closure
-        result = seed(importance_sampling_closure)(
+        # Use models directly with Const[...] passed as arguments
+        # Estimate using importance sampling with seeded function
+        result = seed(importance_sampling)(
             key2,
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix),
-            (initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            const(n_samples),
             constraints,
         )
 
@@ -441,35 +383,17 @@ class TestImportanceSampling:
         errors = []
 
         for i, n_samples in enumerate(sample_sizes):
-            # Create models with static T
-            discrete_hmm_model = discrete_hmm_model_factory(T)
-            hmm_proposal = hmm_proposal_factory(T)
-
-            # Create closure for importance_sampling that captures n_samples as static
-            def importance_sampling_closure(
-                discrete_hmm_model,
-                hmm_proposal,
-                target_args,
-                proposal_args,
-                constraints,
-            ):
-                return importance_sampling(
-                    discrete_hmm_model,
-                    hmm_proposal,
-                    target_args,
-                    proposal_args,
-                    n_samples,
-                    constraints,
-                )
-
             # Use a different key for each iteration
             iteration_key = jrand.fold_in(key2, i)
-            result = seed(importance_sampling_closure)(
+
+            # Use models directly with Const[...] passed as arguments
+            result = seed(importance_sampling)(
                 iteration_key,
                 discrete_hmm_model,
                 hmm_proposal,
-                (initial_probs, transition_matrix, emission_matrix),
-                (initial_probs, transition_matrix, emission_matrix),
+                (const(T), initial_probs, transition_matrix, emission_matrix),
+                (const(T), initial_probs, transition_matrix, emission_matrix),
+                const(n_samples),
                 constraints,
             )
 
@@ -518,30 +442,15 @@ class TestRobustness:
             observations, initial_probs, transition_matrix, emission_matrix
         )
 
-        # Create models with static T
-        discrete_hmm_model = discrete_hmm_model_factory(T)
-        hmm_proposal = hmm_proposal_factory(T)
-
-        # Create closure for importance_sampling that captures n_samples as static
-        def importance_sampling_closure(
-            discrete_hmm_model, hmm_proposal, target_args, proposal_args, constraints
-        ):
-            return importance_sampling(
-                discrete_hmm_model,
-                hmm_proposal,
-                target_args,
-                proposal_args,
-                n_samples,
-                constraints,
-            )
-
+        # Use models directly with Const[...] passed as arguments
         # Should not crash and should give reasonable results
-        result = seed(importance_sampling_closure)(
+        result = seed(importance_sampling)(
             key2,
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix),
-            (initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            const(n_samples),
             constraints,
         )
 
@@ -582,30 +491,15 @@ class TestRobustness:
             observations, initial_probs, transition_matrix, emission_matrix
         )
 
-        # Create models with static T
-        discrete_hmm_model = discrete_hmm_model_factory(T)
-        hmm_proposal = hmm_proposal_factory(T)
-
-        # Create closure for importance_sampling that captures n_samples as static
-        def importance_sampling_closure(
-            discrete_hmm_model, hmm_proposal, target_args, proposal_args, constraints
-        ):
-            return importance_sampling(
-                discrete_hmm_model,
-                hmm_proposal,
-                target_args,
-                proposal_args,
-                n_samples,
-                constraints,
-            )
-
+        # Use models directly with Const[...] passed as arguments
         # Should handle deterministic case
-        result = seed(importance_sampling_closure)(
+        result = seed(importance_sampling)(
             key2,
             discrete_hmm_model,
             hmm_proposal,
-            (initial_probs, transition_matrix, emission_matrix),
-            (initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            (const(T), initial_probs, transition_matrix, emission_matrix),
+            const(n_samples),
             constraints,
         )
 

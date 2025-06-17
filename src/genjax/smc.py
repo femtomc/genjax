@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.special
 
-from .core import GFI, Trace, modular_vmap, Pytree, X, R, Any, Weight
+from .core import GFI, Trace, modular_vmap, Pytree, X, R, Any, Weight, Const
 from .distributions import categorical, uniform
 import jax.tree_util as jtu
 
@@ -116,7 +116,7 @@ class ParticleCollection(Pytree):
 def default_importance_sampling(
     target_gf: GFI[X, R],
     target_args: tuple,
-    n_samples: int,
+    n_samples: Const[int],
     constraints: X,
 ) -> ParticleCollection:
     """
@@ -128,7 +128,7 @@ def default_importance_sampling(
     Args:
         target_gf: Target generative function (model)
         target_args: Arguments for target generative function
-        n_samples: Number of importance samples to draw
+        n_samples: Number of importance samples to draw (static value)
         constraints: Dictionary of constrained random choices
 
     Returns:
@@ -150,7 +150,7 @@ def default_importance_sampling(
     vectorized_sample = modular_vmap(
         _single_default_importance_sample,
         in_axes=(None, None, None),
-        axis_size=n_samples,
+        axis_size=n_samples.value,
     )
 
     # Run vectorized importance sampling
@@ -159,7 +159,7 @@ def default_importance_sampling(
     return ParticleCollection(
         traces=traces,  # vectorized
         log_weights=log_weights,
-        n_samples=n_samples,
+        n_samples=n_samples.value,
     )
 
 
@@ -210,7 +210,7 @@ def importance_sampling(
     proposal_gf: GFI[X, Any],
     target_args: tuple,
     proposal_args: tuple,
-    n_samples: int,
+    n_samples: Const[int],
     constraints: X,
 ) -> ParticleCollection:
     """
@@ -223,7 +223,7 @@ def importance_sampling(
         proposal_gf: Proposal generative function
         target_args: Arguments for target generative function
         proposal_args: Arguments for proposal generative function
-        n_samples: Number of importance samples to draw
+        n_samples: Number of importance samples to draw (static value)
         constraints: Optional dictionary of constrained random choices
 
     Returns:
@@ -233,7 +233,7 @@ def importance_sampling(
     vectorized_sample = modular_vmap(
         _single_importance_sample,
         in_axes=(None, None, None, None, None),
-        axis_size=n_samples,
+        axis_size=n_samples.value,
     )
 
     # Run vectorized importance sampling
@@ -244,5 +244,5 @@ def importance_sampling(
     return ParticleCollection(
         traces=traces,  # vectorized
         log_weights=log_weights,
-        n_samples=n_samples,
+        n_samples=n_samples.value,
     )
