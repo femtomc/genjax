@@ -65,7 +65,7 @@ def main():
 
     # Initialize particles using the initial_model with generate
     print("Initializing particles using initial_model...")
-    n_particles = 200  # Increased for complex cross-room navigation
+    n_particles = 1000  # Increased for complex cross-room navigation
 
     # Run particle filter
     print("Running particle filter...")

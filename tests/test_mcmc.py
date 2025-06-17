@@ -3,7 +3,7 @@ Test cases for GenJAX MCMC inference algorithms.
 
 These tests validate MCMC implementations against analytically known posteriors,
 following the same pattern as SMC tests which validate against exact log marginals.
-Tests include Metropolis-Hastings and vectorized MCMC implementations.
+Tests include Metropolis-Hastings implementations.
 """
 
 import jax
@@ -15,7 +15,6 @@ import genjax as gx
 from genjax.mcmc import (
     MCMCResult,
     metropolis_hastings,
-    metropolis_hastings_vectorized,
 )
 
 
@@ -230,7 +229,7 @@ def test_mh_beta_bernoulli_obs_true(
     var_error = jnp.abs(sample_variance - exact_variance)
 
     # Use practical tolerance for MCMC convergence testing
-    practical_mean_tolerance = 0.15  # Relaxed but reasonable tolerance
+    practical_mean_tolerance = 0.01  # Relaxed but reasonable tolerance
 
     assert mean_error < practical_mean_tolerance, (
         f"Mean error {mean_error:.4f} > tolerance {practical_mean_tolerance:.4f}"
@@ -278,7 +277,7 @@ def test_mh_beta_bernoulli_obs_false(
     mean_error = jnp.abs(sample_mean - exact_mean)
     var_error = jnp.abs(sample_variance - exact_variance)
 
-    practical_mean_tolerance = 0.15  # Practical tolerance for MCMC
+    practical_mean_tolerance = 0.01  # Practical tolerance for MCMC
 
     assert mean_error < practical_mean_tolerance, (
         f"Mean error {mean_error:.4f} > tolerance {practical_mean_tolerance:.4f}"
@@ -400,48 +399,6 @@ def test_mh_bivariate_normal_marginal(
     assert var_error < mcmc_tolerance, (
         f"Variance error {var_error:.4f} > {mcmc_tolerance}"
     )
-
-
-# ============================================================================
-# Vectorized MCMC Tests
-# ============================================================================
-
-
-@pytest.mark.mcmc
-@pytest.mark.integration
-@pytest.mark.fast
-def test_vectorized_mh_convergence(
-    simple_normal_model, mcmc_steps_medium, mcmc_key, convergence_tolerance
-):
-    """Test that vectorized chains converge to correct distribution."""
-    n_chains = 4
-
-    # Create vectorized initial traces using modular_vmap
-    vectorized_simulate = gx.modular_vmap(
-        simple_normal_model.simulate, in_axes=None, axis_size=n_chains
-    )
-    initial_traces = vectorized_simulate((1.0, 2.0))
-    selection = gx.sel("x")
-
-    # Apply seed transformation
-    seeded_mh_vec = gx.seed(metropolis_hastings_vectorized)
-    result = seeded_mh_vec(mcmc_key, initial_traces, selection, mcmc_steps_medium)
-
-    # Extract samples from all chains: shape (n_chains, n_steps)
-    all_samples = result.traces.get_choices()["x"]
-
-    # Test that each chain converges to correct mean
-    chain_means = jnp.mean(all_samples, axis=1)  # Mean for each chain
-    overall_mean = jnp.mean(chain_means)
-
-    # True mean is 1.0
-    assert jnp.abs(overall_mean - 1.0) < convergence_tolerance, (
-        f"Overall mean {overall_mean:.3f} far from 1.0"
-    )
-
-    # Check that chains are different (independence) - use a more relaxed check
-    chain_std = jnp.std(chain_means)
-    assert chain_std > 0.01, f"Chain means too similar, std: {chain_std:.4f}"
 
 
 # ============================================================================

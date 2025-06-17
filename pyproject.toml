@@ -3,7 +3,11 @@ authors = [{ name = "McCoy Becker", email = "mccoyb@mit.edu" }]
 name = "genjax"
 requires-python = ">= 3.12"
 version = "0.1.0"
-dependencies = [ "penzai>=0.2.5,<0.3", "beartype>=0.21.0,<0.22", "jaxtyping>=0.3.2,<0.4", "tensorflow-probability>=0.25.0,<0.26", "genstudio>=2025.4.1,<2026",
+dependencies = [
+    "penzai>=0.2.5,<0.3",
+    "beartype>=0.21.0,<0.22",
+    "jaxtyping>=0.3.2,<0.4",
+    "tensorflow-probability>=0.25.0,<0.26",
 ]
 
 [build-system]
@@ -26,16 +30,6 @@ min_confidence = 80
 paths = ["src"]
 sort_by_size = true
 
-[tool.pixi.feature.cuda]
-system-requirements = {cuda = "12"}
-
-[tool.pixi.feature.cuda.target.linux-64.pypi-dependencies]
-jaxlib = { version = "*", extras = ["cuda"] }
-
-[tool.pixi.feature.cuda.tasks]
-gol-timing = "pixi run python examples/gol/time_scaling.py"
-gol = "pixi run python examples/gol/figures.py"
-localization = "pixi run python -m examples.localization.main"
 
 [tool.pixi.feature.faircoin.dependencies]
 matplotlib = "*"
@@ -86,28 +80,36 @@ doctest = "xdoctest src/genjax --verbose=2"
 doctest-module = "xdoctest src/genjax/{module} --verbose=2"
 test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"
 
+[tool.pixi.feature.gol.tasks]
+gol-timing = "pixi run python examples/gol/time_scaling.py"
+gol = "pixi run python examples/gol/figures.py"
+
+[tool.pixi.feature.localization.tasks]
+localization = "pixi run python -m examples.localization.main"
+
 [tool.pixi.environments]
-cuda = ["cuda"]
 format = { features = ["format"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "docs" }
 test = { features = ["test"], solve-group = "default" }
 faircoin = { features = ["faircoin"], solve-group = "default" }
 curvefit = { features = ["curvefit"], solve-group = "default" }
+gol = { features = ["gol"], solve-group = "default" }
+localization = { features = ["localization"], solve-group = "default" }
 
 [dependency-groups]
-format = ["ruff>=0.9.2,<0.10","vulture>=2.14,<3","pre-commit>=4.0,<5"]
+format = ["ruff>=0.9.2,<0.10", "vulture>=2.14,<3", "pre-commit>=4.0,<5"]
 docs = ["jupyter"]
-test = ["pytest>=8.0,<9", "pytest-cov>=6.0,<7", "coverage>=7.0,<8", "xdoctest>=1.1.0,<2"]
+test = [
+    "pytest>=8.0,<9",
+    "pytest-cov>=6.0,<7",
+    "coverage>=7.0,<8",
+    "xdoctest>=1.1.0,<2",
+]
 cuda = ["matplotlib", "seaborn", "numpyro"]
 
 [tool.coverage.run]
 source = ["src"]
-omit = [
-    "*/tests/*",
-    "*/examples/*",
-    "*/quarto/*",
-    "*/docs/*",
-]
+omit = ["*/tests/*", "*/examples/*", "*/quarto/*", "*/docs/*"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -126,13 +128,13 @@ exclude_lines = [
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = [
-    "-ra",  # Show short test summary for all results
-    "--strict-markers",  # Require all markers to be defined
-    "--strict-config",  # Strict configuration parsing
-    "--cov=src/genjax",  # Coverage for source code
-    "--cov-report=term-missing",  # Show missing lines in terminal
-    "--cov-report=html",  # Generate HTML coverage report
-    "--cov-report=xml",  # Generate XML coverage for CI
+    "-ra",                       # Show short test summary for all results
+    "--strict-markers",          # Require all markers to be defined
+    "--strict-config",           # Strict configuration parsing
+    "--cov=src/genjax",          # Coverage for source code
+    "--cov-report=term-missing", # Show missing lines in terminal
+    "--cov-report=html",         # Generate HTML coverage report
+    "--cov-report=xml",          # Generate XML coverage for CI
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
@@ -156,7 +158,7 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning:jax.*",
     "ignore::DeprecationWarning:tensorflow_probability.*",
-    "error::UserWarning",  # Turn UserWarnings into errors to catch issues
+    "error::UserWarning",                                  # Turn UserWarnings into errors to catch issues
 ]
 
 [tool.xdoctest]
