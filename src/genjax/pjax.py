@@ -6,7 +6,7 @@ primitives and specialized interpreters for handling probabilistic computations.
 PJAX provides the foundational infrastructure for GenJAX's probabilistic programming
 capabilities by introducing:
 
-1. **Probabilistic Primitives**: Custom JAX primitives (`assume_p`, `log_density_p`)
+1. **Probabilistic Primitives**: Custom JAX primitives (`sample_p`, `log_density_p`)
    that represent random sampling and density evaluation operations.
 
 2. **JAX-aware Interpreters**: Specialized interpreters that handle probabilistic
@@ -267,8 +267,8 @@ class PPPrimitive(Primitive):
 
     `PPPrimitive` (Pretty Print Primitive) wraps an underlying InitialStylePrimitive
     and stores metadata parameters in a hidden field to prevent them from cluttering
-    JAX's Jaxpr pretty printer output. This is essential for PJAX because probabilistic
-    primitives often carry complex metadata (samplers, distributions, transformation
+    JAX's Jaxpr pretty printer output. PJAX's probabilistic
+    primitives carry complex metadata (samplers, distributions, transformation
     rules, etc.) that would make Jaxpr representations unreadable if displayed.
 
     The wrapper:
@@ -280,7 +280,8 @@ class PPPrimitive(Primitive):
     Args:
         prim: The underlying InitialStylePrimitive to wrap.
         **params: Metadata parameters to hide from pretty printer.
-                 These will be merged with parameters passed during binding.
+                 These will be merged with parameters passed during binding
+                 and passed to prim.
 
     Technical Details:
         When JAX creates a Jaxpr representation, it only shows the primitive name
@@ -501,12 +502,12 @@ class TerminalStyle:
 
 
 # Core PJAX primitives that represent probabilistic operations
-assume_p = InitialStylePrimitive(
+sample_p = InitialStylePrimitive(
     f"{TerminalStyle.BOLD}{TerminalStyle.CYAN}pjax.assume{TerminalStyle.RESET}",
 )
 """Core primitive representing random sampling operations.
 
-`assume_p` is the fundamental primitive in PJAX that represents the act of
+`sample_p` is the fundamental primitive in PJAX that represents the act of
 drawing a random sample from a probability distribution. It appears in
 Jaxpr when probabilistic functions are staged, and different interpreters
 handle it in different ways:
@@ -525,7 +526,7 @@ log_density_p = InitialStylePrimitive(
 """Core primitive representing log-density evaluation operations.
 
 `log_density_p` represents the evaluation of log probability density at
-a given value. This is dual to `assume_p` - while `assume_p` generates
+a given value. This is dual to `sample_p` - while `sample_p` generates
 samples, `log_density_p` evaluates how likely those samples are under
 the distribution.
 
@@ -580,9 +581,9 @@ def assume_binder(
     )
 
     def assume(*args, **kwargs):
-        # We're playing a trick here by allowing users to invoke assume_p
+        # We're playing a trick here by allowing users to invoke sample_p
         # without a key. So we hide it inside, and we pass this as the
-        # impl of `assume_p`.
+        # impl of `sample_p`.
         #
         # This is problematic for JIT, which will cache the statically
         # generated key. But it's obvious to the user - their returned
@@ -627,7 +628,7 @@ def assume_binder(
                 raise NotImplementedError()
 
         lowering_msg = (
-            "JAX is attempting to lower the `pjax.assume_p` primitive to MLIR. "
+            "JAX is attempting to lower the `pjax.sample_p` primitive to MLIR. "
             "This will bake a PRNG key into the MLIR code, resulting in deterministic behavior. "
             "Instead, use `seed` to transform your function into one which allows keys to be passed in. "
             "Try and do this as high in the computation graph as you can."
@@ -637,7 +638,7 @@ def assume_binder(
         )
 
         return initial_style_bind(
-            assume_p,
+            sample_p,
             keyful_sampler=keyful_sampler,
             flat_keyful_sampler=flat_keyful_sampler,
             batch=batch,
@@ -827,11 +828,11 @@ class SeedInterpreter:
 
     The `SeedInterpreter` is PJAX's core mechanism for making probabilistic
     computations compatible with standard JAX transformations. It works by
-    traversing a Jaxpr and replacing `assume_p` primitives with actual sampling
+    traversing a Jaxpr and replacing `sample_p` primitives with actual sampling
     operations using explicit PRNG keys.
 
     Key Features:
-    - **Eliminates PJAX primitives**: Converts assume_p to concrete sampling
+    - **Eliminates PJAX primitives**: Converts sample_p to concrete sampling
     - **Explicit randomness**: Uses provided PRNG key for all random operations
     - **JAX compatibility**: Output can be jit'd, vmap'd, grad'd normally
     - **Deterministic**: Same key produces same results (good for debugging)
@@ -877,7 +878,7 @@ class SeedInterpreter:
             args = subfuns + invals
             primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
 
-            if primitive == assume_p:
+            if primitive == sample_p:
                 invals = safe_map(env.read, eqn.invars)
                 args = subfuns + invals
                 flat_keyful_sampler = inner_params["flat_keyful_sampler"]
@@ -1013,7 +1014,7 @@ class ModularVmapInterpreter:
     operations while preserving their semantic meaning.
 
     Key Capabilities:
-    - **Probabilistic vectorization**: Correctly handles `assume_p` under vmap
+    - **Probabilistic vectorization**: Correctly handles `sample_p` under vmap
     - **Batch shape inference**: Automatically adjusts distribution batch shapes
     - **Control flow support**: Handles cond/scan within vectorized computations
     - **Semantic preservation**: Maintains probabilistic meaning across batches
@@ -1060,7 +1061,7 @@ class ModularVmapInterpreter:
             args = subfuns + invals
 
             # Probabilistic.
-            if PPPrimitive.check(eqn.primitive, assume_p):
+            if PPPrimitive.check(eqn.primitive, sample_p):
                 outvals = eqn.primitive.bind(
                     dummy_arg,
                     *args,
@@ -1203,7 +1204,7 @@ def modular_vmap(
     across the vectorized dimension.
 
     Key Differences from `jax.vmap`:
-    - **Probabilistic awareness**: Handles `assume_p` and `log_density_p` primitives
+    - **Probabilistic awareness**: Handles `sample_p` and `log_density_p` primitives
     - **Batch shape handling**: Automatically adjusts distribution batch shapes
     - **Independent sampling**: Each vectorized element gets independent randomness
     - **Semantic correctness**: Maintains probabilistic meaning across batches
@@ -1224,7 +1225,7 @@ def modular_vmap(
         from genjax import normal, modular_vmap
 
         def sample_normal(mu):
-            return normal(mu, 1.0)  # Contains assume_p primitive
+            return normal(mu, 1.0)  # Contains sample_p primitive
 
         # Vectorize over different means
         batch_sample = modular_vmap(sample_normal, in_axes=(0,))
@@ -1275,7 +1276,7 @@ def modular_vmap(
 # without first applying the `seed()` transformation.
 
 enforce_lowering_exception = True
-"""Whether to raise exceptions when assume_p primitives reach MLIR lowering.
+"""Whether to raise exceptions when sample_p primitives reach MLIR lowering.
 
 When True, attempting to compile probabilistic functions (e.g., with jax.jit)
 without first applying `seed()` will raise a LoweringSamplePrimitiveToMLIRException.
@@ -1285,7 +1286,7 @@ Set to False for debugging or if you want warnings instead of exceptions.
 """
 
 lowering_warning = False
-"""Whether to show warnings when assume_p primitives reach MLIR lowering.
+"""Whether to show warnings when sample_p primitives reach MLIR lowering.
 
 When True, shows warning messages instead of raising exceptions when
 probabilistic primitives reach compilation without proper transformation.

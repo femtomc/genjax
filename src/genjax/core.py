@@ -1109,7 +1109,7 @@ def distribution(
 
 
 # Mostly, just use TFP.
-# This wraps PJAX's `assume_p` correctly.
+# This wraps PJAX's `sample_p` correctly.
 def tfp_distribution(
     dist: Callable[..., "tfd.Distribution"],
     /,
@@ -1118,7 +1118,7 @@ def tfp_distribution(
     """Create a Distribution from a TensorFlow Probability distribution.
 
     Wraps a TFP distribution constructor to create a GenJAX Distribution
-    that properly handles PJAX's `assume_p` primitive.
+    that properly handles PJAX's `sample_p` primitive.
 
     Args:
         dist: TFP distribution constructor function.
