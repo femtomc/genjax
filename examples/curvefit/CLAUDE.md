@@ -14,6 +14,7 @@ examples/curvefit/
 ├── README.md           # User documentation (if present)
 ├── main.py             # Main script to generate all figures
 ├── core.py             # Model definitions and inference functions
+├── data.py             # Standardized test data generation across frameworks
 ├── figs.py             # Visualization and figure generation utilities
 └── figs/               # Generated visualization outputs
     └── *.pdf           # Various curve fitting visualizations
@@ -43,6 +44,25 @@ examples/curvefit/
 - **`pyro_run_importance_sampling()`**: Importance sampling inference
 - **`pyro_run_variational_inference()`**: Stochastic variational inference (SVI)
 - **`pyro_sample_from_variational_posterior()`**: Posterior sampling from fitted guide
+
+### `data.py` - Standardized Test Data
+
+**Cross-Framework Data Generation**:
+
+- **`sinfn()`**: Core sine function with frequency and offset parameters
+- **`generate_test_dataset()`**: Creates standardized datasets with configurable parameters
+- **`convert_to_torch()`**: Convert JAX datasets to PyTorch format for Pyro compatibility
+- **`convert_to_numpy()`**: Convert JAX datasets to NumPy format for general use
+- **`get_standard_datasets()`**: Generate pre-configured datasets for common benchmarks
+- **`print_dataset_summary()`**: Display dataset statistics and true parameters
+
+**Key Features**:
+
+- **Consistent Parameters**: Default true_freq=0.3, true_offset=1.5 across all frameworks
+- **Reproducible Seeds**: Fixed random seeds ensure identical datasets for fair comparisons
+- **Framework Compatibility**: Automatic conversion between JAX, NumPy, and PyTorch formats
+- **Noise Modeling**: Standardized Gaussian noise (σ=0.3) for realistic observations
+- **Benchmark Suites**: Pre-configured datasets for performance and accuracy comparisons
 
 ### `figs.py` - Visualization
 
