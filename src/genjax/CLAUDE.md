@@ -135,7 +135,7 @@ def step_fn(carry, _):
     return x, x
 
 scan_gf = Scan(step_fn, length=10)
-result = scan_gf((init_carry, None)) @ "scan"
+result = scan_gf(init_carry, None) @ "scan"
 ```
 
 **Vmap** - Vectorization (like `jax.vmap` for generative functions):
@@ -143,7 +143,7 @@ result = scan_gf((init_carry, None)) @ "scan"
 ```python
 # Vectorize over parameters
 vectorized_normal = normal.vmap(in_axes=(0, None))
-traces = vectorized_normal.simulate((mus_array, sigma_scalar))
+traces = vectorized_normal.simulate(mus_array, sigma_scalar)
 
 # Independent sampling
 batch_sampler = single_sample.repeat(n=10)  # axis_size=10
@@ -158,7 +158,7 @@ def branch_a(): return exponential(1.0) @ "value"
 def branch_b(): return exponential(2.0) @ "value"
 
 cond_gf = Cond(branch_a, branch_b)
-result = cond_gf((condition,)) @ "conditional"
+result = cond_gf(condition) @ "conditional"
 ```
 
 ## Critical API Patterns
@@ -200,7 +200,7 @@ def good_model():
 
     # Use Scan combinator for iteration
     scan_gf = Scan(step_fn, length=n)
-    results = scan_gf((init, None)) @ "scan"
+    results = scan_gf(init, None) @ "scan"
 ```
 
 ### PJAX: Probabilistic JAX
@@ -227,42 +227,44 @@ vmap_model = modular_vmap(model.simulate, in_axes=(0,))
 JAX transformations make all arguments dynamic, but some GenJAX operations need static values:
 
 ```python
-# ❌ PROBLEMATIC - T becomes a tracer
-def inference_fn(T, args):
-    model = model_factory(T)  # T must be static!
+# ❌ PROBLEMATIC - length becomes a tracer
+def bad_scan_model(length, init_carry, xs):
+    scan_gf = Scan(step_fn, length=length)  # length must be static!
+    return scan_gf(init_carry, xs)
 
 # ✅ CORRECT - Use Const[...] for static values
 from genjax import Const, const
 
 @gen
-def model_with_static_length(length: Const[int], init_carry, xs):
+def scan_model(length: Const[int], init_carry, xs):
     scan_gf = Scan(step_fn, length=length.value)  # length.value is static
     return scan_gf(init_carry, xs) @ "scan"
 
 # Usage with static values
 args = (const(10), init_carry, xs)  # Wrap static value with const()
-trace = seed(model_with_static_length.simulate)(key, args)
+trace = seed(scan_model.simulate)(key, args)
 
-# ✅ ALTERNATIVE - Use closures for more complex cases
-T = 5  # Static
-def inference_closure(args):
-    model = model_factory(T)  # Captured as static
-    return inference_logic(model, args)
+# Works with any static configuration
+@gen
+def configurable_model(config: Const[dict], data):
+    if config.value["use_hierarchical"]:
+        prior = normal(config.value["prior_mean"], config.value["prior_std"]) @ "prior"
+    else:
+        prior = exponential(config.value["rate"]) @ "prior"
+    return normal(prior, 1.0) @ "obs"
 
-seeded_inference = seed(inference_closure)
+# Pass static configuration
+config = const({"use_hierarchical": True, "prior_mean": 0.0, "prior_std": 1.0})
+trace = configurable_model.simulate((config, data))
 ```
 
 **Const[...] Pattern Benefits**:
 
 - Preserves static values across JAX transformations like `seed(fn)(...)`
 - Enables type-safe static parameters with proper type hints
-- Cleaner API compared to closure-based solutions
-- Works seamlessly with scan lengths, model configurations, etc.
-
-**When to Use Each Pattern**:
-
-- **Const[...]**: For simple static values (numbers, booleans) passed as arguments
-- **Closures**: For complex static objects or when static values don't fit argument patterns
+- Works seamlessly with scan lengths, model configurations, conditionals
+- Cleaner and more explicit than closure-based alternatives
+- Integrates naturally with GenJAX's type system
 
 ### Pytree Usage
 
