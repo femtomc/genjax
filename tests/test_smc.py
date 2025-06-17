@@ -14,7 +14,8 @@ from genjax.smc import (
     importance_sampling,
     default_importance_sampling,
 )
-from genjax.core import gen, seed, const
+from genjax.core import gen, const
+from genjax.pjax import seed
 
 from discrete_hmm import (
     discrete_hmm_model,

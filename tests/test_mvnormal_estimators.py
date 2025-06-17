@@ -9,7 +9,8 @@ import jax.numpy as jnp
 import jax.random as jrand
 from jax.lax import scan
 
-from genjax.core import gen, seed
+from genjax.core import gen
+from genjax.pjax import seed
 from genjax.adev import expectation
 from genjax import (
     multivariate_normal,

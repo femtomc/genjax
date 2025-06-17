@@ -10,7 +10,8 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.special
 
-from .core import GFI, Trace, modular_vmap, Pytree, X, R, Any, Weight, Const
+from .core import GFI, Trace, Pytree, X, R, Any, Weight, Const
+from .pjax import modular_vmap
 from .distributions import categorical, uniform
 import jax.tree_util as jtu
 

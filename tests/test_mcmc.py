@@ -11,7 +11,8 @@ import jax.numpy as jnp
 import jax.random as jrand
 import pytest
 
-from genjax.core import gen, seed, sel, Const
+from genjax.core import gen, sel, Const
+from genjax.pjax import seed
 from genjax.distributions import beta, flip, exponential
 from genjax.mcmc import (
     MCMCResult,

@@ -16,7 +16,7 @@ import tensorflow_probability.substrates.jax as tfp
 
 
 # GenJAX imports
-from genjax.core import seed
+from genjax.pjax import seed
 
 # Import HMM implementation from the same directory
 from discrete_hmm import (

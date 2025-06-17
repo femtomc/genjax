@@ -15,7 +15,8 @@ import jax.random as jrand
 import pytest
 from jax.lax import scan
 
-from genjax.core import gen, Scan, Cond, seed, sel, Const, const
+from genjax.core import gen, Scan, Cond, sel, Const, const
+from genjax.pjax import seed
 from genjax.distributions import normal, exponential
 
 
@@ -1230,7 +1231,7 @@ class TestVmapAndVectorization:
 
     def test_modular_vmap_basic(self):
         """Test modular_vmap function."""
-        from genjax.core import modular_vmap
+        from genjax.pjax import modular_vmap
         from genjax.distributions import normal
 
         def sample_normal(mu, sigma):
@@ -1247,7 +1248,7 @@ class TestVmapAndVectorization:
 
     def test_modular_vmap_with_axis_size(self):
         """Test modular_vmap with explicit axis_size."""
-        from genjax.core import modular_vmap
+        from genjax.pjax import modular_vmap
 
         def simple_func(x):
             return x * 2
