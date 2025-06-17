@@ -2,7 +2,8 @@ import jax.numpy as jnp
 import jax.random as jrand
 import pytest
 from genjax.adev import Dual, expectation, flip_enum, flip_mvd
-from genjax.core import gen, seed
+from genjax.core import gen
+from genjax.pjax import seed
 from genjax import (
     normal_reparam,
     normal_reinforce,

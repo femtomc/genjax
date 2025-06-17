@@ -37,12 +37,14 @@ from .core import (  # noqa: E402
     Cond,
     gen,
     get_choices,
-    modular_vmap,
-    seed,
     tfp_distribution,
     trace,
     sel,
     Selection,
+)
+from .pjax import (  # noqa: E402
+    modular_vmap,
+    seed,
 )
 from .distributions import (  # noqa: E402
     bernoulli,

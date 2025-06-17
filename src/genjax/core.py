@@ -13,9 +13,9 @@ from typing_extensions import dataclass_transform
 
 # Import PJAX functionality that was moved from this file
 from .pjax import (
+    modular_vmap,
     wrap_sampler,
     wrap_logpdf,
-    modular_vmap,
 )
 
 tfd = tfp.distributions

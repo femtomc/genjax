@@ -1,9 +1,58 @@
+"""PJAX: Probabilistic JAX
+
+This module implements PJAX (Probabilistic JAX), which extends JAX with probabilistic
+primitives and specialized interpreters for handling probabilistic computations.
+
+PJAX provides the foundational infrastructure for GenJAX's probabilistic programming
+capabilities by introducing:
+
+1. **Probabilistic Primitives**: Custom JAX primitives (`assume_p`, `log_density_p`)
+   that represent random sampling and density evaluation operations.
+
+2. **JAX-aware Interpreters**: Specialized interpreters that handle probabilistic
+   primitives while preserving JAX's transformation semantics:
+   - `SeedInterpreter`: Eliminates PJAX's sampling primitive for JAX PRNG implementations
+   - `ModularVmapInterpreter`: Vectorizes probabilistic computations
+
+3. **Staging Infrastructure**: Tools for converting Python functions to JAX's
+   intermediate representation (Jaxpr) while preserving probabilistic semantics.
+
+Key Concepts:
+    - **Assume Primitive**: Represents random sampling operations in Jaxpr
+    - **Seed Transformation**: Converts probabilistic functions to accept explicit keys
+    - **Modular Vmap**: Vectorizes probabilistic functions while preserving semantics
+    - **Elaborated Primitives**: Enhanced primitives with metadata for pretty printing
+
+Usage:
+    ```python
+    from genjax.pjax import seed, modular_vmap, assume_binder
+
+    # Transform probabilistic function to accept explicit keys
+    seeded_fn = seed(probabilistic_function)
+    result = seeded_fn(key, args)
+
+    # Vectorize probabilistic computations
+    vmap_fn = modular_vmap(probabilistic_function, in_axes=(0,))
+    results = vmap_fn(batched_args)
+    ```
+
+Technical Details:
+    PJAX works by representing probabilistic operations as JAX primitives that can be
+    interpreted differently depending on the transformation applied. The `seed`
+    transformation eliminates these primitives by providing explicit randomness,
+    while `modular_vmap` preserves them for probability-aware vectorization.
+
+References:
+    - JAX Primitives: https://jax.readthedocs.io/en/latest/notebooks/How_JAX_primitives_work.html
+    - GenJAX Documentation: See src/genjax/CLAUDE.md for PJAX usage patterns
+"""
+
 import itertools as it
 import warnings
 from dataclasses import dataclass, field
 from functools import partial, wraps
 
-import beartype.typing as btyping
+# Core JAX imports
 import jax
 import jax.core as jc
 import jax.extend as jex
@@ -11,7 +60,6 @@ import jax.extend.linear_util as lu
 import jax.numpy as jnp
 import jax.random as jrand
 import jax.tree_util as jtu
-import jaxtyping as jtyping
 from jax import api_util, tree_util
 from jax._src.interpreters.batching import AxisData  # pyright: ignore
 from jax.core import eval_jaxpr
@@ -20,19 +68,28 @@ from jax.interpreters import ad, batching, mlir
 from jax.interpreters import partial_eval as pe
 from jax.lax import cond_p, scan, scan_p, switch
 from jax.util import safe_map, split_list
+
+# External imports
+import beartype.typing as btyping
+import jaxtyping as jtyping
 from numpy import dtype
+
+##########
+# Types  #
+##########
 
 Any = btyping.Any
 Callable = btyping.Callable
-
-# Additional typing imports needed
-PRNGKey = jtyping.PRNGKeyArray
-Array = jtyping.Array
 Sequence = btyping.Sequence
 TypeVar = btyping.TypeVar
 
+# JAX-specific types
+PRNGKey = jtyping.PRNGKeyArray
+Array = jtyping.Array
+
 # Type variables
 R = TypeVar("R")
+VarOrLiteral = Var | Literal
 
 ############################################
 # Staging utilities for Jaxpr interpreters #
@@ -40,25 +97,53 @@ R = TypeVar("R")
 
 
 def get_shaped_aval(x):
+    """Get the shaped abstract value of a JAX array."""
     return jc.get_aval(x)
 
 
 @lu.cache
 def cached_stage_dynamic(flat_fun, in_avals):
+    """Cache-enabled function to stage a flattened function to Jaxpr.
+
+    Args:
+        flat_fun: Flattened function to stage.
+        in_avals: Input abstract values.
+
+    Returns:
+        ClosedJaxpr representing the function.
+    """
     jaxpr, _, consts = pe.trace_to_jaxpr_dynamic(flat_fun, in_avals)
     typed_jaxpr = ClosedJaxpr(jaxpr, consts)
     return typed_jaxpr
 
 
 def stage(f, **params):
-    """Returns a function that stages a function to a ClosedJaxpr.
+    """Stage a function to JAX's intermediate representation (Jaxpr).
+
+    Converts a Python function into JAX's Jaxpr format, which enables
+    interpretation and transformation of the function's computation graph.
+    This is essential for PJAX's ability to inspect and transform
+    probabilistic computations.
 
     Args:
         f: Function to stage to JAX representation.
         **params: Additional parameters to pass to the wrapped function.
 
     Returns:
-        Callable that returns a tuple of ClosedJaxpr and execution metadata.
+        Callable that returns a tuple of (ClosedJaxpr, execution_metadata).
+        The execution metadata contains flattened arguments, input/output trees,
+        and tree reconstruction functions.
+
+    Example:
+        ```python
+        def my_function(x, y):
+            return x + y
+
+        staged_fn = stage(my_function)
+        jaxpr, metadata = staged_fn(1.0, 2.0)
+        # jaxpr contains the computational graph
+        # metadata contains argument information for reconstruction
+        ```
     """
 
     @wraps(f)
@@ -86,14 +171,43 @@ def stage(f, **params):
 
 
 class InitialStylePrimitive(Primitive):
-    """JAX primitive with default transformation implementations.
+    """JAX primitive with configurable transformation implementations.
 
-    This class provides a convenient way to define custom JAX primitives
-    with standard implementations for common transformations like JVP,
-    batching, and MLIR lowering.
+    This class extends JAX's `Primitive` to provide a convenient way to define
+    custom primitives with parameterizable implementations for all JAX
+    transformations. Instead of requiring separate registration of each
+    transformation rule, this primitive accepts transformation implementations
+    as parameters, making it ideal for PJAX's dynamic primitive creation.
+
+    The primitive supports all core JAX transformations:
+    - `impl`: Concrete implementation for evaluation
+    - `abstract`: Abstract evaluation for shape/dtype inference
+    - `jvp`: Jacobian-vector product for forward-mode autodiff
+    - `batch`: Batching rule for vmap
+    - `lowering`: MLIR compilation for XLA
 
     Args:
-        name: Name of the primitive.
+        name: Name of the primitive (used in Jaxpr pretty-printing).
+
+    Note:
+        All transformation rules are passed as parameters when the primitive
+        is bound, allowing the same primitive to have different behaviors
+        in different contexts. This is essential for PJAX's ability to
+        reinterpret probabilistic operations.
+
+    Example:
+        ```python
+        my_primitive = InitialStylePrimitive("my_op")
+
+        # When binding, provide transformation implementations
+        result = my_primitive.bind(
+            args,
+            impl=my_impl_function,
+            abstract=my_abstract_function,
+            jvp=my_jvp_function,
+            batch=my_batch_function
+        )
+        ```
     """
 
     def __init__(self, name):
@@ -139,15 +253,44 @@ class InitialStylePrimitive(Primitive):
 
 
 class ElaboratedPrimitive(Primitive):
-    """A primitive wrapper that adds elaboration for pretty printing.
+    """A primitive wrapper that enhances debugging and introspection.
 
-    An `ElaboratedPrimitive` wraps an underlying primitive with additional
-    parameters that only appear in the pretty printing of a `Jaxpr`. It also
-    hides excess metadata during pretty printing for cleaner output.
+    `ElaboratedPrimitive` wraps an underlying primitive with additional metadata
+    that improves Jaxpr pretty-printing and debugging without affecting the
+    computation. This is crucial for PJAX because probabilistic primitives often
+    carry complex metadata (samplers, distributions, etc.) that would clutter
+    the Jaxpr representation if shown in full.
+
+    The elaboration includes:
+    - Simplified pretty-printing names for probabilistic operations
+    - Metadata hiding for cleaner Jaxpr visualization
+    - Enhanced debugging information for probabilistic computations
+    - Preservation of all original transformation behavior
 
     Args:
         prim: The underlying InitialStylePrimitive to wrap.
-        **params: Additional elaboration parameters.
+        **params: Additional elaboration parameters that will be merged
+                 with parameters passed during binding.
+
+    Technical Details:
+        The elaborated primitive acts as a transparent proxy that forwards
+        all transformation calls to the underlying primitive while injecting
+        the elaboration parameters. This allows the same primitive to behave
+        differently based on the elaboration context.
+
+    Example:
+        ```python
+        base_prim = InitialStylePrimitive("sample")
+        elaborated = ElaboratedPrimitive(
+            base_prim,
+            distribution="normal",
+            name="x"
+        )
+
+        # The elaborated primitive will show as "normal @ x" in Jaxpr
+        # but maintain all the transformation behavior of base_prim
+        result = elaborated.bind(args, mu=0.0, sigma=1.0)
+        ```
     """
 
     def __init__(self, prim: InitialStylePrimitive, **params):
@@ -301,9 +444,9 @@ def initial_style_bind(
     return bind
 
 
-########
-# PJAX #
-########
+##################################
+# PJAX Core: Probabilistic Primitives #
+##################################
 
 
 def static_dim_length(in_axes, args: tuple[Any, ...]) -> int | None:
@@ -333,24 +476,54 @@ def static_dim_length(in_axes, args: tuple[Any, ...]) -> int | None:
     return axis_sizes[0] if axis_sizes else None
 
 
-######################
-# Sampling primitive #
-######################
+################################
+# Core PJAX Primitives          #
+################################
 
 
-class style:
+class TerminalStyle:
+    """ANSI terminal styling for pretty-printed primitives."""
+
     CYAN = "\033[36m"
     GREEN = "\033[32m"
     BOLD = "\033[1m"
     RESET = "\033[0m"
 
 
+# Core PJAX primitives that represent probabilistic operations
 assume_p = InitialStylePrimitive(
-    f"{style.BOLD}{style.CYAN}pjax.assume{style.RESET}",
+    f"{TerminalStyle.BOLD}{TerminalStyle.CYAN}pjax.assume{TerminalStyle.RESET}",
 )
+"""Core primitive representing random sampling operations.
+
+`assume_p` is the fundamental primitive in PJAX that represents the act of
+drawing a random sample from a probability distribution. It appears in
+Jaxpr when probabilistic functions are staged, and different interpreters
+handle it in different ways:
+
+- `SeedInterpreter`: Replaces with actual sampling using provided PRNG key
+- `ModularVmapInterpreter`: Vectorizes the sampling operation
+- Standard JAX: Raises warning/exception (requires transformation)
+
+The primitive carries metadata about the sampler function, distribution
+parameters, and optional support constraints.
+"""
+
 log_density_p = InitialStylePrimitive(
-    f"{style.BOLD}{style.CYAN}pjax.log_density{style.RESET}",
+    f"{TerminalStyle.BOLD}{TerminalStyle.CYAN}pjax.log_density{TerminalStyle.RESET}",
 )
+"""Core primitive representing log-density evaluation operations.
+
+`log_density_p` represents the evaluation of log probability density at
+a given value. This is dual to `assume_p` - while `assume_p` generates
+samples, `log_density_p` evaluates how likely those samples are under
+the distribution.
+
+Used primarily in:
+- Density evaluation for inference algorithms
+- Gradient computation in variational methods
+- Importance weight calculations in SMC
+"""
 
 
 # Zero-cost, just staging.
@@ -533,6 +706,16 @@ def wrap_logpdf(
     logpdf,
     name: str | None = None,
 ):
+    """Wrap a log-density function to work with PJAX primitives.
+
+    Args:
+        logpdf: Function that computes log probability density.
+        name: Optional name for the operation (used in Jaxpr pretty-printing).
+
+    Returns:
+        Function that binds the logpdf to the log_density_p primitive.
+    """
+
     def _(v, *args, **kwargs):
         return log_density_binder(
             logpdf,
@@ -542,12 +725,26 @@ def wrap_logpdf(
     return _
 
 
-VarOrLiteral = Var | Literal
+###################################
+# Jaxpr Interpretation Infrastructure #
+###################################
 
 
 @dataclass
 class Environment:
-    """Keeps track of variables and their values during interpretation."""
+    """Variable environment for Jaxpr interpretation.
+
+    Manages the mapping between JAX variables (from Jaxpr) and their concrete
+    values during interpretation. This is essential for interpreters that need
+    to execute Jaxpr equations step-by-step while maintaining state.
+
+    The environment handles both:
+    - Var objects: Variables with unique identifiers
+    - Literal objects: Constant values embedded in the Jaxpr
+
+    This design enables efficient interpretation of probabilistic Jaxpr by
+    PJAX's specialized interpreters.
+    """
 
     env: dict[int, Any] = field(default_factory=dict)
 
@@ -616,6 +813,43 @@ class Environment:
 
 @dataclass
 class SeedInterpreter:
+    """Interpreter that eliminates probabilistic primitives with explicit randomness.
+
+    The `SeedInterpreter` is PJAX's core mechanism for making probabilistic
+    computations compatible with standard JAX transformations. It works by
+    traversing a Jaxpr and replacing `assume_p` primitives with actual sampling
+    operations using explicit PRNG keys.
+
+    Key Features:
+    - **Eliminates PJAX primitives**: Converts assume_p to concrete sampling
+    - **Explicit randomness**: Uses provided PRNG key for all random operations
+    - **JAX compatibility**: Output can be jit'd, vmap'd, grad'd normally
+    - **Deterministic**: Same key produces same results (good for debugging)
+    - **Hierarchical key splitting**: Automatically manages keys for nested operations
+
+    The interpreter handles JAX control flow primitives (cond, scan) by
+    recursively applying the seed transformation to their sub-computations.
+
+    Usage Pattern:
+        This interpreter is primarily used via the `seed()` transformation:
+
+        ```python
+        # Instead of using the interpreter directly:
+        # interpreter = SeedInterpreter(key)
+        # result = interpreter.run_interpreter(fn, args)
+
+        # Use the seed transformation:
+        seeded_fn = seed(fn)
+        result = seeded_fn(key, args)
+        ```
+
+    Technical Details:
+        The interpreter maintains a PRNG key that is split at each random
+        operation, ensuring proper randomness while maintaining determinism.
+        For control flow, it passes seeded versions of sub-computations to
+        JAX's control primitives.
+    """
+
     key: PRNGKey
 
     def eval_jaxpr_seed(
@@ -755,17 +989,48 @@ def seed(
 
 
 ############################################
-# Interpreter which modularly extends vmap #
+# Modular Vmap Interpreter                #
 ############################################
 
 
 @dataclass
 class ModularVmapInterpreter:
-    """JAX vmap interpreter with probabilistic primitive awareness.
+    """Vectorization interpreter that preserves probabilistic primitives.
 
-    This interpreter extends `jax.vmap` to handle probability distributions
-    as first class citizens, allowing vectorization over probabilistic
-    computations while preserving their semantic meaning.
+    The `ModularVmapInterpreter` extends JAX's `vmap` to handle probabilistic
+    computations correctly. Unlike standard `vmap`, which would fail on
+    PJAX primitives, this interpreter knows how to vectorize probabilistic
+    operations while preserving their semantic meaning.
+
+    Key Capabilities:
+    - **Probabilistic vectorization**: Correctly handles `assume_p` under vmap
+    - **Batch shape inference**: Automatically adjusts distribution batch shapes
+    - **Control flow support**: Handles cond/scan within vectorized computations
+    - **Semantic preservation**: Maintains probabilistic meaning across batches
+    - **Performance**: Avoids explicit loops for better efficiency
+
+    How It Works:
+        The interpreter uses a "dummy argument" technique to track the vectorization
+        axis size and injects this information into probabilistic primitives so
+        they can adjust their behavior appropriately (e.g., sampling multiple
+        independent values vs. broadcasting parameters).
+
+    Usage:
+        Primarily used via the `modular_vmap()` function:
+
+        ```python
+        # Vectorize a probabilistic function
+        batch_fn = modular_vmap(prob_function, in_axes=(0,))
+        batch_results = batch_fn(batch_args)
+
+        # Each element gets independent randomness
+        # Distribution parameters are correctly broadcast
+        ```
+
+    Technical Details:
+        The interpreter maintains PJAX primitives in the Jaxpr rather than
+        eliminating them (unlike SeedInterpreter). This allows proper
+        vectorization semantics for probabilistic operations.
     """
 
     @staticmethod
@@ -908,9 +1173,9 @@ class ModularVmapInterpreter:
         )(dummy_arg, args)
 
 
-########
-# APIs #
-########
+##########################################
+# Public API: Core PJAX Transformations #
+##########################################
 
 
 def modular_vmap(
@@ -922,18 +1187,49 @@ def modular_vmap(
 ) -> Callable[..., R]:
     """Vectorize a function while preserving probabilistic semantics.
 
-    Extends `jax.vmap` to handle probability distributions as first class
-    citizens, enabling vectorization over probabilistic computations.
+    This is PJAX's probabilistic-aware version of `jax.vmap`. Unlike standard
+    `vmap`, which fails on probabilistic primitives, `modular_vmap` correctly
+    handles probabilistic computations by preserving their semantic meaning
+    across the vectorized dimension.
+
+    Key Differences from `jax.vmap`:
+    - **Probabilistic awareness**: Handles `assume_p` and `log_density_p` primitives
+    - **Batch shape handling**: Automatically adjusts distribution batch shapes
+    - **Independent sampling**: Each vectorized element gets independent randomness
+    - **Semantic correctness**: Maintains probabilistic meaning across batches
 
     Args:
-        f: Function to vectorize.
-        in_axes: Axis specification for input arguments.
-        axis_size: Size of the mapped axis.
-        axis_name: Name for the mapped axis.
+        f: Function to vectorize (may contain probabilistic operations).
+        in_axes: Axis specification for input arguments (same as jax.vmap).
+        axis_size: Size of the mapped axis (inferred if None).
+        axis_name: Name for the mapped axis (for debugging).
         spmd_axis_name: SPMD axis name for parallel computation.
 
     Returns:
-        Vectorized function that preserves probabilistic semantics.
+        Vectorized function that correctly handles probabilistic computations.
+
+    Example:
+        ```python
+        import jax.random as jrand
+        from genjax import normal, modular_vmap
+
+        def sample_normal(mu):
+            return normal(mu, 1.0)  # Contains assume_p primitive
+
+        # Vectorize over different means
+        batch_sample = modular_vmap(sample_normal, in_axes=(0,))
+        mus = jnp.array([0.0, 1.0, 2.0])
+        samples = batch_sample(mus)  # Shape: (3,), independent samples
+
+        # Compare with seed for JAX compatibility
+        seeded_fn = seed(batch_sample)
+        samples = seeded_fn(key, mus)  # Can be jit'd, grad'd, etc.
+        ```
+
+    Note:
+        For JAX transformations (jit, grad, etc.), use `seed()` first:
+        `jax.jit(seed(modular_vmap(f)))` rather than trying to jit
+        the modular_vmap directly.
     """
 
     @wraps(f)
@@ -960,10 +1256,29 @@ def modular_vmap(
     return wrapped
 
 
-# Control the behavior of lowering `assume_p`
-# to MLIR.
-# `assume_p` should be _eliminated_ by `seed`,
-# otherwise, keys are baked in, yielding deterministic results.
-# These flags send warnings / raise exceptions in case this happens.
+####################################
+# Configuration and Error Handling  #
+####################################
+
+# Global flags that control the behavior when PJAX primitives reach MLIR compilation
+# This happens when probabilistic functions are passed to JAX transformations
+# without first applying the `seed()` transformation.
+
 enforce_lowering_exception = True
+"""Whether to raise exceptions when assume_p primitives reach MLIR lowering.
+
+When True, attempting to compile probabilistic functions (e.g., with jax.jit)
+without first applying `seed()` will raise a LoweringSamplePrimitiveToMLIRException.
+This prevents silent errors where PRNG keys get baked into compiled code.
+
+Set to False for debugging or if you want warnings instead of exceptions.
+"""
+
 lowering_warning = False
+"""Whether to show warnings when assume_p primitives reach MLIR lowering.
+
+When True, shows warning messages instead of raising exceptions when
+probabilistic primitives reach compilation without proper transformation.
+Generally, exceptions (enforce_lowering_exception=True) are preferred
+as they prevent subtle bugs.
+"""
