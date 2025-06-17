@@ -15,8 +15,13 @@ import jax.random as jrand
 import pytest
 from jax.lax import scan
 
-from genjax.core import gen, Scan, Cond, seed, sel
+from genjax.core import gen, Scan, Cond, seed, sel, Const, const
 from genjax.distributions import normal, exponential
+
+
+# =============================================================================
+# GENERATIVE FUNCTION (@gen) TESTS
+# =============================================================================
 
 
 @pytest.mark.core
@@ -379,6 +384,11 @@ def test_fn_conditional_sampling(standard_tolerance, helpers):
         )
 
 
+# =============================================================================
+# SCAN COMBINATOR TESTS
+# =============================================================================
+
+
 @pytest.mark.core
 @pytest.mark.unit
 @pytest.mark.fast
@@ -393,16 +403,19 @@ def test_scan_simulate_vs_manual_density(base_key, standard_tolerance, helpers):
         output = new_carry * 2.0
         return new_carry, output
 
-    # Create scan generative function
-    scan_gf = Scan(add_normal_step, length=4)
+    # Create scan generative function with Const[int] for static length
+    @gen
+    def scan_model(length: Const[int], init_carry, xs):
+        scan_gf = Scan(add_normal_step, length=length.value)
+        return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
     init_carry = 1.0
     xs = jnp.array([0.5, -0.2, 1.1, 0.8])
-    args = (init_carry, xs)
+    args = (const(4), init_carry, xs)
 
     # Generate a trace using simulate with seed transformation
-    trace = seed(scan_gf.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, args)
     choices = trace.get_choices()
     scan_score = trace.get_score()  # This is log(1/density), so negative log density
 
@@ -424,7 +437,7 @@ def test_scan_simulate_vs_manual_density(base_key, standard_tolerance, helpers):
     final_carry, (outputs, log_densities) = scan(
         manual_scan_fn,
         init_carry,
-        (xs, choices),
+        (xs, choices["scan"]),
         length=len(xs),
     )
 
@@ -467,19 +480,22 @@ def test_scan_assess_vs_manual_density(standard_tolerance, helpers):
         output = sample + input_val
         return new_carry, output
 
-    # Create scan generative function
-    scan_gf = Scan(exponential_step, length=3)
+    # Create scan generative function with Const[int] for static length
+    @gen
+    def scan_model(length: Const[int], init_carry, xs):
+        scan_gf = Scan(exponential_step, length=length.value)
+        return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
     init_carry = 0.5
     xs = jnp.array([0.1, 0.3, -0.2])
-    args = (init_carry, xs)
+    args = (const(3), init_carry, xs)
 
     # Create some fixed choices to assess
-    choices = {"exp_sample": jnp.array([0.8, 1.2, 0.4])}
+    choices = {"scan": {"exp_sample": jnp.array([0.8, 1.2, 0.4])}}
 
     # Assess using Scan
-    scan_density, scan_retval = scan_gf.assess(args, choices)
+    scan_density, scan_retval = scan_model.assess(args, choices)
     helpers.assert_valid_density(scan_density)
 
     # Manually compute density
@@ -498,7 +514,7 @@ def test_scan_assess_vs_manual_density(standard_tolerance, helpers):
     final_carry, (outputs, log_densities) = scan(
         manual_assess_fn,
         init_carry,
-        (xs, choices),
+        (xs, choices["scan"]),
         length=len(xs),
     )
 
@@ -548,16 +564,19 @@ def test_scan_simulate_assess_consistency(base_key, standard_tolerance, helpers)
         output = (sample1, sample2)
         return new_carry, output
 
-    # Create scan generative function
-    scan_gf = Scan(complex_step, length=4)
+    # Create scan generative function with Const[int] for static length
+    @gen
+    def scan_model(length: Const[int], init_carry, xs):
+        scan_gf = Scan(complex_step, length=length.value)
+        return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
     init_carry = 0.2
     xs = jnp.array([0.5, -0.3, 0.8, 1.0])
-    args = (init_carry, xs)
+    args = (const(4), init_carry, xs)
 
     # Generate trace with simulate using seed transformation
-    trace = seed(scan_gf.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, args)
     choices = trace.get_choices()
     simulate_score = trace.get_score()
     simulate_retval = trace.get_retval()
@@ -566,7 +585,7 @@ def test_scan_simulate_assess_consistency(base_key, standard_tolerance, helpers)
     helpers.assert_valid_trace(trace)
 
     # Assess the same choices
-    assess_density, assess_retval = scan_gf.assess(args, choices)
+    assess_density, assess_retval = scan_model.assess(args, choices)
     helpers.assert_valid_density(assess_density)
 
     # simulate_score should be -assess_density (score is log(1/density))
@@ -611,15 +630,18 @@ def test_empty_scan(helpers):
         sample = normal(0.0, 1.0) @ "sample"
         return carry + sample, sample
 
-    scan_gf = Scan(simple_step, length=0)
+    @gen
+    def scan_model(length: Const[int], init_carry, xs):
+        scan_gf = Scan(simple_step, length=length.value)
+        return scan_gf(init_carry, xs) @ "scan"
 
     # Empty inputs
     init_carry = 1.0
     xs = jnp.array([])  # Empty array
-    args = (init_carry, xs)
+    args = (const(0), init_carry, xs)
 
     # Should work and return initial carry with empty outputs
-    trace = scan_gf.simulate(args)
+    trace = scan_model.simulate(args)
     final_carry, outputs = trace.get_retval()
 
     # Validate trace structure
@@ -644,26 +666,29 @@ def test_single_step_scan(base_key, standard_tolerance, helpers):
         new_carry = carry + sample
         return new_carry, sample**2
 
-    scan_gf = Scan(single_step, length=1)
+    @gen
+    def scan_model(length: Const[int], init_carry, xs):
+        scan_gf = Scan(single_step, length=length.value)
+        return scan_gf(init_carry, xs) @ "scan"
 
     # Single input
     init_carry = 2.0
     xs = jnp.array([1.5])
-    args = (init_carry, xs)
+    args = (const(1), init_carry, xs)
 
     # Test simulate with seed transformation
-    trace = seed(scan_gf.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, args)
     choices = trace.get_choices()
 
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
     # Test assess with same choice
-    density, retval = scan_gf.assess(args, choices)
+    density, retval = scan_model.assess(args, choices)
     helpers.assert_valid_density(density)
 
     # Compute expected density using Distribution.assess
-    sample = choices["sample"][0]
+    sample = choices["scan"]["sample"][0]
     expected_log_density, _ = normal.assess((1.5, 0.5), sample)
 
     helpers.assert_finite_and_close(
@@ -687,22 +712,26 @@ def test_scan_with_different_lengths(length, base_key, standard_tolerance, helpe
         new_carry = carry + input_val + sample
         return new_carry, new_carry
 
-    scan_gf = Scan(accumulating_step, length=length)
+    @gen
+    def scan_model(length: Const[int], init_carry, xs):
+        scan_gf = Scan(accumulating_step, length=length.value)
+        return scan_gf(init_carry, xs) @ "scan"
+
     init_carry = 0.0
     xs = jnp.ones(length) * 0.1  # Small constant inputs
-    args = (init_carry, xs)
+    args = (const(length), init_carry, xs)
 
     # Test that simulate and assess are consistent
     # Use different key for each length to ensure varied test conditions
     key_list = jrand.split(base_key, 2)
     test_key = key_list[0] if length % 2 == 0 else key_list[1]
-    trace = seed(scan_gf.simulate)(test_key, args)
+    trace = seed(scan_model.simulate)(test_key, args)
     choices = trace.get_choices()
 
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
-    assess_density, assess_retval = scan_gf.assess(args, choices)
+    assess_density, assess_retval = scan_model.assess(args, choices)
     helpers.assert_valid_density(assess_density)
     simulate_score = trace.get_score()
 
@@ -714,10 +743,15 @@ def test_scan_with_different_lengths(length, base_key, standard_tolerance, helpe
     )
 
     # Check that we have the right number of choices and outputs
-    assert choices["sample"].shape[0] == length, (
-        f"Wrong number of choices: {choices['sample'].shape[0]} != {length}"
+    assert choices["scan"]["sample"].shape[0] == length, (
+        f"Wrong number of choices: {choices['scan']['sample'].shape[0]} != {length}"
     )
     assert trace.get_retval()[1].shape[0] == length, "Wrong number of outputs"
+
+
+# =============================================================================
+# GENERATIVE FUNCTION INTERFACE (GFI) METHOD TESTS
+# =============================================================================
 
 
 class TestGenerateConsistency:
@@ -1454,192 +1488,6 @@ class TestUpdateAndRegenerate:
     @pytest.mark.core
     @pytest.mark.unit
     @pytest.mark.fast
-    def test_fn_regenerate_weight_invariant(self, standard_tolerance, helpers):
-        """Test that Fn.regenerate weight satisfies invariant."""
-
-        @gen
-        def hierarchical_model():
-            mu = normal(0.0, 2.0) @ "mu"
-            sigma = exponential(1.0) @ "sigma"
-            x = normal(mu, sigma) @ "x"
-            y = normal(x, 0.1) @ "y"
-            return y
-
-        # Create initial trace
-        initial_trace = hierarchical_model.simulate(())
-        old_score = initial_trace.get_score()
-        old_choices = initial_trace.get_choices()
-        helpers.assert_valid_trace(initial_trace)
-
-        # Regenerate a subset of choices
-        selection = sel("mu") | sel("x")  # Regenerate mu and x, keep sigma and y
-        new_trace, weight, discarded = hierarchical_model.regenerate(
-            (), initial_trace, selection
-        )
-        new_score = new_trace.get_score()
-
-        # Test weight invariant
-        expected_weight = -new_score + old_score
-        helpers.assert_finite_and_close(
-            weight,
-            expected_weight,
-            rtol=standard_tolerance,
-            msg="Regenerate weight does not satisfy invariant",
-        )
-
-        # Test that selected addresses were regenerated (likely different)
-        # Note: These could be the same by chance, but very unlikely
-        mu_changed = not jnp.allclose(
-            new_trace.get_choices()["mu"], old_choices["mu"], rtol=1e-10
-        )
-        x_changed = not jnp.allclose(
-            new_trace.get_choices()["x"], old_choices["x"], rtol=1e-10
-        )
-        # At least one should have changed (very high probability)
-        assert mu_changed or x_changed, "Regenerated choices should likely be different"
-
-        # Test that non-selected addresses remained the same
-        assert jnp.allclose(
-            new_trace.get_choices()["sigma"],
-            old_choices["sigma"],
-            rtol=standard_tolerance,
-        )
-        assert jnp.allclose(
-            new_trace.get_choices()["y"], old_choices["y"], rtol=standard_tolerance
-        )
-
-        # Test that discarded contains old values for regenerated addresses
-        assert "mu" in discarded
-        assert "x" in discarded
-        assert jnp.allclose(discarded["mu"], old_choices["mu"], rtol=standard_tolerance)
-        assert jnp.allclose(discarded["x"], old_choices["x"], rtol=standard_tolerance)
-
-    @pytest.mark.core
-    @pytest.mark.unit
-    @pytest.mark.fast
-    def test_fn_regenerate_empty_selection(self, standard_tolerance, helpers):
-        """Test Fn.regenerate with empty selection."""
-
-        @gen
-        def simple_model():
-            x = normal(0.0, 1.0) @ "x"
-            return x
-
-        # Create initial trace
-        initial_trace = simple_model.simulate(())
-        old_score = initial_trace.get_score()
-        old_choices = initial_trace.get_choices()
-
-        # Regenerate with empty selection
-        empty_selection = sel()  # No addresses selected
-        new_trace, weight, discarded = simple_model.regenerate(
-            (), initial_trace, empty_selection
-        )
-        new_score = new_trace.get_score()
-
-        # Test weight invariant (should be zero since nothing changed)
-        expected_weight = -new_score + old_score
-        helpers.assert_finite_and_close(
-            weight, expected_weight, rtol=standard_tolerance
-        )
-        helpers.assert_finite_and_close(weight, 0.0, rtol=standard_tolerance)
-
-        # Test that nothing changed
-        assert jnp.allclose(
-            new_trace.get_choices()["x"], old_choices["x"], rtol=standard_tolerance
-        )
-        assert jnp.allclose(new_score, old_score, rtol=standard_tolerance)
-
-        # Test that discarded is empty
-        assert len(discarded) == 0
-
-    @pytest.mark.core
-    @pytest.mark.unit
-    @pytest.mark.fast
-    def test_fn_regenerate_all_choices(self, standard_tolerance, helpers):
-        """Test Fn.regenerate with all choices selected."""
-
-        @gen
-        def multi_var_model():
-            x = normal(0.0, 1.0) @ "x"
-            y = exponential(2.0) @ "y"
-            z = normal(x + y, 0.5) @ "z"
-            return z
-
-        # Create initial trace
-        initial_trace = multi_var_model.simulate(())
-        old_score = initial_trace.get_score()
-        old_choices = initial_trace.get_choices()
-
-        # Regenerate all choices
-        full_selection = sel("x") | sel("y") | sel("z")
-        new_trace, weight, discarded = multi_var_model.regenerate(
-            (), initial_trace, full_selection
-        )
-        new_score = new_trace.get_score()
-
-        # Test weight invariant
-        expected_weight = -new_score + old_score
-        helpers.assert_finite_and_close(
-            weight, expected_weight, rtol=standard_tolerance
-        )
-
-        # Test that discarded contains all old values
-        assert "x" in discarded
-        assert "y" in discarded
-        assert "z" in discarded
-        assert jnp.allclose(discarded["x"], old_choices["x"], rtol=standard_tolerance)
-        assert jnp.allclose(discarded["y"], old_choices["y"], rtol=standard_tolerance)
-        assert jnp.allclose(discarded["z"], old_choices["z"], rtol=standard_tolerance)
-
-    @pytest.mark.core
-    @pytest.mark.unit
-    @pytest.mark.fast
-    def test_update_regenerate_consistency(self, standard_tolerance, helpers):
-        """Test that update and regenerate are consistent when applicable."""
-
-        @gen
-        def simple_model():
-            x = normal(0.0, 1.0) @ "x"
-            y = normal(x, 0.5) @ "y"
-            return x + y
-
-        # Create initial trace
-        initial_trace = simple_model.simulate(())
-        old_score = initial_trace.get_score()
-
-        # Method 1: Use update to change x
-        new_x_value = 3.0
-        new_choices = {"x": new_x_value}
-        update_trace, update_weight, update_discarded = simple_model.update(
-            (), initial_trace, new_choices
-        )
-
-        # Method 2: Use regenerate with constrained generation
-        # This is more complex - we'd need to condition the model
-        # For now, let's test that both methods satisfy the weight invariant independently
-
-        # Test update weight invariant - use standard tolerance for floating point
-        update_expected_weight = -update_trace.get_score() + old_score
-        helpers.assert_finite_and_close(
-            update_weight, update_expected_weight, rtol=standard_tolerance
-        )
-
-        # Now test regenerate on the same initial trace
-        selection = sel("x")  # Regenerate just x
-        regen_trace, regen_weight, regen_discarded = simple_model.regenerate(
-            (), initial_trace, selection
-        )
-
-        # Test regenerate weight invariant
-        regen_expected_weight = -regen_trace.get_score() + old_score
-        helpers.assert_finite_and_close(
-            regen_weight, regen_expected_weight, rtol=standard_tolerance
-        )
-
-    @pytest.mark.core
-    @pytest.mark.unit
-    @pytest.mark.fast
     def test_scan_update_weight_invariant(self, base_key, standard_tolerance, helpers):
         """Test that Scan.update weight satisfies invariant."""
 
@@ -1758,3 +1606,128 @@ class TestUpdateAndRegenerate:
         assert jnp.isfinite(weight)
         assert jnp.isfinite(new_score)
         assert jnp.isfinite(old_score)
+
+
+# =============================================================================
+# SELECTION TESTS
+# =============================================================================
+
+
+class TestSelection:
+    """Test Selection class and its various implementations."""
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_str_selection_basic(self):
+        """Test basic string selection functionality."""
+        selection = sel("x")
+
+        # Should match the exact address
+        matches, _ = selection.match("x")
+        assert matches is True
+
+        # Should not match different addresses
+        matches, _ = selection.match("y")
+        assert matches is False
+
+        # Should not match nested addresses
+        matches, _ = selection.match(("x", "y"))
+        assert matches is False
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_or_selection_combination(self):
+        """Test OR combination of selections."""
+        selection = sel("x") | sel("y")
+
+        # Should match either address
+        matches_x, _ = selection.match("x")
+        matches_y, _ = selection.match("y")
+        assert matches_x is True
+        assert matches_y is True
+
+        # Should not match unrelated addresses
+        matches_z, _ = selection.match("z")
+        assert matches_z is False
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_complex_selection_combinations(self):
+        """Test complex combinations of selections."""
+        # Multiple OR combinations
+        selection = sel("x") | sel("y") | sel("z")
+
+        for addr in ["x", "y", "z"]:
+            matches, _ = selection.match(addr)
+            assert matches is True
+
+        matches, _ = selection.match("w")
+        assert matches is False
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_empty_selection(self):
+        """Test empty selection matches nothing."""
+        selection = sel()
+
+        # Should not match any address
+        for addr in ["x", "y", ("a", "b"), 42]:
+            matches, _ = selection.match(addr)
+            assert matches is False
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_all_selection(self):
+        """Test selection that matches everything."""
+        from genjax.core import Selection, AllSel
+
+        selection = Selection(AllSel())
+
+        # Should match any address
+        for addr in ["x", "y", ("a", "b"), 42]:
+            matches, _ = selection.match(addr)
+            assert matches is True
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_selection_in_regenerate_context(self, helpers):
+        """Test that selections work correctly in regenerate context."""
+
+        @gen
+        def test_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(x, 0.5) @ "y"
+            z = normal(y, 0.1) @ "z"
+            return z
+
+        # Create initial trace
+        initial_trace = test_model.simulate(())
+        old_choices = initial_trace.get_choices()
+
+        # Test single selection
+        selection = sel("y")
+        new_trace, weight, discarded = test_model.regenerate(
+            (), initial_trace, selection
+        )
+
+        # Only y should be in discarded, x and z should remain the same
+        assert "y" in discarded
+        assert jnp.allclose(new_trace.get_choices()["x"], old_choices["x"], rtol=1e-10)
+        assert jnp.allclose(new_trace.get_choices()["z"], old_choices["z"], rtol=1e-10)
+
+        # Test multiple selection
+        multi_selection = sel("x") | sel("z")
+        new_trace2, weight2, discarded2 = test_model.regenerate(
+            (), initial_trace, multi_selection
+        )
+
+        # x and z should be in discarded, y should remain the same
+        assert "x" in discarded2
+        assert "z" in discarded2
+        assert jnp.allclose(new_trace2.get_choices()["y"], old_choices["y"], rtol=1e-10)

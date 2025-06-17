@@ -34,6 +34,49 @@ pixi run python -m pytest tests/test_<module>.py -v
 pixi run python -m pytest tests/test_<module>.py::test_function_name
 ```
 
+### Test File Organization
+
+Use **sectional headers** to organize tests within each file for better readability and navigation:
+
+```python
+# =============================================================================
+# GENERATIVE FUNCTION (@gen) TESTS
+# =============================================================================
+
+@pytest.mark.core
+def test_fn_simulate_vs_manual_density():
+    """Test @gen function simulation."""
+    pass
+
+# =============================================================================
+# SCAN COMBINATOR TESTS
+# =============================================================================
+
+@pytest.mark.core
+def test_scan_simulate_vs_manual_density():
+    """Test Scan combinator functionality."""
+    pass
+
+# =============================================================================
+# GENERATIVE FUNCTION INTERFACE (GFI) METHOD TESTS
+# =============================================================================
+
+class TestGenerateConsistency:
+    """Test generate method consistency."""
+    pass
+
+class TestUpdateAndRegenerate:
+    """Test update and regenerate methods."""
+    pass
+```
+
+**Guidelines for sectional headers:**
+- Use descriptive section names that clearly identify the functionality being tested
+- Group related tests under the same header
+- Use consistent formatting with `# =============================================================================`
+- Place headers before test functions/classes, not within them
+- Keep sections focused - split large sections if they become unwieldy
+
 ### Test Writing Patterns
 
 1. **JAX Integration Tests**
