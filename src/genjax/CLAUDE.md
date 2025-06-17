@@ -21,22 +21,22 @@ This file provides detailed guidance on GenJAX concepts and usage patterns for C
 
 ```python
 # Forward sampling
-trace = model.simulate(args)                    # Sample (choices, retval) ~ P(·; args)
+trace = model.simulate(*args)                   # Sample (choices, retval) ~ P(·; args)
 # trace.get_score() = log(1/P(choices; args))   # Negative log probability
 
 # Density evaluation
-log_density, retval = model.assess(args, choices)  # Compute log P(choices; args)
+log_density, retval = model.assess(choices, *args)  # Compute log P(choices; args)
 
 # Constrained generation (importance sampling)
-trace, weight = model.generate(args, constraints)
+trace, weight = model.generate(constraints, *args)
 # weight = log[P(all_choices; args) / Q(unconstrained; constrained, args)]
 
 # Edit moves (MCMC, SMC)
-new_trace, weight, discarded = model.update(new_args, trace, constraints)
+new_trace, weight, discarded = model.update(trace, constraints, *new_args)
 # weight = log[P(new_choices; new_args)/Q(new; old, constraints)] - log[P(old_choices; old_args)/Q(old)]
 
 # Selective regeneration (edit move)
-new_trace, weight, discarded = model.regenerate(args, trace, selection)
+new_trace, weight, discarded = model.regenerate(trace, selection, *args, **kwargs)
 # weight = log P(new_selected | non_selected; args) - log P(old_selected | non_selected; args)
 ```
 
@@ -76,7 +76,7 @@ sel("x") & sel("y")         # AND: select "x" and "y" (intersection)
 
 # Usage in regenerate
 selection = sel("mu") | sel("sigma")  # Select parameters to resample
-new_trace, weight, discarded = model.regenerate(args, trace, selection)
+new_trace, weight, discarded = model.regenerate(trace, selection, *args, **kwargs)
 ```
 
 **Selection Semantics**:
@@ -101,7 +101,7 @@ exponential.sample(rate)            # ✅ CORRECT
 logp = normal.logpdf(x, mu, sigma)  # ✅ CORRECT
 
 # Usage: GFI methods, same idea.
-normal.simulate((mu, sigma)) # ✅ CORRECT
+normal.simulate(mu, sigma) # ✅ CORRECT
 ```
 
 ### `@gen` Functions (`Fn` type)
@@ -168,12 +168,12 @@ result = cond_gf(condition) @ "conditional"
 ```python
 # ✅ CORRECT patterns
 x = normal(mu, sigma) @ "x"                    # In @gen functions
-log_density, retval = normal.assess((mu, sigma), sample)  # GFI calls with tuple args
+log_density, retval = normal.assess(sample, mu, sigma)  # GFI calls with unpacked args
 
 # ❌ WRONG patterns
 x = normal(mu, sigma)                         # Not traced
 x = normal(mu=mu, sigma=sigma) @ "x"          # No kwargs
-normal(mu, sigma).assess((), sample)          # Wrong arg structure
+normal.assess((mu, sigma), sample)           # Wrong arg structure (old format)
 ```
 
 ## JAX Integration & Constraints
@@ -242,7 +242,7 @@ def scan_model(length: Const[int], init_carry, xs):
 
 # Usage with static values
 args = (const(10), init_carry, xs)  # Wrap static value with const()
-trace = seed(scan_model.simulate)(key, args)
+trace = seed(scan_model.simulate)(key, *args)
 
 # Works with any static configuration
 @gen
@@ -255,7 +255,7 @@ def configurable_model(config: Const[dict], data):
 
 # Pass static configuration
 config = const({"use_hierarchical": True, "prior_mean": 0.0, "prior_std": 1.0})
-trace = configurable_model.simulate((config, data))
+trace = configurable_model.simulate(config, data)
 ```
 
 **Const[...] Pattern Benefits**:
@@ -284,11 +284,11 @@ trace = configurable_model.simulate((config, data))
 
 ```python
 # ❌ Problematic
-trace = model_with_scan.simulate(())
+trace = model_with_scan.simulate()
 
 # ✅ Fixed
 seeded_model = seed(model_with_scan.simulate)
-trace = seeded_model(key, ())
+trace = seeded_model(key)
 ```
 
 ## Glossary

@@ -127,7 +127,7 @@ infer_latents = jax.jit(_infer_latents, static_argnums=(2,))
 
 def get_points_for_inference(n_points=20):
     n_points_const = Const(n_points)
-    trace = npoint_curve.simulate((n_points_const,))
+    trace = npoint_curve.simulate(n_points_const)
     return trace.get_retval()
 
 

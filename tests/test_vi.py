@@ -61,7 +61,7 @@ class TestBasicVIFunctionality:
 
         @expectation
         def elbo(data: dict, theta):
-            tr = variational_family.simulate((data, theta))
+            tr = variational_family.simulate(data, theta)
             q_score = tr.get_score()  # log(1/q) = -log(q)
             p = variational_model.log_density((), {**data, **tr.get_choices()})
             # ELBO = log(p) - log(q) = log(p) + q_score
@@ -151,7 +151,7 @@ class TestVariationalFamilies:
         )
 
         constraint = {}  # Dummy constraint for testing
-        trace = family.simulate((constraint, params))
+        trace = family.simulate(constraint, params)
         samples = trace.get_retval()
 
         assert samples.shape == (n_dims,)
@@ -170,7 +170,7 @@ class TestVariationalFamilies:
         )
 
         constraint = {}  # Dummy constraint for testing
-        trace = family.simulate((constraint, params))
+        trace = family.simulate(constraint, params)
         samples = trace.get_retval()
 
         assert samples.shape == (n_dims,)
@@ -195,7 +195,7 @@ class TestVariationalFamilies:
         params = {"mean": mean, "chol_cov": chol_cov}
 
         constraint = {}  # Dummy constraint for testing
-        trace = family.simulate((constraint, params))
+        trace = family.simulate(constraint, params)
         samples = trace.get_retval()
 
         assert samples.shape == (n_dims,)

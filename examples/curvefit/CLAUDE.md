@@ -228,7 +228,7 @@ samples = pyro_sample_from_variational_posterior(xs, num_samples=1000)
 ```python
 # Create model for specific number of points
 model = npoint_curve_factory(15)
-trace = model.simulate(())
+trace = model.simulate()  # No args needed for this model
 ```
 
 ### Running Examples
@@ -306,7 +306,7 @@ result = seed(default_importance_sampling)(key, model, (), n_samples, constraint
 ```python
 # Test factory pattern
 model = npoint_curve_factory(10)
-trace = model.simulate(())
+trace = model.simulate()  # No args needed for this model
 assert trace.get_retval()[1][0].shape == (10,)  # xs shape
 assert trace.get_retval()[1][1].shape == (10,)  # ys shape
 ```

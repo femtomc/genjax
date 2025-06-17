@@ -127,14 +127,14 @@ For computationally intensive algorithms:
 def test_model_density_validation():
     """Test that simulate and assess are consistent."""
     # Generate trace
-    trace = model.simulate(args)
+    trace = model.simulate(*args)
     choices = trace.get_choices()
 
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
     # Check simulate/assess consistency
-    assess_density, assess_retval = model.assess(args, choices)
+    assess_density, assess_retval = model.assess(choices, *args)
     simulate_score = trace.get_score()
 
     # Score should be negative log density
@@ -147,17 +147,17 @@ def test_model_density_validation():
 ```python
 def test_manual_density_computation():
     """Validate against manual probability calculations."""
-    trace = model.simulate(args)
+    trace = model.simulate(*args)
     choices = trace.get_choices()
 
     # Compute expected density using Distribution.assess
     expected_log_density = 0.0
     for addr, choice_value in choices.items():
-        dist_log_density, _ = distribution.assess(dist_params, choice_value)
+        dist_log_density, _ = distribution.assess(choice_value, *dist_params)
         expected_log_density += dist_log_density
 
     # Compare with model.assess
-    actual_log_density, _ = model.assess(args, choices)
+    actual_log_density, _ = model.assess(choices, *args)
     assert jnp.allclose(actual_log_density, expected_log_density, rtol=tolerance)
     assert jnp.allclose(trace.get_score(), -expected_log_density, rtol=tolerance)
 ```
@@ -170,11 +170,11 @@ def test_manual_density_computation():
 def test_update_weight_invariant():
     """Test that update satisfies the weight invariant."""
     # Create initial trace
-    initial_trace = model.simulate(args)
+    initial_trace = model.simulate(*args)
     old_score = initial_trace.get_score()
 
     # Update with new arguments/constraints
-    new_trace, weight, discarded = model.update(new_args, initial_trace, constraints)
+    new_trace, weight, discarded = model.update(initial_trace, constraints, *new_args)
     new_score = new_trace.get_score()
 
     # Test weight invariant: weight = -new_score + old_score (for simple cases)
@@ -192,13 +192,13 @@ def test_update_weight_invariant():
 def test_regenerate_selective_resampling():
     """Test that regenerate only changes selected addresses."""
     # Create initial trace
-    initial_trace = model.simulate(args)
+    initial_trace = model.simulate(*args)
     old_choices = initial_trace.get_choices()
     old_score = initial_trace.get_score()
 
     # Regenerate subset of choices
     selection = sel("x") | sel("y")  # Select specific addresses
-    new_trace, weight, discarded = model.regenerate(args, initial_trace, selection)
+    new_trace, weight, discarded = model.regenerate(initial_trace, selection, *args)
     new_choices = new_trace.get_choices()
     new_score = new_trace.get_score()
 
@@ -225,7 +225,7 @@ def test_generate_with_constraints():
     constraints = {"x": 1.5, "y": 2.0}
 
     # Generate with constraints
-    trace, weight = model.generate(args, constraints)
+    trace, weight = model.generate(constraints, *args)
     choices = trace.get_choices()
 
     # Verify constraints are satisfied
@@ -234,7 +234,7 @@ def test_generate_with_constraints():
 
     # Verify weight computation (importance weight)
     # For fully constrained case: weight = log P(choices; args)
-    expected_density, _ = model.assess(args, choices)
+    expected_density, _ = model.assess(choices, *args)
     # Weight should account for constraint satisfaction
     assert jnp.isfinite(weight)
     assert jnp.isfinite(expected_density)
@@ -256,7 +256,7 @@ def test_scan_with_const_pattern():
     args = (const(4), init_carry, xs)
 
     # Test simulate with seed transformation
-    trace = seed(scan_model.simulate)(key, args)
+    trace = seed(scan_model.simulate)(key, *args)
     choices = trace.get_choices()
 
     # Validate addressing structure
@@ -264,7 +264,7 @@ def test_scan_with_const_pattern():
     assert "sample" in choices["scan"]  # From step_fn
 
     # Test simulate/assess consistency
-    assess_density, assess_retval = scan_model.assess(args, choices)
+    assess_density, assess_retval = scan_model.assess(choices, *args)
     assert jnp.allclose(trace.get_score(), -assess_density, rtol=tolerance)
 ```
 
@@ -290,7 +290,7 @@ def test_selection_combinations():
     assert empty_selection.match("x")[0] is False
 
     # Test in regenerate context
-    new_trace, weight, discarded = model.regenerate(args, trace, or_selection)
+    new_trace, weight, discarded = model.regenerate(trace, or_selection, *args)
     assert "x" in discarded or "y" in discarded  # At least one regenerated
 ```
 
@@ -319,15 +319,15 @@ def test_invalid_inputs():
     """Test that invalid inputs raise appropriate errors."""
     # Test invalid choice maps
     with pytest.raises(KeyError):
-        model.assess(args, invalid_choices)
+        model.assess(invalid_choices, *args)
 
     # Test invalid arguments
     with pytest.raises((ValueError, TypeError)):
-        model.simulate(invalid_args)
+        model.simulate(*invalid_args)
 
     # Test beartype violations
     with pytest.raises(TypeError):
-        model.assess(args, wrong_type_choices)
+        model.assess(wrong_type_choices, *args)
 ```
 
 ## Critical Testing Requirements

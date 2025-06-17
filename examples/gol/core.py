@@ -241,10 +241,12 @@ class GibbsSampler(Pytree):
                     @ "init"
                 )
 
-            init_q_trace = proposal.simulate(())
+            init_q_trace = proposal.simulate()
             p_trace, _ = generate_state_pair.generate(
-                (n_x, n_y, p_flip),
                 {**init_q_trace.get_choices(), **step},
+                n_x,
+                n_y,
+                p_flip,
             )
             return GibbsSamplerState(p_trace)
 
@@ -269,12 +271,11 @@ class GibbsSampler(Pytree):
             p_flip,
         )
         new_trace, _, _ = current_state.inferred_trace.update(
+            current_state.inferred_trace,
             {"init": new_state},
-            (
-                self.target_image.shape[0],
-                self.target_image.shape[1],
-                self.p_flip,
-            ),
+            self.target_image.shape[0],
+            self.target_image.shape[1],
+            self.p_flip,
         )
         return GibbsSamplerState(new_trace)
 

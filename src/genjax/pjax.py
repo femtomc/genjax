@@ -1415,7 +1415,7 @@ def seed(
         >>>
         >>> seeded_model = seed(model.simulate)
         >>> key = jrand.key(0)
-        >>> trace = seeded_model(key, ())
+        >>> trace = seeded_model(key)
     """
 
     @wraps(f)

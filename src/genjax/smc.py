@@ -144,7 +144,7 @@ def default_importance_sampling(
         """Single importance sampling step using target's default proposal."""
         # Use target's generate method with constraints
         # This will use the target's internal proposal to fill in missing choices
-        target_trace, log_weight = target_gf.generate(target_args, constraints)
+        target_trace, log_weight = target_gf.generate(constraints, *target_args)
         return target_trace, log_weight
 
     # Vectorize the single importance sampling step
@@ -185,7 +185,7 @@ def _single_importance_sample(
         Tuple of (target_trace, log_weight)
     """
     # Sample from proposal using simulate
-    proposal_trace = proposal_gf.simulate(proposal_args)
+    proposal_trace = proposal_gf.simulate(*proposal_args)
     proposal_choices = proposal_trace.get_choices()
 
     # Get proposal score: log(1/P_proposal)
@@ -195,7 +195,7 @@ def _single_importance_sample(
     merged_choices = target_gf.merge(proposal_choices, constraints)
 
     # Generate from target using merged choices
-    target_trace, target_weight = target_gf.generate(target_args, merged_choices)
+    target_trace, target_weight = target_gf.generate(merged_choices, *target_args)
 
     # Compute importance weight: P/Q
     # target_weight is the weight from generate (density of model at merged choices)
