@@ -1517,17 +1517,37 @@ class GFI(Generic[X, R], Pytree):
     implement. It provides methods for simulation, assessment, generation,
     updating, and regeneration of probabilistic computations.
 
+    Mathematical Foundation:
+    A generative function bundles three mathematical objects:
+    1. Measure kernel P(dx; args) - the probability distribution over choices
+    2. Return value function f(x, args) -> R - deterministic computation from choices
+    3. Internal proposal family Q(dx; args, context) - for efficient inference
+
+    The GFI methods provide access to these mathematical objects and enable:
+    - Forward sampling (simulate)
+    - Density evaluation (assess)
+    - Constrained generation (generate)
+    - Incremental updates (update, regenerate)
+
+    All density computations are in log space for numerical stability.
+    Weights from generate/update/regenerate enable importance sampling and MCMC.
+
     Type Parameters:
-        X: The type of the random choices.
+        X: The type of the random choices (choice map).
         R: The type of the return value.
 
-    Methods:
-        simulate: Sample an execution trace.
-        assess: Compute log density of choices.
-        generate: Generate trace with partial constraints.
-        update: Update trace with new arguments/constraints.
-        regenerate: Regenerate selected parts of trace.
-        merge: Merge two choices.
+    Core Methods:
+        simulate: Sample (choices, retval) ~ P(·; args)
+        assess: Compute log P(choices; args)
+        generate: Sample with constraints, return importance weight
+        update: Update trace arguments/choices, return weight ratio
+        regenerate: Resample selected choices, return weight ratio
+
+    Additional Methods:
+        merge: Combine choice maps (for compositional functions)
+        log_density: Convenience method for assess that sums log densities
+        vmap/repeat: Vectorization combinators
+        cond: Conditional execution combinator
     """
 
     def __call__(self, *args) -> "Thunk[X, R] | R":
@@ -1546,6 +1566,26 @@ class GFI(Generic[X, R], Pytree):
         self,
         args,
     ) -> Trace[X, R]:
+        """Sample an execution trace from the generative function.
+
+        Mathematical specification:
+        - Samples (choices, retval) ~ P(·; args) where P is the generative function's measure kernel
+        - Returns trace containing choices, return value, score, and arguments
+
+        The score in the returned trace is log(1/P(choices; args)), i.e., the negative
+        log probability density of the sampled choices.
+
+        Args:
+            args: Arguments to the generative function.
+
+        Returns:
+            A trace containing the sampled choices, return value, score, and arguments.
+
+        Example:
+            >>> trace = model.simulate((mu, sigma))
+            >>> choices = trace.get_choices()
+            >>> score = trace.get_score()  # -log P(choices; mu, sigma)
+        """
         pass
 
     @abstractmethod
@@ -1554,6 +1594,31 @@ class GFI(Generic[X, R], Pytree):
         args,
         x: X | None,
     ) -> tuple[Trace[X, R], Weight]:
+        """Generate a trace with optional constraints on some choices.
+
+        Mathematical specification:
+        - Samples unconstrained choices ~ Q(·; constrained_choices, args)
+        - Computes importance weight: log [P(all_choices; args) / Q(unconstrained_choices; constrained_choices, args)]
+        - When x=None, equivalent to simulate() but returns weight=0
+
+        The weight enables importance sampling and is crucial for inference algorithms.
+        For fully constrained generation, the weight equals the log density.
+
+        Args:
+            args: Arguments to the generative function.
+            x: Optional constraints on subset of choices. If None, equivalent to simulate.
+
+        Returns:
+            A tuple (trace, weight) where:
+            - trace: contains all choices (constrained + sampled) and return value
+            - weight: log [P(all_choices; args) / Q(unconstrained_choices; constrained_choices, args)]
+
+        Example:
+            >>> # Constrain some choices
+            >>> constraints = {"x": 1.5, "y": 2.0}
+            >>> trace, weight = model.generate(args, constraints)
+            >>> # weight accounts for probability of constrained choices
+        """
         pass
 
     @abstractmethod
@@ -1562,6 +1627,26 @@ class GFI(Generic[X, R], Pytree):
         args,
         x: X,
     ) -> tuple[Density, R]:
+        """Compute the log probability density of given choices.
+
+        Mathematical specification:
+        - Computes log P(choices; args) where P is the generative function's measure kernel
+        - Also computes the return value for the given choices
+        - Requires P(choices; args) > 0 (choices must be valid)
+
+        Args:
+            args: Arguments to the generative function.
+            x: The choices to evaluate.
+
+        Returns:
+            A tuple (log_density, retval) where:
+            - log_density: log P(choices; args)
+            - retval: return value computed with the given choices
+
+        Example:
+            >>> log_density, retval = model.assess((mu, sigma), choices)
+            >>> # log_density = log P(choices; mu, sigma)
+        """
         pass
 
     @abstractmethod
@@ -1571,6 +1656,33 @@ class GFI(Generic[X, R], Pytree):
         tr: Trace[X, R],
         x_: X | None,
     ) -> tuple[Tr[X, R], Weight, X | None]:
+        """Update a trace with new arguments and/or choice constraints.
+
+        Mathematical specification:
+        - Transforms trace from (old_args, old_choices) to (new_args, new_choices)
+        - Computes weight difference enabling incremental inference:
+
+        weight = log [P(new_choices; new_args) / Q(new_choices; new_args, old_choices, constraints)]
+               - log [P(old_choices; old_args) / Q(old_choices; old_args)]
+
+        where Q is the internal proposal distribution used for updating.
+
+        Args:
+            args_: New arguments to the generative function.
+            tr: Current trace to update.
+            x_: Optional constraints on choices to enforce during update.
+
+        Returns:
+            A tuple (new_trace, weight, discarded_choices) where:
+            - new_trace: updated trace with new arguments and choices
+            - weight: log probability ratio for the update (enables MCMC, SMC)
+            - discarded_choices: old choice values that were changed
+
+        Example:
+            >>> # Update trace with new arguments
+            >>> new_trace, weight, discarded = model.update(new_args, old_trace, None)
+            >>> # weight = log P(new_choices; new_args) - log P(old_choices; old_args)
+        """
         pass
 
     @abstractmethod
@@ -1580,10 +1692,53 @@ class GFI(Generic[X, R], Pytree):
         tr: Trace[X, R],
         sel: Selection,
     ) -> tuple[Tr[X, R], Weight, X | None]:
+        """Regenerate selected choices in a trace while keeping others fixed.
+
+        Mathematical specification:
+        - Resamples choices at addresses selected by 'sel' from their conditional distribution
+        - Keeps non-selected choices unchanged
+        - Computes weight for the regeneration:
+
+        weight = log P(new_selected_choices | non_selected_choices; args)
+               - log P(old_selected_choices | non_selected_choices; args)
+
+        When sel selects all addresses, regenerate becomes equivalent to simulate.
+        When sel selects no addresses, weight = 0 and trace unchanged.
+
+        Args:
+            args_: Arguments to the generative function.
+            tr: Current trace to regenerate from.
+            sel: Selection specifying which addresses to regenerate.
+
+        Returns:
+            A tuple (new_trace, weight, discarded_choices) where:
+            - new_trace: trace with selected choices resampled
+            - weight: log probability ratio for the regeneration
+            - discarded_choices: old values of the regenerated choices
+
+        Example:
+            >>> # Regenerate choices at addresses "x" and "y"
+            >>> selection = sel("x") | sel("y")
+            >>> new_trace, weight, discarded = model.regenerate(args, trace, selection)
+            >>> # weight accounts for probability change due to regeneration
+        """
         pass
 
     @abstractmethod
     def merge(self, x: X, x_: X) -> X:
+        """Merge two choice maps, with the second taking precedence.
+
+        Used internally for compositional generative functions where choice maps
+        from different components need to be combined. The merge operation resolves
+        conflicts by preferring choices from x_ over x.
+
+        Args:
+            x: First choice map.
+            x_: Second choice map (takes precedence in conflicts).
+
+        Returns:
+            Merged choice map with x_ values overriding x values at conflicting addresses.
+        """
         pass
 
     def vmap(

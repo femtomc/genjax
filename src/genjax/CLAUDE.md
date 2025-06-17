@@ -13,27 +13,75 @@ This file provides detailed guidance on GenJAX concepts and usage patterns for C
 
 **Mathematical Foundation**: Generative functions bundle:
 
-- Measure kernel $P(dx; a \in A)$ over measurable space $X$ (the model distribution)
-- Function $f(x, a \in A) \rightarrow R$ (return value function)
-- Proposal family $Q(dx; a \in A, x' \in X')$ (internal proposals)
+- Measure kernel $P(dx; args)$ over measurable space $X$ (the model distribution)
+- Return value function $f(x, args) \rightarrow R$ (deterministic computation from choices)
+- Internal proposal family $Q(dx; args, context)$ (for efficient inference)
 
-**GFI Methods**:
+**Core GFI Methods** (all densities in log space):
 
 ```python
-# Core interface (defined in src/core.py)
-GFI[X, R].simulate(args: tuple) -> Trace[X, R]                    # Sample execution
-GFI[X, R].assess(args: tuple, x: X) -> tuple[Density, R]          # Evaluate density
-GFI[X, R].generate(args: tuple, x: X_) -> tuple[Trace[X, R], Weight]
-GFI[X, R].update(args: tuple, trace: Trace[X, R], x_: X_) -> tuple[Trace[X, R], Weight, X_]
-GFI[X, R].regenerate(args: tuple, trace: Trace[X, R], s: Sel) -> tuple[Trace[X, R], Weight, X_]
+# Forward sampling
+trace = model.simulate(args)                    # Sample (choices, retval) ~ P(·; args)
+# trace.get_score() = log(1/P(choices; args))   # Negative log probability
 
-# Trace methods
-Trace[X, R].get_retval() -> R         # Return value
-Trace[X, R].get_choices() -> X        # Random choices
-Trace[X, R].get_score() -> Score      # log(1/P(choices))
-Trace[X, R].get_args() -> tuple       # Arguments
-Trace[X, R].get_gen_fn() -> GFI[X, R] # Source function
+# Density evaluation
+log_density, retval = model.assess(args, choices)  # Compute log P(choices; args)
+
+# Constrained generation (importance sampling)
+trace, weight = model.generate(args, constraints)
+# weight = log[P(all_choices; args) / Q(unconstrained; constrained, args)]
+
+# Incremental updates (MCMC, SMC)
+new_trace, weight, discarded = model.update(new_args, trace, constraints)
+# weight = log[P(new_choices; new_args)/Q(new; old, constraints)] - log[P(old_choices; old_args)/Q(old)]
+
+# Selective regeneration
+new_trace, weight, discarded = model.regenerate(args, trace, selection)
+# weight = log P(new_selected | non_selected; args) - log P(old_selected | non_selected; args)
 ```
+
+**Mathematical Properties**:
+- **Importance weights** enable unbiased Monte Carlo estimation
+- **Weight ratios** from update/regenerate enable MCMC acceptance probabilities
+- **Incremental computation** allows efficient inference on large models
+- **Selection interface** enables fine-grained control over which choices to modify
+
+**Trace Interface**:
+```python
+trace.get_retval()     # Return value: R
+trace.get_choices()    # Random choices: X
+trace.get_score()      # Negative log probability: log(1/P(choices))
+trace.get_args()       # Function arguments: tuple
+trace.get_gen_fn()     # Source generative function: GFI[X, R]
+```
+
+### Selection Interface
+
+**Selections** specify which addresses to target for regeneration/update operations:
+
+```python
+from genjax import sel
+
+# Basic selections
+sel("x")                    # Select address "x"
+sel()                       # Select nothing (empty selection)
+Selection(AllSel())         # Select everything
+
+# Combinators
+sel("x") | sel("y")         # OR: select "x" or "y"
+sel("x") & sel("y")         # AND: select "x" and "y" (intersection)
+~sel("x")                   # NOT: select everything except "x" (complement)
+
+# Usage in regenerate
+selection = sel("mu") | sel("sigma")  # Select parameters to resample
+new_trace, weight, discarded = model.regenerate(args, trace, selection)
+```
+
+**Selection Semantics**:
+- `match(addr) -> (bool, subselection)` determines if address is selected
+- Supports hierarchical addressing for nested generative functions
+- Empty selection → no regeneration, weight = 0
+- Full selection → equivalent to `simulate()` from scratch
 
 ## Generative Function Types
 
