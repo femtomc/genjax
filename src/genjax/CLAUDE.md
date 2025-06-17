@@ -231,7 +231,19 @@ JAX transformations make all arguments dynamic, but some GenJAX operations need 
 def inference_fn(T, args):
     model = model_factory(T)  # T must be static!
 
-# ✅ CORRECT - Use closures for static values
+# ✅ CORRECT - Use Const[...] for static values
+from genjax import Const, const
+
+@gen
+def model_with_static_length(length: Const[int], init_carry, xs):
+    scan_gf = Scan(step_fn, length=length.value)  # length.value is static
+    return scan_gf(init_carry, xs) @ "scan"
+
+# Usage with static values
+args = (const(10), init_carry, xs)  # Wrap static value with const()
+trace = seed(model_with_static_length.simulate)(key, args)
+
+# ✅ ALTERNATIVE - Use closures for more complex cases
 T = 5  # Static
 def inference_closure(args):
     model = model_factory(T)  # Captured as static
@@ -239,6 +251,18 @@ def inference_closure(args):
 
 seeded_inference = seed(inference_closure)
 ```
+
+**Const[...] Pattern Benefits**:
+
+- Preserves static values across JAX transformations like `seed(fn)(...)`
+- Enables type-safe static parameters with proper type hints
+- Cleaner API compared to closure-based solutions
+- Works seamlessly with scan lengths, model configurations, etc.
+
+**When to Use Each Pattern**:
+
+- **Const[...]**: For simple static values (numbers, booleans) passed as arguments
+- **Closures**: For complex static objects or when static values don't fit argument patterns
 
 ### Pytree Usage
 
@@ -276,7 +300,7 @@ trace = seeded_model(key, ())
 
 ### Theoretical Foundation
 
-- **Sequential Monte Carlo with Programmable Proposals (SMCP3)**: Lew, A. K., Matheos, G., Zhi-Xuan, T., Ghavamizadeh, M., Russell, N., Cusumano-Towner, M., & Mansinghka, V. K. (2023). Sequential Monte Carlo with programmable proposals. In Proceedings of the 39th Conference on Uncertainty in Artificial Intelligence (UAI 2023). [Paper](https://proceedings.mlr.press/v206/lew23a/lew23a.pdf)
+- **SMCP3: Sequential Monte Carlo with Probabilistic Program Proposals (SMCP3)**: Lew, A. K., Matheos, G., Zhi-Xuan, T., Ghavamizadeh, M., Russell, N., Cusumano-Towner, M., & Mansinghka, V. K. (2023). Sequential Monte Carlo with programmable proposals. In Proceedings of the 39th Conference on Uncertainty in Artificial Intelligence (UAI 2023). [Paper](https://proceedings.mlr.press/v206/lew23a/lew23a.pdf)
 
 ### Gen Julia Implementation
 
