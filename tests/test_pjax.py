@@ -49,7 +49,7 @@ def test_seed_transform_scan_simulate(base_key, standard_tolerance, helpers):
     args = (const(4), init_carry, xs)
 
     # Generate a trace using simulate with seed transformation
-    trace = seed(scan_model.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, *args)
     choices = trace.get_choices()
     scan_score = trace.get_score()
 
@@ -99,7 +99,7 @@ def test_seed_transform_simulate_assess_consistency(
     args = (const(4), init_carry, xs)
 
     # Generate trace with simulate using seed transformation
-    trace = seed(scan_model.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, *args)
     choices = trace.get_choices()
     simulate_score = trace.get_score()
     simulate_retval = trace.get_retval()
@@ -108,7 +108,7 @@ def test_seed_transform_simulate_assess_consistency(
     helpers.assert_valid_trace(trace)
 
     # Assess the same choices (without seed transformation for assess)
-    assess_density, assess_retval = scan_model.assess(args, choices)
+    assess_density, assess_retval = scan_model.assess(choices, *args)
     helpers.assert_valid_density(assess_density)
 
     # simulate_score should be -assess_density (score is log(1/density))
@@ -170,7 +170,7 @@ def test_seed_transform_different_lengths(
     # Use different key for each length to ensure varied test conditions
     key_list = jrand.split(base_key, 2)
     test_key = key_list[0] if length % 2 == 0 else key_list[1]
-    trace = seed(scan_model.simulate)(test_key, args)
+    trace = seed(scan_model.simulate)(test_key, *args)
     choices = trace.get_choices()
 
     # Validate trace structure
@@ -347,7 +347,7 @@ def test_modular_vmap_vs_manual_vectorization(standard_tolerance):
     scales = jnp.array([1.0, 2.0, 0.5])
     manual_traces = []
     for scale in scales:
-        trace = test_model.simulate((scale,))
+        trace = test_model.simulate(scale)
         manual_traces.append(trace)
 
     # Extract manual results
@@ -433,7 +433,7 @@ def test_pjax_error_without_seed_transformation():
         return x
 
     # This should work fine (no JAX control flow)
-    trace = model_requiring_seed.simulate(())
+    trace = model_requiring_seed.simulate()
     assert jnp.isfinite(trace.get_score())
 
     # However, certain JAX transformations may require seed
@@ -464,7 +464,7 @@ def test_seed_with_scan_update_operations(base_key, standard_tolerance, helpers)
     args = (init_carry, xs)
 
     # Create initial trace with seed
-    initial_trace = seed(scan_gf.simulate)(base_key, args)
+    initial_trace = seed(scan_gf.simulate)(base_key, *args)
     old_score = initial_trace.get_score()
     old_choices = initial_trace.get_choices()
     helpers.assert_valid_trace(initial_trace)

@@ -57,7 +57,7 @@ def genjax_timing(
     data = {"obs": jnp.ones(num_obs)}
 
     def importance_(data):
-        _, w = beta_ber.generate((), data)
+        _, w = beta_ber.generate(data)
         return w
 
     imp_jit = jax.jit(

@@ -505,7 +505,7 @@ def particle_filter_step(particles, weights, observation, world, key):
         # The Vmap combinator expects choices in the structure: {"measurements": {"distance": [array of distances]}}
         choices = {"measurements": {"distance": observation}}
         try:
-            log_weight, _ = sensor_model.assess((pose, world), choices)
+            log_weight, _ = sensor_model.assess(choices, pose, world)
             # log_weight should now be a scalar (joint log density from Vmap.assess)
             weight = jnp.exp(log_weight)
             # Avoid numerical issues using JAX conditionals
@@ -542,7 +542,7 @@ def initialize_particles(n_particles, world, key, initial_pose=None):
             }
 
             # Use generate to create particles constrained around initial pose
-            trace, weight = initial_model.generate((world,), choices)
+            trace, weight = initial_model.generate(choices, world)
             particles.append(trace.get_retval())
 
         print(f"Initialized {len(particles)} particles around initial pose")

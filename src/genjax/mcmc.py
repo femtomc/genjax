@@ -52,7 +52,14 @@ def metropolis_hastings_step(
     args = current_trace.get_args()
 
     # Regenerate selected addresses - weight is log acceptance probability
-    new_trace, log_weight, _ = target_gf.regenerate(args, current_trace, selection)
+    if isinstance(args, tuple) and len(args) == 2 and isinstance(args[1], dict):
+        # Handle (args, kwargs) tuple format
+        new_trace, log_weight, _ = target_gf.regenerate(
+            current_trace, selection, *args[0], **args[1]
+        )
+    else:
+        # Handle legacy args format
+        new_trace, log_weight, _ = target_gf.regenerate(current_trace, selection, args)
 
     # MH acceptance step
     log_alpha = jnp.minimum(0.0, log_weight)  # min(1, exp(log_weight))

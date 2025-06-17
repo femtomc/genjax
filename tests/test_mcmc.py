@@ -173,7 +173,7 @@ def exact_normal_normal_posterior_moments(
 @pytest.mark.fast
 def test_mcmc_result_creation(simple_normal_model, mcmc_steps_small, mcmc_key, helpers):
     """Test MCMCResult creation and field access."""
-    initial_trace = simple_normal_model.simulate((0.0, 1.0))
+    initial_trace = simple_normal_model.simulate(0.0, 1.0)
     selection = sel("x")
 
     # Apply seed transformation to eliminate PJAX primitives
@@ -204,7 +204,7 @@ def test_mh_beta_bernoulli_obs_true(
     """Test MH on Beta-Bernoulli with obs=True."""
     # Create constrained trace
     constraints = {"obs": True}
-    initial_trace, _ = beta_bernoulli_model.generate((), constraints)
+    initial_trace, _ = beta_bernoulli_model.generate(constraints)
 
     # Run MCMC
     selection = sel("p")
@@ -253,7 +253,7 @@ def test_mh_beta_bernoulli_obs_false(
     """Test MH on Beta-Bernoulli with obs=False."""
     # Create constrained trace
     constraints = {"obs": False}
-    initial_trace, _ = beta_bernoulli_model.generate((), constraints)
+    initial_trace, _ = beta_bernoulli_model.generate(constraints)
 
     # Run MCMC
     selection = sel("p")
@@ -305,7 +305,7 @@ def test_mh_hierarchical_normal(
 
     # Create constrained trace
     constraints = {"y": y_observed}
-    initial_trace, _ = hierarchical_normal_model.generate((0.0, 1.0, 0.5), constraints)
+    initial_trace, _ = hierarchical_normal_model.generate(constraints, 0.0, 1.0, 0.5)
 
     # Run MCMC
     selection = sel("mu")
@@ -360,7 +360,7 @@ def test_mh_bivariate_normal_marginal(
 
     # Create constrained trace
     constraints = {"y": y_observed}
-    initial_trace, _ = bivariate_normal_model.generate((), constraints)
+    initial_trace, _ = bivariate_normal_model.generate(constraints)
 
     # Run MCMC to sample x | y
     selection = sel("x")
@@ -414,7 +414,7 @@ def test_mh_bivariate_normal_marginal(
 @pytest.mark.skip(reason="Failing acceptance rate test - needs investigation")
 def test_acceptance_rates(gamma_exponential_model, mcmc_steps_medium, mcmc_key):
     """Test that acceptance rates are reasonable."""
-    initial_trace = gamma_exponential_model.simulate(())
+    initial_trace = gamma_exponential_model.simulate()
     selection = sel("x")
 
     seeded_mh = seed(metropolis_hastings)
@@ -436,7 +436,7 @@ def test_chain_stationarity(
     simple_normal_model, mcmc_steps_medium, mcmc_key, convergence_tolerance
 ):
     """Test basic stationarity of MCMC chains."""
-    initial_trace = simple_normal_model.simulate((0.0, 1.0))
+    initial_trace = simple_normal_model.simulate(0.0, 1.0)
     selection = sel("x")
 
     seeded_mh = seed(metropolis_hastings)
@@ -469,7 +469,7 @@ def test_exponential_moments(
 ):
     """Test MCMC samples match exponential distribution moments."""
     rate = 2.0
-    initial_trace = gamma_exponential_model.simulate(())
+    initial_trace = gamma_exponential_model.simulate()
     selection = sel("x")
 
     # Apply seed transformation
@@ -514,7 +514,7 @@ def test_exponential_moments(
 def test_mcmc_deterministic_with_seed(simple_normal_model, mcmc_steps_small, seed_val):
     """Test that MCMC is deterministic given the same seed."""
     key = jrand.key(seed_val)
-    initial_trace = simple_normal_model.simulate((0.0, 1.0))
+    initial_trace = simple_normal_model.simulate(0.0, 1.0)
     selection = sel("x")
 
     seeded_mh = seed(metropolis_hastings)
@@ -539,7 +539,7 @@ def test_mcmc_deterministic_with_seed(simple_normal_model, mcmc_steps_small, see
 @pytest.mark.parametrize("n_steps_val", [10, 50, 100])
 def test_mcmc_result_structure(simple_normal_model, base_key, n_steps_val, helpers):
     """Test MCMC result structure with different step counts."""
-    initial_trace = simple_normal_model.simulate((0.0, 1.0))
+    initial_trace = simple_normal_model.simulate(0.0, 1.0)
     selection = sel("x")
     n_steps = Const(n_steps_val)
 

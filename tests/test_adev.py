@@ -171,7 +171,7 @@ class TestADEVGradientComputation:
 
         @expectation
         def elbo(data, theta):
-            tr = variational_family.simulate((data, theta))
+            tr = variational_family.simulate(data, theta)
             q_score = tr.get_score()
             p = target_model.log_density((), {**data, **tr.get_choices()})
             return p + q_score
@@ -201,7 +201,7 @@ class TestADEVGradientComputation:
 
         @expectation
         def elbo(theta):
-            tr = variational_family.simulate((theta,))
+            tr = variational_family.simulate(theta)
             q_score = tr.get_score()
             p = target_model.log_density((), tr.get_choices())
             return p + q_score
@@ -221,7 +221,7 @@ class TestADEVGradientComputation:
 
         @expectation
         def objective(theta):
-            tr = mixed_model.simulate((theta,))
+            tr = mixed_model.simulate(theta)
             return jnp.sum(tr.get_retval())
 
         theta = jnp.array([0.5, -0.3])

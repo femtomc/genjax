@@ -31,7 +31,7 @@ def visualize_onepoint_trace(trace, ylim=(-1.5, 1.5)):
 
 def save_onepoint_trace_viz():
     print("Making and saving onepoint trace visualization.")
-    trace = onepoint_curve.simulate((0.0,))
+    trace = onepoint_curve.simulate(0.0)
     fig = visualize_onepoint_trace(trace)
     fig.savefig("examples/curvefit/figs/010_onepoint_trace.pdf")
 
@@ -75,7 +75,7 @@ def visualize_multipoint_trace(
 def save_multipoint_trace_viz():
     print("Making and saving multipoint trace visualization.")
     npoint_curve = npoint_curve_factory(10)
-    trace = npoint_curve.simulate(())
+    trace = npoint_curve.simulate()
     fig = visualize_multipoint_trace(trace, yrange=(-1.5, 1.5))
     fig.savefig("examples/curvefit/figs/020_multipoint_trace.pdf")
 
@@ -93,7 +93,7 @@ def save_four_multipoint_trace_vizs():
     print("Making and saving visualizations of traces generated from vmap(simulate).")
     npoint_curve = npoint_curve_factory(10)
     traces = vmap(
-        lambda: npoint_curve.simulate(()),
+        lambda: npoint_curve.simulate(),
         axis_size=4,
         in_axes=None,
     )()

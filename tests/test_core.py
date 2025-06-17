@@ -33,7 +33,7 @@ def test_fn_simulate_vs_manual_density(
 ):
     """Test that @gen Fn.simulate produces correct densities compared to manual computation."""
     # Generate trace
-    trace = bivariate_normal_model.simulate(())
+    trace = bivariate_normal_model.simulate()
     choices = trace.get_choices()
     fn_score = trace.get_score()
 
@@ -45,8 +45,8 @@ def test_fn_simulate_vs_manual_density(
     y_choice = choices["y"]
 
     # Compute densities using Distribution.assess
-    x_log_density, _ = normal.assess((0.0, 1.0), x_choice)
-    y_log_density, _ = normal.assess((x_choice, 0.5), y_choice)
+    x_log_density, _ = normal.assess(x_choice, 0.0, 1.0)
+    y_log_density, _ = normal.assess(y_choice, x_choice, 0.5)
 
     manual_total_log_density = x_log_density + y_log_density
     expected_fn_score = -manual_total_log_density
@@ -89,16 +89,16 @@ def test_fn_assess_vs_manual_density(standard_tolerance, helpers):
     choices = {"x": 0.8, "y": 1.2}
 
     # Assess using Fn
-    fn_density, fn_retval = exponential_fn.assess(args, choices)
+    fn_density, fn_retval = exponential_fn.assess(choices, *args)
 
     # Manual computation
     x_val = choices["x"]
     y_val = choices["y"]
 
     # Compute densities using Distribution.assess
-    x_log_density, _ = exponential.assess((rate1,), x_val)
+    x_log_density, _ = exponential.assess(x_val, rate1)
     y_rate = rate2 * x_val
-    y_log_density, _ = exponential.assess((y_rate,), y_val)
+    y_log_density, _ = exponential.assess(y_val, y_rate)
 
     manual_total_log_density = x_log_density + y_log_density
     manual_retval = x_val * y_val
@@ -134,7 +134,7 @@ def test_fn_simulate_assess_consistency(standard_tolerance, helpers):
     args = (2.0, 0.8)
 
     # Generate trace
-    trace = complex_fn.simulate(args)
+    trace = complex_fn.simulate(*args)
     choices = trace.get_choices()
     simulate_score = trace.get_score()
     simulate_retval = trace.get_retval()
@@ -143,7 +143,7 @@ def test_fn_simulate_assess_consistency(standard_tolerance, helpers):
     helpers.assert_valid_trace(trace)
 
     # Assess same choices
-    assess_density, assess_retval = complex_fn.assess(args, choices)
+    assess_density, assess_retval = complex_fn.assess(choices, *args)
     helpers.assert_valid_density(assess_density)
 
     # Should be consistent
@@ -194,7 +194,7 @@ def test_fn_nested_addressing(standard_tolerance, helpers):
         return x + y + z
 
     # Generate trace
-    trace = outer_fn.simulate(())
+    trace = outer_fn.simulate()
     choices = trace.get_choices()
     fn_score = trace.get_score()
 
@@ -208,14 +208,14 @@ def test_fn_nested_addressing(standard_tolerance, helpers):
 
     # Compute densities using Distribution.assess
     # x ~ normal(1.0, 0.5)
-    x_log_density, _ = normal.assess((1.0, 0.5), x_choice)
+    x_log_density, _ = normal.assess(x_choice, 1.0, 0.5)
 
     # y ~ normal(0.0, abs(x)) (from inner function)
     y_scale = jnp.abs(x_choice)
-    y_log_density, _ = normal.assess((0.0, y_scale), y_choice)
+    y_log_density, _ = normal.assess(y_choice, 0.0, y_scale)
 
     # z ~ normal(y, 0.2)
-    z_log_density, _ = normal.assess((y_choice, 0.2), z_choice)
+    z_log_density, _ = normal.assess(z_choice, y_choice, 0.2)
 
     manual_total_log_density = x_log_density + y_log_density + z_log_density
     expected_fn_score = -manual_total_log_density
@@ -263,13 +263,13 @@ def test_fn_with_deterministic_computation(standard_tolerance, helpers):
     args = (0.5,)
 
     # Test consistency
-    trace = mixed_fn.simulate(args)
+    trace = mixed_fn.simulate(*args)
     choices = trace.get_choices()
 
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
-    assess_density, assess_retval = mixed_fn.assess(args, choices)
+    assess_density, assess_retval = mixed_fn.assess(choices, *args)
     helpers.assert_valid_density(assess_density)
     simulate_score = trace.get_score()
 
@@ -302,7 +302,7 @@ def test_fn_empty_program(standard_tolerance, helpers):
     args = (2.0, 3.0)
 
     # Should work and have zero score (no probabilistic choices)
-    trace = deterministic_fn.simulate(args)
+    trace = deterministic_fn.simulate(*args)
     choices = trace.get_choices()
 
     assert trace.get_score() == 0.0, "Deterministic function should have zero score"
@@ -318,7 +318,7 @@ def test_fn_empty_program(standard_tolerance, helpers):
     )
 
     # Assess should also work
-    density, retval = deterministic_fn.assess(args, {})
+    density, retval = deterministic_fn.assess({}, *args)
     assert density == 0.0, "Deterministic assess should have zero density"
     helpers.assert_finite_and_close(
         retval,
@@ -360,14 +360,14 @@ def test_fn_conditional_sampling(standard_tolerance, helpers):
     args_low = (1.0,)  # threshold high, likely to take second branch
 
     for args in [args_high, args_low]:
-        trace = conditional_fn.simulate(args)
+        trace = conditional_fn.simulate(*args)
         choices = trace.get_choices()
 
         # Validate trace structure
         helpers.assert_valid_trace(trace)
 
         # Should be consistent between simulate and assess
-        assess_density, assess_retval = conditional_fn.assess(args, choices)
+        assess_density, assess_retval = conditional_fn.assess(choices, *args)
         helpers.assert_valid_density(assess_density)
         simulate_score = trace.get_score()
 
@@ -416,7 +416,7 @@ def test_scan_simulate_vs_manual_density(base_key, standard_tolerance, helpers):
     args = (const(4), init_carry, xs)
 
     # Generate a trace using simulate with seed transformation
-    trace = seed(scan_model.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, *args)
     choices = trace.get_choices()
     scan_score = trace.get_score()  # This is log(1/density), so negative log density
 
@@ -431,7 +431,7 @@ def test_scan_simulate_vs_manual_density(base_key, standard_tolerance, helpers):
         output = new_carry * 2.0
 
         # Compute log density using Distribution.assess
-        log_density, _ = normal.assess((0.0, 1.0), noise)
+        log_density, _ = normal.assess(noise, 0.0, 1.0)
         return new_carry, (output, log_density)
 
     # Run manual scan with the same choices
@@ -496,7 +496,7 @@ def test_scan_assess_vs_manual_density(standard_tolerance, helpers):
     choices = {"scan": {"exp_sample": jnp.array([0.8, 1.2, 0.4])}}
 
     # Assess using Scan
-    scan_density, scan_retval = scan_model.assess(args, choices)
+    scan_density, scan_retval = scan_model.assess(choices, *args)
     helpers.assert_valid_density(scan_density)
 
     # Manually compute density
@@ -508,7 +508,7 @@ def test_scan_assess_vs_manual_density(standard_tolerance, helpers):
         output = sample + input_val
 
         # Compute log density using Distribution.assess
-        log_density, _ = exponential.assess((rate,), sample)
+        log_density, _ = exponential.assess(sample, rate)
         return new_carry, (output, log_density)
 
     # Run manual assessment
@@ -577,7 +577,7 @@ def test_scan_simulate_assess_consistency(base_key, standard_tolerance, helpers)
     args = (const(4), init_carry, xs)
 
     # Generate trace with simulate using seed transformation
-    trace = seed(scan_model.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, *args)
     choices = trace.get_choices()
     simulate_score = trace.get_score()
     simulate_retval = trace.get_retval()
@@ -586,7 +586,7 @@ def test_scan_simulate_assess_consistency(base_key, standard_tolerance, helpers)
     helpers.assert_valid_trace(trace)
 
     # Assess the same choices
-    assess_density, assess_retval = scan_model.assess(args, choices)
+    assess_density, assess_retval = scan_model.assess(choices, *args)
     helpers.assert_valid_density(assess_density)
 
     # simulate_score should be -assess_density (score is log(1/density))
@@ -642,7 +642,7 @@ def test_empty_scan(helpers):
     args = (const(0), init_carry, xs)
 
     # Should work and return initial carry with empty outputs
-    trace = scan_model.simulate(args)
+    trace = scan_model.simulate(*args)
     final_carry, outputs = trace.get_retval()
 
     # Validate trace structure
@@ -678,19 +678,19 @@ def test_single_step_scan(base_key, standard_tolerance, helpers):
     args = (const(1), init_carry, xs)
 
     # Test simulate with seed transformation
-    trace = seed(scan_model.simulate)(base_key, args)
+    trace = seed(scan_model.simulate)(base_key, *args)
     choices = trace.get_choices()
 
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
     # Test assess with same choice
-    density, retval = scan_model.assess(args, choices)
+    density, retval = scan_model.assess(choices, *args)
     helpers.assert_valid_density(density)
 
     # Compute expected density using Distribution.assess
     sample = choices["scan"]["sample"][0]
-    expected_log_density, _ = normal.assess((1.5, 0.5), sample)
+    expected_log_density, _ = normal.assess(sample, 1.5, 0.5)
 
     helpers.assert_finite_and_close(
         density,
@@ -726,13 +726,13 @@ def test_scan_with_different_lengths(length, base_key, standard_tolerance, helpe
     # Use different key for each length to ensure varied test conditions
     key_list = jrand.split(base_key, 2)
     test_key = key_list[0] if length % 2 == 0 else key_list[1]
-    trace = seed(scan_model.simulate)(test_key, args)
+    trace = seed(scan_model.simulate)(test_key, *args)
     choices = trace.get_choices()
 
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
-    assess_density, assess_retval = scan_model.assess(args, choices)
+    assess_density, assess_retval = scan_model.assess(choices, *args)
     helpers.assert_valid_density(assess_density)
     simulate_score = trace.get_score()
 
@@ -765,11 +765,11 @@ class TestGenerateConsistency:
         sample_value = 1.5
 
         # Test generate with full sample
-        trace, weight = normal.generate(args, sample_value)
+        trace, weight = normal.generate(sample_value, *args)
         helpers.assert_valid_trace(trace)
 
         # Test assess with same sample
-        density, retval = normal.assess(args, sample_value)
+        density, retval = normal.assess(sample_value, *args)
         helpers.assert_valid_density(density)
 
         # For distributions: generate weight should equal assess density
@@ -816,11 +816,11 @@ class TestGenerateConsistency:
         args = ()
 
         # Test generate with full sample
-        trace, weight = simple_model.generate(args, full_sample)
+        trace, weight = simple_model.generate(full_sample, *args)
         helpers.assert_valid_trace(trace)
 
         # Test assess with same sample
-        density, retval = simple_model.assess(args, full_sample)
+        density, retval = simple_model.assess(full_sample, *args)
         helpers.assert_valid_density(density)
 
         # Generate weight should equal assess density for full samples
@@ -872,11 +872,11 @@ class TestGenerateConsistency:
         full_sample = {"mu": 1.5, "y": 2.0}
 
         # Test generate with full sample
-        trace, weight = hierarchical_model.generate(args, full_sample)
+        trace, weight = hierarchical_model.generate(full_sample, *args)
         helpers.assert_valid_trace(trace)
 
         # Test assess with same sample
-        density, retval = hierarchical_model.assess(args, full_sample)
+        density, retval = hierarchical_model.assess(full_sample, *args)
         helpers.assert_valid_density(density)
 
         # Generate weight should equal assess density
@@ -920,10 +920,10 @@ class TestGenerateConsistency:
         args = ()
 
         # Test generate with full sample
-        trace, weight = scan_model.generate(args, full_sample)
+        trace, weight = scan_model.generate(full_sample, *args)
 
         # Test assess with same sample
-        density, retval = scan_model.assess(args, full_sample)
+        density, retval = scan_model.assess(full_sample, *args)
 
         # Generate weight should equal assess density
         assert jnp.allclose(weight, density, rtol=1e-6), (
@@ -935,7 +935,7 @@ class TestGenerateConsistency:
         args = (0.0, 1.0)  # mu=0.0, sigma=1.0
 
         # Test generate with None (simulate)
-        trace, weight = normal.generate(args, None)
+        trace, weight = normal.generate(None, *args)
 
         # Weight should be 0.0 when no constraints are provided (pure simulation)
         assert jnp.allclose(weight, 0.0, rtol=1e-10), (
@@ -944,7 +944,7 @@ class TestGenerateConsistency:
 
         # Score should be negative log density
         sample = trace.get_choices()
-        density, _ = normal.assess(args, sample)
+        density, _ = normal.assess(sample, *args)
         assert jnp.allclose(trace.get_score(), -density, rtol=1e-10)
 
     def test_fn_generate_with_partial_sample(self):
@@ -961,7 +961,7 @@ class TestGenerateConsistency:
         args = ()
 
         # Generate should fill in missing choices and return appropriate weight
-        trace, weight = simple_model.generate(args, partial_sample)
+        trace, weight = simple_model.generate(partial_sample, *args)
         choices = trace.get_choices()
 
         # Should have both x and y in choices
@@ -972,7 +972,7 @@ class TestGenerateConsistency:
         # Weight should be the density of the constrained variable (y)
         # given the generated value of x
         x_val = choices["x"]
-        y_density, _ = normal.assess((x_val, 0.5), 2.0)
+        y_density, _ = normal.assess(2.0, x_val, 0.5)
         assert jnp.allclose(weight, y_density, rtol=1e-6), (
             f"Weight {weight} should equal y density {y_density}"
         )
@@ -1102,7 +1102,7 @@ class TestDistributionClass:
 
         # Test simulate
         args = (0.0, 1.0)
-        trace = normal_dist.simulate(args)
+        trace = normal_dist.simulate(*args)
 
         assert hasattr(trace, "get_choices")
         assert hasattr(trace, "get_score")
@@ -1110,7 +1110,7 @@ class TestDistributionClass:
 
         # Test assess
         test_value = 1.5
-        density, retval = normal_dist.assess(args, test_value)
+        density, retval = normal_dist.assess(test_value, *args)
         assert jnp.isfinite(density)
         assert retval == test_value
 
@@ -1136,13 +1136,13 @@ class TestDistributionClass:
         args = (2.0,)
 
         # Test generate with None (should simulate)
-        trace, weight = exp_dist.generate(args, None)
+        trace, weight = exp_dist.generate(None, *args)
         assert jnp.allclose(weight, 0.0)  # Weight should be 0 for unconstrained
         assert trace.get_score() < 0  # Score should be negative log prob
 
         # Test generate with fixed value
         test_value = 0.5
-        trace, weight = exp_dist.generate(args, test_value)
+        trace, weight = exp_dist.generate(test_value, *args)
         expected_density = logpdf_exponential(test_value, *args)
         assert jnp.allclose(weight, expected_density)
         assert jnp.allclose(trace.get_score(), -expected_density)
@@ -1162,11 +1162,11 @@ class TestDistributionClass:
 
         # Create initial trace
         args = (1.0,)
-        initial_trace = delta_dist.simulate(args)
+        initial_trace = delta_dist.simulate(*args)
 
         # Test update with new args, same choice
         new_args = (2.0,)
-        new_trace, weight, discard = delta_dist.update(new_args, initial_trace, None)
+        new_trace, weight, discard = delta_dist.update(initial_trace, None, *new_args)
 
         assert jnp.allclose(new_trace.get_choices(), initial_trace.get_choices())
         assert jnp.allclose(discard, initial_trace.get_retval())
@@ -1174,7 +1174,7 @@ class TestDistributionClass:
         # Test update with new choice
         new_choice = jnp.array(3.0)
         new_trace, weight, discard = delta_dist.update(
-            new_args, initial_trace, new_choice
+            initial_trace, new_choice, *new_args
         )
         assert jnp.allclose(new_trace.get_choices(), new_choice)
 
@@ -1190,14 +1190,14 @@ class TestDistributionClass:
 
         # Test basic operations
         args = (0.0, 1.0)
-        trace = normal_tfp.simulate(args)
+        trace = normal_tfp.simulate(*args)
 
         assert hasattr(trace, "get_choices")
         assert jnp.isfinite(trace.get_score())
 
         # Test assess
         test_value = 0.5
-        density, retval = normal_tfp.assess(args, test_value)
+        density, retval = normal_tfp.assess(test_value, *args)
         assert jnp.isfinite(density)
         assert retval == test_value
 
@@ -1271,7 +1271,7 @@ class TestTraceAndSelectors:
         from genjax.distributions import normal
 
         # Create a trace using normal distribution
-        trace = normal.simulate((0.0, 1.0))
+        trace = normal.simulate(0.0, 1.0)
 
         # Test accessor functions work
         choices = get_choices(trace)
@@ -1286,7 +1286,7 @@ class TestTraceAndSelectors:
         assert jnp.allclose(trace.get_choices(), choices)
         assert jnp.allclose(trace.get_score(), score)
         assert jnp.allclose(trace.get_retval(), retval)
-        assert trace.get_args() == (0.0, 1.0)
+        assert trace.get_args() == ((0.0, 1.0), {})
         assert trace.get_gen_fn() == normal
 
 
@@ -1308,7 +1308,7 @@ class TestErrorHandlingAndEdgeCases:
         from genjax.distributions import normal
 
         # Test basic functionality without complex APIs
-        trace = normal.simulate((0.0, 1.0))
+        trace = normal.simulate(0.0, 1.0)
         choices = get_choices(trace)
         assert jnp.isfinite(choices)
 
@@ -1326,7 +1326,7 @@ class TestErrorHandlingAndEdgeCases:
         dist = Distribution(sample_func, logpdf_func)
 
         # Test with empty args
-        trace = dist.simulate(())
+        trace = dist.simulate()
         assert jnp.allclose(trace.get_retval(), jnp.array(1.0))
 
 
@@ -1341,13 +1341,13 @@ class TestUpdateAndRegenerate:
         args = (1.0, 0.5)  # mu=1.0, sigma=0.5
 
         # Create initial trace
-        initial_trace = normal.simulate(args)
+        initial_trace = normal.simulate(*args)
         old_score = initial_trace.get_score()
         helpers.assert_valid_trace(initial_trace)
 
         # Update with new choice
         new_choice = 2.5
-        new_trace, weight, discarded = normal.update(args, initial_trace, new_choice)
+        new_trace, weight, discarded = normal.update(initial_trace, new_choice, *args)
         new_score = new_trace.get_score()
 
         # Test weight invariant: weight = -(new_score) + old_score
@@ -1378,12 +1378,12 @@ class TestUpdateAndRegenerate:
         args = (0.0, 1.0)
 
         # Create initial trace
-        initial_trace = normal.simulate(args)
+        initial_trace = normal.simulate(*args)
         old_choice = initial_trace.get_choices()
         old_score = initial_trace.get_score()
 
         # Update with same choice
-        new_trace, weight, discarded = normal.update(args, initial_trace, old_choice)
+        new_trace, weight, discarded = normal.update(initial_trace, old_choice, *args)
         new_score = new_trace.get_score()
 
         # Weight should still satisfy invariant
@@ -1411,16 +1411,14 @@ class TestUpdateAndRegenerate:
             return x + y
 
         # Create initial trace
-        initial_trace = simple_model.simulate(())
+        initial_trace = simple_model.simulate()
         old_score = initial_trace.get_score()
         old_choices = initial_trace.get_choices()
         helpers.assert_valid_trace(initial_trace)
 
         # Update y choice
         new_choices = {"y": 3.0}
-        new_trace, weight, discarded = simple_model.update(
-            (), initial_trace, new_choices
-        )
+        new_trace, weight, discarded = simple_model.update(initial_trace, new_choices)
         new_score = new_trace.get_score()
 
         # Test weight invariant
@@ -1455,14 +1453,14 @@ class TestUpdateAndRegenerate:
             return x + y + z
 
         # Create initial trace
-        initial_trace = multi_choice_model.simulate(())
+        initial_trace = multi_choice_model.simulate()
         old_score = initial_trace.get_score()
         old_choices = initial_trace.get_choices()
 
         # Update multiple choices
         new_choices = {"x": 2.0, "z": -1.0}
         new_trace, weight, discarded = multi_choice_model.update(
-            (), initial_trace, new_choices
+            initial_trace, new_choices
         )
         new_score = new_trace.get_score()
 
@@ -1504,14 +1502,14 @@ class TestUpdateAndRegenerate:
         args = (init_carry, xs)
 
         # Create initial trace with seed
-        initial_trace = seed(scan_gf.simulate)(base_key, args)
+        initial_trace = seed(scan_gf.simulate)(base_key, *args)
         old_score = initial_trace.get_score()
         old_choices = initial_trace.get_choices()
         helpers.assert_valid_trace(initial_trace)
 
         # Update some scan choices
         new_choices = {"noise": jnp.array([0.5, old_choices["noise"][1], -0.2])}
-        new_trace, weight, discarded = scan_gf.update(args, initial_trace, new_choices)
+        new_trace, weight, discarded = scan_gf.update(initial_trace, new_choices, *args)
         new_score = new_trace.get_score()
 
         # Test weight invariant
@@ -1544,13 +1542,13 @@ class TestUpdateAndRegenerate:
         new_args = (2.0, 0.5)  # mu=2.0, sigma=0.5
 
         # Create initial trace with old args
-        initial_trace = normal.simulate(old_args)
+        initial_trace = normal.simulate(*old_args)
         old_score = initial_trace.get_score()
         old_choice = initial_trace.get_choices()
 
         # Update with new args and same choice value
         new_trace, weight, discarded = normal.update(
-            new_args, initial_trace, old_choice
+            initial_trace, old_choice, *new_args
         )
         new_score = new_trace.get_score()
 
@@ -1567,7 +1565,7 @@ class TestUpdateAndRegenerate:
         )
 
         # Verify the new score is correct for the new parameters
-        expected_new_density, _ = normal.assess(new_args, old_choice)
+        expected_new_density, _ = normal.assess(old_choice, *new_args)
         expected_new_score = -expected_new_density
         helpers.assert_finite_and_close(
             new_score, expected_new_score, rtol=standard_tolerance
@@ -1587,13 +1585,13 @@ class TestUpdateAndRegenerate:
             return y
 
         # Create initial trace
-        initial_trace = edge_case_model.simulate(())
+        initial_trace = edge_case_model.simulate()
         old_score = initial_trace.get_score()
 
         # Update with value that should have very low probability
         new_choices = {"y": 1000.0}  # Very unlikely given the model
         new_trace, weight, discarded = edge_case_model.update(
-            (), initial_trace, new_choices
+            initial_trace, new_choices
         )
         new_score = new_trace.get_score()
 
@@ -1708,14 +1706,12 @@ class TestSelection:
             return z
 
         # Create initial trace
-        initial_trace = test_model.simulate(())
+        initial_trace = test_model.simulate()
         old_choices = initial_trace.get_choices()
 
         # Test single selection
         selection = sel("y")
-        new_trace, weight, discarded = test_model.regenerate(
-            (), initial_trace, selection
-        )
+        new_trace, weight, discarded = test_model.regenerate(initial_trace, selection)
 
         # Only y should be in discarded, x and z should remain the same
         assert "y" in discarded
@@ -1725,7 +1721,7 @@ class TestSelection:
         # Test multiple selection
         multi_selection = sel("x") | sel("z")
         new_trace2, weight2, discarded2 = test_model.regenerate(
-            (), initial_trace, multi_selection
+            initial_trace, multi_selection
         )
 
         # x and z should be in discarded, y should remain the same
