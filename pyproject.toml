@@ -65,6 +65,8 @@ curvefit-all = "pixi run curvefit-genjax && pixi run curvefit-pyro && pixi run c
 
 [tool.pixi.feature.format.tasks]
 format = "ruff format . && ruff check . --fix"
+format-md = "npx prettier --write '**/*.md'"
+format-all = "ruff format . && ruff check . --fix && npx prettier --write '**/*.md'"
 vulture = "vulture"
 precommit-install = "pre-commit install"
 precommit-run = "pre-commit run --all-files"
@@ -95,6 +97,9 @@ faircoin = { features = ["faircoin"], solve-group = "default" }
 curvefit = { features = ["curvefit"], solve-group = "default" }
 gol = { features = ["gol"], solve-group = "default" }
 localization = { features = ["localization"], solve-group = "default" }
+
+[tool.pixi.feature.format.dependencies]
+nodejs = "*"
 
 [dependency-groups]
 format = ["ruff>=0.9.2,<0.10", "vulture>=2.14,<3", "pre-commit>=4.0,<5"]

@@ -22,6 +22,7 @@ examples/curvefit/
 ## Code Organization
 
 ### `core.py` - Model Implementations
+
 - **`point(x, curve)`**: Single data point model with outlier handling
 - **`sine()`**: Sine wave parameter prior model
 - **`onepoint_curve(x)`**: Single point curve fitting model
@@ -31,12 +32,14 @@ examples/curvefit/
 - **`get_points_for_inference()`**: Test data generation utility
 
 ### `figs.py` - Visualization
+
 - **Trace visualizations**: Single and multi-point curve traces
 - **Inference visualizations**: Posterior curve overlays with uncertainty
 - **Scaling studies**: Performance and quality analysis across sample sizes
 - **Density visualizations**: Log-density comparisons
 
 ### `main.py` - Figure Generation
+
 - **Orchestrates all visualizations**: Calls figure generation functions in sequence
 - **Produces complete paper-ready figures**: For research and documentation
 
@@ -45,6 +48,7 @@ examples/curvefit/
 ### Model Specification
 
 **Hierarchical Sine Wave Model**:
+
 ```python
 @gen
 def sine():
@@ -81,6 +85,7 @@ def npoint_curve_factory(n: int):
 ```
 
 **Why Factory Pattern is Necessary**:
+
 - `jnp.arange(0, n)` requires concrete value for `n`
 - Direct usage in `@gen` functions causes tracing issues with SMC
 - Factory pattern captures `n` as static in closure, preventing tracer propagation
@@ -88,6 +93,7 @@ def npoint_curve_factory(n: int):
 ### SMC Integration with Closure Pattern
 
 **Proper SMC Usage**:
+
 ```python
 def _infer_latents(key, ys, n_samples):
     # Create model with static n using factory pattern
@@ -108,6 +114,7 @@ def _infer_latents(key, ys, n_samples):
 ```
 
 **Key Patterns**:
+
 1. **Factory for static dependencies**: Handles `jnp.arange` concrete value requirement
 2. **Closure for static arguments**: Captures `n_samples` for `seed` transformation
 3. **Empty target args**: `()` because `n` is captured in factory, not passed as argument
@@ -115,6 +122,7 @@ def _infer_latents(key, ys, n_samples):
 ### Outlier-Robust Modeling
 
 **Mixture Model Approach**:
+
 - **Primary model**: Sine wave with Gaussian noise
 - **Outlier model**: Uniform distribution over reasonable range
 - **Mixture probability**: 8% outlier rate (tunable parameter)
@@ -123,6 +131,7 @@ def _infer_latents(key, ys, n_samples):
 ### Lambda Utility for Dynamic Functions
 
 **Dynamic Function Creation**:
+
 ```python
 @Pytree.dataclass
 class Lambda(Pytree):
@@ -139,11 +148,13 @@ class Lambda(Pytree):
 ## Visualization Features
 
 ### Research Quality Outputs
+
 - **High DPI PDF generation**: Publication-ready figures
 - **Multiple visualization types**: Traces, densities, inference results, scaling studies
 - **Systematic organization**: Numbered figure outputs for paper inclusion
 
 ### Scaling Studies
+
 - **Performance analysis**: Timing across different sample sizes
 - **Quality assessment**: Inference accuracy vs computational cost
 - **Comparative visualization**: Shows convergence properties
@@ -151,6 +162,7 @@ class Lambda(Pytree):
 ## Usage Patterns
 
 ### Basic Inference
+
 ```python
 key = jrand.key(42)
 curve, (xs, ys) = get_points_for_inference()
@@ -158,6 +170,7 @@ samples, weights = infer_latents(key, ys, 1000)
 ```
 
 ### Custom Model Creation
+
 ```python
 # Create model for specific number of points
 model = npoint_curve_factory(15)
@@ -165,6 +178,7 @@ trace = model.simulate(())
 ```
 
 ### Visualization Generation
+
 ```bash
 pixi run -e curvefit curvefit
 ```
@@ -172,16 +186,19 @@ pixi run -e curvefit curvefit
 ## Development Guidelines
 
 ### When Adding New Models
+
 1. **Use factory pattern** for any static dependencies (array sizes, loop bounds)
 2. **Capture concrete values** before entering generative functions
 3. **Follow SMC closure pattern** for inference integration
 
 ### When Modifying Inference
+
 1. **Maintain factory + closure pattern** for SMC compatibility
 2. **Test with different data sizes** to ensure static parameter handling works
 3. **Verify JIT compilation** with `static_argnums` specification
 
 ### When Adding Visualizations
+
 1. **Use high DPI settings** for publication quality
 2. **Follow systematic naming** (e.g., `050_inference_viz.pdf`)
 3. **Include uncertainty visualization** for Bayesian results
@@ -189,6 +206,7 @@ pixi run -e curvefit curvefit
 ## Common Patterns
 
 ### Factory Pattern Usage
+
 ```python
 # ✅ CORRECT - Static parameter in factory
 def model_factory(n: int):
@@ -205,6 +223,7 @@ def model(n):
 ```
 
 ### SMC Closure Pattern
+
 ```python
 # ✅ CORRECT - Closure captures static arguments
 def inference_closure(target_gf, target_args, constraints):
@@ -219,6 +238,7 @@ result = seed(default_importance_sampling)(key, model, (), n_samples, constraint
 ## Testing Patterns
 
 ### Model Validation
+
 ```python
 # Test factory pattern
 model = npoint_curve_factory(10)
@@ -228,6 +248,7 @@ assert trace.get_retval()[1][1].shape == (10,)  # ys shape
 ```
 
 ### Inference Validation
+
 ```python
 # Test inference convergence
 samples, weights = infer_latents(key, ys, 1000)
@@ -238,11 +259,13 @@ assert weights.shape == (1000,)
 ## Performance Considerations
 
 ### JIT Compilation
+
 - **Static arguments**: Use `static_argnums=(2,)` for `n_samples` parameter
 - **Factory benefits**: Eliminates repeated model compilation
 - **Closure benefits**: Enables efficient SMC vectorization
 
 ### Memory Usage
+
 - **Large sample sizes**: Monitor memory usage with >100k samples
 - **Vectorized operations**: Prefer `point.vmap()` over Python loops
 - **Trace storage**: Consider trace compression for very large inference runs
@@ -250,6 +273,7 @@ assert weights.shape == (1000,)
 ## Integration with Main GenJAX
 
 This case study serves as:
+
 1. **Factory pattern example**: Shows how to handle static dependencies properly
 2. **SMC usage demonstration**: Illustrates correct closure patterns with seed
 3. **Outlier modeling showcase**: Demonstrates robust Bayesian inference
@@ -258,16 +282,19 @@ This case study serves as:
 ## Common Issues
 
 ### Concrete Value Errors
+
 - **Cause**: Using dynamic arguments in `jnp.arange`, `jnp.zeros`, etc.
 - **Solution**: Use factory pattern to capture static values
 - **Example**: `npoint_curve_factory(n)` instead of `npoint_curve(n)`
 
 ### SMC Tracing Issues
+
 - **Cause**: Passing dynamic `n_samples` to `default_importance_sampling`
 - **Solution**: Use closure pattern to capture static arguments
 - **Pattern**: See `test_smc.py` lines 242-256 for reference
 
 ### Import Dependencies
+
 - **Matplotlib required**: For figure generation in `figs.py`
 - **NumPy compatibility**: Used alongside JAX for some visualizations
 - **Environment**: Use `pixi run -e curvefit` for proper dependencies
@@ -275,6 +302,7 @@ This case study serves as:
 ## Evolution Notes
 
 The implementation has evolved from manual SMC replication to proper SMC library usage:
+
 - **Original**: Manual `modular_vmap` + `generate` pattern
 - **Current**: Factory pattern + closure pattern + `genjax.smc.default_importance_sampling`
 - **Benefits**: Better maintainability, consistency with GenJAX patterns, educational value
