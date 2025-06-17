@@ -1527,7 +1527,7 @@ class GFI(Generic[X, R], Pytree):
     - Forward sampling (simulate)
     - Density evaluation (assess)
     - Constrained generation (generate)
-    - SMCP3 moves (update, regenerate)
+    - Edit moves (update, regenerate)
 
     All density computations are in log space for numerical stability.
     Weights from generate/update/regenerate enable importance sampling and MCMC.
@@ -1660,7 +1660,7 @@ class GFI(Generic[X, R], Pytree):
 
         Mathematical specification:
         - Transforms trace from (old_args, old_choices) to (new_args, new_choices)
-        - Computes incremental importance weight (SMCP3 move):
+        - Computes incremental importance weight (edit move):
 
         weight = log [P(new_choices; new_args) / Q(new_choices; new_args, old_choices, constraints)]
                - log [P(old_choices; old_args) / Q(old_choices; old_args)]
@@ -1697,7 +1697,7 @@ class GFI(Generic[X, R], Pytree):
         Mathematical specification:
         - Resamples choices at addresses selected by 'sel' from their conditional distribution
         - Keeps non-selected choices unchanged
-        - Computes incremental importance weight (SMCP3 move):
+        - Computes incremental importance weight (edit move):
 
         weight = log P(new_selected_choices | non_selected_choices; args)
                - log P(old_selected_choices | non_selected_choices; args)

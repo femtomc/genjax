@@ -31,22 +31,24 @@ log_density, retval = model.assess(args, choices)  # Compute log P(choices; args
 trace, weight = model.generate(args, constraints)
 # weight = log[P(all_choices; args) / Q(unconstrained; constrained, args)]
 
-# SMCP3 moves (MCMC, SMC)
+# Edit moves (MCMC, SMC)
 new_trace, weight, discarded = model.update(new_args, trace, constraints)
 # weight = log[P(new_choices; new_args)/Q(new; old, constraints)] - log[P(old_choices; old_args)/Q(old)]
 
-# Selective regeneration (SMCP3 move)
+# Selective regeneration (edit move)
 new_trace, weight, discarded = model.regenerate(args, trace, selection)
 # weight = log P(new_selected | non_selected; args) - log P(old_selected | non_selected; args)
 ```
 
 **Mathematical Properties**:
+
 - **Importance weights** enable unbiased Monte Carlo estimation
 - **Incremental importance weights** from update/regenerate enable MCMC acceptance probabilities
-- **SMCP3 moves** (update, regenerate) provide efficient inference transitions
+- **Edit moves** (update, regenerate) provide efficient inference transitions
 - **Selection interface** enables fine-grained control over which choices to modify
 
 **Trace Interface**:
+
 ```python
 trace.get_retval()     # Return value: R
 trace.get_choices()    # Random choices: X
@@ -78,6 +80,7 @@ new_trace, weight, discarded = model.regenerate(args, trace, selection)
 ```
 
 **Selection Semantics**:
+
 - `match(addr) -> (bool, subselection)` determines if address is selected
 - Supports hierarchical addressing for nested generative functions
 - Empty selection → no regeneration, weight = 0
@@ -284,3 +287,19 @@ def test_model():
 - **PJAX**: Probabilistic extension to JAX with primitives `assume_p`, `log_density_p`
 - **Trace**: Execution record with choices, args, return value, score
 - **Score**: `log(1/P(choices))` - negative log probability
+
+## References
+
+### Theoretical Foundation
+
+- **Sequential Monte Carlo with Programmable Proposals (SMCP3)**: Lew, A. K., Matheos, G., Zhi-Xuan, T., Ghavamizadeh, M., Russell, N., Cusumano-Towner, M., & Mansinghka, V. K. (2023). Sequential Monte Carlo with programmable proposals. In Proceedings of the 39th Conference on Uncertainty in Artificial Intelligence (UAI 2023). [Paper](https://proceedings.mlr.press/v206/lew23a/lew23a.pdf)
+
+### Gen Julia Implementation
+
+- **Gen Julia Documentation**: Comprehensive documentation for the original Gen probabilistic programming language. [https://www.gen.dev/docs/stable/](https://www.gen.dev/docs/stable/)
+- **Gen Julia GitHub Repository**: Source code and examples for the Julia implementation. [https://github.com/probcomp/Gen.jl](https://github.com/probcomp/Gen.jl)
+- **Generative Function Interface**: Mathematical specification and API reference. [https://www.gen.dev/docs/stable/api/model/gfi/](https://www.gen.dev/docs/stable/api/model/gfi/)
+
+### Notes
+
+GenJAX implements the same mathematical foundations as Gen Julia, with the GFI methods (`simulate`, `assess`, `generate`, `update`, `regenerate`) following identical mathematical specifications. The `update` and `regenerate` methods are examples of SMCP3 edit moves that enable efficient probabilistic inference.
