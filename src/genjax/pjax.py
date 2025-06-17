@@ -25,7 +25,7 @@ Key Concepts:
 
 Usage:
     ```python
-    from genjax.pjax import seed, modular_vmap, assume_binder
+    from genjax.pjax import seed, modular_vmap, sample_binder
 
     # Transform probabilistic function to accept explicit keys
     seeded_fn = seed(probabilistic_function)
@@ -503,7 +503,7 @@ class TerminalStyle:
 
 # Core PJAX primitives that represent probabilistic operations
 sample_p = InitialStylePrimitive(
-    f"{TerminalStyle.BOLD}{TerminalStyle.CYAN}pjax.assume{TerminalStyle.RESET}",
+    f"{TerminalStyle.BOLD}{TerminalStyle.CYAN}pjax.sample{TerminalStyle.RESET}",
 )
 """Core primitive representing random sampling operations.
 
@@ -569,7 +569,7 @@ global_counter = GlobalKeyCounter()
 _fake_key = jrand.key(1)
 
 
-def assume_binder(
+def sample_binder(
     keyful_sampler: Callable[..., Any],
     name: str | None = None,
     batch_shape: tuple[int, ...] = (),
@@ -580,7 +580,7 @@ def assume_binder(
         sample_shape=batch_shape,
     )
 
-    def assume(*args, **kwargs):
+    def sample(*args, **kwargs):
         # We're playing a trick here by allowing users to invoke sample_p
         # without a key. So we hide it inside, and we pass this as the
         # impl of `sample_p`.
@@ -617,7 +617,7 @@ def assume_binder(
                 )
                 assert isinstance(outer_batch_dim, tuple)
                 new_batch_shape = outer_batch_dim + batch_shape
-                v = assume_binder(
+                v = sample_binder(
                     keyful_sampler,
                     name=name,
                     batch_shape=new_batch_shape,
@@ -647,7 +647,7 @@ def assume_binder(
             lowering_exception=lowering_exception,
         )(keyless, name=name)(*args, **kwargs)
 
-    return assume
+    return sample
 
 
 def log_density_binder(
@@ -700,7 +700,7 @@ def wrap_sampler(
         batch_shape = kwargs.get("shape", ())
         if "shape" in kwargs:
             kwargs.pop("shape")
-        return assume_binder(
+        return sample_binder(
             keyful_sampler,
             name=name,
             batch_shape=batch_shape,
@@ -847,7 +847,7 @@ class SeedInterpreter:
         ```python
         # Instead of using the interpreter directly:
         # interpreter = SeedInterpreter(key)
-        # result = interpreter.run_interpreter(fn, args)
+        # result = interpreter.eval(fn, args)
 
         # Use the seed transformation:
         seeded_fn = seed(fn)
@@ -948,7 +948,7 @@ class SeedInterpreter:
 
         return safe_map(env.read, jaxpr.outvars)
 
-    def run_interpreter(self, fn, *args):
+    def eval(self, fn, *args):
         closed_jaxpr, (flat_args, _, out_tree) = stage(fn)(*args)
         jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.literals
         flat_out = self.eval_jaxpr_seed(
@@ -991,7 +991,7 @@ def seed(
     @wraps(f)
     def wrapped(key: PRNGKey, *args):
         interpreter = SeedInterpreter(key)
-        return interpreter.run_interpreter(
+        return interpreter.eval(
             f,
             *args,
         )
@@ -1008,9 +1008,9 @@ def seed(
 class ModularVmapInterpreter:
     """Vectorization interpreter that preserves probabilistic primitives.
 
-    The `ModularVmapInterpreter` extends JAX's `vmap` to handle probabilistic
-    computations correctly. Unlike standard `vmap`, which would fail on
-    PJAX primitives, this interpreter knows how to vectorize probabilistic
+    The `ModularVmapInterpreter` extends JAX's `vmap` to handle
+    PJAX's probabilistic primitives correctly. Unlike standard `vmap`, which isn't aware
+    of PJAX primitives, this interpreter knows how to vectorize probabilistic
     operations while preserving their semantic meaning.
 
     Key Capabilities:
@@ -1155,7 +1155,7 @@ class ModularVmapInterpreter:
         )
         return jtu.tree_unflatten(out_tree(), flat_out)
 
-    def run_interpreter(
+    def eval(
         self,
         in_axes: int | tuple[int | None, ...] | Sequence[Any] | None,
         axis_size: int | None,
@@ -1225,7 +1225,7 @@ def modular_vmap(
         from genjax import normal, modular_vmap
 
         def sample_normal(mu):
-            return normal(mu, 1.0)  # Contains sample_p primitive
+            return normal.sample(mu, 1.0)  # Contains sample_p primitive
 
         # Vectorize over different means
         batch_sample = modular_vmap(sample_normal, in_axes=(0,))
@@ -1234,7 +1234,7 @@ def modular_vmap(
 
         # Compare with seed for JAX compatibility
         seeded_fn = seed(batch_sample)
-        samples = seeded_fn(key, mus)  # Can be jit'd, grad'd, etc.
+        samples = seeded_fn(key, mus)  # Can be jit'd, vmap'd, etc.
         ```
 
     Note:
@@ -1255,7 +1255,7 @@ def modular_vmap(
         )(*args)
 
         interpreter = ModularVmapInterpreter()
-        return interpreter.run_interpreter(
+        return interpreter.eval(
             in_axes,
             axis_size,
             axis_name,

@@ -66,7 +66,7 @@ from genjax.core import (
 from genjax.pjax import (
     PPPrimitive,
     Environment,
-    assume_binder,
+    sample_binder,
     sample_p,
     modular_vmap,
     stage,
@@ -187,7 +187,7 @@ def sample_primitive(adev_prim: ADEVPrimitive, *args):
     with JAX transformations (jit, vmap, grad) and addressing (@) operators.
 
     The key insight is that ADEV primitives need to be integrated with PJAX's
-    assume_binder to get proper parameter setup (like flat_keyful_sampler) that
+    sample_binder to get proper parameter setup (like flat_keyful_sampler) that
     enables compatibility with the seed transformation and other GenJAX features.
 
     Args:
@@ -199,15 +199,15 @@ def sample_primitive(adev_prim: ADEVPrimitive, *args):
 
     Note:
         This function was crucial for fixing the flat_keyful_sampler error -
-        previously ADEV primitives bypassed assume_binder and lacked proper
+        previously ADEV primitives bypassed sample_binder and lacked proper
         parameter setup for JAX transformations.
     """
 
     def _adev_prim_call(key, adev_prim, *args, **kwargs):
-        """Wrapper function that conforms to assume_binder's expected signature."""
+        """Wrapper function that conforms to sample_binder's expected signature."""
         return adev_prim.sample(*args)
 
-    return assume_binder(_adev_prim_call)(adev_prim, *args)
+    return sample_binder(_adev_prim_call)(adev_prim, *args)
 
 
 ####################
