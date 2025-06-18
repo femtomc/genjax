@@ -338,6 +338,215 @@ def test_invalid_inputs():
         model.assess(wrong_type_choices, *args)
 ```
 
+## Inference Algorithm Testing Strategies
+
+### Convergence Testing Philosophy
+
+Inference algorithms should demonstrate **monotonic improvement** as computational resources increase. This principle applies across all GenJAX inference methods:
+
+- **MCMC**: Longer chains → better posterior approximation
+- **SMC**: More particles → better marginal likelihood estimates
+- **Variational Inference**: More optimization steps → better ELBO convergence
+
+### MCMC Convergence Testing
+
+**Monotonic Chain Length Testing**:
+```python
+def test_mcmc_monotonic_convergence():
+    """Test that longer MCMC chains produce better posterior estimates."""
+    chain_lengths = [100, 500, 1000]  # Increasing compute
+    mean_errors = []
+
+    true_posterior_mean = 0.0  # Known analytical value
+
+    for length in chain_lengths:
+        result = run_mcmc_chain(length=length)
+        samples = apply_burn_in(result.traces)
+
+        sample_mean = jnp.mean(samples["parameter"])
+        error = jnp.abs(sample_mean - true_posterior_mean)
+        mean_errors.append(error)
+
+    # Test for overall improvement trend
+    short_error, medium_error, long_error = mean_errors
+
+    # Allow for stochastic variation but require overall progress
+    monotonic_improvement = (medium_error <= short_error) or (long_error <= medium_error)
+    overall_improvement = long_error <= short_error * 1.5  # 50% tolerance
+
+    assert monotonic_improvement or overall_improvement, (
+        f"No convergence: errors {mean_errors} should show decreasing trend"
+    )
+```
+
+**Multi-Chain Diagnostic Testing**:
+```python
+def test_mcmc_multi_chain_convergence():
+    """Test convergence diagnostics improve with more chains."""
+    chain_counts = [2, 4, 8]
+    rhat_values = []
+
+    for n_chains in chain_counts:
+        result = run_mcmc_chain(n_chains=n_chains, n_steps=1000)
+        rhat_values.append(result.rhat["parameter"])
+
+    # R-hat should approach 1.0 with more chains (better convergence assessment)
+    final_rhat = rhat_values[-1]
+    assert final_rhat < 1.1, f"Poor convergence: R-hat = {final_rhat:.3f}"
+
+    # ESS should be reasonable
+    final_ess = result.ess_bulk["parameter"]
+    assert final_ess > 100, f"Low effective sample size: {final_ess:.0f}"
+```
+
+**Algorithm-Specific Testing**:
+```python
+def test_mala_step_size_effects():
+    """Test MALA acceptance rates vary appropriately with step size."""
+    step_sizes = [0.01, 0.1, 1.0, 10.0]  # Small to large
+    acceptance_rates = []
+
+    for step_size in step_sizes:
+        result = run_mala_chain(step_size=step_size)
+        acceptance_rates.append(result.acceptance_rate)
+
+    # Smaller step sizes should generally have higher acceptance
+    small_acceptance = acceptance_rates[0]  # step_size=0.01
+    large_acceptance = acceptance_rates[-1]  # step_size=10.0
+
+    assert small_acceptance >= large_acceptance, (
+        f"Step size ordering violated: {small_acceptance:.3f} vs {large_acceptance:.3f}"
+    )
+
+    # Very large step sizes should definitely reject some proposals
+    assert large_acceptance < 1.0, "Large step size should not accept everything"
+```
+
+### SMC Convergence Testing
+
+**Particle Count Scaling**:
+```python
+def test_smc_particle_scaling():
+    """Test SMC accuracy improves with more particles."""
+    particle_counts = [100, 500, 1000]
+    log_marginal_errors = []
+
+    true_log_marginal = compute_exact_log_marginal()  # Analytical value
+
+    for n_particles in particle_counts:
+        particles = run_smc(n_particles=n_particles)
+        estimated_log_marginal = particles.log_marginal_likelihood()
+        error = jnp.abs(estimated_log_marginal - true_log_marginal)
+        log_marginal_errors.append(error)
+
+    # More particles should reduce Monte Carlo error
+    final_error = log_marginal_errors[-1]
+    assert final_error < 1.0, f"SMC convergence too slow: error {final_error:.3f}"
+
+    # Test overall improvement trend
+    assert log_marginal_errors[-1] <= log_marginal_errors[0] * 1.5, (
+        "No improvement with more particles"
+    )
+```
+
+**Effective Sample Size Testing**:
+```python
+def test_smc_degeneracy_management():
+    """Test SMC maintains particle diversity."""
+    particles = run_smc_with_resampling(n_particles=1000)
+
+    # ESS should not be too low (severe degeneracy)
+    ess = particles.effective_sample_size()
+    assert ess > 100, f"Severe particle degeneracy: ESS = {ess:.0f}"
+
+    # Weight entropy should be reasonable
+    weights = particles.get_weights()
+    normalized_weights = weights / jnp.sum(weights)
+    entropy = -jnp.sum(normalized_weights * jnp.log(normalized_weights + 1e-10))
+
+    # High entropy indicates good particle diversity
+    max_entropy = jnp.log(len(weights))
+    relative_entropy = entropy / max_entropy
+    assert relative_entropy > 0.1, f"Low particle diversity: {relative_entropy:.3f}"
+```
+
+### Variational Inference Convergence Testing
+
+**ELBO Convergence**:
+```python
+def test_vi_elbo_monotonic_improvement():
+    """Test ELBO improves monotonically during optimization."""
+    n_steps_list = [100, 500, 1000]
+    final_elbos = []
+
+    for n_steps in n_steps_list:
+        vi_result = run_variational_inference(n_steps=n_steps)
+        final_elbos.append(vi_result.elbo_history[-1])
+
+    # Longer optimization should achieve better ELBO
+    short_elbo, medium_elbo, long_elbo = final_elbos
+
+    assert long_elbo >= medium_elbo >= short_elbo, (
+        f"ELBO not improving: {short_elbo:.3f} → {medium_elbo:.3f} → {long_elbo:.3f}"
+    )
+
+    # ELBO should converge (not still improving rapidly)
+    elbo_history = vi_result.elbo_history
+    final_improvement = elbo_history[-1] - elbo_history[-100]  # Last 100 steps
+    assert final_improvement < 0.1, f"ELBO not converged: still improving by {final_improvement:.3f}"
+```
+
+### Cross-Algorithm Validation
+
+**Posterior Moment Comparison**:
+```python
+def test_inference_algorithm_consistency():
+    """Test different algorithms converge to same posterior."""
+    # Run multiple inference methods on same model
+    mcmc_result = run_mcmc_chain(n_steps=5000, burn_in=1000)
+    smc_result = run_smc(n_particles=1000)
+    vi_result = run_variational_inference(n_steps=1000)
+
+    # Extract posterior samples/approximations
+    mcmc_samples = mcmc_result.traces.get_choices()["parameter"]
+    smc_samples = smc_result.traces.get_choices()["parameter"]
+    vi_samples = vi_result.sample_posterior(n_samples=1000)
+
+    # Compare posterior moments
+    mcmc_mean = jnp.mean(mcmc_samples)
+    smc_mean = jnp.mean(smc_samples)
+    vi_mean = jnp.mean(vi_samples)
+
+    # All methods should agree on posterior mean (within tolerance)
+    tolerance = 0.1
+    assert jnp.abs(mcmc_mean - smc_mean) < tolerance
+    assert jnp.abs(mcmc_mean - vi_mean) < tolerance
+    assert jnp.abs(smc_mean - vi_mean) < tolerance
+```
+
+### Testing Guidelines for Inference Algorithms
+
+**Computational Resource Scaling**:
+1. **Always test with increasing compute**: More chains, longer chains, more particles, more optimization steps
+2. **Expect monotonic improvement**: Errors should decrease (with reasonable tolerance for stochasticity)
+3. **Test algorithm-specific properties**: Step size effects (MALA), particle degeneracy (SMC), ELBO convergence (VI)
+4. **Validate against known solutions**: Use conjugate models with analytical posteriors when possible
+
+**Tolerance Management**:
+```python
+# Tolerance hierarchy for different computational budgets
+strict_tolerance = 1e-3      # High-compute scenarios
+standard_tolerance = 1e-2    # Medium-compute scenarios
+practical_tolerance = 1e-1   # Low-compute or difficult problems
+convergence_tolerance = 0.1  # Convergence trend detection
+```
+
+**Stochasticity Handling**:
+- Use **multiple random seeds** for robustness testing
+- Allow **reasonable variance** in convergence patterns (not strictly monotonic)
+- Focus on **overall trends** rather than step-by-step improvement
+- Test **worst-case scenarios** with challenging initializations
+
 ## Critical Testing Requirements
 
 1. **Always test after changes** to corresponding source files
@@ -345,3 +554,5 @@ def test_invalid_inputs():
 3. **Add tests for new functionality** - don't just modify existing code
 4. **Test edge cases** and error conditions
 5. **Use appropriate tolerances** for floating-point comparisons with probabilistic algorithms
+6. **Test convergence properties** - algorithms should improve with more compute
+7. **Validate against analytical solutions** when available (conjugate models)

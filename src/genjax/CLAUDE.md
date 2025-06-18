@@ -417,15 +417,21 @@ GenJAX provides implementations of standard inference algorithms with vectorizat
 **Core MCMC Components**:
 
 ```python
-from genjax import mh, chain, seed, MCMCResult
+from genjax import mh, mala, chain, seed, MCMCResult
 
 # Basic Metropolis-Hastings step
 def mh_kernel(trace):
     selection = sel("param")  # Select which addresses to resample
     return mh(trace, selection)
 
+# MALA (Metropolis-Adjusted Langevin Algorithm) step with gradient information
+def mala_kernel(trace):
+    selection = sel("param")  # Select which addresses to resample
+    step_size = 0.01  # Step size parameter (smaller = more conservative)
+    return mala(trace, selection, step_size)
+
 # Create MCMC chain algorithm
-mcmc_chain = chain(mh_kernel)
+mcmc_chain = chain(mh_kernel)  # or chain(mala_kernel)
 seeded_chain = seed(mcmc_chain)
 
 # Run single chain
@@ -476,12 +482,30 @@ The `chain` higher-order function transforms simple MCMC kernels into full algor
 mcmc_algorithm = chain(mh)
 ```
 
+**MALA (Metropolis-Adjusted Langevin Algorithm)**:
+
+MALA uses gradient information to make more efficient proposals than standard Metropolis-Hastings:
+
+```python
+# MALA proposal: x_new = x + step_size^2/2 * ∇log(p(x)) + step_size * noise
+def mala_kernel(trace):
+    selection = sel("mu") | sel("sigma")  # Select parameters to update
+    step_size = 0.01  # Controls proposal variance and drift strength
+    return mala(trace, selection, step_size)
+
+# MALA works well for continuous parameters with smooth log densities
+# Step size tuning: smaller = higher acceptance but slower mixing
+mala_chain = chain(mala_kernel)
+result = seed(mala_chain)(key, trace, n_steps=const(1000))
+```
+
 **Key Features**:
 - Parallel chain execution using `modular_vmap`
 - Burn-in and thinning support
 - Pytree-structured diagnostics matching choice structure
 - State collection for acceptance tracking
 - JAX-compatible design for JIT compilation
+- MALA: Gradient-guided proposals for improved efficiency on smooth densities
 
 ### SMC (Sequential Monte Carlo)
 

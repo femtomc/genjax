@@ -61,6 +61,7 @@ from .mcmc import (  # noqa: E402
     MCMCResult,
     chain,
     mh,
+    mala,
     compute_rhat,
     compute_ess,
 )
@@ -105,6 +106,7 @@ __all__ = [
     "MCMCResult",
     "chain",
     "mh",
+    "mala",
     "compute_rhat",
     "compute_ess",
     "modular_vmap",

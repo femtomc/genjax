@@ -1028,6 +1028,33 @@ class GFI(Generic[X, R], Pytree):
         """
         pass
 
+    @abstractmethod
+    def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
+        """Filter choice map into selected and unselected parts.
+
+        Used to partition choices based on a selection, enabling fine-grained manipulation
+        of subsets of choices in inference algorithms. Each GFI implementation specializes
+        this method for its choice type X.
+
+        Args:
+            x: Choice map to filter.
+            selection: Selection specifying which addresses to include.
+
+        Returns:
+            Tuple of (selected_choices, unselected_choices) where:
+            - selected_choices: Choice map containing only selected addresses, or None if no matches
+            - unselected_choices: Choice map containing only unselected addresses, or None if no matches
+            Both have the same structure as X but contain disjoint subsets of addresses.
+
+        Example:
+            >>> # choices = {"mu": 1.0, "sigma": 2.0, "obs": 3.0}
+            >>> # selection = sel("mu") | sel("sigma")
+            >>> # selected, unselected = model.filter(choices, selection)
+            >>> # selected = {"mu": 1.0, "sigma": 2.0}, unselected = {"obs": 3.0}
+            >>> pass  # doctest placeholder
+        """
+        pass
+
     def vmap(
         self,
         in_axes: int | tuple[int | None, ...] | Sequence[Any] | None = 0,
@@ -1205,6 +1232,28 @@ class Vmap(Generic[X, R], GFI[X, R]):
     def merge(self, x: X, x_: X) -> X:
         return modular_vmap(self.merge, in_axes=(0, 0))(x, x_)
 
+    def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
+        """Filter vectorized choices using the underlying generative function's filter.
+
+        For Vmap, choices are vectorized across the batch dimension. We apply
+        the underlying GF's filter to each vectorized choice.
+
+        Args:
+            x: Vectorized choice to filter.
+            selection: Selection specifying which addresses to include.
+
+        Returns:
+            Tuple of (selected_choices, unselected_choices) where each is vectorized or None.
+        """
+        # Use modular_vmap to apply filter across the batch dimension
+        selected, unselected = modular_vmap(
+            self.gen_fn.filter,
+            in_axes=(0, None),
+            axis_size=self.axis_size.value,
+        )(x, selection)
+
+        return selected, unselected
+
 
 #################
 # Distributions #
@@ -1335,6 +1384,25 @@ class Distribution(Generic[X], GFI[X, X]):
         raise Exception(
             "Can't merge: the underlying sample space `X` for the type `Distribution` doesn't support merging."
         )
+
+    def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
+        """Filter choice into selected and unselected parts.
+
+        For Distribution, the choice is a single value X. Selection either
+        matches the empty address () or it doesn't.
+
+        Args:
+            x: Choice value to potentially filter.
+            selection: Selection specifying whether to include the choice.
+
+        Returns:
+            Tuple of (selected_choice, unselected_choice) where exactly one is x and the other is None.
+        """
+        is_selected, _ = selection.match(())
+        if is_selected:
+            return x, None
+        else:
+            return None, x
 
 
 def distribution(
@@ -1894,6 +1962,54 @@ class Fn(
 
         return result
 
+    def filter(
+        self, x: dict[str, Any], selection: "Selection"
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        """Filter choice map into selected and unselected parts.
+
+        For Fn, choices are stored as dict[str, Any] with string addresses.
+
+        Args:
+            x: Choice dictionary to filter.
+            selection: Selection specifying which addresses to include.
+
+        Returns:
+            Tuple of (selected_choices, unselected_choices) where each is a dict or None.
+        """
+        if not x:
+            return None, None
+
+        selected = {}
+        unselected = {}
+        found_selected = False
+        found_unselected = False
+
+        for addr, value in x.items():
+            is_selected, subselection = selection.match(addr)
+            if is_selected:
+                if isinstance(value, dict) and subselection is not None:
+                    # Recursively filter nested choices
+                    selected_sub, unselected_sub = self.filter(value, subselection)
+                    if selected_sub is not None:
+                        selected[addr] = selected_sub
+                        found_selected = True
+                    if unselected_sub is not None:
+                        unselected[addr] = unselected_sub
+                        found_unselected = True
+                else:
+                    # Include the entire value in selected
+                    selected[addr] = value
+                    found_selected = True
+            else:
+                # Include the entire value in unselected
+                unselected[addr] = value
+                found_unselected = True
+
+        return (
+            selected if found_selected else None,
+            unselected if found_unselected else None,
+        )
+
 
 def gen(fn: Callable[..., R]) -> Fn[R]:
     """Convert a function into a generative function.
@@ -1997,6 +2113,21 @@ class Scan(Generic[X, R], GFI[X, R]):
 
     def merge(self, x: X, x_: X):
         return self.callee.merge(x, x_)
+
+    def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
+        """Filter scan choices using the underlying generative function's filter.
+
+        For Scan, choices are structured according to the scan iterations.
+        We delegate to the underlying callee's filter method.
+
+        Args:
+            x: Scan choice structure to filter.
+            selection: Selection specifying which addresses to include.
+
+        Returns:
+            Tuple of (selected_choices, unselected_choices) from the underlying callee.
+        """
+        return self.callee.filter(x, selection)
 
     def simulate(
         self,
@@ -2232,6 +2363,21 @@ class Cond(Generic[X, R], GFI[X, R]):
 
     def merge(self, x: X, x_: X):
         return self.callee.merge(x, x_)
+
+    def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
+        """Filter conditional choices using the underlying generative function's filter.
+
+        For Cond, choices are determined by which branch was executed.
+        We delegate to the first callee's filter method.
+
+        Args:
+            x: Conditional choice structure to filter.
+            selection: Selection specifying which addresses to include.
+
+        Returns:
+            Tuple of (selected_choices, unselected_choices) from the underlying callee.
+        """
+        return self.callee.filter(x, selection)
 
     def simulate(
         self,

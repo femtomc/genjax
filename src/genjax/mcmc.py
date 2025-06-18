@@ -2,8 +2,28 @@
 MCMC (Markov Chain Monte Carlo) inference algorithms for GenJAX.
 
 This module provides implementations of standard MCMC algorithms including
-Metropolis-Hastings and Hamiltonian Monte Carlo (HMC). All algorithms use
-the GFI (Generative Function Interface) for efficient trace operations.
+Metropolis-Hastings and MALA (Metropolis-Adjusted Langevin Algorithm).
+All algorithms use the GFI (Generative Function Interface) for efficient
+trace operations.
+
+References
+----------
+
+**Metropolis-Hastings Algorithm:**
+- Metropolis, N., Rosenbluth, A. W., Rosenbluth, M. N., Teller, A. H., & Teller, E. (1953).
+  "Equation of state calculations by fast computing machines."
+  The Journal of Chemical Physics, 21(6), 1087-1092.
+- Hastings, W. K. (1970). "Monte Carlo sampling methods using Markov chains and their applications."
+  Biometrika, 57(1), 97-109.
+
+**MALA (Metropolis-Adjusted Langevin Algorithm):**
+- Roberts, G. O., & Tweedie, R. L. (1996). "Exponential convergence of Langevin distributions
+  and their discrete approximations." Bernoulli, 2(4), 341-363.
+- Roberts, G. O., & Rosenthal, J. S. (1998). "Optimal scaling of discrete approximations to
+  Langevin diffusions." Journal of the Royal Statistical Society: Series B, 60(1), 255-268.
+
+**Implementation Reference:**
+- Gen.jl MALA implementation: https://github.com/probcomp/Gen.jl/blob/master/src/inference/mala.jl
 """
 
 import jax
@@ -21,7 +41,7 @@ from .core import (
     const,
     Callable,
 )
-from .distributions import uniform
+from .distributions import uniform, normal
 from .state import save, state
 
 # Type alias for MCMC kernel functions
@@ -153,14 +173,9 @@ def mh(
     args = current_trace.get_args()
 
     # Regenerate selected addresses - weight is log acceptance probability
-    if isinstance(args, tuple) and len(args) == 2 and isinstance(args[1], dict):
-        # Handle (args, kwargs) tuple format
-        new_trace, log_weight, _ = target_gf.regenerate(
-            current_trace, selection, *args[0], **args[1]
-        )
-    else:
-        # Handle legacy args format
-        new_trace, log_weight, _ = target_gf.regenerate(current_trace, selection, args)
+    new_trace, log_weight, _ = target_gf.regenerate(
+        current_trace, selection, *args[0], **args[1]
+    )
 
     # MH acceptance step
     log_alpha = jnp.minimum(0.0, log_weight)  # min(1, exp(log_weight))
@@ -178,6 +193,137 @@ def mh(
     )
 
     # Save acceptance as auxiliary state (can be accessed via state decorator)
+    save(accept=accept)
+
+    return final_trace
+
+
+def mala(
+    current_trace: Trace[X, R],
+    selection: Selection,
+    step_size: float,
+) -> Trace[X, R]:
+    """
+    Single MALA (Metropolis-Adjusted Langevin Algorithm) step.
+
+    MALA uses gradient information to make more efficient proposals than
+    standard Metropolis-Hastings. The proposal distribution is:
+
+    x_proposed = x_current + step_size^2/2 * ∇log(p(x)) + step_size * ε
+
+    where ε ~ N(0, I) is standard Gaussian noise.
+
+    This implementation follows the approach from Gen.jl, computing both
+    forward and backward proposal probabilities to account for the asymmetric
+    drift term in the MALA proposal.
+
+    Args:
+        current_trace: Current trace state
+        selection: Addresses to regenerate (subset of choices)
+        step_size: Step size parameter (τ) controlling proposal variance
+
+    Returns:
+        Updated trace after MALA step
+
+    State:
+        accept: Boolean indicating whether the proposal was accepted
+    """
+    target_gf = current_trace.get_gen_fn()
+    args = current_trace.get_args()
+    current_choices = current_trace.get_choices()
+
+    # Use the new GFI.filter method to extract selected choices
+    selected_choices, unselected_choices = target_gf.filter(current_choices, selection)
+
+    if selected_choices is None:
+        # No choices selected, return current trace unchanged
+        save(accept=True)
+        return current_trace
+
+    # Create closure to compute gradients with respect to only selected choices
+    def log_density_wrt_selected(selected_choices_only):
+        # Reconstruct full choices by merging selected with unselected
+        if unselected_choices is None:
+            # All choices were selected
+            full_choices = selected_choices_only
+        else:
+            # Use the GFI's merge method for all choice structures
+            full_choices = target_gf.merge(unselected_choices, selected_choices_only)
+
+        log_density, _ = target_gf.assess(full_choices, *args[0], **args[1])
+        return log_density
+
+    # Get gradients with respect to selected choices only
+    selected_gradients = jax.grad(log_density_wrt_selected)(selected_choices)
+
+    # Generate MALA proposal for selected choices using tree operations
+    def mala_proposal_fn(current_val, grad_val):
+        # MALA drift term: step_size^2/2 * gradient
+        drift = (step_size**2 / 2.0) * grad_val
+
+        # Gaussian noise term: step_size * N(0,1)
+        noise = step_size * normal.sample(0.0, 1.0)
+
+        # Proposed value
+        return current_val + drift + noise
+
+    def mala_log_prob_fn(current_val, proposed_val, grad_val):
+        # MALA proposal log probability: N(current + drift, step_size)
+        drift = (step_size**2 / 2.0) * grad_val
+        mean = current_val + drift
+        return normal.logpdf(proposed_val, mean, step_size)
+
+    # Apply MALA proposal to all selected choices
+    proposed_selected = jtu.tree_map(
+        mala_proposal_fn, selected_choices, selected_gradients
+    )
+
+    # Compute forward proposal log probabilities
+    forward_log_probs = jtu.tree_map(
+        mala_log_prob_fn, selected_choices, proposed_selected, selected_gradients
+    )
+
+    # Update trace with only the proposed selected choices
+    # This ensures discard only contains the keys that were actually changed
+    proposed_trace, model_weight, discard = target_gf.update(
+        current_trace, proposed_selected, *args[0], **args[1]
+    )
+
+    # Get gradients at proposed point with respect to selected choices
+    backward_gradients = jax.grad(log_density_wrt_selected)(proposed_selected)
+
+    # Filter discard to only the selected addresses (in case update includes extra keys)
+    discarded_selected, _ = target_gf.filter(discard, selection)
+
+    # Compute backward proposal log probabilities using the same function
+    backward_log_probs = jtu.tree_map(
+        mala_log_prob_fn,
+        proposed_selected,
+        discarded_selected,
+        backward_gradients,
+    )
+
+    # Sum up log probabilities using tree_reduce
+    forward_log_prob_total = jtu.tree_reduce(jnp.add, forward_log_probs)
+    backward_log_prob_total = jtu.tree_reduce(jnp.add, backward_log_probs)
+
+    # MALA acceptance probability
+    # Alpha = model_weight + log P(x_old | x_new) - log P(x_new | x_old)
+    log_alpha = model_weight + backward_log_prob_total - forward_log_prob_total
+    log_alpha = jnp.minimum(0.0, log_alpha)  # min(1, exp(log_alpha))
+
+    # Accept or reject using numerically stable log comparison
+    log_u = jnp.log(uniform.sample(0.0, 1.0))
+    accept = log_u < log_alpha
+
+    # Select final trace
+    final_trace = jtu.tree_map(
+        lambda new_leaf, old_leaf: jax.lax.select(accept, new_leaf, old_leaf),
+        proposed_trace,
+        current_trace,
+    )
+
+    # Save acceptance for diagnostics
     save(accept=accept)
 
     return final_trace
