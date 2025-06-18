@@ -10,8 +10,8 @@ import jax.numpy as jnp
 from jax.lax import scan
 from typing import Any
 
-from .core import GFI, Pytree, gen, X, R, const, Const
-from .adev import (
+from genjax.core import GFI, Pytree, gen, X, R, const, Const
+from genjax.adev import (
     expectation,
     multivariate_normal_reparam,
     multivariate_normal_reinforce,

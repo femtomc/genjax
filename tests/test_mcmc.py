@@ -14,7 +14,7 @@ import pytest
 from genjax.core import gen, sel, Const, const
 from genjax.pjax import seed
 from genjax.distributions import beta, flip, exponential
-from genjax.mcmc import (
+from genjax.inference import (
     MCMCResult,
     chain,
     mh,
@@ -457,7 +457,6 @@ def test_acceptance_rates(gamma_exponential_model, mcmc_steps_medium, mcmc_key):
 @pytest.mark.fast
 def test_mcmc_with_state_acceptances(beta_bernoulli_model, mcmc_steps_small, mcmc_key):
     """Test that MCMC acceptances can be accessed via state decorator."""
-    from genjax.pjax import seed
 
     initial_trace = beta_bernoulli_model.simulate()
     selection = sel("p")
@@ -496,7 +495,6 @@ def test_mcmc_with_state_acceptances(beta_bernoulli_model, mcmc_steps_small, mcm
 @pytest.mark.fast
 def test_chain_function(beta_bernoulli_model, mcmc_steps_small, mcmc_key):
     """Test the generic chain function with mh kernel."""
-    from genjax.pjax import seed
 
     initial_trace = beta_bernoulli_model.simulate()
     selection = sel("p")
@@ -539,7 +537,6 @@ def test_mh_chain_with_burn_in_and_thinning(
     beta_bernoulli_model, mcmc_steps_small, mcmc_key
 ):
     """Test chain function with burn_in and autocorrelation_resampling."""
-    from genjax.pjax import seed
 
     initial_trace = beta_bernoulli_model.simulate()
     selection = sel("p")
@@ -573,7 +570,6 @@ def test_mh_chain_with_burn_in_and_thinning(
 @pytest.mark.fast
 def test_mh_chain_multiple_chains(beta_bernoulli_model, mcmc_steps_small, mcmc_key):
     """Test chain function with multiple parallel chains."""
-    from genjax.pjax import seed
 
     initial_trace = beta_bernoulli_model.simulate()
     selection = sel("p")
@@ -630,7 +626,6 @@ def test_single_vs_multi_chain_consistency(
     beta_bernoulli_model, mcmc_steps_small, mcmc_key
 ):
     """Test that single chain (n_chains=1) behaves consistently."""
-    from genjax.pjax import seed
 
     initial_trace = beta_bernoulli_model.simulate()
     selection = sel("p")
@@ -1038,8 +1033,6 @@ def test_mala_chain_monotonic_convergence(
     true_mean = 0.0  # Known posterior mean for simple normal
 
     # Use different keys for different chain lengths to avoid identical results
-    import jax.random as jrand
-
     for i, length in enumerate(chain_lengths):
         key_for_length = (
             jrand.split(mcmc_key, num=1)[0]

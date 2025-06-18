@@ -14,9 +14,10 @@ import jax.numpy as jnp
 import jax.random as jrand
 import pytest
 from jax.lax import scan
+import tensorflow_probability.substrates.jax as tfp
 
-from genjax.core import gen, Scan, Cond, sel, Const, const, distribution
-from genjax.pjax import seed
+from genjax.core import gen, Scan, Cond, sel, Const, const, distribution, Pytree, tfp_distribution
+from genjax.pjax import seed, modular_vmap
 from genjax.distributions import normal, exponential
 
 
@@ -986,7 +987,6 @@ class TestPytreeAndDataClasses:
     @pytest.mark.fast
     def test_pytree_dataclass_basic(self, helpers):
         """Test basic Pytree dataclass functionality."""
-        from genjax.core import Pytree
 
         @Pytree.dataclass
         class SimpleModel(Pytree):
@@ -1013,7 +1013,6 @@ class TestPytreeAndDataClasses:
     @pytest.mark.fast
     def test_pytree_static_vs_dynamic_fields(self):
         """Test distinction between static and dynamic fields."""
-        from genjax.core import Pytree
 
         @Pytree.dataclass
         class MixedModel(Pytree):
@@ -1050,7 +1049,6 @@ class TestPytreeAndDataClasses:
     @pytest.mark.fast
     def test_pytree_field_vs_static_annotations(self):
         """Test different field annotation types."""
-        from genjax.core import Pytree
 
         @Pytree.dataclass
         class AnnotationTest(Pytree):
@@ -1083,8 +1081,6 @@ class TestDistributionClass:
 
     def test_distribution_basic_functionality(self):
         """Test basic Distribution operations."""
-        import jax.numpy as jnp
-        import jax.random as jrand
 
         # Create simple normal distribution
         def sample_normal(mu, sigma):
@@ -1097,7 +1093,6 @@ class TestDistributionClass:
                 - 0.5 * jnp.log(2 * jnp.pi)
             )
 
-        from genjax.core import distribution
 
         normal_dist = distribution(sample_normal, logpdf_normal, name="normal")
 
@@ -1121,9 +1116,6 @@ class TestDistributionClass:
 
     def test_distribution_generate_method(self):
         """Test Distribution.generate with various inputs."""
-        from genjax.core import distribution
-        import jax.numpy as jnp
-        import jax.random as jrand
 
         def sample_exponential(rate):
             return jrand.exponential(jrand.key(42)) / rate
@@ -1150,8 +1142,6 @@ class TestDistributionClass:
 
     def test_distribution_update_method(self):
         """Test Distribution.update with different scenarios."""
-        from genjax.core import distribution
-        import jax.numpy as jnp
 
         def dummy_sample(mu):
             return jnp.array(mu)  # Return JAX array
@@ -1181,8 +1171,6 @@ class TestDistributionClass:
 
     def test_tfp_distribution_integration(self):
         """Test tfp_distribution wrapper functionality."""
-        from genjax.core import tfp_distribution
-        import tensorflow_probability.substrates.jax as tfp
 
         # Create TFP-based normal distribution
         normal_tfp = tfp_distribution(
@@ -1209,7 +1197,6 @@ class TestDistributionClass:
 
     def test_distribution_error_handling(self):
         """Test Distribution error cases."""
-        from genjax.core import distribution
 
         def dummy_sample():
             return 1.0
@@ -1232,8 +1219,6 @@ class TestVmapAndVectorization:
 
     def test_modular_vmap_basic(self):
         """Test modular_vmap function."""
-        from genjax.pjax import modular_vmap
-        from genjax.distributions import normal
 
         def sample_normal(mu, sigma):
             return normal.sample(mu, sigma)
@@ -1249,7 +1234,6 @@ class TestVmapAndVectorization:
 
     def test_modular_vmap_with_axis_size(self):
         """Test modular_vmap with explicit axis_size."""
-        from genjax.pjax import modular_vmap
 
         def simple_func(x):
             return x * 2
@@ -1269,7 +1253,6 @@ class TestTraceAndSelectors:
     def test_trace_basic_operations(self):
         """Test basic Trace operations."""
         from genjax.core import get_choices, get_score, get_retval
-        from genjax.distributions import normal
 
         # Create a trace using normal distribution
         trace = normal.simulate(0.0, 1.0)
@@ -1306,7 +1289,6 @@ class TestErrorHandlingAndEdgeCases:
     def test_basic_core_functionality(self):
         """Test basic core functionality works."""
         from genjax.core import get_choices
-        from genjax.distributions import normal
 
         # Test basic functionality without complex APIs
         trace = normal.simulate(0.0, 1.0)
@@ -1315,7 +1297,6 @@ class TestErrorHandlingAndEdgeCases:
 
     def test_distribution_with_empty_args(self):
         """Test Distribution behavior with empty arguments."""
-        import jax.numpy as jnp
 
         def sample_func():
             return jnp.array(1.0)

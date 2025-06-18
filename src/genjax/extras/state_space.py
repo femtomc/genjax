@@ -35,8 +35,9 @@ Rauch-Tung-Striebel Smoothing:
 import jax
 import jax.numpy as jnp
 
-from genjax.core import gen, Pytree, get_choices, Scan, Const, const
-from genjax.distributions import categorical, normal
+from genjax.core import gen, Pytree, get_choices, Const, const
+from genjax.distributions import categorical, multivariate_normal
+from genjax.pjax import modular_vmap
 
 
 @Pytree.dataclass
@@ -48,64 +49,51 @@ class DiscreteHMMTrace(Pytree):
     log_prob: jnp.ndarray  # Log probability of the sequence
 
 
-@gen
-def hmm_step(carry, x):
-    """
-    Single step of HMM generation.
-
-    Args:
-        carry: Previous state and model parameters
-        x: Scan input (unused but required by Scan interface)
-
-    Returns:
-        (new_state, observation): Next state and observation
-    """
-    prev_state, transition_matrix, emission_matrix = carry
-
-    # Sample next state given previous state (using static addresses)
-    next_state = categorical(jnp.log(transition_matrix[prev_state])) @ "state"
-
-    # Sample observation given current state (using static addresses)
-    obs = categorical(jnp.log(emission_matrix[next_state])) @ "obs"
-
-    # New carry includes state and fixed matrices
-    new_carry = (next_state, transition_matrix, emission_matrix)
-
-    return new_carry, obs
-
-
 def _discrete_hmm(
-    T: Const[int],  # Number of time steps (static parameter)
+    prev_state,  # Previous state (dummy for t=0) - can be jnp.ndarray or Const
+    time_index,  # Current time step - can be jnp.ndarray or Const
     initial_probs: jnp.ndarray,  # Shape: (K,) - initial state probabilities
     transition_matrix: jnp.ndarray,  # Shape: (K, K) - transition probabilities
     emission_matrix: jnp.ndarray,  # Shape: (K, M) - emission probabilities
 ):
     """
-    Discrete HMM generative model using Scan combinator with Const parameters.
+    Discrete HMM kernel generative function.
+
+    This function can be iteratively applied to generate state-observation sequences.
+    For t=0, it samples from initial distribution; for t>0, it transitions from prev_state.
 
     Args:
-        T: Number of time steps wrapped in Const (must be > 1)
+        prev_state: Previous latent state (ignored when time_index == 0)
+        time_index: Current time step (0 for initial, >0 for transitions)
         initial_probs: Initial state distribution (K states)
         transition_matrix: State transition probabilities (K x K)
         emission_matrix: Observation emission probabilities (K x M observations)
 
     Returns:
-        Sequence of observations
+        tuple: (new_state, time_index + 1, initial_probs, transition_matrix, emission_matrix)
     """
-    # Sample initial state
-    initial_state = categorical(jnp.log(initial_probs)) @ "state_0"
+    # For t=0: sample from initial distribution
+    # For t>0: sample from transition distribution
+    is_initial = time_index == 0
 
-    # Sample initial observation
-    initial_obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
+    # Sample current state
+    # Select between initial and transition logits
+    initial_logits = jnp.log(initial_probs)
+    transition_logits = jnp.log(transition_matrix[prev_state])
+    current_logits = jax.lax.select(is_initial, initial_logits, transition_logits)
+    current_state = categorical(current_logits) @ "state"
 
-    # Use Scan for remaining steps (T.value is static)
-    scan_fn = Scan(hmm_step, length=T - 1)
-    init_carry = (initial_state, transition_matrix, emission_matrix)
-    final_carry, remaining_obs = scan_fn(init_carry, None) @ "scan_steps"
+    # Sample observation given current state (accessible via GFI)
+    categorical(jnp.log(emission_matrix[current_state])) @ "obs"
 
-    # Combine initial and remaining observations
-    all_obs = jnp.concatenate([jnp.array([initial_obs]), remaining_obs])
-    return all_obs
+    # Return new state and carry all other arguments
+    return (
+        current_state,
+        time_index + 1,
+        initial_probs,
+        transition_matrix,
+        emission_matrix,
+    )
 
 
 # Apply the @gen decorator explicitly
@@ -308,46 +296,66 @@ def sample_hmm_dataset(
     initial_probs: jnp.ndarray,
     transition_matrix: jnp.ndarray,
     emission_matrix: jnp.ndarray,
-    T: int,
+    T: Const[int],
+    K: Const[int] = const(1),  # Number of sequences to generate
 ) -> tuple[jnp.ndarray, jnp.ndarray, dict]:
     """
-    Sample a dataset from the discrete HMM model.
+    Sample a dataset from the discrete HMM model using kernel function.
 
     Args:
         initial_probs: Initial state distribution (K,)
         transition_matrix: Transition probabilities (K, K)
         emission_matrix: Emission probabilities (K, M)
         T: Number of time steps
+        K: Number of sequences to generate
 
     Returns:
         Tuple of (true_states, observations, constraints)
+        - true_states: Shape (K, T) if K > 1, else (T,)
+        - observations: Shape (K, T) if K > 1, else (T,)
     """
-    trace = discrete_hmm.simulate(
-        const(T), initial_probs, transition_matrix, emission_matrix
-    )
 
-    # Extract states and observations from trace
-    choices = get_choices(trace)
-    observations = trace.get_retval()
+    def sample_single_sequence():
+        def scan_step(carry, _):
+            trace = discrete_hmm.simulate(*carry)
+            # Extract the new carry from the trace return value
+            new_carry = trace.get_retval()
+            return new_carry, trace
 
-    # Extract states: initial state + states from scan (assume T > 1)
-    initial_state = choices["state_0"]
-    if T > 1:
-        # Get vectorized states from scan
-        scan_choices = choices["scan_steps"]
-        scan_states = scan_choices["state"]  # This will be a vector of states
-        states = jnp.concatenate([jnp.array([initial_state]), scan_states])
+        # Initial carry: dummy state, time=0, and all parameters
+        dummy_state = jnp.array(0)
+        init_carry = (
+            dummy_state,
+            jnp.array(0),
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
+        )
+
+        # Use jax.lax.scan to generate T timesteps
+        final_carry, traces = jax.lax.scan(scan_step, init_carry, None, length=T.value)
+
+        # Extract states and observations from traces using tree operations
+        all_choices = jax.tree.map(get_choices, traces)
+        states = all_choices["state"]  # Shape: (T,)
+        observations = all_choices["obs"]  # Shape: (T,)
+
+        return states, observations
+
+    if K.value == 1:
+        # Single sequence
+        states, observations = sample_single_sequence()
+        constraints = {"obs": observations}
     else:
-        states = jnp.array([initial_state])
-
-    # Create constraints from observations
-    if T == 1:
-        constraints = {"obs_0": observations[0]}
-    else:
-        constraints = {
-            "obs_0": observations[0],
-            "scan_steps": {"obs": observations[1:]},
-        }
+        # Multiple sequences using modular_vmap
+        vectorized_sample = modular_vmap(
+            sample_single_sequence, in_axes=(), axis_size=K.value
+        )
+        # Generate K sequences
+        all_states, all_observations = vectorized_sample()
+        states = all_states  # Shape: (K, T)
+        observations = all_observations  # Shape: (K, T)
+        constraints = {"obs": observations}
 
     return states, observations, constraints
 
@@ -366,36 +374,9 @@ class LinearGaussianTrace(Pytree):
     log_prob: jnp.ndarray  # Log probability of the sequence
 
 
-@gen
-def linear_gaussian_step(carry, x):
-    """
-    Single step of linear Gaussian state space model generation.
-
-    Args:
-        carry: Previous state and model parameters
-        x: Scan input (unused but required by Scan interface)
-
-    Returns:
-        (new_state, observation): Next state and observation
-    """
-    prev_state, A, Q, C, R = carry
-
-    # Sample next state: x_t = A @ x_{t-1} + noise, noise ~ N(0, Q)
-    mean_state = A @ prev_state
-    next_state = normal(mean_state, jnp.sqrt(jnp.diag(Q))) @ "state"
-
-    # Sample observation: y_t = C @ x_t + noise, noise ~ N(0, R)
-    mean_obs = C @ next_state
-    obs = normal(mean_obs, jnp.sqrt(jnp.diag(R))) @ "obs"
-
-    # New carry includes state and fixed matrices
-    new_carry = (next_state, A, Q, C, R)
-
-    return new_carry, obs
-
-
-def _linear_gaussian_ssm(
-    T: Const[int],  # Number of time steps (static parameter)
+def _linear_gaussian(
+    prev_state: jnp.ndarray,  # Previous state (dummy for t=0)
+    time_index: jnp.ndarray,  # Current time step
     initial_mean: jnp.ndarray,  # Shape: (d_state,) - initial state mean
     initial_cov: jnp.ndarray,  # Shape: (d_state, d_state) - initial state covariance
     A: jnp.ndarray,  # Shape: (d_state, d_state) - transition matrix
@@ -404,7 +385,10 @@ def _linear_gaussian_ssm(
     R: jnp.ndarray,  # Shape: (d_obs, d_obs) - observation noise covariance
 ):
     """
-    Linear Gaussian state space model using Scan combinator.
+    Linear Gaussian state space model kernel generative function.
+
+    This function can be iteratively applied to generate state-observation sequences.
+    For t=0, it samples from initial distribution; for t>0, it transitions from prev_state.
 
     Model:
         x_0 ~ N(initial_mean, initial_cov)
@@ -412,7 +396,8 @@ def _linear_gaussian_ssm(
         y_t = C @ x_t + v_t, v_t ~ N(0, R)
 
     Args:
-        T: Number of time steps wrapped in Const (must be > 1)
+        prev_state: Previous latent state (ignored when time_index == 0)
+        time_index: Current time step (0 for initial, >0 for transitions)
         initial_mean: Initial state mean
         initial_cov: Initial state covariance
         A: State transition matrix
@@ -421,27 +406,29 @@ def _linear_gaussian_ssm(
         R: Observation noise covariance
 
     Returns:
-        Sequence of observations
+        tuple: (new_state, time_index + 1, initial_mean, initial_cov, A, Q, C, R)
     """
-    # Sample initial state
-    initial_state = normal(initial_mean, jnp.sqrt(jnp.diag(initial_cov))) @ "state_0"
+    # For t=0: sample from initial distribution
+    # For t>0: sample from transition distribution
+    is_initial = time_index == 0
 
-    # Sample initial observation
-    initial_obs_mean = C @ initial_state
-    initial_obs = normal(initial_obs_mean, jnp.sqrt(jnp.diag(R))) @ "obs_0"
+    # Sample current state
+    # Select between initial and transition parameters
+    transition_mean = A @ prev_state
+    current_mean = jax.lax.select(is_initial, initial_mean, transition_mean)
+    current_cov = jax.lax.select(is_initial, initial_cov, Q)
+    current_state = multivariate_normal(current_mean, current_cov) @ "state"
 
-    # Use Scan for remaining steps (T.value is static)
-    scan_fn = Scan(linear_gaussian_step, length=T - 1)
-    init_carry = (initial_state, A, Q, C, R)
-    final_carry, remaining_obs = scan_fn(init_carry, None) @ "scan_steps"
+    # Sample observation given current state (accessible via GFI)
+    obs_mean = C @ current_state
+    multivariate_normal(obs_mean, R) @ "obs"
 
-    # Combine initial and remaining observations
-    all_obs = jnp.concatenate([initial_obs[None, :], remaining_obs], axis=0)
-    return all_obs
+    # Return new state and carry all other arguments
+    return current_state, time_index + 1, initial_mean, initial_cov, A, Q, C, R
 
 
 # Apply the @gen decorator explicitly
-linear_gaussian_ssm = gen(_linear_gaussian_ssm)
+linear_gaussian = gen(_linear_gaussian)
 
 
 def kalman_filter(
@@ -629,10 +616,11 @@ def sample_linear_gaussian_dataset(
     Q: jnp.ndarray,
     C: jnp.ndarray,
     R: jnp.ndarray,
-    T: int,
+    T: Const[int],
+    K: Const[int] = const(1),  # Number of sequences to generate
 ) -> tuple[jnp.ndarray, jnp.ndarray, dict]:
     """
-    Sample a dataset from the linear Gaussian state space model.
+    Sample a dataset from the linear Gaussian state space model using kernel function.
 
     Args:
         initial_mean: Initial state mean (d_state,)
@@ -642,42 +630,55 @@ def sample_linear_gaussian_dataset(
         C: Observation matrix (d_obs, d_state)
         R: Observation noise covariance (d_obs, d_obs)
         T: Number of time steps
+        K: Number of sequences to generate
 
     Returns:
         Tuple of (true_states, observations, constraints)
+        - true_states: Shape (K, T, d_state) if K > 1, else (T, d_state)
+        - observations: Shape (K, T, d_obs) if K > 1, else (T, d_obs)
     """
-    trace = linear_gaussian_ssm.simulate(
-        const(T), initial_mean, initial_cov, A, Q, C, R
-    )
 
-    # Extract states and observations from trace
-    choices = get_choices(trace)
-    observations = trace.get_retval()
+    def sample_single_sequence():
+        def scan_step(carry, _):
+            trace = linear_gaussian.simulate(*carry)
+            # Extract the new carry from the trace return value
+            new_carry = trace.get_retval()
+            return new_carry, trace
 
-    # Extract states: initial state + states from scan (assume T > 1)
-    initial_state = choices["state_0"]
-    if T > 1:
-        # Get vectorized states from scan
-        scan_choices = choices["scan_steps"]
-        scan_states = scan_choices["state"]  # This will be a matrix of states
-        states = jnp.concatenate([initial_state[None, :], scan_states], axis=0)
+        # Initial carry: dummy state, time=0, and all parameters
+        dummy_state = jnp.zeros_like(initial_mean)  # Match state dimension
+        init_carry = (dummy_state, jnp.array(0), initial_mean, initial_cov, A, Q, C, R)
+
+        # Use jax.lax.scan to generate T timesteps
+        final_carry, traces = jax.lax.scan(scan_step, init_carry, None, length=T.value)
+
+        # Extract states and observations from traces using tree operations
+        all_choices = jax.tree.map(get_choices, traces)
+        states = all_choices["state"]  # Shape: (T, d_state)
+        observations = all_choices["obs"]  # Shape: (T, d_obs)
+
+        return states, observations
+
+    if K.value == 1:
+        # Single sequence
+        states, observations = sample_single_sequence()
+        constraints = {"obs": observations}
     else:
-        states = initial_state[None, :]
-
-    # Create constraints from observations
-    if T == 1:
-        constraints = {"obs_0": observations[0]}
-    else:
-        constraints = {
-            "obs_0": observations[0],
-            "scan_steps": {"obs": observations[1:]},
-        }
+        # Multiple sequences using modular_vmap
+        vectorized_sample = modular_vmap(
+            sample_single_sequence, in_axes=(), axis_size=K.value
+        )
+        # Generate K sequences
+        all_states, all_observations = vectorized_sample()
+        states = all_states  # Shape: (K, T, d_state)
+        observations = all_observations  # Shape: (K, T, d_obs)
+        constraints = {"obs": observations}
 
     return states, observations, constraints
 
 
 # =============================================================================
-# UNIFIED TESTING API
+# INFERENCE TESTING API
 # =============================================================================
 
 
@@ -685,7 +686,7 @@ def discrete_hmm_test_dataset(
     initial_probs: jnp.ndarray,
     transition_matrix: jnp.ndarray,
     emission_matrix: jnp.ndarray,
-    T: int,
+    T: Const[int],
 ) -> dict:
     """
     Generate test dataset for discrete HMM with standardized format.
@@ -738,7 +739,7 @@ def linear_gaussian_test_dataset(
     Q: jnp.ndarray,
     C: jnp.ndarray,
     R: jnp.ndarray,
-    T: int,
+    T: Const[int],
 ) -> dict:
     """
     Generate test dataset for linear Gaussian SSM with standardized format.
@@ -797,7 +798,7 @@ def discrete_hmm_inference_problem(
     initial_probs: jnp.ndarray,
     transition_matrix: jnp.ndarray,
     emission_matrix: jnp.ndarray,
-    T: int,
+    T: Const[int],
 ) -> tuple[dict, jnp.ndarray]:
     """
     Generate inference problem for discrete HMM: dataset + exact log marginal.
@@ -832,7 +833,7 @@ def linear_gaussian_inference_problem(
     Q: jnp.ndarray,
     C: jnp.ndarray,
     R: jnp.ndarray,
-    T: int,
+    T: Const[int],
 ) -> tuple[dict, jnp.ndarray]:
     """
     Generate inference problem for linear Gaussian SSM: dataset + exact log marginal.

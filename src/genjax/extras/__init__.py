@@ -15,7 +15,7 @@ from .state_space import (
     sample_hmm_dataset,
     DiscreteHMMTrace,
     # Linear Gaussian state space model functionality
-    linear_gaussian_ssm,
+    linear_gaussian,
     kalman_filter,
     kalman_smoother,
     sample_linear_gaussian_dataset,
@@ -40,7 +40,7 @@ __all__ = [
     "sample_hmm_dataset",
     "DiscreteHMMTrace",
     # Linear Gaussian state space model
-    "linear_gaussian_ssm",
+    "linear_gaussian",
     "kalman_filter",
     "kalman_smoother",
     "sample_linear_gaussian_dataset",

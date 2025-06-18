@@ -17,7 +17,7 @@ from genjax.adev import (
     normal_reparam,
     multivariate_normal_reparam,
 )
-from genjax.vi import (
+from genjax.inference import (
     VariationalApproximation,
     elbo_factory,
     mean_field_normal_family,

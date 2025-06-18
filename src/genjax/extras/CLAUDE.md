@@ -33,15 +33,15 @@ Provides exact inference algorithms for discrete and continuous state space mode
 - **Exact inference**: Kalman filtering and smoothing
 - **Use case**: Testing continuous state inference
 
-### Unified Testing API
+### Inference Testing API
 
-**CRITICAL**: All testing should use the unified API for consistency and ease of use.
+**CRITICAL**: All testing should use the inference testing API for consistency and ease of use.
 
 #### Core Testing Functions
 
 ```python
 from genjax.extras.state_space import (
-    # Unified testing API - use these for testing
+    # Inference testing API - use these for testing
     discrete_hmm_test_dataset,
     discrete_hmm_exact_log_marginal,
     discrete_hmm_inference_problem,
@@ -130,7 +130,7 @@ dataset, exact_log_marginal = seeded_problem(key)
 
 ### Critical Guidelines for Testing
 
-1. **Always use the unified API** (`*_test_dataset`, `*_exact_log_marginal`, `*_inference_problem`)
+1. **Always use the inference testing API** (`*_test_dataset`, `*_exact_log_marginal`, `*_inference_problem`)
 2. **Use inference problem generators** (`*_inference_problem`) for new tests - they're more convenient
 3. **Validate dataset format** - ensure `{"z": ..., "obs": ...}` structure
 4. **Test convergence properties** - increasing computational resources should improve accuracy
