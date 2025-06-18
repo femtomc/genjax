@@ -2,11 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🔥 CRITICAL: Initial Context Loading
+
+When starting work in this codebase, ALWAYS read the relevant CLAUDE.md files first:
+1. **Core concepts**: Read `src/genjax/CLAUDE.md` for GenJAX fundamentals
+2. **Inference algorithms**: Read `src/genjax/inference/CLAUDE.md` for MCMC, SMC, VI
+3. **ADEV**: Read `src/genjax/adev/CLAUDE.md` for gradient estimation
+4. **Module-specific**: Check for CLAUDE.md in any directory you're working in
+
 ## Overview
 
 GenJAX is a probabilistic programming language embedded in Python centered on programmable inference.
-
-For detailed GenJAX concepts, API patterns, and usage examples, see [src/genjax/CLAUDE.md](src/genjax/CLAUDE.md).
 
 ## Directory Structure
 
@@ -44,26 +50,24 @@ genjax/
 
 ### CRITICAL Guidelines
 
-1. **🔥 HIGH PRIORITY: Always read CLAUDE.md files** in directories you're working in
+1. **🔥 ALWAYS write test scripts first**
+   - NEVER use inline Python snippets
+   - Create test scripts in a temporary directory: `test_feature.py`
+   - Run with: `pixi run python test_feature.py`
+   - Only add to test suite after validating locally
 
-   - Each directory may contain specific guidance and patterns
-   - These files contain essential context for that module/example
-
-2. **Always run tests after changes** to `src/genjax/`
-
-   - Run the full test suite: `pixi run test`
-   - Or run specific test file: `pixi run python -m pytest tests/test_<module>.py`
-   - Example: after changing `src/genjax/mcmc.py`, run `tests/test_mcmc.py`
+2. **Prefer localized testing over full suite**
+   - Run specific test: `pixi run python -m pytest tests/test_<module>.py -k test_name`
+   - Full suite is slow - use only for final validation
+   - Example: after changing `src/genjax/inference/mcmc.py`, test with:
+     ```bash
+     pixi run python -m pytest tests/test_mcmc.py -k test_metropolis
+     ```
 
 3. **Check for corresponding test files**
-   - `src/genjax/core.py` → `tests/test_core.py`
-   - `src/genjax/distributions.py` → `tests/test_distributions.py`
-   - `src/genjax/pjax.py` → `tests/test_pjax.py`
-   - `src/genjax/state.py` → `tests/test_state.py`
-   - `src/genjax/mcmc.py` → `tests/test_mcmc.py`
-   - `src/genjax/smc.py` → `tests/test_smc.py`
-   - `src/genjax/vi.py` → `tests/test_vi.py`
-   - `src/genjax/adev.py` → `tests/test_adev.py`
+   - Core modules: `src/genjax/*.py` → `tests/test_*.py`
+   - Inference: `src/genjax/inference/*.py` → `tests/test_*.py`
+   - ADEV: `src/genjax/adev/*.py` → `tests/test_adev.py`
 
 ### CRITICAL Claude Code Workflow
 
@@ -101,28 +105,52 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 
 **Key insight**: Steps 1-2 are crucial - without them, Claude tends to jump straight to coding without proper understanding.
 
-### CRITICAL Communication Guidelines
+### CRITICAL Development Practices
 
-- **Be concise** - avoid unnecessary explanation or elaboration
-- **Eliminate sycophancy** - no "I'd be happy to help" or similar pleasantries
-- **Ask questions** - clarify requirements rather than making assumptions
-- **Don't commit failures** - if you fail to solve a problem, don't commit partial/broken solutions
-- **🔥 NEVER RUN INLINE PYTHON** - ALWAYS write test scripts for debugging, testing imports, or validation. This is CRITICAL for reproducibility and proper testing practices.
+1. **Testing Protocol**
+   - 🔥 NEVER RUN INLINE PYTHON - always write test scripts
+   - Create `test_<feature>.py` scripts for all experiments
+   - Use localized tests during development
+   - Run full suite only before commits
+
+2. **Documentation Requirements**
+   - Add paper/website references to `REFERENCES.md` in module directory
+   - Keep CLAUDE.md files focused on their specific module
+   - Cross-reference related CLAUDE.md files explicitly
+
+3. **Communication Guidelines**
+   - Be concise - avoid unnecessary elaboration
+   - Ask questions rather than making assumptions
+   - Don't commit partial/broken solutions
 
 ### CRITICAL Documentation Policy
 
 - **NEVER create documentation files** unless explicitly requested
 - Focus on implementation tasks and working code
 
-### CRITICAL Efficiency Guidelines
+### Module Organization
 
-1. **Always read CLAUDE.md files first** - Check for directory-specific guidance before working
-2. **Use parallel tool calls** - Batch independent operations (git status + git diff, multiple file reads)
-3. **Use Task tool for complex searches** - When searches may require multiple rounds of exploration
-4. **Check existing patterns** - Read similar code before implementing new features
-5. **Test relevant modules** - After changing `src/genjax/X.py`, run `tests/test_X.py`
-6. **Avoid unnecessary files** - Only create files when absolutely required for the task
-7. **Use proper search tools** - Glob for file patterns, Grep for content, Task for open-ended exploration
+```
+src/genjax/
+├── CLAUDE.md           # Core concepts: gen, traces, distributions, PJAX
+├── core.py            # Generative functions, traces, Fixed infrastructure
+├── distributions.py   # Probability distributions
+├── pjax.py           # Probabilistic JAX primitives
+├── state.py          # State inspection interpreter
+├── inference/
+│   ├── CLAUDE.md     # Inference algorithms guidance
+│   ├── mcmc.py       # MCMC algorithms
+│   ├── smc.py        # Sequential Monte Carlo
+│   └── vi.py         # Variational inference
+├── adev/
+│   ├── CLAUDE.md     # Gradient estimation guidance
+│   └── __init__.py   # ADEV implementation
+└── extras/
+    ├── CLAUDE.md     # Testing utilities guidance
+    └── state_space.py # Exact inference for testing
+```
+
+Each CLAUDE.md file contains module-specific guidance. Always read the relevant files before working in a module.
 
 ### Workflow Tips
 

@@ -1,6 +1,14 @@
-# GenJAX Concepts Guide
+# GenJAX Core Concepts Guide
 
-This file provides detailed guidance on GenJAX concepts and usage patterns for Claude Code.
+This guide covers the core GenJAX concepts implemented in:
+- `core.py`: Generative functions, traces, Fixed infrastructure
+- `distributions.py`: Probability distributions  
+- `pjax.py`: Probabilistic JAX (PJAX) primitives and interpreters
+- `state.py`: State inspection interpreter
+
+**For inference algorithms**, see `inference/CLAUDE.md`  
+**For gradient estimation**, see `adev/CLAUDE.md`  
+**For testing utilities**, see `extras/CLAUDE.md`
 
 ## Core Concepts
 
@@ -666,243 +674,25 @@ seeded_model = seed(model_with_scan.simulate)
 trace = seeded_model(key)
 ```
 
-## Inference Algorithms
+## Performance and Optimization
 
-GenJAX provides implementations of standard inference algorithms with vectorization and diagnostics.
+### Memory Management
 
-### MCMC (Markov Chain Monte Carlo)
+- **Trace Size**: Be mindful of trace memory with large choice maps
+- **Fixed Infrastructure**: Use `Fixed` wrapper for static values to avoid recompilation
+- **Batching**: Use `vmap` for parallel operations on multiple traces
 
-**Core MCMC Components**:
+### Numerical Stability
 
-```python
-from genjax import mh, mala, chain, seed, MCMCResult
+- **Log Space**: Always work in log space for probabilities
+- **Score Accumulation**: Scores are accumulated as negative log probabilities
+- **Small Probabilities**: Use `logsumexp` for stable probability aggregation
 
-# Basic Metropolis-Hastings step
-def mh_kernel(trace):
-    selection = sel("param")  # Select which addresses to resample
-    return mh(trace, selection)
+### JAX Compilation
 
-# MALA (Metropolis-Adjusted Langevin Algorithm) step with gradient information
-def mala_kernel(trace):
-    selection = sel("param")  # Select which addresses to resample
-    step_size = 0.01  # Step size parameter (smaller = more conservative)
-    return mala(trace, selection, step_size)
-
-# Create MCMC chain algorithm
-mcmc_chain = chain(mh_kernel)  # or chain(mala_kernel)
-seeded_chain = seed(mcmc_chain)
-
-# Run single chain
-result = seeded_chain(key, initial_trace, n_steps=const(1000))
-```
-
-**Multi-Chain MCMC with Diagnostics**:
-
-```python
-# Run multiple parallel chains with diagnostics
-result = seeded_chain(
-    key,
-    initial_trace,
-    n_steps=const(1000),
-    n_chains=const(4),              # Number of parallel chains
-    burn_in=const(200),             # Burn-in samples to discard
-    autocorrelation_resampling=const(2)  # Thinning (keep every N-th sample)
-)
-
-# MCMCResult contains diagnostics
-assert isinstance(result, MCMCResult)
-assert result.n_chains.value == 4
-assert result.rhat is not None          # R-hat convergence diagnostic
-assert result.ess_bulk is not None      # Bulk effective sample size
-assert result.ess_tail is not None      # Tail effective sample size
-
-# Access diagnostics (same structure as choices)
-choices = result.traces.get_choices()
-print(f"R-hat for param: {result.rhat['param']}")
-print(f"Bulk ESS: {result.ess_bulk['param']}")
-print(f"Tail ESS: {result.ess_tail['param']}")
-```
-
-**MCMC Diagnostics**:
-
-- **R-hat (Potential Scale Reduction Factor)**: Convergence assessment comparing between-chain and within-chain variance. Values close to 1.0 indicate convergence.
-- **Effective Sample Size (ESS)**:
-  - **Bulk ESS**: Efficiency for bulk of the distribution
-  - **Tail ESS**: Efficiency for distribution tails (5th and 95th percentiles)
-- **Acceptance Rate**: Proportion of proposed moves that were accepted
-
-**Chain Function Architecture**:
-
-The `chain` higher-order function transforms simple MCMC kernels into full algorithms:
-
-```python
-# Transform into full MCMC algorithm
-mcmc_algorithm = chain(mh)
-```
-
-**MALA (Metropolis-Adjusted Langevin Algorithm)**:
-
-MALA uses gradient information to make more efficient proposals than standard Metropolis-Hastings:
-
-```python
-# MALA proposal: x_new = x + step_size^2/2 * ∇log(p(x)) + step_size * noise
-def mala_kernel(trace):
-    selection = sel("mu") | sel("sigma")  # Select parameters to update
-    step_size = 0.01  # Controls proposal variance and drift strength
-    return mala(trace, selection, step_size)
-
-# MALA works well for continuous parameters with smooth log densities
-# Step size tuning: smaller = higher acceptance but slower mixing
-mala_chain = chain(mala_kernel)
-result = seed(mala_chain)(key, trace, n_steps=const(1000))
-```
-
-**Key Features**:
-- Parallel chain execution using `modular_vmap`
-- Burn-in and thinning support
-- Pytree-structured diagnostics matching choice structure
-- State collection for acceptance tracking
-- JAX-compatible design for JIT compilation
-- MALA: Gradient-guided proposals for improved efficiency on smooth densities
-
-### SMC (Sequential Monte Carlo)
-
-**Particle Collection System**:
-
-```python
-from genjax import init, change, extend, rejuvenate, resample, ParticleCollection
-
-# Initialize particle collection with importance sampling
-particles = init(
-    target_gf=model,
-    target_args=args,
-    n_samples=const(1000),
-    constraints={"obs": observed_data},
-    proposal_gf=custom_proposal  # Optional custom proposal
-)
-
-# Access particle statistics
-ess = particles.effective_sample_size()
-log_marginal = particles.log_marginal_likelihood()
-```
-
-**SMC Move Types**:
-
-**Change Move** - Translate particles between models:
-```python
-# choice_fn must be a bijection on address space only
-# Valid: remap keys while preserving all values exactly
-def choice_fn(old_choices):
-    return {"new_param": old_choices["old_param"], "obs": old_choices["obs"]}
-
-particles = change(
-    particles,
-    new_target_gf=new_model,
-    new_target_args=new_args,
-    choice_fn=choice_fn  # Bijective mapping of address space
-)
-
-# Identity mapping (simplest valid choice_fn)
-particles = change(particles, new_model, new_args, lambda x: x)
-```
-
-**Extension Move** - Add new random choices:
-```python
-# Use extended target's internal proposal (default)
-particles = extend(
-    particles,
-    extended_target_gf=extended_model,
-    extended_target_args=extended_args,
-    constraints={"new_obs": observed_value}  # Constraints on new variables
-)
-
-# Or use custom extension proposal
-@gen
-def custom_proposal():
-    # Proposal for new variables only
-    return normal(0.5, 0.2) @ "new_param"
-
-particles = extend(
-    particles,
-    extended_target_gf=extended_model,
-    extended_target_args=extended_args,
-    constraints={},  # No hard constraints
-    extension_proposal=custom_proposal
-)
-```
-
-**Rejuvenation Move** - Apply MCMC to combat degeneracy:
-```python
-# Use MCMC kernel from mcmc.py
-def mcmc_kernel(trace):
-    return mh(trace, sel("param"))
-
-particles = rejuvenate(particles, mcmc_kernel)
-# Weights remain unchanged due to detailed balance
-# Model density ratio cancels with proposal density ratio
-```
-
-**Resampling** - Combat particle degeneracy:
-```python
-# Resample when effective sample size is low
-if particles.effective_sample_size() < threshold:
-    particles = resample(particles, method="systematic")  # or "categorical"
-```
-
-**Choice Function Specification**:
-
-For the `change` move, the `choice_fn` parameter has strict requirements:
-
-```python
-# CRITICAL: choice_fn must be a bijection on address space only
-
-# Valid examples (preserve all values exactly):
-lambda x: x                                    # Identity mapping
-lambda d: {"mu": d["param"], "obs": d["obs"]}  # Key remapping only
-lambda d: {"new_key": d["old_key"]}            # Single key remap
-
-# Invalid examples (break probability density):
-lambda x: x + 1                               # Modifies scalar values
-lambda d: {"key": d["key"] * 2}               # Modifies dict values
-lambda d: {"key": d["key1"] + d["key2"]}      # Combines values
-
-# Mathematical requirement:
-# If choice_fn(x) = y, then probability density p(x) must equal p(y)
-# This is only possible if choice_fn preserves values exactly
-```
-
-**SMC Algorithm Composition**:
-
-```python
-# Complete SMC algorithm with rejuvenation
-final_particles = rejuvenation_smc(
-    initial_model=model_t0,
-    extended_model=model_extended,
-    transition_proposal=transition_proposal,
-    mcmc_kernel=lambda trace: mh(trace, sel("latent")),
-    observations=time_series_data,
-    choice_fn=lambda x: x,  # Identity mapping for same address space
-    n_particles=const(1000)
-)
-
-# The algorithm automatically handles:
-# 1. Initialization with first observation
-# 2. Sequential extension with remaining observations
-# 3. Adaptive resampling based on effective sample size
-# 4. MCMC rejuvenation to maintain particle diversity
-```
-
-For implementation details, see `rejuvenation_smc` in `src/genjax/smc.py`.
-
-**Key SMC Features**:
-- **Vectorized Operations**: All moves use `modular_vmap` for parallel processing
-- **Weight Tracking**: Importance weights maintained across all moves
-- **Marginal Likelihood Estimation**: Computation via importance sampling
-- **Flexible Proposals**: Support for both default and custom proposal distributions
-- **MCMC Integration**: Kernels from `mcmc.py` work directly with `rejuvenate`
-- **Mathematical Correctness**: Choice functions enforce bijection constraints
-- **Detailed Balance**: Rejuvenation preserves weights via MCMC detailed balance
-- **JAX Compatibility**: Full integration with JAX transformations via `jax.lax.scan`
+- **JIT Compilation**: Use `@jax.jit` for hot loops
+- **Static Arguments**: Mark static arguments with `Const[T]` type hints
+- **Avoid Recompilation**: Use consistent shapes and types
 
 ## References
 

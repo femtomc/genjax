@@ -2,6 +2,10 @@
 
 This file provides guidance for Claude Code when working with the GenJAX automatic differentiation for variational estimates (ADEV) module.
 
+**For core GenJAX concepts**, see `../CLAUDE.md`  
+**For inference algorithms using ADEV**, see `../inference/CLAUDE.md`  
+**For academic references**, see `REFERENCES.md`
+
 ## Overview
 
 The `adev` module provides automatic differentiation capabilities specifically designed for variational inference in probabilistic programming. It implements various gradient estimators that enable efficient optimization of variational objectives.
