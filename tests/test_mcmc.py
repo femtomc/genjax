@@ -16,7 +16,8 @@ from genjax.pjax import seed
 from genjax.distributions import beta, flip, exponential
 from genjax.mcmc import (
     MCMCResult,
-    metropolis_hastings,
+    chain,
+    mh,
 )
 
 
@@ -84,30 +85,27 @@ def mcmc_tolerance():
 # ============================================================================
 
 
-def apply_burn_in(result: MCMCResult, burn_in_frac: float = 0.2) -> MCMCResult:
+def apply_burn_in(traces, burn_in_frac: float = 0.2):
     """
-    Apply burn-in to MCMC results by discarding initial samples.
+    Apply burn-in to MCMC traces by discarding initial samples.
 
     Args:
-        result: Original MCMC result
+        traces: MCMC traces from chain function
         burn_in_frac: Fraction of samples to discard as burn-in
 
     Returns:
-        New MCMCResult with burn-in samples removed
+        Traces with burn-in samples removed
     """
-    burn_in_steps = int(result.n_steps.value * burn_in_frac)
+    n_steps = traces.get_choices()[list(traces.get_choices().keys())[0]].shape[0]
+    burn_in_steps = int(n_steps * burn_in_frac)
 
     # Apply burn-in using tree_map to handle all trace structures
     post_burn_in_traces = jax.tree_util.tree_map(
         lambda x: x[burn_in_steps:] if hasattr(x, "shape") and len(x.shape) > 0 else x,
-        result.traces,
+        traces,
     )
 
-    return MCMCResult(
-        traces=post_burn_in_traces,
-        n_steps=result.n_steps - const(burn_in_steps),
-        acceptance_rate=result.acceptance_rate,  # Keep original acceptance rate
-    )
+    return post_burn_in_traces
 
 
 # ============================================================================
@@ -172,19 +170,21 @@ def exact_normal_normal_posterior_moments(
 @pytest.mark.unit
 @pytest.mark.fast
 def test_mcmc_result_creation(simple_normal_model, mcmc_steps_small, mcmc_key, helpers):
-    """Test MCMCResult creation and field access."""
+    """Test MCMC traces creation and validation."""
     initial_trace = simple_normal_model.simulate(0.0, 1.0)
     selection = sel("x")
 
-    # Apply seed transformation to eliminate PJAX primitives
-    seeded_mh = seed(metropolis_hastings)
-    result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_small)
+    # Create MH chain using new API
+    def mh_kernel(trace):
+        return mh(trace, selection)
 
-    # Validate result structure
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(mcmc_key, initial_trace, mcmc_steps_small)
+
+    # Validate MCMCResult structure
     assert isinstance(result, MCMCResult)
-    assert result.n_steps.value == mcmc_steps_small.value
-    assert 0.0 <= result.acceptance_rate <= 1.0
-    assert result.traces is not None
+    assert result.traces.get_choices()["x"].shape == (mcmc_steps_small.value,)
 
     # Validate trace structure
     helpers.assert_valid_trace(result.traces)
@@ -209,12 +209,16 @@ def test_mh_beta_bernoulli_obs_true(
     # Run MCMC
     selection = sel("p")
 
-    # Apply seed transformation
-    seeded_mh = seed(metropolis_hastings)
-    raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
+    # Create MH chain with built-in burn-in
+    def mh_kernel(trace):
+        return mh(trace, selection)
 
-    # Apply burn-in post-processing
-    result = apply_burn_in(raw_result, burn_in_frac=0.3)
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    burn_in_steps = int(mcmc_steps_large.value * 0.3)
+    result = seeded_chain(
+        mcmc_key, initial_trace, mcmc_steps_large, burn_in=const(burn_in_steps)
+    )
 
     # Extract p samples
     p_samples = result.traces.get_choices()["p"]
@@ -258,12 +262,16 @@ def test_mh_beta_bernoulli_obs_false(
     # Run MCMC
     selection = sel("p")
 
-    # Apply seed transformation
-    seeded_mh = seed(metropolis_hastings)
-    raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
+    # Create MH chain with built-in burn-in
+    def mh_kernel(trace):
+        return mh(trace, selection)
 
-    # Apply burn-in post-processing
-    result = apply_burn_in(raw_result, burn_in_frac=0.3)
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    burn_in_steps = int(mcmc_steps_large.value * 0.3)
+    result = seeded_chain(
+        mcmc_key, initial_trace, mcmc_steps_large, burn_in=const(burn_in_steps)
+    )
 
     # Extract p samples
     p_samples = result.traces.get_choices()["p"]
@@ -310,12 +318,16 @@ def test_mh_hierarchical_normal(
     # Run MCMC
     selection = sel("mu")
 
-    # Apply seed transformation
-    seeded_mh = seed(metropolis_hastings)
-    raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
+    # Create MH chain with built-in burn-in
+    def mh_kernel(trace):
+        return mh(trace, selection)
 
-    # Apply burn-in post-processing
-    result = apply_burn_in(raw_result, burn_in_frac=0.3)
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    burn_in_steps = int(mcmc_steps_large.value * 0.3)
+    result = seeded_chain(
+        mcmc_key, initial_trace, mcmc_steps_large, burn_in=const(burn_in_steps)
+    )
 
     # Extract mu samples
     mu_samples = result.traces.get_choices()["mu"]
@@ -365,11 +377,16 @@ def test_mh_bivariate_normal_marginal(
     # Run MCMC to sample x | y
     selection = sel("x")
 
-    seeded_mh = seed(metropolis_hastings)
-    raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_medium)
+    # Create MH chain with built-in burn-in
+    def mh_kernel(trace):
+        return mh(trace, selection)
 
-    # Apply burn-in post-processing
-    result = apply_burn_in(raw_result, burn_in_frac=0.3)
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    burn_in_steps = int(mcmc_steps_medium.value * 0.3)
+    result = seeded_chain(
+        mcmc_key, initial_trace, mcmc_steps_medium, burn_in=const(burn_in_steps)
+    )
 
     # Extract x samples
     x_samples = result.traces.get_choices()["x"]
@@ -417,8 +434,13 @@ def test_acceptance_rates(gamma_exponential_model, mcmc_steps_medium, mcmc_key):
     initial_trace = gamma_exponential_model.simulate()
     selection = sel("x")
 
-    seeded_mh = seed(metropolis_hastings)
-    result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_medium)
+    # Create MH chain
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(mcmc_key, initial_trace, mcmc_steps_medium)
 
     # Acceptance rate should be reasonable (not too high or low)
     assert 0.05 < result.acceptance_rate < 0.95, (
@@ -427,6 +449,224 @@ def test_acceptance_rates(gamma_exponential_model, mcmc_steps_medium, mcmc_key):
 
     # Check acceptance rate is computed correctly
     assert result.acceptance_rate >= 0.0 and result.acceptance_rate <= 1.0
+
+
+@pytest.mark.mcmc
+@pytest.mark.unit
+@pytest.mark.fast
+def test_mcmc_with_state_acceptances(beta_bernoulli_model, mcmc_steps_small, mcmc_key):
+    """Test that MCMC acceptances can be accessed via state decorator."""
+    from genjax.pjax import seed
+
+    initial_trace = beta_bernoulli_model.simulate()
+    selection = sel("p")
+
+    # Create MH chain and wrap with state to collect acceptances
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+
+    # The chain already uses state internally, so we get acceptances in MCMCResult
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(mcmc_key, initial_trace, mcmc_steps_small)
+
+    # Check that we got MCMCResult with acceptances
+    assert isinstance(result, MCMCResult)
+    assert result.traces.get_retval().shape[0] == mcmc_steps_small.value
+
+    # Check that acceptances were collected
+    acceptances = result.accepts
+    assert acceptances.shape == (mcmc_steps_small.value,)
+
+    # All acceptances should be boolean (0 or 1)
+    assert jnp.all((acceptances == 0) | (acceptances == 1))
+
+    # Check acceptance rate
+    assert 0.0 <= result.acceptance_rate <= 1.0
+
+    # Acceptance rate should match computed rate from acceptances
+    computed_rate = jnp.mean(acceptances)
+    assert jnp.allclose(result.acceptance_rate, computed_rate)
+
+
+@pytest.mark.mcmc
+@pytest.mark.unit
+@pytest.mark.fast
+def test_chain_function(beta_bernoulli_model, mcmc_steps_small, mcmc_key):
+    """Test the generic chain function with mh kernel."""
+    from genjax.pjax import seed
+
+    initial_trace = beta_bernoulli_model.simulate()
+    selection = sel("p")
+
+    # Create a step function using mh
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    # Create chain algorithm and run it
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(
+        mcmc_key,
+        initial_trace,
+        mcmc_steps_small,
+        burn_in=const(2),
+        autocorrelation_resampling=const(1),
+    )
+
+    # Check MCMCResult structure
+    assert isinstance(result, MCMCResult)
+    expected_steps = mcmc_steps_small.value - 2  # After burn-in
+    assert result.n_steps.value == expected_steps
+    assert result.traces.get_retval().shape[0] == expected_steps
+    assert result.accepts.shape == (expected_steps,)
+    assert 0.0 <= result.acceptance_rate <= 1.0
+
+    # Check that accepts are boolean
+    assert jnp.all((result.accepts == 0) | (result.accepts == 1))
+
+    # Check that acceptance_rate matches accepts
+    computed_rate = jnp.mean(result.accepts)
+    assert jnp.allclose(result.acceptance_rate, computed_rate)
+
+
+@pytest.mark.mcmc
+@pytest.mark.unit
+@pytest.mark.fast
+def test_mh_chain_with_burn_in_and_thinning(
+    beta_bernoulli_model, mcmc_steps_small, mcmc_key
+):
+    """Test chain function with burn_in and autocorrelation_resampling."""
+    from genjax.pjax import seed
+
+    initial_trace = beta_bernoulli_model.simulate()
+    selection = sel("p")
+
+    # Create MH chain with burn-in and thinning
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(
+        mcmc_key,
+        initial_trace,
+        mcmc_steps_small,
+        burn_in=const(1),
+        autocorrelation_resampling=const(2),
+    )
+
+    # Check MCMCResult structure
+    assert isinstance(result, MCMCResult)
+    # With burn_in=1, autocorrelation_resampling=2: arange(1, 100, 2) = 50 elements
+    expected_steps = len(jnp.arange(1, mcmc_steps_small.value, 2))
+    assert result.n_steps.value == expected_steps
+    assert result.traces.get_retval().shape[0] == expected_steps
+    assert result.accepts.shape == (expected_steps,)
+    assert 0.0 <= result.acceptance_rate <= 1.0
+
+
+@pytest.mark.mcmc
+@pytest.mark.unit
+@pytest.mark.fast
+def test_mh_chain_multiple_chains(beta_bernoulli_model, mcmc_steps_small, mcmc_key):
+    """Test chain function with multiple parallel chains."""
+    from genjax.pjax import seed
+
+    initial_trace = beta_bernoulli_model.simulate()
+    selection = sel("p")
+    n_chains_val = 4
+
+    # Create MH chain with multiple chains
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(
+        mcmc_key, initial_trace, mcmc_steps_small, n_chains=const(n_chains_val)
+    )
+
+    # Check MCMCResult structure for multiple chains
+    assert isinstance(result, MCMCResult)
+    assert result.n_chains.value == n_chains_val
+    assert result.n_steps.value == mcmc_steps_small.value
+
+    # Traces should be vectorized over chains: (n_chains, n_steps)
+    assert result.traces.get_retval().shape == (n_chains_val, mcmc_steps_small.value)
+    assert result.accepts.shape == (n_chains_val, mcmc_steps_small.value)
+
+    # Acceptance rate should be computed across all chains
+    assert 0.0 <= result.acceptance_rate <= 1.0
+
+    # Should have diagnostics for multiple chains
+    assert result.rhat is not None
+    assert result.ess_bulk is not None
+    assert result.ess_tail is not None
+
+    # Check that diagnostics have the same structure as choices
+    choices = result.traces.get_choices()
+    assert set(result.rhat.keys()) == set(choices.keys())
+    assert set(result.ess_bulk.keys()) == set(choices.keys())
+    assert set(result.ess_tail.keys()) == set(choices.keys())
+
+    # R-hat should be finite and reasonable (close to 1 for good convergence)
+    assert jnp.isfinite(result.rhat["p"])
+    assert result.rhat["p"] > 0.5  # Sanity check
+
+    # ESS should be positive and finite
+    assert jnp.isfinite(result.ess_bulk["p"])
+    assert jnp.isfinite(result.ess_tail["p"])
+    assert result.ess_bulk["p"] > 0
+    assert result.ess_tail["p"] > 0
+
+
+@pytest.mark.mcmc
+@pytest.mark.unit
+@pytest.mark.fast
+def test_single_vs_multi_chain_consistency(
+    beta_bernoulli_model, mcmc_steps_small, mcmc_key
+):
+    """Test that single chain (n_chains=1) behaves consistently."""
+    from genjax.pjax import seed
+
+    initial_trace = beta_bernoulli_model.simulate()
+    selection = sel("p")
+
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+
+    # Run single chain without n_chains parameter (default)
+    result_default = seeded_chain(mcmc_key, initial_trace, mcmc_steps_small)
+
+    # Run single chain with explicit n_chains=1
+    result_explicit = seeded_chain(
+        mcmc_key, initial_trace, mcmc_steps_small, n_chains=const(1)
+    )
+
+    # Both should have same structure for single chain
+    assert result_default.n_chains.value == 1
+    assert result_explicit.n_chains.value == 1
+
+    # Both should have same trace shapes
+    assert (
+        result_default.traces.get_retval().shape
+        == result_explicit.traces.get_retval().shape
+    )
+    assert result_default.accepts.shape == result_explicit.accepts.shape
+
+    # Single chain should not have between-chain diagnostics
+    assert result_default.rhat is None
+    assert result_default.ess_bulk is None
+    assert result_default.ess_tail is None
+
+    assert result_explicit.rhat is None
+    assert result_explicit.ess_bulk is None
+    assert result_explicit.ess_tail is None
 
 
 @pytest.mark.mcmc
@@ -439,8 +679,13 @@ def test_chain_stationarity(
     initial_trace = simple_normal_model.simulate(0.0, 1.0)
     selection = sel("x")
 
-    seeded_mh = seed(metropolis_hastings)
-    result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_medium)
+    # Create MH chain
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(mcmc_key, initial_trace, mcmc_steps_medium)
 
     samples = result.traces.get_choices()["x"]
 
@@ -472,12 +717,16 @@ def test_exponential_moments(
     initial_trace = gamma_exponential_model.simulate()
     selection = sel("x")
 
-    # Apply seed transformation
-    seeded_mh = seed(metropolis_hastings)
-    raw_result = seeded_mh(mcmc_key, initial_trace, selection, mcmc_steps_large)
+    # Create MH chain with built-in burn-in
+    def mh_kernel(trace):
+        return mh(trace, selection)
 
-    # Apply burn-in post-processing
-    result = apply_burn_in(raw_result, burn_in_frac=0.3)
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    burn_in_steps = int(mcmc_steps_large.value * 0.3)
+    result = seeded_chain(
+        mcmc_key, initial_trace, mcmc_steps_large, burn_in=const(burn_in_steps)
+    )
 
     samples = result.traces.get_choices()["x"]
 
@@ -517,11 +766,16 @@ def test_mcmc_deterministic_with_seed(simple_normal_model, mcmc_steps_small, see
     initial_trace = simple_normal_model.simulate(0.0, 1.0)
     selection = sel("x")
 
-    seeded_mh = seed(metropolis_hastings)
+    # Create MH chain
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
 
     # Run twice with same key
-    result1 = seeded_mh(key, initial_trace, selection, mcmc_steps_small)
-    result2 = seeded_mh(key, initial_trace, selection, mcmc_steps_small)
+    result1 = seeded_chain(key, initial_trace, mcmc_steps_small)
+    result2 = seeded_chain(key, initial_trace, mcmc_steps_small)
 
     # Results should be identical
     samples1 = result1.traces.get_choices()["x"]
@@ -543,8 +797,13 @@ def test_mcmc_result_structure(simple_normal_model, base_key, n_steps_val, helpe
     selection = sel("x")
     n_steps = Const(n_steps_val)
 
-    seeded_mh = seed(metropolis_hastings)
-    result = seeded_mh(base_key, initial_trace, selection, n_steps)
+    # Create MH chain
+    def mh_kernel(trace):
+        return mh(trace, selection)
+
+    mh_chain = chain(mh_kernel)
+    seeded_chain = seed(mh_chain)
+    result = seeded_chain(base_key, initial_trace, n_steps)
 
     # Check result structure
     assert result.n_steps.value == n_steps_val
