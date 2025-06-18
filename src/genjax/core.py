@@ -214,6 +214,204 @@ class Const(Generic[A], Pytree):
 
     value: A = Pytree.static()
 
+    def __add__(self, other):
+        """Add two Const values or a Const and a regular value."""
+        if isinstance(other, Const):
+            return const(self.value + other.value)
+        try:
+            return const(self.value + other)
+        except TypeError:
+            raise TypeError(
+                f"Cannot add {type(self.value).__name__} and {type(other).__name__}"
+            )
+
+    def __radd__(self, other):
+        """Right addition for when Const is on the right side."""
+        try:
+            return const(other + self.value)
+        except TypeError:
+            raise TypeError(
+                f"Cannot add {type(other).__name__} and {type(self.value).__name__}"
+            )
+
+    def __sub__(self, other):
+        """Subtract two Const values or a Const and a regular value."""
+        if isinstance(other, Const):
+            return const(self.value - other.value)
+        try:
+            return const(self.value - other)
+        except TypeError:
+            raise TypeError(
+                f"Cannot subtract {type(other).__name__} from {type(self.value).__name__}"
+            )
+
+    def __rsub__(self, other):
+        """Right subtraction for when Const is on the right side."""
+        try:
+            return const(other - self.value)
+        except TypeError:
+            raise TypeError(
+                f"Cannot subtract {type(self.value).__name__} from {type(other).__name__}"
+            )
+
+    def __mul__(self, other):
+        """Multiply two Const values or a Const and a regular value."""
+        if isinstance(other, Const):
+            return const(self.value * other.value)
+        try:
+            return const(self.value * other)
+        except TypeError:
+            raise TypeError(
+                f"Cannot multiply {type(self.value).__name__} and {type(other).__name__}"
+            )
+
+    def __rmul__(self, other):
+        """Right multiplication for when Const is on the right side."""
+        try:
+            return const(other * self.value)
+        except TypeError:
+            raise TypeError(
+                f"Cannot multiply {type(other).__name__} and {type(self.value).__name__}"
+            )
+
+    def __truediv__(self, other):
+        """Divide two Const values or a Const and a regular value."""
+        if isinstance(other, Const):
+            return const(self.value / other.value)
+        try:
+            return const(self.value / other)
+        except TypeError:
+            raise TypeError(
+                f"Cannot divide {type(self.value).__name__} by {type(other).__name__}"
+            )
+
+    def __rtruediv__(self, other):
+        """Right division for when Const is on the right side."""
+        try:
+            return const(other / self.value)
+        except TypeError:
+            raise TypeError(
+                f"Cannot divide {type(other).__name__} by {type(self.value).__name__}"
+            )
+
+    def __floordiv__(self, other):
+        """Floor divide two Const values or a Const and a regular value."""
+        if isinstance(other, Const):
+            return const(self.value // other.value)
+        try:
+            return const(self.value // other)
+        except TypeError:
+            raise TypeError(
+                f"Cannot floor divide {type(self.value).__name__} by {type(other).__name__}"
+            )
+
+    def __rfloordiv__(self, other):
+        """Right floor division for when Const is on the right side."""
+        try:
+            return const(other // self.value)
+        except TypeError:
+            raise TypeError(
+                f"Cannot floor divide {type(other).__name__} by {type(self.value).__name__}"
+            )
+
+    def __mod__(self, other):
+        """Modulo two Const values or a Const and a regular value."""
+        if isinstance(other, Const):
+            return const(self.value % other.value)
+        try:
+            return const(self.value % other)
+        except TypeError:
+            raise TypeError(
+                f"Cannot compute {type(self.value).__name__} modulo {type(other).__name__}"
+            )
+
+    def __rmod__(self, other):
+        """Right modulo for when Const is on the right side."""
+        try:
+            return const(other % self.value)
+        except TypeError:
+            raise TypeError(
+                f"Cannot compute {type(other).__name__} modulo {type(self.value).__name__}"
+            )
+
+    def __pow__(self, other):
+        """Power of two Const values or a Const and a regular value."""
+        if isinstance(other, Const):
+            return const(self.value**other.value)
+        try:
+            return const(self.value**other)
+        except TypeError:
+            raise TypeError(
+                f"Cannot raise {type(self.value).__name__} to power {type(other).__name__}"
+            )
+
+    def __rpow__(self, other):
+        """Right power for when Const is on the right side."""
+        try:
+            return const(other**self.value)
+        except TypeError:
+            raise TypeError(
+                f"Cannot raise {type(other).__name__} to power {type(self.value).__name__}"
+            )
+
+    def __neg__(self):
+        """Unary negation."""
+        try:
+            return const(-self.value)
+        except TypeError:
+            raise TypeError(f"Cannot negate {type(self.value).__name__}")
+
+    def __pos__(self):
+        """Unary positive."""
+        try:
+            return const(+self.value)
+        except TypeError:
+            raise TypeError(f"Cannot apply unary + to {type(self.value).__name__}")
+
+    def __abs__(self):
+        """Absolute value."""
+        try:
+            return const(abs(self.value))
+        except TypeError:
+            raise TypeError(
+                f"Cannot compute absolute value of {type(self.value).__name__}"
+            )
+
+    # Comparison operations
+    def __eq__(self, other):
+        """Equality comparison."""
+        if isinstance(other, Const):
+            return self.value == other.value
+        return self.value == other
+
+    def __ne__(self, other):
+        """Inequality comparison."""
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        """Less than comparison."""
+        if isinstance(other, Const):
+            return self.value < other.value
+        return self.value < other
+
+    def __le__(self, other):
+        """Less than or equal comparison."""
+        if isinstance(other, Const):
+            return self.value <= other.value
+        return self.value <= other
+
+    def __gt__(self, other):
+        """Greater than comparison."""
+        if isinstance(other, Const):
+            return self.value > other.value
+        return self.value > other
+
+    def __ge__(self, other):
+        """Greater than or equal comparison."""
+        if isinstance(other, Const):
+            return self.value >= other.value
+        return self.value >= other
+
 
 def const(a: A) -> Const[A]:
     """Create a Const wrapper for a static value.
@@ -1099,14 +1297,14 @@ class Distribution(Generic[X], GFI[X, X]):
     ) -> tuple[Tr[X, X], Weight, X | None]:
         if x_ is None:
             x_ = get_choices(tr)
-            log_density_ = self.logpdf.value(x_, *args, **kwargs)
+            log_density_ = self.logpdf(x_, *args, **kwargs)
             return (
                 Tr(self, (args, kwargs), x_, x_, -log_density_),
                 log_density_ + tr.get_score(),
                 tr.get_retval(),
             )
         else:
-            log_density_ = self.logpdf.value(x_, *args, **kwargs)
+            log_density_ = self.logpdf(x_, *args, **kwargs)
             return (
                 Tr(self, (args, kwargs), x_, x_, -log_density_),
                 log_density_ + tr.get_score(),
@@ -1125,7 +1323,7 @@ class Distribution(Generic[X], GFI[X, X]):
             return tr_, jnp.array(0.0), get_choices(tr)
         else:
             x_ = get_choices(tr)
-            log_density_ = self.logpdf.value(get_choices(tr), *args, **kwargs)
+            log_density_ = self.logpdf(get_choices(tr), *args, **kwargs)
             return (
                 Tr(self, (args, kwargs), x_, x_, -log_density_),
                 log_density_ + tr.get_score(),
