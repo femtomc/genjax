@@ -283,23 +283,25 @@ def change(
 
 def extend(
     particles: ParticleCollection,
-    proposal_gf: GFI[X, Any],
     extended_target_gf: GFI[X, R],
     extended_target_args: tuple,
+    constraints: X,
+    extension_proposal: GFI[X, Any] = None,
 ) -> ParticleCollection:
     """
     Extension move for particle collection.
 
     Extends each particle by:
-    1. Sampling an extension from the proposal using (old_choices, *extended_target_args)
-    2. Merging with existing particle choices
+    1. Sampling an extension from the proposal (or extended target's internal proposal)
+    2. Merging with existing particle choices and constraints
     3. Evaluating under the extended target model
 
     Args:
         particles: Current particle collection
-        proposal_gf: Proposal for the extension using signature (old_choices, *extended_target_args)
         extended_target_gf: Extended target generative function
         extended_target_args: Arguments for extended target
+        constraints: Constraints on the extended variables (e.g., new observations)
+        extension_proposal: Optional proposal for the extension. If None, uses extended target's internal proposal.
 
     Returns:
         New ParticleCollection with extended particles
@@ -308,24 +310,38 @@ def extend(
     def _single_extension(
         old_trace: Trace[X, R], old_log_weight: jnp.ndarray
     ) -> tuple[Trace[X, R], jnp.ndarray]:
-        # Get existing choices to pass to proposal
+        # Get existing choices
         old_choices = old_trace.get_choices()
 
-        # Sample extension from proposal using new signature
-        proposal_trace = proposal_gf.simulate(old_choices, *extended_target_args)
-        extension_choices = proposal_trace.get_choices()
-        proposal_score = proposal_trace.get_score()
+        if extension_proposal is None:
+            # Use extended target's internal proposal - merge old choices with constraints
+            merged_choices = extended_target_gf.merge(old_choices, constraints)
 
-        # Merge with existing choices
-        merged_choices = extended_target_gf.merge(old_choices, extension_choices)
+            # Generate with extended target using merged choices
+            new_trace, log_weight = extended_target_gf.generate(
+                merged_choices, *extended_target_args
+            )
 
-        # Generate with extended target
-        new_trace, log_weight = extended_target_gf.generate(
-            merged_choices, *extended_target_args
-        )
+            # Weight is just the target weight (no proposal correction needed)
+            new_log_weight = old_log_weight + log_weight
+        else:
+            # Use custom extension proposal
+            # Sample extension from proposal
+            extension_trace = extension_proposal.simulate(*extended_target_args)
+            extension_choices = extension_trace.get_choices()
+            proposal_score = extension_trace.get_score()
 
-        # Importance weight: target_weight + proposal_score + old_weight
-        new_log_weight = old_log_weight + log_weight + proposal_score
+            # Merge old choices, extension choices, and constraints
+            temp_merged = extended_target_gf.merge(old_choices, extension_choices)
+            merged_choices = extended_target_gf.merge(temp_merged, constraints)
+
+            # Generate with extended target
+            new_trace, log_weight = extended_target_gf.generate(
+                merged_choices, *extended_target_args
+            )
+
+            # Importance weight: target_weight + proposal_score + old_weight
+            new_log_weight = old_log_weight + log_weight + proposal_score
 
         return new_trace, new_log_weight
 
@@ -350,7 +366,7 @@ def extend(
 
 def rejuvenate(
     particles: ParticleCollection,
-    mcmc_kernel: Callable[[Trace[X, R]], tuple[Trace[X, R], Any]],
+    mcmc_kernel: Callable[[Trace[X, R]], Trace[X, R]],
 ) -> ParticleCollection:
     """
     Rejuvenate move for particle collection.
@@ -361,8 +377,7 @@ def rejuvenate(
     Args:
         particles: Current particle collection
         mcmc_kernel: MCMC kernel function that takes a trace and returns
-                    (new_trace, diagnostics). Should be compatible with
-                    kernels from mcmc.py like metropolis_hastings_step.
+                    a new trace. Should be compatible with kernels from mcmc.py like mh.
 
     Returns:
         New ParticleCollection with rejuvenated particles
@@ -372,7 +387,7 @@ def rejuvenate(
         old_trace: Trace[X, R], old_log_weight: jnp.ndarray
     ) -> tuple[Trace[X, R], jnp.ndarray]:
         # Apply MCMC kernel
-        new_trace, _ = mcmc_kernel(old_trace)
+        new_trace = mcmc_kernel(old_trace)
 
         # Weights remain unchanged for MCMC moves (detailed balance)
         return new_trace, old_log_weight
@@ -478,8 +493,14 @@ def rejuvenation_smc(
     particles = change(particles, extended_model, (), change_mapping)
 
     def smc_step(particles, obs):
-        # Extend particles with transition proposal
-        particles = extend(particles, transition_proposal, extended_model, obs)
+        # Extend particles with new observation constraints
+        particles = extend(
+            particles,
+            extended_model,
+            (),
+            {"obs": obs},
+            extension_proposal=transition_proposal,
+        )
 
         # Resample if needed
         ess = particles.effective_sample_size()

@@ -437,8 +437,8 @@ result = seeded_chain(key, initial_trace, n_steps=const(1000))
 ```python
 # Run multiple parallel chains with diagnostics
 result = seeded_chain(
-    key, 
-    initial_trace, 
+    key,
+    initial_trace,
     n_steps=const(1000),
     n_chains=const(4),              # Number of parallel chains
     burn_in=const(200),             # Burn-in samples to discard
@@ -462,7 +462,7 @@ print(f"Tail ESS: {result.ess_tail['param']}")
 **MCMC Diagnostics**:
 
 - **R-hat (Potential Scale Reduction Factor)**: Convergence assessment comparing between-chain and within-chain variance. Values close to 1.0 indicate convergence.
-- **Effective Sample Size (ESS)**: 
+- **Effective Sample Size (ESS)**:
   - **Bulk ESS**: Efficiency for bulk of the distribution
   - **Tail ESS**: Efficiency for distribution tails (5th and 95th percentiles)
 - **Acceptance Rate**: Proportion of proposed moves that were accepted
