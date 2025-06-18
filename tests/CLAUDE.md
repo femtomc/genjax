@@ -71,6 +71,7 @@ class TestUpdateAndRegenerate:
 ```
 
 **Guidelines for sectional headers:**
+
 - Use descriptive section names that clearly identify the functionality being tested
 - Group related tests under the same header
 - Use consistent formatting with `# =============================================================================`
@@ -80,16 +81,19 @@ class TestUpdateAndRegenerate:
 ### Test Writing Patterns
 
 1. **JAX Integration Tests**
+
    - Use `jax.random.PRNGKey` for reproducible randomness
    - Test both CPU and compilation (JIT) behavior where relevant
    - Use `jax.numpy` for array operations
 
 2. **Probabilistic Programming Tests**
+
    - Test generative functions with known distributions
    - Verify trace structure and addressing
    - Check inference algorithm convergence properties
 
 3. **MCMC Algorithm Tests**
+
    - Test acceptance rates are reasonable
    - Verify chain mixing and convergence
    - Check posterior estimates against known values

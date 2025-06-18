@@ -25,6 +25,7 @@ examples/curvefit/
 ### `core.py` - Model Implementations
 
 **GenJAX Models:**
+
 - **`point(x, curve)`**: Single data point model with outlier handling
 - **`sine()`**: Sine wave parameter prior model
 - **`onepoint_curve(x)`**: Single point curve fitting model
@@ -34,12 +35,14 @@ examples/curvefit/
 - **`get_points_for_inference()`**: Test data generation utility
 
 **NumPyro Implementations (if numpyro available):**
+
 - **`numpyro_npoint_model()`**: Equivalent NumPyro model with Gaussian likelihood
 - **`numpyro_run_importance_sampling()`**: Importance sampling inference
 - **`numpyro_run_hmc_inference()`**: Hamiltonian Monte Carlo inference
 - **`numpyro_hmc_summary_statistics()`**: HMC diagnostics and summary stats
 
 **Pyro Implementations (if torch and pyro-ppl available):**
+
 - **`pyro_npoint_model()`**: Equivalent Pyro model with Gaussian likelihood
 - **`pyro_run_importance_sampling()`**: Importance sampling inference
 - **`pyro_run_variational_inference()`**: Stochastic variational inference (SVI)
@@ -197,6 +200,7 @@ class Lambda(Pytree):
 ### Basic Inference
 
 **GenJAX:**
+
 ```python
 key = jrand.key(42)
 curve, (xs, ys) = get_points_for_inference()
@@ -204,6 +208,7 @@ samples, weights = infer_latents(key, ys, 1000)
 ```
 
 **NumPyro (if available):**
+
 ```python
 # Importance sampling
 result = numpyro_run_importance_sampling(key, xs, ys, num_samples=5000)
@@ -214,6 +219,7 @@ summary = numpyro_hmc_summary_statistics(hmc_result)
 ```
 
 **Pyro (if available):**
+
 ```python
 # Importance sampling
 result = pyro_run_importance_sampling(xs, ys, num_samples=5000)
