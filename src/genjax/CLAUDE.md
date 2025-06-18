@@ -318,6 +318,7 @@ def problematic_model():
 ```
 
 **Address collision detection runs in all GFI methods**:
+
 - `simulate()`, `assess()`, `generate()`, `update()`, `regenerate()`
 - Provides clear error messages with function and line information
 - Helps debug complex generative functions with many addresses
@@ -368,6 +369,7 @@ def valid_model():
 ```
 
 **Error reporting improvements apply to**:
+
 - Address collision detection
 - Invalid trace operations
 - Type checking violations
