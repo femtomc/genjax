@@ -15,6 +15,8 @@ genjax/
 ├── src/genjax/           # Core GenJAX library
 │   ├── core.py          # GFI implementation, traces, generative functions
 │   ├── distributions.py # Built-in probability distributions
+│   ├── pjax.py          # Probabilistic JAX (PJAX) - probabilistic primitives and interpreters
+│   ├── state.py         # State interpreter for tagged value inspection
 │   ├── mcmc.py          # MCMC algorithms (Metropolis-Hastings, HMC)
 │   ├── smc.py           # Sequential Monte Carlo methods
 │   ├── vi.py            # Variational inference algorithms
@@ -25,6 +27,15 @@ genjax/
 │   ├── localization/    # Particle filter localization
 │   └── gol/             # Game of Life inference
 ├── tests/               # Test suite
+│   ├── test_core.py     # Tests for core.py
+│   ├── test_distributions.py # Tests for distributions.py
+│   ├── test_pjax.py     # Tests for pjax.py
+│   ├── test_state.py    # Tests for state.py
+│   ├── test_mcmc.py     # Tests for mcmc.py
+│   ├── test_smc.py      # Tests for smc.py
+│   ├── test_vi.py       # Tests for vi.py
+│   ├── test_adev.py     # Tests for adev.py
+│   └── discrete_hmm.py  # Discrete HMM test utilities
 ├── docs/                # Generated documentation
 └── quarto/              # Documentation source files
 ```
@@ -46,8 +57,13 @@ genjax/
 
 3. **Check for corresponding test files**
    - `src/genjax/core.py` → `tests/test_core.py`
+   - `src/genjax/distributions.py` → `tests/test_distributions.py`
+   - `src/genjax/pjax.py` → `tests/test_pjax.py`
+   - `src/genjax/state.py` → `tests/test_state.py`
    - `src/genjax/mcmc.py` → `tests/test_mcmc.py`
    - `src/genjax/smc.py` → `tests/test_smc.py`
+   - `src/genjax/vi.py` → `tests/test_vi.py`
+   - `src/genjax/adev.py` → `tests/test_adev.py`
 
 ### CRITICAL Claude Code Workflow
 

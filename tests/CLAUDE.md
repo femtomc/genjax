@@ -9,11 +9,15 @@ The test suite mirrors the main library structure:
 ```
 tests/
 ├── test_core.py         # Tests for src/genjax/core.py (GFI, traces, generative functions)
-├── test_distributions.py # Tests for src/genjax/distributions.py
+├── test_distributions.py # Tests for src/genjax/distributions.py (built-in distributions)
+├── test_pjax.py         # Tests for src/genjax/pjax.py (PJAX primitives and interpreters)
+├── test_state.py        # Tests for src/genjax/state.py (state interpreter)
 ├── test_mcmc.py         # Tests for src/genjax/mcmc.py (Metropolis-Hastings, HMC)
 ├── test_smc.py          # Tests for src/genjax/smc.py (Sequential Monte Carlo)
 ├── test_vi.py           # Tests for src/genjax/vi.py (Variational inference)
-└── test_adev.py         # Tests for src/genjax/adev.py (Automatic differentiation)
+├── test_adev.py         # Tests for src/genjax/adev.py (Automatic differentiation)
+├── discrete_hmm.py      # Discrete HMM test utilities
+└── conftest.py          # Test configuration and shared fixtures
 ```
 
 ## Testing Guidelines
