@@ -355,7 +355,7 @@ The state interpreter allows you to inspect and organize intermediate values wit
 ```python
 from genjax.state import state, save, namespace
 
-# Basic pattern: @state decorator + save() function
+# Basic pattern: @state decorator + save() function (named mode)
 @state
 def computation(x):
     y = x + 1
@@ -368,6 +368,24 @@ result, state_dict = computation(5)
 # result = 16, state_dict = {"intermediate": 6, "doubled": 10}
 ```
 
+#### Leaf Mode for Direct Storage
+
+The `save()` function supports two modes:
+
+**Named Mode** (`save(**kwargs)`): Save values with explicit names (original behavior):
+```python
+save(first=value1, second=value2)  # → {"first": value1, "second": value2}
+```
+
+**Leaf Mode** (`save(*args)`): Save values directly at current namespace leaf:
+```python
+# Single value
+namespace(lambda: save(42), "coords")()  # → {"coords": 42}
+
+# Multiple values (stored as tuple)
+namespace(lambda: save(1, 2, 3), "coords")()  # → {"coords": (1, 2, 3)}
+```
+
 #### Namespace Organization
 
 **Hierarchical State Collection**: Use `namespace(fn, ns)` to organize state into nested structures:
@@ -375,19 +393,26 @@ result, state_dict = computation(5)
 ```python
 @state
 def complex_computation(x):
-    # Root level state
+    # Root level state (named mode)
     save(input=x, stage="preprocessing")
 
-    # Organized under "processing" namespace
+    # Named mode in namespace
     processing_fn = namespace(
         lambda y: save(step1=y*2, step2=y+10),
         "processing"
     )
     processing_fn(x)
 
-    # Nested namespaces: analysis.statistics
+    # Leaf mode in namespace - store values directly
+    coords_fn = namespace(
+        lambda z: save(z, z*2, z*3),  # Leaf mode: saves tuple at "coords"
+        "coords"
+    )
+    coords_fn(x)
+
+    # Nested namespaces with mixed modes
     stats_fn = namespace(
-        namespace(lambda z: save(mean=z, variance=z**2), "statistics"),
+        namespace(lambda z: save(mean=z, variance=z**2), "statistics"),  # Named mode
         "analysis"
     )
     stats_fn(x)
@@ -398,8 +423,9 @@ result, state_dict = complex_computation(5)
 # state_dict = {
 #     "input": 5,
 #     "stage": "preprocessing",
-#     "processing": {"step1": 10, "step2": 15},
-#     "analysis": {"statistics": {"mean": 5, "variance": 25}}
+#     "processing": {"step1": 10, "step2": 15},  # Named mode
+#     "coords": (5, 10, 15),                     # Leaf mode: tuple directly
+#     "analysis": {"statistics": {"mean": 5, "variance": 25}}  # Named mode
 # }
 ```
 
@@ -480,13 +506,19 @@ gradient = grad_fn(5.0)
 
 #### Key Features
 
+- **Two Storage Modes**: Named mode (`save(**kwargs)`) and leaf mode (`save(*args)`)
 - **Hierarchical Organization**: `namespace(fn, ns)` for structured state collection
 - **Composable Namespaces**: Unlimited nesting depth through function composition
 - **JAX Transformation Safety**: Full compatibility with `jit`, `vmap`, `grad`, `scan`
 - **Error Handling**: Automatic namespace stack cleanup on exceptions
 - **MCMC Integration**: Used internally for acceptance tracking and diagnostics
 - **Mixed State**: Combine root-level and namespaced state in same computation
+- **Leaf Mode Benefits**: Store values directly at namespace paths without additional keys
 - **Performance**: Zero overhead when not using `@state` decorator
+
+**When to Use Each Mode**:
+- **Named Mode**: When you want explicit keys for multiple values in same namespace
+- **Leaf Mode**: When you want to store coordinates, vectors, or single values directly at namespace path
 
 ### Static vs Dynamic Arguments
 

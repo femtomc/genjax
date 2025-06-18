@@ -20,7 +20,8 @@ Primary API:
 
 Basic State Collection:
 - `state(f)`: Transform function to collect tagged state values
-- `save(**tagged_values)`: Recommended way to tag multiple values by name
+- `save(**tagged_values)`: Tag multiple values by name (named mode)
+- `save(*values)`: Save values directly at current namespace leaf (leaf mode)
 
 Hierarchical Organization:
 - `namespace(fn, ns)`: Transform function to collect state under namespace
@@ -46,13 +47,13 @@ result, state_dict = computation(5)
 # state_dict = {"intermediate": 6, "doubled": 10}
 ```
 
-Hierarchical organization:
+Hierarchical organization with named mode:
 ```python
 @state
 def complex_computation(x):
     save(input=x)
 
-    # Namespace for processing steps
+    # Namespace for processing steps (named mode)
     processing = namespace(
         lambda: save(step1=x*2, step2=x+1),
         "processing"
@@ -73,6 +74,30 @@ result, state_dict = complex_computation(5)
 #     "input": 5,
 #     "processing": {"step1": 10, "step2": 6},
 #     "analysis": {"stats": {"mean": 5}}
+# }
+```
+
+Leaf mode for direct namespace storage:
+```python
+@state
+def leaf_computation(x):
+    save(input=x)
+
+    # Leaf mode: save values directly at namespace (no additional keys)
+    coords = namespace(lambda: save(x, x*2, x*3), "coordinates")
+    coords()
+
+    # Mixed with named mode in different namespace
+    stats = namespace(lambda: save(mean=x, variance=x**2), "statistics")
+    stats()
+
+    return x
+
+result, state_dict = leaf_computation(5)
+# state_dict = {
+#     "input": 5,
+#     "coordinates": (5, 10, 15),  # Leaf mode: tuple stored directly
+#     "statistics": {"mean": 5, "variance": 25}  # Named mode: dict
 # }
 ```
 
@@ -197,14 +222,38 @@ class State(Pytree):
                 if name is None:
                     raise ValueError("tag_state requires a 'name' parameter")
                 values = list(invals) if invals else []
-                value = values if len(values) > 1 else (values[0] if values else None)
+                value = (
+                    tuple(values)
+                    if len(values) > 1
+                    else (values[0] if values else None)
+                )
 
-                # Handle namespace path using interpreter's stack
-                namespace_path = tuple(self.namespace_stack)
-                if namespace_path:
-                    _nested_dict_set(self.collected_state, namespace_path, name, value)
+                # Handle leaf mode storage (special case for save(*args))
+                if name == "__NAMESPACE_LEAF__":
+                    namespace_path = tuple(self.namespace_stack)
+                    if namespace_path:
+                        # Store directly at the namespace path (no additional key)
+                        current = self.collected_state
+                        for namespace in namespace_path[:-1]:
+                            if namespace not in current:
+                                current[namespace] = {}
+                            current = current[namespace]
+                        # Store at the final namespace level
+                        current[namespace_path[-1]] = value
+                    else:
+                        # If no namespace, we can't do leaf storage at root
+                        raise ValueError(
+                            "Leaf mode save() requires being inside a namespace"
+                        )
                 else:
-                    self.collected_state[name] = value
+                    # Handle namespace path using interpreter's stack (named mode)
+                    namespace_path = tuple(self.namespace_stack)
+                    if namespace_path:
+                        _nested_dict_set(
+                            self.collected_state, namespace_path, name, value
+                        )
+                    else:
+                        self.collected_state[name] = value
 
                 # The state primitive returns the values as-is due to multiple_results
                 outvals = values
@@ -338,6 +387,11 @@ def _namespace_push(namespace: str) -> None:
         return None
 
     def batch_rule(vector_args, dims, **params):
+        # Re-insert namespace push primitive under vmap
+        initial_style_bind(
+            namespace_push_p,
+            batch=batch_rule,  # Self-reference for nested vmaps
+        )(empty_fn, namespace=params.get("namespace"))()
         return (), ()
 
     initial_style_bind(
@@ -353,6 +407,11 @@ def _namespace_pop() -> None:
         return None
 
     def batch_rule(vector_args, dims, **params):
+        # Re-insert namespace pop primitive under vmap
+        initial_style_bind(
+            namespace_pop_p,
+            batch=batch_rule,  # Self-reference for nested vmaps
+        )(empty_fn)()
         return (), ()
 
     initial_style_bind(
@@ -395,12 +454,27 @@ def tag_state(*values: Any, name: str) -> Any:
 
     # Use initial_style_bind for proper JAX transformation compatibility
     def identity_fn(*args):
-        return args if len(args) > 1 else args[0]
+        return tuple(args) if len(args) > 1 else args[0]
 
-    # Create a simple batch rule that preserves the identity operation
+    # Create a batch rule that re-inserts the primitive under vmap
     def batch_rule(vector_args, dims, **params):
-        # For identity operation, we just return the args with the same dims
-        return vector_args, dims
+        # Re-insert the state primitive with the vectorized args
+        def vectorized_identity(*args):
+            return tuple(args) if len(args) > 1 else args[0]
+
+        # Apply the primitive to the vectorized args
+        result = initial_style_bind(
+            state_p,
+            batch=batch_rule,  # Self-reference for nested vmaps
+        )(vectorized_identity, name=params.get("name"))(*vector_args)
+
+        # Return result with appropriate batching dimensions
+        if isinstance(result, tuple):
+            # For multiple outputs, each has the same dims as inputs
+            return result, tuple(dims[0] if dims else () for _ in result)
+        else:
+            # For single output, return as tuple (JAX expects a sequence for dims_out)
+            return (result,), (dims[0] if dims else (),)
 
     result = initial_style_bind(
         state_p,
@@ -410,37 +484,57 @@ def tag_state(*values: Any, name: str) -> Any:
     return result
 
 
-def save(**tagged_values) -> dict[str, Any]:
-    """Save multiple values with their corresponding names (primary API).
+def save(*values, **tagged_values) -> Any:
+    """Save values either at current namespace leaf or with explicit names (primary API).
 
-    **This is the recommended way to tag state values.** It provides a clean,
-    convenient interface for tagging multiple values with different names in
-    a single call. Each value is tagged separately using the tag_state function.
+    **This is the recommended way to tag state values.** Supports two modes:
+
+    1. **Leaf mode** (`*args`): Save values directly at current namespace leaf
+    2. **Named mode** (`**kwargs`): Save values with explicit names (original behavior)
 
     Args:
-        **tagged_values: Keyword arguments where keys are names and
-                        values are the values to save.
+        *values: Values to save at current namespace leaf (mutually exclusive with **tagged_values)
+        **tagged_values: Keyword arguments where keys are names and values are the values to save
 
     Returns:
-        Dictionary of the same saved values (for convenience).
+        - Leaf mode: The values as a tuple (or single value if only one)
+        - Named mode: Dictionary of the saved values (for convenience)
 
     Example:
-        >>> x, y = 1, 2
-        >>> values = save(first=x, second=y)
-        >>> # values == {"first": 1, "second": 2}
-        >>> # When run through state(), both will be collected
-        >>>
+        Leaf mode (saves at current namespace):
         >>> @state
         >>> def computation():
-        ...     values = save(a=10, b=20, c=30)
+        ...     namespace_fn = namespace(lambda: save(1, 2, 3), "coords")
+        ...     namespace_fn()
+        ...     return 42
+        >>> result, state_dict = computation()
+        >>> # state_dict == {"coords": (1, 2, 3)}
+
+        Named mode (original behavior):
+        >>> @state
+        >>> def computation():
+        ...     values = save(first=1, second=2)
         ...     return sum(values.values())
         >>> result, state_dict = computation()
-        >>> # state_dict == {"a": 10, "b": 20, "c": 30}
+        >>> # state_dict == {"first": 1, "second": 2}
     """
-    result = {}
-    for name, value in tagged_values.items():
-        result[name] = tag_state(value, name=name)
-    return result
+    if values and tagged_values:
+        raise ValueError(
+            "Cannot use both positional args (*values) and keyword args (**tagged_values) in save()"
+        )
+
+    if values:
+        # Leaf mode: save values directly at current namespace leaf
+        # Use a special reserved name to indicate leaf storage
+        leaf_value = values if len(values) > 1 else values[0]
+        tag_state(leaf_value, name="__NAMESPACE_LEAF__")
+        return leaf_value
+    else:
+        # Named mode: original behavior with explicit names
+        result = {}
+        for name, value in tagged_values.items():
+            result[name] = tag_state(value, name=name)
+        return result
 
 
 def namespace(f: Callable[..., Any], ns: str) -> Callable[..., Any]:

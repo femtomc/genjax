@@ -37,7 +37,7 @@ class TestTagState:
 
         result, state_dict = computation(5)
         assert result == 16  # 6 + 10
-        assert state_dict == {"pair": [6, 10]}
+        assert state_dict == {"pair": (6, 10)}
 
     def test_multiple_separate_tags(self):
         """Test tagging multiple separate values."""
@@ -235,6 +235,76 @@ class TestStateWithJAXTransforms:
         )  # Get result, not state
         gradient = grad_computation(3.0)
         assert jnp.isclose(gradient, 6.0)  # d/dx(x^2) = 2x = 2*3 = 6
+
+    def test_state_after_vmap(self):
+        """Test applying state decorator after vmap."""
+
+        def base_computation(x):
+            y = x * 2
+            tag_state(y, name="doubled")
+            z = x + 3
+            tag_state(z, name="plus_three")
+            return y + z
+
+        # Apply vmap first, then state
+        vmapped_then_state = state(jax.vmap(base_computation))
+
+        x_array = jnp.array([1, 2, 3])
+        result, state_dict = vmapped_then_state(x_array)
+
+        expected_result = jnp.array([6, 9, 12])  # [1*2+1+3, 2*2+2+3, 3*2+3+3]
+        expected_doubled = jnp.array([2, 4, 6])  # [1*2, 2*2, 3*2]
+        expected_plus_three = jnp.array([4, 5, 6])  # [1+3, 2+3, 3+3]
+
+        assert jnp.allclose(result, expected_result)
+        assert jnp.allclose(state_dict["doubled"], expected_doubled)
+        assert jnp.allclose(state_dict["plus_three"], expected_plus_three)
+
+    def test_state_after_vmap_with_namespaces(self):
+        """Test applying state decorator after vmap with namespace functionality."""
+
+        def base_computation(x):
+            # Root level state
+            save(input=x)
+
+            # Namespaced state
+            processing_fn = namespace(
+                lambda y: save(step1=y * 2, step2=y + 10), "processing"
+            )
+            processing_fn(x)
+
+            # Leaf mode namespace
+            coords_fn = namespace(
+                lambda z: save(z, z * 3),  # Save tuple at leaf
+                "coords",
+            )
+            coords_fn(x)
+
+            return x * 5
+
+        # Apply vmap first, then state
+        vmapped_then_state = state(jax.vmap(base_computation))
+
+        x_array = jnp.array([2, 4])
+        result, state_dict = vmapped_then_state(x_array)
+
+        expected_result = jnp.array([10, 20])  # [2*5, 4*5]
+
+        assert jnp.allclose(result, expected_result)
+
+        # Check vectorized state collection
+        assert jnp.allclose(state_dict["input"], jnp.array([2, 4]))
+
+        # Check vectorized named mode namespace
+        assert jnp.allclose(state_dict["processing"]["step1"], jnp.array([4, 8]))
+        assert jnp.allclose(state_dict["processing"]["step2"], jnp.array([12, 14]))
+
+        # Check vectorized leaf mode namespace - should be tuple of arrays
+        coords_values = state_dict["coords"]
+        assert len(coords_values) == 2  # Tuple with 2 elements
+        # First element: array of z values, second element: array of z*3 values
+        assert jnp.allclose(coords_values[0], jnp.array([2, 4]))  # z values
+        assert jnp.allclose(coords_values[1], jnp.array([6, 12]))  # z*3 values
 
 
 class TestComplexStateScenarios:
@@ -689,4 +759,216 @@ class TestNamespace:
             "ns1": {"same_key": 4},
             "ns2": {"same_key": 6},
             "overwrite": {"key": 20},  # Second save overwrites first
+        }
+
+
+# =============================================================================
+# LEAF MODE SAVE TESTS
+# =============================================================================
+
+
+class TestSaveLeafMode:
+    """Test the new save(*args) leaf mode functionality."""
+
+    def test_save_single_value_leaf_mode(self):
+        """Test saving a single value at namespace leaf."""
+
+        @state
+        def computation(x):
+            save(root=x)
+
+            # Leaf mode: save single value at current namespace
+            leaf_fn = namespace(lambda y: save(y * 2), "coords")
+            leaf_fn(x)
+
+            return x
+
+        result, state_dict = computation(5)
+        assert result == 5
+        assert state_dict == {
+            "root": 5,
+            "coords": 10,  # Single value stored directly at namespace
+        }
+
+    def test_save_multiple_values_leaf_mode(self):
+        """Test saving multiple values as tuple at namespace leaf."""
+
+        @state
+        def computation(x):
+            save(root=x)
+
+            # Leaf mode: save multiple values as tuple at current namespace
+            leaf_fn = namespace(lambda y: save(y, y * 2, y * 3), "coords")
+            leaf_fn(x)
+
+            return x
+
+        result, state_dict = computation(3)
+        assert result == 3
+        assert state_dict == {
+            "root": 3,
+            "coords": (3, 6, 9),  # Multiple values stored as tuple
+        }
+
+    def test_save_leaf_mode_nested_namespaces(self):
+        """Test leaf mode with nested namespaces."""
+
+        @state
+        def computation(x):
+            save(root=x)
+
+            # Nested namespaces with leaf storage
+            deep_fn = namespace(namespace(lambda y: save(y * 10), "inner"), "outer")
+            deep_fn(x)
+
+            return x
+
+        result, state_dict = computation(4)
+        assert result == 4
+        assert state_dict == {
+            "root": 4,
+            "outer": {"inner": 40},  # Value stored at leaf of nested namespace
+        }
+
+    def test_save_leaf_mode_mixed_with_named_mode(self):
+        """Test mixing leaf mode and named mode in different namespaces."""
+
+        @state
+        def computation(x):
+            save(root=x)
+
+            # Named mode in one namespace
+            named_fn = namespace(lambda y: save(named_val=y * 2), "named")
+            named_fn(x)
+
+            # Leaf mode in another namespace
+            leaf_fn = namespace(lambda y: save(y * 3), "leaf")
+            leaf_fn(x)
+
+            return x
+
+        result, state_dict = computation(5)
+        assert result == 5
+        assert state_dict == {
+            "root": 5,
+            "named": {"named_val": 10},  # Named mode
+            "leaf": 15,  # Leaf mode
+        }
+
+    def test_save_leaf_mode_overwrite(self):
+        """Test that leaf mode overwrites values at same namespace."""
+
+        @state
+        def computation(x):
+            # Multiple leaf saves in same namespace should overwrite
+            overwrite_fn = namespace(
+                lambda y: [save(y), save(y * 10)],  # Second save overwrites first
+                "overwrite",
+            )
+            overwrite_fn(x)
+
+            return x
+
+        result, state_dict = computation(3)
+        assert result == 3
+        assert state_dict == {
+            "overwrite": 30  # Second value overwrites first
+        }
+
+    def test_save_leaf_mode_with_jax_arrays(self):
+        """Test leaf mode with JAX arrays."""
+
+        @state
+        def computation(x):
+            arr = jnp.array([1, 2, 3]) + x
+            save(root_array=arr)
+
+            # Leaf mode with array
+            array_fn = namespace(lambda y: save(y * 2), "array_ns")
+            array_fn(arr)
+
+            return jnp.sum(arr)
+
+        result, state_dict = computation(2)
+        expected_arr = jnp.array([3, 4, 5])
+
+        assert result == 12
+        assert jnp.allclose(state_dict["root_array"], expected_arr)
+        assert jnp.allclose(state_dict["array_ns"], expected_arr * 2)
+
+    def test_save_leaf_mode_error_at_root(self):
+        """Test that leaf mode raises error when used at root level."""
+
+        @state
+        def computation(x):
+            # This should raise an error - can't use leaf mode at root
+            save(x)  # No namespace context
+            return x
+
+        with pytest.raises(
+            ValueError, match="Leaf mode save\\(\\) requires being inside a namespace"
+        ):
+            computation(5)
+
+    def test_save_mixed_args_kwargs_error(self):
+        """Test that mixing *args and **kwargs raises error."""
+
+        @state
+        def computation(x):
+            # This should raise error - can't mix positional and keyword args
+            namespace_fn = namespace(
+                lambda y: save(y, named_val=y * 2),  # Mixed args and kwargs
+                "mixed",
+            )
+            return namespace_fn(x)
+
+        with pytest.raises(
+            ValueError, match="Cannot use both positional args.*and keyword args"
+        ):
+            computation(5)
+
+    def test_save_leaf_mode_return_value(self):
+        """Test that leaf mode returns the saved values correctly."""
+
+        @state
+        def computation(x):
+            # Test return value of leaf mode save
+            leaf_fn = namespace(
+                lambda y: save(y, y * 2),  # Should return tuple (y, y*2)
+                "return_test",
+            )
+            returned = leaf_fn(x)
+
+            # Use the returned value in computation
+            save(returned_sum=sum(returned))
+            return sum(returned)
+
+        result, state_dict = computation(3)
+        assert result == 9  # 3 + 6
+        assert state_dict == {
+            "return_test": (3, 6),  # Leaf mode storage
+            "returned_sum": 9,  # Using returned value
+        }
+
+    def test_save_leaf_mode_single_value_return(self):
+        """Test that leaf mode with single value returns scalar, not tuple."""
+
+        @state
+        def computation(x):
+            # Single value should return scalar
+            leaf_fn = namespace(
+                lambda y: save(y * 5),  # Should return scalar, not tuple
+                "single",
+            )
+            returned = leaf_fn(x)
+
+            # Check that returned is scalar (not tuple) by using it directly
+            save(returned_plus_one=returned + 1)
+            return returned
+
+        result, state_dict = computation(4)
+        assert result == 20
+        assert state_dict == {
+            "single": 20,  # Scalar storage
+            "returned_plus_one": 21,  # Can use scalar directly
         }
