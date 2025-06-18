@@ -4,6 +4,13 @@ JAX interpreter for inspecting tagged state inside JAX Python functions.
 This module provides a State interpreter that can collect tagged values from
 within JAX computations using a special `state_p` primitive. The interpreter
 follows the same patterns as the Seed interpreter for consistency.
+
+Primary API:
+- `save(**tagged_values)`: Recommended way to tag multiple values by name
+- `state(f)`: Transform function to collect tagged state values
+
+Lower-level API:
+- `tag_state(*values, name="...")`: Tag individual values for collection
 """
 
 from functools import wraps
@@ -162,17 +169,18 @@ def state(f: Callable[..., Any]):
         Function that returns a tuple of (original_result, collected_state).
 
     Example:
-        >>> from genjax.state import state, tag_state
+        >>> from genjax.state import state, save
         >>>
+        >>> @state
         >>> def computation(x):
         ...     y = x + 1
-        ...     tag_state(y, name="intermediate")
-        ...     return y * 2
+        ...     z = x * 2
+        ...     values = save(intermediate=y, doubled=z)
+        ...     return values["intermediate"] * 2
         >>>
-        >>> state_fn = state(computation)
-        >>> result, state_dict = state_fn(5)
+        >>> result, state_dict = computation(5)
         >>> print(result)  # 12
-        >>> print(state_dict)  # {"intermediate": 6}
+        >>> print(state_dict)  # {"intermediate": 6, "doubled": 10}
     """
 
     @wraps(f)
@@ -185,6 +193,9 @@ def state(f: Callable[..., Any]):
 
 def tag_state(*values: Any, name: str) -> Any:
     """Tag one or more values to be collected by the StateInterpreter.
+
+    **Note: Consider using `save(**tagged_values)` for most use cases, as it
+    provides a more convenient API for tagging multiple values.**
 
     This function marks values to be collected when the computation
     is run through the `state` transformation. The values are passed
@@ -205,6 +216,9 @@ def tag_state(*values: Any, name: str) -> Any:
         >>> a, b = tag_state(1, 2, name="pair")  # a == 1, b == 2
         >>> # When run through state() transformation,
         >>> # values will be collected in state dict
+        >>>
+        >>> # Prefer save() for multiple named values:
+        >>> values = save(x=42, y=24)  # More convenient
     """
     if not values:
         raise ValueError("tag_state requires at least one value")
@@ -226,13 +240,12 @@ def tag_state(*values: Any, name: str) -> Any:
     return result
 
 
-# Convenience function for saving multiple values
 def save(**tagged_values) -> dict[str, Any]:
-    """Save multiple values with their corresponding names.
+    """Save multiple values with their corresponding names (primary API).
 
-    This is a convenience function that allows saving multiple values
-    with different names in a single call. Each value is tagged separately
-    using the tag_state function.
+    **This is the recommended way to tag state values.** It provides a clean,
+    convenient interface for tagging multiple values with different names in
+    a single call. Each value is tagged separately using the tag_state function.
 
     Args:
         **tagged_values: Keyword arguments where keys are names and
