@@ -114,7 +114,6 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 - Check examples in the relevant directory for usage patterns
 - When unsure about approach, explore first with explicit "don't write code yet" statement
 
-
 ## Development Commands
 
 ### Setup
@@ -123,10 +122,7 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 pixi install              # Install dependencies
 ```
 
-**CUDA Support**: GenJAX automatically configures CUDA support on linux-64 systems when available. The environment includes:
-- CUDA-enabled JAX libraries for GPU acceleration
-- Automatic GPU detection and configuration
-- CUDA examples in localization and Game of Life case studies
+**JAX Backend**: GenJAX uses CPU-compatible JAX by default for maximum compatibility across environments. JAX will automatically detect and use GPU acceleration when available without requiring special configuration.
 
 ### Testing
 
@@ -160,9 +156,9 @@ pixi run -e faircoin python -m examples.faircoin.main --all        # All figures
 pixi run -e curvefit curvefit
 pixi run -e curvefit curvefit-all
 
-# CUDA examples (requires CUDA environment)
-pixi run -e cuda localization
-pixi run -e cuda gol
+# Other examples
+pixi run -e localization localization
+pixi run -e gol gol
 ```
 
 ### Documentation
