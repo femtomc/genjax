@@ -104,6 +104,28 @@ logp = normal.logpdf(x, mu, sigma)  # ✅ CORRECT
 normal.simulate(mu, sigma) # ✅ CORRECT
 ```
 
+**Creating Custom Distributions with `distribution()` helper**:
+
+When working with static parameters that need to survive JAX transformations, use the `distribution()` helper function:
+
+```python
+from genjax import distribution, const
+
+# ✅ CORRECT - Using distribution() helper for custom distributions
+@gen
+def model_with_custom_dist():
+    # Create distribution with static parameters using Const pattern
+    custom_normal = distribution(
+        _sample=lambda key, mu, sigma: ...,     # Sampling function
+        _logpdf=lambda x, mu, sigma: ...,       # Log density function
+        mu=const(0.0),                          # Static mean parameter
+        sigma=const(1.0)                        # Static std parameter
+    )
+    return custom_normal.simulate() @ "x"
+
+# The distribution() helper automatically handles Const fields properly
+```
+
 ### `@gen` Functions (`Fn` type)
 
 Transform JAX-compatible Python functions into generative functions:
@@ -275,6 +297,81 @@ trace = configurable_model.simulate(config, data)
 - **Pattern**: Use single vectorized `Trace`, not `[trace1, trace2, ...]`
 
 ## Common Error Patterns
+
+### Address Collision Detection
+
+**GenJAX now automatically detects duplicate addresses** at the same level in `@gen` functions:
+
+```python
+# ❌ ERROR - Address collision detected
+@gen
+def problematic_model():
+    x = normal(0.0, 1.0) @ "duplicate"  # First use
+    y = normal(2.0, 3.0) @ "duplicate"  # ❌ Same address!
+    return x + y
+
+# Error message includes location information:
+# ValueError: Address collision detected: 'duplicate' is used multiple times at the same level.
+# Each address in a generative function must be unique.
+# Function: function 'problematic_model' at /path/to/file.py:42
+# Location: file.py:44
+```
+
+**Address collision detection runs in all GFI methods**:
+- `simulate()`, `assess()`, `generate()`, `update()`, `regenerate()`
+- Provides clear error messages with function and line information
+- Helps debug complex generative functions with many addresses
+
+**Valid patterns that DON'T trigger collisions**:
+
+```python
+# ✅ CORRECT - Same address in different scopes
+@gen
+def inner():
+    return normal(0, 1) @ "x"
+
+@gen
+def outer():
+    a = inner() @ "call1"  # inner has address "x"
+    b = inner() @ "call2"  # inner has address "x" - this is fine!
+    return a + b
+    # Final structure: choices["call1"]["x"], choices["call2"]["x"]
+
+# ✅ CORRECT - Unique addresses at same level
+@gen
+def valid_model():
+    x = normal(0.0, 1.0) @ "first"
+    y = normal(2.0, 3.0) @ "second"  # Different address
+    return x + y
+```
+
+### Enhanced Error Reporting
+
+**GenJAX provides enhanced error messages** with source location information for debugging:
+
+```python
+# Error messages now include:
+# 1. Function name and file location where error occurs
+# 2. Specific line number of the problematic code
+# 3. Clear description of the issue and how to fix it
+
+# Example error output:
+# ValueError: Address collision detected: 'x' is used multiple times at the same level.
+# Each address in a generative function must be unique.
+# Function: function 'my_model' at /path/to/model.py:15
+# Location: model.py:18
+
+# Benefits:
+# - Quickly locate problematic code in large generative functions
+# - Stack trace filtering removes internal GenJAX frames
+# - Filters out beartype wrapper noise for cleaner error messages
+```
+
+**Error reporting improvements apply to**:
+- Address collision detection
+- Invalid trace operations
+- Type checking violations
+- GFI method constraint violations
 
 ### `LoweringSamplePrimitiveToMLIRException`
 
