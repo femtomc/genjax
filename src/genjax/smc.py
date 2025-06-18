@@ -439,3 +439,63 @@ def resample(
         n_samples=particles.n_samples,
         log_marginal_estimate=new_log_marginal_estimate,
     )
+
+
+def rejuvenation_smc(
+    initial_model: GFI[X, R],
+    extended_model: GFI[X, R],
+    transition_proposal: GFI[X, Any],
+    mcmc_kernel: Callable[[Trace[X, R]], Trace[X, R]],
+    observations: X,
+    change_mapping: Callable[[X], X],
+    n_particles: Const[int] = const(1000),
+) -> ParticleCollection:
+    """
+    Complete SMC algorithm with rejuvenation using jax.lax.scan.
+
+    Implements sequential Monte Carlo with particle extension, resampling,
+    and MCMC rejuvenation. Handles observations as Pytree structures.
+
+    Args:
+        initial_model: Starting generative function for first timestep
+        extended_model: Extended generative function for subsequent timesteps
+        transition_proposal: Proposal for extending particles at each timestep
+        mcmc_kernel: MCMC kernel for particle rejuvenation
+        observations: Sequence of observations (can be Pytree structure)
+        change_mapping: Function to map initial particles to extended model address space
+        n_particles: Number of particles to maintain
+
+    Returns:
+        Final ParticleCollection after processing all observations
+    """
+    # Extract first observation using tree_map (handles Pytree structure)
+    first_obs = jtu.tree_map(lambda x: x[0], observations)
+
+    # Initialize with first observation
+    particles = init(initial_model, (), n_particles, {"obs": first_obs})
+
+    # Map initial particles to extended model address space
+    particles = change(particles, extended_model, (), change_mapping)
+
+    def smc_step(particles, obs):
+        # Extend particles with transition proposal
+        particles = extend(particles, transition_proposal, extended_model, obs)
+
+        # Resample if needed
+        ess = particles.effective_sample_size()
+        particles = jax.lax.cond(
+            ess < n_particles.value // 2, lambda p: resample(p), lambda p: p, particles
+        )
+
+        # Optional rejuvenation
+        particles = rejuvenate(particles, mcmc_kernel)
+
+        return particles, particles  # (carry, output)
+
+    # Sequential updates using scan over remaining observations
+    # Slice remaining observations using tree_map (handles Pytree structure)
+    remaining_obs = jtu.tree_map(lambda x: x[1:], observations)
+
+    final_particles, all_particles = jax.lax.scan(smc_step, particles, remaining_obs)
+
+    return final_particles

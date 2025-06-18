@@ -24,6 +24,9 @@ from .core import (
 from .distributions import uniform
 from .state import save, state
 
+# Type alias for MCMC kernel functions
+MCMCKernel = Callable[[Trace[X, R]], Trace[X, R]]
+
 
 def compute_rhat(samples: jnp.ndarray) -> FloatArray:
     """
@@ -180,7 +183,7 @@ def mh(
     return final_trace
 
 
-def chain(mcmc_kernel: Callable[[Trace[X, R]], Trace[X, R]]):
+def chain(mcmc_kernel: MCMCKernel):
     """
     Higher-order function that creates MCMC chain algorithms from simple kernels.
 
