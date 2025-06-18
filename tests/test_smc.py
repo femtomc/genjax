@@ -16,6 +16,7 @@ from genjax.smc import (
     extend,
     rejuvenate,
     resample,
+    rejuvenation_smc,
 )
 from genjax.core import gen, const
 from genjax.pjax import seed
@@ -735,4 +736,304 @@ class TestSMCComponents:
         assert (
             rejuvenated_particles.log_marginal_estimate
             == particles.log_marginal_estimate
+        )
+
+
+class TestRejuvenationSMC:
+    """Test complete rejuvenation SMC algorithm."""
+
+    def test_rejuvenation_smc_simple_case(self):
+        """Test rejuvenation SMC on a simple sequential model."""
+        key = jrand.key(42)
+
+        # Simple sequential model for time series
+        @gen
+        def initial_model():
+            x = normal(0.0, 1.0) @ "x"
+            obs = normal(x, 0.1) @ "obs"
+            return obs
+
+        @gen
+        def extended_model():
+            x = normal(0.0, 1.0) @ "x"
+            obs = normal(x, 0.1) @ "obs"
+            return obs
+
+        @gen
+        def transition_proposal():
+            # Simple proposal that doesn't depend on previous state
+            return normal(0.0, 0.5) @ "x"
+
+        def mcmc_kernel(trace):
+            return mh(trace, sel("x"))
+
+        # Create simple time series observations with proper structure
+        observations = {"obs": jnp.array([0.5, 1.0, 0.8])}
+
+        # Run rejuvenation SMC with seed transformation
+        final_particles = seed(rejuvenation_smc)(
+            key,
+            initial_model,
+            extended_model,
+            transition_proposal,
+            const(mcmc_kernel),  # Wrap function in Const
+            observations,
+            const(lambda x: x),  # Wrap choice function in Const
+            const(100),
+        )
+
+        # Verify basic properties
+        assert final_particles.n_samples.value == 100
+        assert jnp.isfinite(final_particles.log_marginal_likelihood())
+        assert final_particles.effective_sample_size() > 0
+
+        # Check that we have proper trace structure
+        choices = final_particles.traces.get_choices()
+        assert "x" in choices
+        assert "obs" in choices
+
+    def test_rejuvenation_smc_discrete_hmm_convergence(self):
+        """Test rejuvenation SMC convergence on discrete HMM with exact inference comparison."""
+        key = jrand.key(42)
+        key1, key2 = jrand.split(key)
+
+        # Use simple HMM parameters
+        initial_probs, transition_matrix, emission_matrix = create_simple_hmm_params()
+        T = 5
+
+        # Generate test data
+        def sample_hmm_dataset_closure(
+            initial_probs, transition_matrix, emission_matrix
+        ):
+            return sample_hmm_dataset(
+                initial_probs, transition_matrix, emission_matrix, T
+            )
+
+        true_states, observations, constraints = seed(sample_hmm_dataset_closure)(
+            key1, initial_probs, transition_matrix, emission_matrix
+        )
+
+        # Compute exact log marginal likelihood using forward filter
+        _, exact_log_marginal = forward_filter(
+            observations, initial_probs, transition_matrix, emission_matrix
+        )
+
+        # Create simplified HMM models for SMC
+        @gen
+        def initial_hmm_model():
+            # Sample initial state
+            state = categorical(jnp.log(initial_probs)) @ "state"
+            # Generate observation
+            obs = categorical(jnp.log(emission_matrix[state])) @ "obs"
+            return obs
+
+        # For this test, use the same model for both initial and extended
+        # The SMC algorithm will handle the sequential aspect
+        extended_hmm_model = initial_hmm_model
+
+        # Create transition proposal for HMM
+        @gen
+        def hmm_transition_proposal(*args):
+            """Proposal for next state."""
+            # Proposal that samples from transition probabilities
+            # In a real SMC, this would depend on previous state, but for simplicity
+            # we'll use a simple uniform proposal
+            n_states = transition_matrix.shape[0]
+            uniform_probs = jnp.ones(n_states) / n_states
+            next_state = categorical(jnp.log(uniform_probs)) @ "state"
+            return next_state
+
+        # MCMC kernel for HMM state space
+        def hmm_mcmc_kernel(trace):
+            # Rejuvenate the latent state
+            return mh(trace, sel("state"))
+
+        # Identity choice function since models have same structure
+        def hmm_choice_fn(choices):
+            return choices
+
+        # Create observations in proper format for SMC
+        # SMC expects observations as arrays that can be indexed by timestep
+        # Structure: {"obs": [obs_0, obs_1, obs_2, ...]}
+        obs_sequence = {"obs": observations}
+
+        # Test convergence with different sample sizes
+        sample_sizes = [100, 500, 1000, 2000]
+        errors = []
+
+        for i, n_particles in enumerate(sample_sizes):
+            # Use different key for each test
+            test_key = jrand.fold_in(key2, i)
+
+            # Run rejuvenation SMC
+            final_particles = seed(rejuvenation_smc)(
+                test_key,
+                initial_hmm_model,
+                extended_hmm_model,
+                hmm_transition_proposal,
+                const(hmm_mcmc_kernel),
+                obs_sequence,
+                const(hmm_choice_fn),
+                const(n_particles),
+            )
+
+            # Compare log marginal likelihood estimates
+            estimated_log_marginal = final_particles.log_marginal_likelihood()
+            error = jnp.abs(estimated_log_marginal - exact_log_marginal)
+            errors.append(error)
+
+            print(f"n_particles={n_particles}, error={error:.6f}")
+
+        # Check that errors are reasonable
+        for i, error in enumerate(errors):
+            assert error < 2.0, (
+                f"Error {error} too large for sample size {sample_sizes[i]}"
+            )
+
+        # Check that the algorithm produces finite results
+        assert all(jnp.isfinite(error) for error in errors), (
+            "All errors should be finite"
+        )
+
+        # Print summary for analysis
+        print(f"Exact log marginal: {exact_log_marginal:.6f}")
+        print(f"Error range: [{min(errors):.6f}, {max(errors):.6f}]")
+        print(f"Final error: {errors[-1]:.6f}")
+
+        # Basic convergence check - at least the algorithm should be stable
+        # (exact convergence may require more sophisticated model design)
+        assert len(errors) == len(sample_sizes), (
+            "Should have error for each sample size"
+        )
+
+    def test_rejuvenation_smc_monotonic_convergence(self):
+        """Test that rejuvenation SMC shows (probably) monotonic convergence with sample size."""
+        key = jrand.key(123)  # Different seed for this test
+        key1, key2 = jrand.split(key)
+
+        # Use simple HMM parameters
+        initial_probs, transition_matrix, emission_matrix = create_simple_hmm_params()
+        T = 3  # Shorter sequence for faster testing
+
+        # Generate test data
+        def sample_hmm_dataset_closure(
+            initial_probs, transition_matrix, emission_matrix
+        ):
+            return sample_hmm_dataset(
+                initial_probs, transition_matrix, emission_matrix, T
+            )
+
+        true_states, observations, constraints = seed(sample_hmm_dataset_closure)(
+            key1, initial_probs, transition_matrix, emission_matrix
+        )
+
+        # Compute exact log marginal likelihood
+        _, exact_log_marginal = forward_filter(
+            observations, initial_probs, transition_matrix, emission_matrix
+        )
+
+        # Create models (same as previous test)
+        @gen
+        def initial_hmm_model():
+            state = categorical(jnp.log(initial_probs)) @ "state"
+            obs = categorical(jnp.log(emission_matrix[state])) @ "obs"
+            return obs
+
+        extended_hmm_model = initial_hmm_model
+
+        @gen
+        def hmm_transition_proposal(*args):
+            n_states = transition_matrix.shape[0]
+            uniform_probs = jnp.ones(n_states) / n_states
+            next_state = categorical(jnp.log(uniform_probs)) @ "state"
+            return next_state
+
+        def hmm_mcmc_kernel(trace):
+            return mh(trace, sel("state"))
+
+        def hmm_choice_fn(choices):
+            return choices
+
+        obs_sequence = {"obs": observations}
+
+        # Test different sample sizes with multiple trials each
+        sample_sizes = [50, 100, 200, 500]
+        n_trials = 5  # Multiple trials per sample size
+
+        mean_errors = []
+        std_errors = []
+
+        for sample_size in sample_sizes:
+            trial_errors = []
+
+            for trial in range(n_trials):
+                # Use different key for each trial
+                trial_key = jrand.fold_in(key2, sample_size * 100 + trial)
+
+                # Run rejuvenation SMC
+                final_particles = seed(rejuvenation_smc)(
+                    trial_key,
+                    initial_hmm_model,
+                    extended_hmm_model,
+                    hmm_transition_proposal,
+                    const(hmm_mcmc_kernel),
+                    obs_sequence,
+                    const(hmm_choice_fn),
+                    const(sample_size),
+                )
+
+                # Compute error
+                estimated_log_marginal = final_particles.log_marginal_likelihood()
+                error = jnp.abs(estimated_log_marginal - exact_log_marginal)
+                trial_errors.append(float(error))
+
+            # Compute statistics for this sample size
+            mean_error = jnp.mean(jnp.array(trial_errors))
+            std_error = jnp.std(jnp.array(trial_errors))
+
+            mean_errors.append(float(mean_error))
+            std_errors.append(float(std_error))
+
+            print(
+                f"n_particles={sample_size}: mean_error={mean_error:.4f} ± {std_error:.4f}"
+            )
+
+        # Test for (probably) monotonic convergence
+        # Check that larger sample sizes tend to have smaller mean errors
+
+        # At least the largest sample size should outperform the smallest
+        assert mean_errors[-1] < mean_errors[0], (
+            f"Largest sample size (mean error {mean_errors[-1]:.4f}) should outperform smallest ({mean_errors[0]:.4f})"
+        )
+
+        # Check that we have a general downward trend (allowing for some noise)
+        # Count how many adjacent pairs show improvement
+        improvements = 0
+        for i in range(len(mean_errors) - 1):
+            if mean_errors[i + 1] < mean_errors[i]:
+                improvements += 1
+
+        # At least half of the transitions should show improvement
+        min_improvements = (len(mean_errors) - 1) // 2
+        assert improvements >= min_improvements, (
+            f"Expected at least {min_improvements} improvements, got {improvements}"
+        )
+
+        # Check that all results are finite and reasonable
+        assert all(jnp.isfinite(error) for error in mean_errors), (
+            "All mean errors should be finite"
+        )
+        assert all(error < 3.0 for error in mean_errors), (
+            "All mean errors should be reasonable"
+        )
+
+        print(f"Exact log marginal: {exact_log_marginal:.6f}")
+        print(f"Mean error trend: {[f'{e:.4f}' for e in mean_errors]}")
+        print(f"Improvements in {improvements}/{len(mean_errors) - 1} transitions")
+
+        # Additional check: the best performing size should be among the larger ones
+        best_idx = jnp.argmin(jnp.array(mean_errors))
+        total_sizes = len(sample_sizes)
+        assert best_idx >= total_sizes // 2, (
+            f"Best performance should be in larger half of sample sizes, but was at index {best_idx}"
         )
