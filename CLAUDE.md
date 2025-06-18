@@ -20,7 +20,7 @@ genjax/
 │   ├── vi.py            # Variational inference algorithms
 │   └── adev.py          # Automatic differentiation for variational estimates
 ├── examples/            # Example applications and case studies
-│   ├── faircoin/        # Bayesian coin flipping example
+│   ├── faircoin/        # Beta-Bernoulli framework comparison (GenJAX vs NumPyro vs handcoded JAX)
 │   ├── curvefit/        # Curve fitting with multiple frameworks
 │   ├── localization/    # Particle filter localization
 │   └── gol/             # Game of Life inference
@@ -127,9 +127,11 @@ pixi run precommit-run    # Run pre-commit hooks
 ### Examples
 
 ```bash
-# Faircoin example
-pixi run -e faircoin faircoin-timing
-pixi run -e faircoin faircoin-comparison
+# Faircoin example - Beta-Bernoulli framework comparison
+pixi run -e faircoin faircoin-timing      # Timing comparison only
+pixi run -e faircoin faircoin-combined    # Combined timing + posterior figure (recommended)
+pixi run -e faircoin python -m examples.faircoin.main --posterior  # Posterior comparison only
+pixi run -e faircoin python -m examples.faircoin.main --all        # All figures
 
 # Curvefit example
 pixi run -e curvefit curvefit

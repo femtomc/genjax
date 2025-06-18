@@ -1,7 +1,12 @@
 """Command-line interface for fair coin timing comparison."""
 
 import argparse
-from examples.faircoin.figs import timing_comparison_fig
+from examples.faircoin.figs import (
+    timing_comparison_fig,
+    posterior_comparison_fig,
+    combined_comparison_fig,
+    save_all_figures,
+)
 
 
 def main():
@@ -10,7 +15,15 @@ def main():
         description="Fair coin (Beta-Bernoulli) timing comparison"
     )
     parser.add_argument(
-        "--comparison", action="store_true", help="Include Pyro in timing comparison"
+        "--posterior", action="store_true", help="Generate posterior comparison figure"
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="Generate all figures (timing + posterior)"
+    )
+    parser.add_argument(
+        "--combined",
+        action="store_true",
+        help="Generate combined figure (posterior + timing)",
     )
     parser.add_argument(
         "--num-obs", type=int, default=50, help="Number of observations (default: 50)"
@@ -30,21 +43,39 @@ def main():
 
     args = parser.parse_args()
 
-    print("Fair Coin (Beta-Bernoulli) Timing Comparison")
-    print("=" * 50)
+    print("Fair Coin (Beta-Bernoulli) Analysis")
+    print("=" * 40)
     print("Configuration:")
     print(f"  - Observations: {args.num_obs}")
     print(f"  - Timing repeats: {args.repeats}")
     print(f"  - Importance samples: {args.num_samples}")
-    print(f"  - Include Pyro: {args.comparison}")
+    print(f"  - Generate posterior: {args.posterior}")
+    print(f"  - Generate all: {args.all}")
+    print(f"  - Generate combined: {args.combined}")
     print()
 
-    timing_comparison_fig(
-        num_obs=args.num_obs,
-        repeats=args.repeats,
-        num_samples=args.num_samples,
-        include_pyro=args.comparison,
-    )
+    if args.all:
+        save_all_figures(
+            num_obs=args.num_obs,
+            num_samples=args.num_samples,
+        )
+    elif args.posterior:
+        posterior_comparison_fig(
+            num_obs=args.num_obs,
+            num_samples=args.num_samples,
+        )
+    elif args.combined:
+        combined_comparison_fig(
+            num_obs=args.num_obs,
+            num_samples=args.num_samples,
+        )
+    else:
+        # Default: timing comparison
+        timing_comparison_fig(
+            num_obs=args.num_obs,
+            repeats=args.repeats,
+            num_samples=args.num_samples,
+        )
 
 
 if __name__ == "__main__":
