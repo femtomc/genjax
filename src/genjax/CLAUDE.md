@@ -244,6 +244,54 @@ jit_model = jax.jit(seeded_model)
 vmap_model = modular_vmap(model.simulate, in_axes=(0,))
 ```
 
+### State Interpreter: Tagged Value Inspection
+
+The state interpreter allows you to inspect intermediate values within JAX computations using tagged values:
+
+```python
+from genjax.state import state, tag_state, save
+
+# Tag single values for inspection
+@state
+def computation(x):
+    y = x + 1
+    tagged_y = tag_state(y, name="intermediate")
+    return tagged_y * 2
+
+result, state_dict = computation(5)
+# result = 12, state_dict = {"intermediate": 6}
+
+# Tag multiple values at once
+@state  
+def multi_value_computation(x):
+    y = x + 1
+    z = x * 2
+    tagged_y, tagged_z = tag_state(y, z, name="pair")
+    return tagged_y + tagged_z
+
+result, state_dict = multi_value_computation(5)
+# result = 16, state_dict = {"pair": [6, 10]}
+
+# Convenience function for multiple named values
+@state
+def convenient_computation(x):
+    y = x + 1
+    z = x * 2
+    values = save(first=y, second=z)  # Returns {"first": y, "second": z}
+    return values["first"] + values["second"]
+
+result, state_dict = convenient_computation(5)
+# result = 16, state_dict = {"first": 6, "second": 10}
+```
+
+**JAX Compatibility**: The state interpreter works with all JAX transformations (`jit`, `vmap`, `grad`) by using `initial_style_bind` for proper JAX primitive handling.
+
+**Key Features**:
+- **Multiple value tagging**: `tag_state(a, b, c, name="multi")` 
+- **Required naming**: All tags must have a `name` parameter
+- **JAX transformation compatibility**: Works with `jit`, `vmap`, `grad`
+- **Convenience functions**: `save(x=val1, y=val2)` for multiple named values
+
 ### Static vs Dynamic Arguments
 
 JAX transformations make all arguments dynamic, but some GenJAX operations need static values:
@@ -394,6 +442,7 @@ trace = seeded_model(key)
 
 - **GFI**: Generative Function Interface (simulate, assess, generate, update, regenerate)
 - **PJAX**: Probabilistic extension to JAX with primitives `sample_p`, `log_density_p`
+- **State Interpreter**: JAX interpreter for inspecting tagged intermediate values
 - **Trace**: Execution record with choices, args, return value, score
 - **Score**: `log(1/P(choices))` - negative log probability
 
