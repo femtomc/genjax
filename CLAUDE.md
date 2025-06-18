@@ -73,9 +73,15 @@ Follow this four-step workflow for effective development:
 
 ### 4. Commit
 
-- Commit the result and create pull requests when appropriate
-- Update documentation (READMEs, changelogs) as needed
-- Ensure all tests pass before committing
+Follow this enhanced commit workflow to avoid failed commits and wasted time:
+
+1. **Check git status** - `git status` to see what files will be committed
+2. **Format code** - `pixi run format` to fix linting issues early
+3. **Run pre-commit hooks** - `pixi run precommit-run` to catch issues before commit
+4. **Stage changes** - `git add .` to stage all changes
+5. **Check diff** - `git diff --cached` to review staged changes
+6. **Commit with message** - Use proper commit message format
+7. **Push if requested** - Only push when user explicitly asks
 
 **Key insight**: Steps 1-2 are crucial - without them, Claude tends to jump straight to coding without proper understanding.
 
@@ -91,11 +97,22 @@ Follow this four-step workflow for effective development:
 - **NEVER create documentation files** unless explicitly requested
 - Focus on implementation tasks and working code
 
+### CRITICAL Efficiency Guidelines
+
+1. **Always read CLAUDE.md files first** - Check for directory-specific guidance before working
+2. **Use parallel tool calls** - Batch independent operations (git status + git diff, multiple file reads)
+3. **Use Task tool for complex searches** - When searches may require multiple rounds of exploration
+4. **Check existing patterns** - Read similar code before implementing new features
+5. **Test relevant modules** - After changing `src/genjax/X.py`, run `tests/test_X.py`
+6. **Avoid unnecessary files** - Only create files when absolutely required for the task
+7. **Use proper search tools** - Glob for file patterns, Grep for content, Task for open-ended exploration
+
 ### Workflow Tips
 
-- Use `pixi run format` before committing to ensure code style
-- Run `pixi run test-all` for comprehensive validation (tests + doctests)
+- Before any commit: `pixi run format` → `pixi run precommit-run` → `git add .` → commit
+- Use `pixi run test-all` for comprehensive validation (tests + doctests)
 - Check examples in the relevant directory for usage patterns
+- When unsure about approach, explore first with explicit "don't write code yet" statement
 
 ## Development Commands
 
