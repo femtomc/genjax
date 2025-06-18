@@ -91,9 +91,11 @@ localization = "pixi run python -m examples.localization.main"
 
 [tool.pixi.environments]
 default = { features = ["cuda"], solve-group = "default" }
+default-cpu = { solve-group = "default" }
 format = { features = ["format"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "docs" }
 test = { features = ["test", "cuda"], solve-group = "default" }
+test-cpu = { features = ["test"], solve-group = "default" }
 faircoin = { features = ["faircoin", "cuda"], solve-group = "default" }
 curvefit = { features = ["curvefit", "cuda"], solve-group = "default" }
 gol = { features = ["gol", "cuda"], solve-group = "default" }

@@ -20,7 +20,7 @@ jobs:
         locked: false
 
     - name: Run tests
-      run: pixi run test
+      run: pixi run -e test-cpu test
 
     - name: Run doctests
-      run: pixi run doctest
+      run: pixi run -e test-cpu doctest

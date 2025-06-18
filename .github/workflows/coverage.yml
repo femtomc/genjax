@@ -32,13 +32,13 @@ jobs:
         fi
 
     - name: Run comprehensive test suite
-      run: pixi run test
+      run: pixi run -e test-cpu test
 
     - name: Generate coverage report summary
       run: |
         echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        eval "$(pixi shell-hook -e test)" && coverage report --show-missing >> $GITHUB_STEP_SUMMARY
+        eval "$(pixi shell-hook -e test-cpu)" && coverage report --show-missing >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload to Codecov
