@@ -200,6 +200,7 @@ def init(
                 merged_choices, *target_args
             )
 
+
             # Compute importance weight: P/Q
             # target_weight is the weight from generate (density of model at merged choices)
             # proposal_score is log(1/P_proposal)
@@ -305,7 +306,7 @@ def change(
 def extend(
     particles: ParticleCollection,
     extended_target_gf: GFI[X, R],
-    extended_target_args: tuple,
+    extended_target_args: Any,  # Can be tuple or vectorized args
     constraints: X,
     extension_proposal: GFI[X, Any] = None,
 ) -> ParticleCollection:
@@ -331,12 +332,18 @@ def extend(
     """
 
     def _single_extension(
-        old_trace: Trace[X, R], old_log_weight: jnp.ndarray
+        old_trace: Trace[X, R], old_log_weight: jnp.ndarray, particle_args: Any
     ) -> tuple[Trace[X, R], jnp.ndarray]:
+        # Convert particle_args to tuple if it's not already
+        if isinstance(particle_args, tuple):
+            args = particle_args
+        else:
+            args = (particle_args,)
+            
         if extension_proposal is None:
-            # Generate with extended target using merged choices
+            # Generate with extended target using constraints
             new_trace, log_weight = extended_target_gf.generate(
-                constraints, *extended_target_args
+                constraints, *args
             )
 
             # Weight is just the target weight (no proposal correction needed)
@@ -344,7 +351,7 @@ def extend(
         else:
             # Use custom extension proposal
             # Sample extension from proposal
-            extension_trace = extension_proposal.simulate(*extended_target_args)
+            extension_trace = extension_proposal.simulate(*args)
             extension_choices = extension_trace.get_choices()
             proposal_score = extension_trace.get_score()
 
@@ -353,8 +360,9 @@ def extend(
 
             # Generate with extended target
             new_trace, log_weight = extended_target_gf.generate(
-                merged_choices, *extended_target_args
+                merged_choices, *args
             )
+
 
             # Importance weight: target_weight + proposal_score + old_weight
             new_log_weight = old_log_weight + log_weight + proposal_score
@@ -364,12 +372,12 @@ def extend(
     # Vectorize across particles
     vectorized_extension = modular_vmap(
         _single_extension,
-        in_axes=(0, 0),
+        in_axes=(0, 0, 0),  # Add axis for particle_args
         axis_size=particles.n_samples.value,
     )
 
     new_traces, new_log_weights = vectorized_extension(
-        particles.traces, particles.log_weights
+        particles.traces, particles.log_weights, extended_target_args
     )
 
     return ParticleCollection(
@@ -495,27 +503,27 @@ def resample(
 
 
 def rejuvenation_smc(
-    initial_model: GFI[X, R],
-    extended_model: GFI[X, R],
+    model: GFI[X, R],
     transition_proposal: GFI[X, Any],
     mcmc_kernel: Const[Callable[[Trace[X, R]], Trace[X, R]]],
     observations: X,
-    choice_fn: Const[Callable[[X], X]],
+    initial_model_args: tuple,
     n_particles: Const[int] = const(1000),
 ) -> ParticleCollection:
     """
     Complete SMC algorithm with rejuvenation using jax.lax.scan.
 
     Implements sequential Monte Carlo with particle extension, resampling,
-    and MCMC rejuvenation. Handles observations as Pytree structures.
+    and MCMC rejuvenation. Uses a single model with feedback loop where
+    the return value becomes the next timestep's arguments, creating
+    sequential dependencies.
 
     Args:
-        initial_model: Starting generative function for first timestep
-        extended_model: Extended generative function for subsequent timesteps
+        model: Single generative function where return value feeds into next timestep
         transition_proposal: Proposal for extending particles at each timestep
         mcmc_kernel: MCMC kernel for particle rejuvenation (wrapped in Const)
         observations: Sequence of observations (can be Pytree structure)
-        choice_fn: Function to map initial particles to extended model address space (wrapped in Const)
+        initial_model_args: Arguments for the first timestep
         n_particles: Number of particles to maintain
 
     Returns:
@@ -524,18 +532,20 @@ def rejuvenation_smc(
     # Extract first observation using tree_map (handles Pytree structure)
     first_obs = jtu.tree_map(lambda x: x[0], observations)
 
-    # Initialize with first observation
-    particles = init(initial_model, (), n_particles, first_obs)
-
-    # Map initial particles to extended model address space
-    particles = change(particles, extended_model, (), choice_fn.value)
+    # Initialize with first observation using the single model
+    particles = init(model, initial_model_args, n_particles, first_obs)
 
     def smc_step(particles, obs):
+        # Extract return values from current particles to use as next model args
+        # Get vectorized return values from all particles
+        current_retvals = particles.traces.get_retval()
+        
         # Extend particles with new observation constraints
+        # Use current return values as the model arguments for the next step
         particles = extend(
             particles,
-            extended_model,
-            (),
+            model,
+            current_retvals,  # Feed return values as next model args
             obs,
             extension_proposal=transition_proposal,
         )
