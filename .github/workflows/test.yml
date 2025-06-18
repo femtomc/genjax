@@ -18,6 +18,7 @@ jobs:
       with:
         pixi-version: v0.48.1
         locked: false
+        environments: test-cpu
 
     - name: Run tests
       run: pixi run -e test-cpu test
