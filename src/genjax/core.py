@@ -2036,7 +2036,18 @@ def gen(fn: Callable[..., R]) -> Fn[R]:
         >>> choices = trace.get_choices()
         >>> # choices will contain {"x": <value>, "y": <value>}
     """
-    return Fn(source=const(fn))
+    gf = Fn(source=const(fn))
+    # Copy function metadata to preserve name and module information
+    try:
+        gf.__name__ = fn.__name__
+        gf.__qualname__ = fn.__qualname__
+        gf.__module__ = fn.__module__
+        gf.__doc__ = fn.__doc__
+        gf.__annotations__ = getattr(fn, "__annotations__", {})
+    except (AttributeError, TypeError):
+        # If we can't set these attributes (e.g., on frozen dataclasses), continue anyway
+        pass
+    return gf
 
 
 ########

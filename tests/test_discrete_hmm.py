@@ -16,11 +16,12 @@ import tensorflow_probability.substrates.jax as tfp
 
 
 # GenJAX imports
+from genjax.core import const
 from genjax.pjax import seed
 
-# Import HMM implementation from the same directory
-from discrete_hmm import (
-    discrete_hmm_model_factory,
+# Import HMM implementation from extras module
+from genjax import (
+    discrete_hmm,
     forward_filter,
     forward_filtering_backward_sampling,
     compute_sequence_log_prob,
@@ -182,11 +183,9 @@ class TestDiscreteHMMAgainstTFP:
         T = 10
         n_samples = 1000
 
-        # Sample from GenJAX model using vectorization with seed transformation
-        discrete_hmm_model = discrete_hmm_model_factory(T)
-        vectorized_model = discrete_hmm_model.repeat(n_samples)
+        vectorized_model = discrete_hmm.repeat(n_samples)
         vectorized_trace = seed(vectorized_model.simulate)(
-            key, initial_probs, transition_matrix, emission_matrix
+            key, const(T), initial_probs, transition_matrix, emission_matrix
         )
         genjax_samples = vectorized_trace.get_retval()
 

@@ -7,9 +7,8 @@ algorithm that can be used to test approximate inference implementations in GenJ
 
 import jax
 import jax.numpy as jnp
-from typing import Tuple
 
-from genjax.core import gen, Pytree, get_choices, Scan, Const
+from genjax.core import gen, Pytree, get_choices, Scan, Const, const
 from genjax.distributions import categorical
 
 
@@ -48,8 +47,7 @@ def hmm_step(carry, x):
     return new_carry, obs
 
 
-@gen
-def discrete_hmm_model(
+def _discrete_hmm(
     T: Const[int],  # Number of time steps (static parameter)
     initial_probs: jnp.ndarray,  # Shape: (K,) - initial state probabilities
     transition_matrix: jnp.ndarray,  # Shape: (K, K) - transition probabilities
@@ -83,31 +81,8 @@ def discrete_hmm_model(
     return all_obs
 
 
-def discrete_hmm_model_factory(T: int):
-    """
-    Factory function to create HMM models with static length.
-
-    Deprecated: Use discrete_hmm_model() with Const[int] parameter instead.
-
-    Args:
-        T: Number of time steps (must be static, > 1)
-
-    Returns:
-        Generative function for HMM with fixed length T
-    """
-
-    # Create a generative function that uses the new model with Const parameter
-    @gen
-    def hmm_model_closure(initial_probs, transition_matrix, emission_matrix):
-        result = (
-            discrete_hmm_model(
-                Const(T), initial_probs, transition_matrix, emission_matrix
-            )
-            @ "model"
-        )
-        return result
-
-    return hmm_model_closure
+# Apply the @gen decorator explicitly
+discrete_hmm = gen(_discrete_hmm)
 
 
 def forward_filter(
@@ -115,7 +90,7 @@ def forward_filter(
     initial_probs: jnp.ndarray,
     transition_matrix: jnp.ndarray,
     emission_matrix: jnp.ndarray,
-) -> Tuple[jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray]:
     """
     Forward filtering algorithm for discrete HMM.
 
@@ -307,7 +282,7 @@ def sample_hmm_dataset(
     transition_matrix: jnp.ndarray,
     emission_matrix: jnp.ndarray,
     T: int,
-) -> Tuple[jnp.ndarray, jnp.ndarray, dict]:
+) -> tuple[jnp.ndarray, jnp.ndarray, dict]:
     """
     Sample a dataset from the discrete HMM model.
 
@@ -320,10 +295,7 @@ def sample_hmm_dataset(
     Returns:
         Tuple of (true_states, observations, constraints)
     """
-    # Use the new discrete_hmm_model with Const[...] pattern directly
-    from genjax.core import const
-
-    trace = discrete_hmm_model.simulate(
+    trace = discrete_hmm.simulate(
         const(T), initial_probs, transition_matrix, emission_matrix
     )
 

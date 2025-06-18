@@ -107,6 +107,7 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 - **Eliminate sycophancy** - no "I'd be happy to help" or similar pleasantries
 - **Ask questions** - clarify requirements rather than making assumptions
 - **Don't commit failures** - if you fail to solve a problem, don't commit partial/broken solutions
+- **🔥 NEVER RUN INLINE PYTHON** - ALWAYS write test scripts for debugging, testing imports, or validation. This is CRITICAL for reproducibility and proper testing practices.
 
 ### CRITICAL Documentation Policy
 
