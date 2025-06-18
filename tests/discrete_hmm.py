@@ -74,7 +74,7 @@ def discrete_hmm_model(
     initial_obs = categorical(jnp.log(emission_matrix[initial_state])) @ "obs_0"
 
     # Use Scan for remaining steps (T.value is static)
-    scan_fn = Scan(hmm_step, length=T.value - 1)
+    scan_fn = Scan(hmm_step, length=T - 1)
     init_carry = (initial_state, transition_matrix, emission_matrix)
     final_carry, remaining_obs = scan_fn(init_carry, None) @ "scan_steps"
 

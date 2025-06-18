@@ -128,7 +128,7 @@ def hmm_proposal(
         return new_carry, next_state
 
     # Use Scan for remaining states (T.value is static)
-    scan_fn = Scan(state_step, length=T.value - 1)
+    scan_fn = Scan(state_step, length=T - 1)
     init_carry = (initial_state, transition_matrix)
     final_carry, remaining_states = scan_fn(init_carry, None) @ "scan_steps"
 

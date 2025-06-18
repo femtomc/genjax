@@ -407,7 +407,7 @@ def test_scan_simulate_vs_manual_density(base_key, standard_tolerance, helpers):
     # Create scan generative function with Const[int] for static length
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(add_normal_step, length=length.value)
+        scan_gf = Scan(add_normal_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
@@ -484,7 +484,7 @@ def test_scan_assess_vs_manual_density(standard_tolerance, helpers):
     # Create scan generative function with Const[int] for static length
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(exponential_step, length=length.value)
+        scan_gf = Scan(exponential_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
@@ -568,7 +568,7 @@ def test_scan_simulate_assess_consistency(base_key, standard_tolerance, helpers)
     # Create scan generative function with Const[int] for static length
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(complex_step, length=length.value)
+        scan_gf = Scan(complex_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
@@ -633,7 +633,7 @@ def test_empty_scan(helpers):
 
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(simple_step, length=length.value)
+        scan_gf = Scan(simple_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     # Empty inputs
@@ -669,7 +669,7 @@ def test_single_step_scan(base_key, standard_tolerance, helpers):
 
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(single_step, length=length.value)
+        scan_gf = Scan(single_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     # Single input
@@ -715,7 +715,7 @@ def test_scan_with_different_lengths(length, base_key, standard_tolerance, helpe
 
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(accumulating_step, length=length.value)
+        scan_gf = Scan(accumulating_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     init_carry = 0.0
