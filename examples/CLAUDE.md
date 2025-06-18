@@ -37,12 +37,14 @@ examples/{case_study_name}/
 ## File Responsibilities
 
 ### `CLAUDE.md` (REQUIRED)
+
 - **Purpose**: Provides Claude Code with case study-specific guidance
 - **Template**: Follow the pattern established in existing case studies
 - **Sections**: Overview, Directory Structure, Code Organization, Key Implementation Details, Usage Patterns, Development Guidelines
 - **Critical**: Must document model specifications, data patterns, and performance expectations
 
 ### `main.py` (REQUIRED)
+
 - **Purpose**: Command-line interface for the case study
 - **Pattern**: Use `argparse` for CLI arguments
 - **Default parameters**: Provide sensible defaults for quick testing
@@ -50,6 +52,7 @@ examples/{case_study_name}/
 - **Example**: Support `--all`, `--timing`, `--comparison` flags
 
 ### `core.py` (REQUIRED)
+
 - **Purpose**: Model definitions, inference algorithms, timing utilities
 - **GenJAX models**: Use `@gen` decorator with proper type annotations
 - **Timing functions**: Include benchmarking utilities with proper warm-up
@@ -57,12 +60,14 @@ examples/{case_study_name}/
 - **Consistent naming**: `{framework}_timing()`, `{framework}_inference()` patterns
 
 ### `data.py` (REQUIRED)
+
 - **Purpose**: Standardized data generation across all frameworks
 - **Consistency**: Same random seeds and data patterns for fair comparison
 - **Reusability**: Functions that can be imported by other case studies
 - **Documentation**: Clear docstrings explaining data generation process
 
 ### `figs.py` (REQUIRED)
+
 - **Purpose**: All visualization and figure generation code
 - **Research quality**: 300 DPI, large fonts (18-22pt), publication-ready
 - **Parametrized filenames**: Include experimental parameters in output names
@@ -70,6 +75,7 @@ examples/{case_study_name}/
 - **Consistent styling**: Use established color schemes and formatting
 
 ### `figs/` directory (REQUIRED)
+
 - **Purpose**: Output directory for generated figures
 - **Format**: Prefer PDF for research publications
 - **Naming**: Parametrized filenames with experimental configuration
@@ -165,43 +171,42 @@ Each case study should integrate with the top-level `pyproject.toml`:
 When creating or modifying case studies:
 
 ### 1. **Read existing CLAUDE.md**
+
 - Understand case study-specific patterns and constraints
 - Follow established model specifications and data patterns
 
 ### 2. **Follow standard structure**
+
 - Create all required files (`main.py`, `core.py`, `data.py`, `figs.py`)
 - Create `figs/` directory for outputs
 - Write comprehensive `CLAUDE.md` with case study guidance
 
 ### 3. **Implement consistent patterns**
+
 - Use established naming conventions
 - Follow timing benchmark standards
 - Generate research-quality figures
 - Support standard CLI arguments
 
 ### 4. **Test thoroughly**
+
 - Run all figure generation modes
 - Verify framework comparison fairness
 - Check research paper quality of outputs
 
 ### 5. **Document properly**
+
 - Update case study `CLAUDE.md` with implementation details
 - Document any special requirements or dependencies
 
 ## Common Patterns
 
 ### Framework Comparisons
-- **GenJAX**: Clean syntax, competitive performance
-- **NumPyro**: Mature ecosystem, reasonable overhead for complex models
-- **Handcoded JAX**: Performance baseline reference
-- **Pyro**: Feature-rich, higher overhead (optional in comparisons)
 
-### Performance Expectations
-- GenJAX should achieve ~100% of handcoded JAX performance
-- NumPyro typically ~400% of handcoded JAX (acceptable for complex models)
 - All frameworks should implement identical algorithms for fair comparison
 
 ### Data Consistency
+
 - Use identical random seeds across frameworks
 - Generate same data patterns for meaningful comparisons
 - Document any framework-specific data transformations
@@ -209,12 +214,14 @@ When creating or modifying case studies:
 ## Quality Standards
 
 ### Research Publication Ready
+
 - **Figures**: 300 DPI PDF output with large fonts (18-22pt)
 - **Documentation**: Clear mathematical model specifications
 - **Reproducibility**: Fixed seeds and documented parameters
 - **Performance**: Statistical rigor with multiple timing runs
 
 ### Code Quality
+
 - **Type hints**: Use proper GenJAX patterns (`Const[int]`, etc.)
 - **Documentation**: Comprehensive docstrings and comments
 - **Testing**: Verify outputs across different parameter settings
@@ -223,6 +230,7 @@ When creating or modifying case studies:
 ## Integration Guidelines
 
 ### Adding New Case Studies
+
 1. Create directory structure following the standard format
 2. Implement all required files with proper patterns
 3. Add pixi task integration to top-level `pyproject.toml`
@@ -230,6 +238,7 @@ When creating or modifying case studies:
 5. Test thoroughly across all supported modes
 
 ### Modifying Existing Case Studies
+
 1. Read the case study's `CLAUDE.md` for specific guidance
 2. Maintain backward compatibility with existing CLI arguments
 3. Follow established model specifications and data patterns
