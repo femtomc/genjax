@@ -8,9 +8,11 @@ follows the same patterns as the Seed interpreter for consistency.
 
 from functools import wraps
 
+import jax.extend as jex
 import jax.tree_util as jtu
 from jax.extend.core import Jaxpr
-from jax.util import safe_map
+from jax.util import safe_map, split_list
+from jax.lax import scan_p, scan
 
 from genjax.core import (
     Callable,
@@ -76,6 +78,48 @@ class State(Pytree):
                 )
                 # The state primitive returns the values as-is due to multiple_results
                 outvals = values
+
+            elif primitive == scan_p:
+                # Handle scan primitive by transforming body to collect state
+                body_jaxpr = params["jaxpr"]
+                length = params["length"]
+                reverse = params["reverse"]
+                num_consts = params["num_consts"]
+                num_carry = params["num_carry"]
+                const_vals, carry_vals, xs_vals = split_list(
+                    invals, [num_consts, num_carry]
+                )
+
+                body_fun = jex.core.jaxpr_as_fun(body_jaxpr)
+
+                def new_body(carry, scanned_in):
+                    in_carry = carry
+                    all_values = const_vals + jtu.tree_leaves((in_carry, scanned_in))
+                    # Apply state transformation to the body
+                    body_result, body_state = state(body_fun)(*all_values)
+                    # Split the body result back into carry and scan parts
+                    out_carry, out_scan = split_list(
+                        jtu.tree_leaves(body_result), [num_carry]
+                    )
+                    # Return carry, scan output, and collected state
+                    return out_carry, (out_scan, body_state)
+
+                flat_carry_out, (scanned_out, scan_states) = scan(
+                    new_body,
+                    carry_vals,
+                    xs_vals,
+                    length=length,
+                    reverse=reverse,
+                )
+
+                # Merge vectorized scan states into collected state
+                # scan_states is already vectorized by scan - just merge it
+                for name, vectorized_values in scan_states.items():
+                    self.collected_state[name] = vectorized_values
+
+                outvals = jtu.tree_leaves(
+                    (flat_carry_out, scanned_out),
+                )
 
             else:
                 # For all other primitives, use normal JAX evaluation
