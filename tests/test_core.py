@@ -1330,6 +1330,135 @@ class TestErrorHandlingAndEdgeCases:
         assert jnp.allclose(trace.get_retval(), jnp.array(1.0))
 
 
+class TestAddressCollisionDetection:
+    """Test address collision detection in @gen functions."""
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_address_collision_simulate(self):
+        """Test that simulate detects address collisions."""
+
+        @gen
+        def bad_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(2.0, 3.0) @ "x"  # Same address - should error
+            return x + y
+
+        with pytest.raises(
+            ValueError, match="Address collision detected: 'x' is used multiple times"
+        ):
+            bad_model.simulate()
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_address_collision_assess(self):
+        """Test that assess detects address collisions."""
+
+        @gen
+        def bad_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(2.0, 3.0) @ "x"  # Same address - should error
+            return x + y
+
+        choices = {"x": 1.0}
+
+        with pytest.raises(
+            ValueError, match="Address collision detected: 'x' is used multiple times"
+        ):
+            bad_model.assess(choices)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_address_collision_generate(self):
+        """Test that generate detects address collisions."""
+
+        @gen
+        def bad_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(2.0, 3.0) @ "x"  # Same address - should error
+            return x + y
+
+        constraints = {"x": 1.5}
+
+        with pytest.raises(
+            ValueError, match="Address collision detected: 'x' is used multiple times"
+        ):
+            bad_model.generate(constraints)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_no_collision_with_unique_addresses(self):
+        """Test that unique addresses work correctly."""
+
+        @gen
+        def good_model():
+            x = normal(0.0, 1.0) @ "x"
+            y = normal(2.0, 3.0) @ "y"  # Different address - should work
+            return x + y
+
+        # All GFI methods should work without error
+        trace = good_model.simulate()
+        assert "x" in trace.get_choices()
+        assert "y" in trace.get_choices()
+
+        choices = trace.get_choices()
+        log_density, retval = good_model.assess(choices)
+        assert jnp.isfinite(log_density)
+
+        trace2, weight = good_model.generate(choices)
+        assert jnp.isfinite(weight)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_nested_addressing_no_collision(self):
+        """Test that nested addressing doesn't trigger false positives."""
+
+        @gen
+        def inner_model():
+            return normal(0.0, 1.0) @ "x"
+
+        @gen
+        def outer_model():
+            a = inner_model() @ "inner1"
+            b = inner_model() @ "inner2"  # Different top-level addresses
+            return a + b
+
+        # Should work fine - the "x" addresses are at different levels
+        trace = outer_model.simulate()
+        choices = trace.get_choices()
+
+        # Should have nested structure
+        assert "inner1" in choices
+        assert "inner2" in choices
+        assert "x" in choices["inner1"]
+        assert "x" in choices["inner2"]
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_collision_error_message_contains_address(self):
+        """Test that error message contains the colliding address name."""
+
+        @gen
+        def bad_model():
+            value1 = normal(0.0, 1.0) @ "my_special_address"
+            value2 = normal(2.0, 3.0) @ "my_special_address"  # Same address
+            return value1 + value2
+
+        with pytest.raises(ValueError) as exc_info:
+            bad_model.simulate()
+
+        error_message = str(exc_info.value)
+        assert "my_special_address" in error_message
+        assert "Address collision detected" in error_message
+        assert "used multiple times" in error_message
+
+
 class TestUpdateAndRegenerate:
     """Test update and regenerate methods for GFI implementations."""
 

@@ -114,6 +114,7 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 - Check examples in the relevant directory for usage patterns
 - When unsure about approach, explore first with explicit "don't write code yet" statement
 
+
 ## Development Commands
 
 ### Setup
@@ -121,6 +122,11 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 ```bash
 pixi install              # Install dependencies
 ```
+
+**CUDA Support**: GenJAX automatically configures CUDA support on linux-64 systems when available. The environment includes:
+- CUDA-enabled JAX libraries for GPU acceleration
+- Automatic GPU detection and configuration
+- CUDA examples in localization and Game of Life case studies
 
 ### Testing
 

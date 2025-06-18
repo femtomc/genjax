@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import overload
+import inspect
 
 import beartype.typing as btyping
 import jax.numpy as jnp
@@ -1409,6 +1410,145 @@ def tfp_distribution(
 ######
 
 
+def _get_generative_function_info(gen_fn: "GFI") -> str:
+    """Extract source information from a generative function.
+
+    Args:
+        gen_fn: The generative function to get info from
+
+    Returns:
+        String describing the function location and name
+    """
+    try:
+        if hasattr(gen_fn, "source") and hasattr(gen_fn.source, "value"):
+            # This is a Fn with a source function
+            func = gen_fn.source.value
+            if hasattr(func, "__name__"):
+                func_name = func.__name__
+                try:
+                    file_path = inspect.getfile(func)
+                    line_no = inspect.findsource(func)[1] + 1
+                    return f"function '{func_name}' at {file_path}:{line_no}"
+                except (OSError, TypeError):
+                    return f"function '{func_name}'"
+            else:
+                return "anonymous function"
+        elif hasattr(gen_fn, "__class__"):
+            # This might be a Distribution or other GFI implementation
+            class_name = gen_fn.__class__.__name__
+            if (
+                hasattr(gen_fn, "name")
+                and hasattr(gen_fn.name, "value")
+                and gen_fn.name.value
+            ):
+                return f"{class_name} '{gen_fn.name.value}'"
+            else:
+                return f"{class_name}"
+        else:
+            return "unknown generative function"
+    except Exception:
+        # Fallback if anything goes wrong with inspection
+        return "generative function"
+
+
+def _get_current_call_location() -> str:
+    """Get the current call location where the @ operator is being used.
+
+    Returns:
+        String describing the file and line where addressing is happening
+    """
+    try:
+        # Walk up the stack to find the first frame outside of GenJAX core and beartype
+        frame = inspect.currentframe()
+        while frame:
+            frame = frame.f_back
+            if frame is None:
+                break
+
+            filename = frame.f_code.co_filename
+            function_name = frame.f_code.co_name
+
+            # Skip frames that are:
+            # 1. In the GenJAX core module
+            # 2. Beartype wrappers
+            # 3. Internal Python machinery
+            skip_conditions = [
+                filename.endswith("core.py"),
+                "beartype" in filename,
+                function_name.startswith("__"),
+                function_name
+                in ["trace", "simulate", "assess", "generate", "update", "regenerate"],
+            ]
+
+            if not any(skip_conditions):
+                line_no = frame.f_lineno
+                # Just show the basename of the file for cleaner output
+                basename = filename.split("/")[-1] if "/" in filename else filename
+                return f"{basename}:{line_no}"
+
+        # If we can't find a good frame, just return basic info
+        return "unknown location"
+    except Exception:
+        return "unknown location"
+
+
+def _check_address_collision(
+    addr: str, trace_map: dict[str, Any], gen_fn: "GFI" = None
+) -> None:
+    """Check for address collision and raise ValueError if detected.
+
+    Args:
+        addr: The address being used
+        trace_map: Dictionary tracking addresses already used
+        gen_fn: Optional generative function for context
+
+    Raises:
+        ValueError: If the address has already been used
+    """
+    if addr in trace_map:
+        # Get location information
+        func_info = (
+            _get_generative_function_info(gen_fn) if gen_fn else "generative function"
+        )
+        call_location = _get_current_call_location()
+
+        raise ValueError(
+            f"Address collision detected: '{addr}' is used multiple times at the same level.\n"
+            f"Each address in a generative function must be unique.\n"
+            f"Function: {func_info}\n"
+            f"Location: {call_location}"
+        )
+
+
+def _check_address_collision_visited(
+    addr: str, visited_addresses: set[str], gen_fn: "GFI" = None
+) -> None:
+    """Check for address collision using a visited set and raise ValueError if detected.
+
+    Args:
+        addr: The address being used
+        visited_addresses: Set tracking addresses already visited
+        gen_fn: Optional generative function for context
+
+    Raises:
+        ValueError: If the address has already been visited
+    """
+    if addr in visited_addresses:
+        # Get location information
+        func_info = (
+            _get_generative_function_info(gen_fn) if gen_fn else "generative function"
+        )
+        call_location = _get_current_call_location()
+
+        raise ValueError(
+            f"Address collision detected: '{addr}' is used multiple times at the same level.\n"
+            f"Each address in a generative function must be unique.\n"
+            f"Function: {func_info}\n"
+            f"Location: {call_location}"
+        )
+    visited_addresses.add(addr)
+
+
 @dataclass
 class Simulate:
     """Handler for simulating generative function executions.
@@ -1418,10 +1558,12 @@ class Simulate:
     Args:
         score: Cumulative log probability score.
         trace_map: Mapping from addresses to trace objects.
+        parent_fn: Optional reference to the @gen function being executed.
     """
 
     score: Weight
     trace_map: dict[str, Any]
+    parent_fn: "GFI" = None
 
     def __call__(
         self,
@@ -1431,6 +1573,10 @@ class Simulate:
         kwargs=None,
     ) -> R:
         kwargs = kwargs or {}
+
+        # Check for address collision
+        _check_address_collision(addr, self.trace_map, self.parent_fn or gen_fn)
+
         tr = gen_fn.simulate(*args, **kwargs)
         self.score += tr.get_score()
         self.trace_map[addr] = tr
@@ -1443,6 +1589,7 @@ class Generate:
     score: Weight
     weight: Weight
     trace_map: dict[str, Any]
+    parent_fn: "GFI" = None
 
     def __call__(
         self,
@@ -1452,6 +1599,10 @@ class Generate:
         kwargs=None,
     ) -> R:
         kwargs = kwargs or {}
+
+        # Check for address collision
+        _check_address_collision(addr, self.trace_map, self.parent_fn or gen_fn)
+
         x = (
             get_choices(
                 self.choice_map[addr],
@@ -1470,6 +1621,8 @@ class Generate:
 class Assess:
     choice_map: dict[str, Any]
     logp: Density
+    visited_addresses: set[str] = field(default_factory=set)
+    parent_fn: "GFI" = None
 
     def __call__(
         self,
@@ -1479,6 +1632,12 @@ class Assess:
         kwargs=None,
     ) -> R:
         kwargs = kwargs or {}
+
+        # Check for address collision
+        _check_address_collision_visited(
+            addr, self.visited_addresses, self.parent_fn or gen_fn
+        )
+
         x = self.choice_map[addr]
         x = get_choices(x)
         logp, r = gen_fn.assess(x, *args, **kwargs)
@@ -1494,6 +1653,7 @@ class Update(Generic[R]):
     discard: dict[str, Any]
     score: Score
     weight: Weight
+    parent_fn: "GFI" = None
 
     def __call__(
         self,
@@ -1503,6 +1663,10 @@ class Update(Generic[R]):
         kwargs=None,
     ) -> R:
         kwargs = kwargs or {}
+
+        # Check for address collision
+        _check_address_collision(addr, self.trace_map, self.parent_fn or gen_fn)
+
         # Get the full subtrace (Tr object) from the trace structure
         subtrace = self.trace._choices[
             addr
@@ -1529,6 +1693,7 @@ class Regenerate(Generic[R]):
     discard: dict[str, Any]
     score: Score
     weight: Weight
+    parent_fn: "GFI" = None
 
     def __call__(
         self,
@@ -1538,6 +1703,10 @@ class Regenerate(Generic[R]):
         kwargs=None,
     ) -> R:
         kwargs = kwargs or {}
+
+        # Check for address collision
+        _check_address_collision(addr, self.trace_map, self.parent_fn or gen_fn)
+
         # Get the full subtrace (Tr object) from the trace structure
         subtrace = self.trace._choices[
             addr
@@ -1611,7 +1780,7 @@ class Fn(
         *args,
         **kwargs,
     ) -> Tr[dict[str, Any], R]:
-        handler_stack.append(Simulate(jnp.array(0.0), {}))
+        handler_stack.append(Simulate(jnp.array(0.0), {}, self))
         r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Simulate)
@@ -1628,7 +1797,7 @@ class Fn(
             tr = self.simulate(*args, **kwargs)
             return tr, jnp.array(0.0)
         else:
-            handler_stack.append(Generate(x, jnp.array(0.0), jnp.array(0.0), {}))
+            handler_stack.append(Generate(x, jnp.array(0.0), jnp.array(0.0), {}, self))
             r = self.source.value(*args, **kwargs)
             handler = handler_stack.pop()
             assert isinstance(handler, Generate)
@@ -1641,7 +1810,7 @@ class Fn(
         *args,
         **kwargs,
     ) -> tuple[Density, R]:
-        handler_stack.append(Assess(x, jnp.array(0.0)))
+        handler_stack.append(Assess(x, jnp.array(0.0), set(), self))
         r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Assess)
@@ -1656,7 +1825,9 @@ class Fn(
         **kwargs,
     ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any] | None]:
         x_ = {} if x_ is None else x_
-        handler_stack.append(Update(tr, x_, {}, {}, jnp.array(0.0), jnp.array(0.0)))
+        handler_stack.append(
+            Update(tr, x_, {}, {}, jnp.array(0.0), jnp.array(0.0), self)
+        )
         r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Update)
@@ -1675,7 +1846,9 @@ class Fn(
         *args,
         **kwargs,
     ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any] | None]:
-        handler_stack.append(Regenerate(tr, s, {}, {}, jnp.array(0.0), jnp.array(0.0)))
+        handler_stack.append(
+            Regenerate(tr, s, {}, {}, jnp.array(0.0), jnp.array(0.0), self)
+        )
         r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Regenerate)
