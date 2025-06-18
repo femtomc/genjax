@@ -125,6 +125,47 @@ class ParticleCollection(Pytree):
         )
         return self.log_marginal_estimate + current_marginal
 
+    def estimate(self, fn: Callable[[X], Any]) -> Any:
+        """
+        Compute weighted estimate of a function applied to particle traces.
+
+        Properly accounts for importance weights to give unbiased estimates.
+
+        Args:
+            fn: Function to apply to each particle's choices (X -> Any)
+
+        Returns:
+            Weighted estimate: sum(w_i * fn(x_i)) / sum(w_i)
+            where w_i are normalized importance weights
+
+        Examples:
+            >>> import jax.numpy as jnp
+            >>> # particles.estimate(lambda choices: choices["param"])  # Posterior mean
+            >>> # particles.estimate(lambda choices: choices["param"]**2) - mean**2  # Variance
+            >>> # particles.estimate(lambda choices: jnp.sin(choices["x"]) + choices["y"])  # Custom
+        """
+        # Get particle choices
+        choices = self.traces.get_choices()
+
+        # Apply function to each particle
+        values = jax.vmap(fn)(choices)
+
+        # Compute normalized weights (in log space for numerical stability)
+        log_weights_normalized = self.log_weights - jax.scipy.special.logsumexp(
+            self.log_weights
+        )
+        weights_normalized = jnp.exp(log_weights_normalized)
+
+        # Compute weighted average
+        # For scalar values: sum(w_i * v_i)
+        # For arrays: maintains shape of values
+        if values.ndim == 1:
+            # Simple weighted average for scalar values per particle
+            return jnp.sum(weights_normalized * values)
+        else:
+            # For multi-dimensional values, weight along the particle dimension (axis 0)
+            return jnp.sum(weights_normalized[:, None] * values, axis=0)
+
 
 def init(
     target_gf: GFI[X, R],

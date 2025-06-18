@@ -2,13 +2,13 @@
 
 This file provides guidance for Claude Code when working with the GenJAX's Automatic Differentiation of Expected Values (ADEV) module.
 
-**For core GenJAX concepts**, see `../CLAUDE.md`  
-**For inference algorithms using ADEV**, see `../inference/CLAUDE.md`  
+**For core GenJAX concepts**, see `../CLAUDE.md`
+**For inference algorithms using ADEV**, see `../inference/CLAUDE.md`
 **For academic references**, see `REFERENCES.md`
 
 ## Overview
 
-The `adev` module provides automatic differentiation capabilities specifically designed for unbiased gradient estimation of expected values. 
+The `adev` module provides automatic differentiation capabilities specifically designed for unbiased gradient estimation of expected values.
 
 ## Module Structure
 
@@ -31,7 +31,7 @@ ADEV provides several gradient estimators for different types of random variable
 - **Implementation**: `reparam` estimator
 
 #### REINFORCE (Score Function)
-- **Use case**: Discrete variables or non-reparameterizable continuous variables  
+- **Use case**: Discrete variables or non-reparameterizable continuous variables
 - **Distributions**: Categorical, Bernoulli, Geometric
 - **Advantages**: General applicability
 - **Disadvantages**: High variance, requires variance reduction
@@ -73,8 +73,8 @@ variational_family = MeanFieldNormalFamily(
 
 # Run variational inference
 result = variational_inference(
-    target, 
-    target_args=(), 
+    target,
+    target_args=(),
     constraints={"obs": 1.5},
     variational_family=variational_family,
     n_samples=const(100),
@@ -90,7 +90,7 @@ result = variational_inference(
 - **Computational cost**: Low
 - **Requirements**: Distribution must be reparameterizable
 
-#### REINFORCE (`reinforce`)  
+#### REINFORCE (`reinforce`)
 - **Best for**: Categorical, Bernoulli, discrete distributions
 - **Variance**: High (use variance reduction techniques)
 - **Computational cost**: Low per sample

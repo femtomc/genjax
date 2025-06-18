@@ -16,7 +16,17 @@ import pytest
 from jax.lax import scan
 import tensorflow_probability.substrates.jax as tfp
 
-from genjax.core import gen, Scan, Cond, sel, Const, const, distribution, Pytree, tfp_distribution
+from genjax.core import (
+    gen,
+    Scan,
+    Cond,
+    sel,
+    Const,
+    const,
+    distribution,
+    Pytree,
+    tfp_distribution,
+)
 from genjax.pjax import seed, modular_vmap
 from genjax.distributions import normal, exponential
 
@@ -1092,7 +1102,6 @@ class TestDistributionClass:
                 - jnp.log(sigma)
                 - 0.5 * jnp.log(2 * jnp.pi)
             )
-
 
         normal_dist = distribution(sample_normal, logpdf_normal, name="normal")
 

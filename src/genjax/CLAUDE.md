@@ -2,12 +2,12 @@
 
 This guide covers the core GenJAX concepts implemented in:
 - `core.py`: Generative functions, traces, Fixed infrastructure
-- `distributions.py`: Probability distributions  
+- `distributions.py`: Probability distributions
 - `pjax.py`: Probabilistic JAX (PJAX) primitives and interpreters
 - `state.py`: State inspection interpreter
 
-**For inference algorithms**, see `inference/CLAUDE.md`  
-**For gradient estimation**, see `adev/CLAUDE.md`  
+**For inference algorithms**, see `inference/CLAUDE.md`
+**For gradient estimation**, see `adev/CLAUDE.md`
 **For testing utilities**, see `extras/CLAUDE.md`
 
 ## Core Concepts
@@ -403,7 +403,7 @@ gradient = grad_fn(5.0)
 - **Named Mode**: When you want explicit keys for multiple values in same namespace
 - **Leaf Mode**: When you want to store coordinates, vectors, or single values directly at namespace path
 
-### The `Const[...]` Pattern 
+### The `Const[...]` Pattern
 
 JAX transformations make all arguments dynamic, but some GenJAX operations need static values:
 

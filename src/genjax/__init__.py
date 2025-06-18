@@ -95,7 +95,6 @@ from .extras import (  # noqa: E402
     sample_hmm_dataset,
     DiscreteHMMTrace,
     # Linear Gaussian state space model functionality
-    linear_gaussian,
     kalman_filter,
     kalman_smoother,
     sample_linear_gaussian_dataset,
