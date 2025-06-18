@@ -176,7 +176,7 @@ def test_seed_transform_different_lengths(
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
-    assess_density, assess_retval = scan_model.assess(args, choices)
+    assess_density, assess_retval = scan_model.assess(choices, *args)
     helpers.assert_valid_density(assess_density)
     simulate_score = trace.get_score()
 
@@ -210,8 +210,7 @@ def test_seed_transform_jit_compilation(base_key):
     jit_simulate = jax.jit(seed(simple_model.simulate))
 
     # Should compile and run without errors
-    args = ()
-    trace = jit_simulate(base_key, args)
+    trace = jit_simulate(base_key)
 
     # Basic validation
     assert hasattr(trace, "get_choices")
@@ -238,14 +237,14 @@ def test_seed_transform_nested_models(base_key, standard_tolerance, helpers):
         return x + y + z
 
     # Test with seed transformation
-    trace = seed(outer_model.simulate)(base_key, ())
+    trace = seed(outer_model.simulate)(base_key)
     choices = trace.get_choices()
 
     # Validate trace structure
     helpers.assert_valid_trace(trace)
 
     # Test consistency with assess
-    assess_density, assess_retval = outer_model.assess((), choices)
+    assess_density, assess_retval = outer_model.assess(choices)
     helpers.assert_valid_density(assess_density)
 
     helpers.assert_finite_and_close(
@@ -356,7 +355,7 @@ def test_modular_vmap_vs_manual_vectorization(standard_tolerance):
 
     # modular_vmap vectorization
     vmap_simulate = modular_vmap(test_model.simulate, in_axes=(0,))
-    vmap_trace = vmap_simulate((scales,))
+    vmap_trace = vmap_simulate(scales)
 
     # Results should be equivalent (up to random sampling differences)
     # We'll check structure and finite-ness rather than exact values
@@ -392,8 +391,8 @@ def test_pjax_primitives_with_jax_transformations(base_key):
 
     # Test JIT compilation
     jit_simulate = jax.jit(seeded_simulate)
-    args = (0.5,)
-    trace = jit_simulate(base_key, args)
+    param = 0.5
+    trace = jit_simulate(base_key, param)
 
     assert jnp.isfinite(trace.get_score())
     assert jnp.isfinite(trace.get_retval())
@@ -402,7 +401,7 @@ def test_pjax_primitives_with_jax_transformations(base_key):
     vmap_simulate = jax.vmap(seeded_simulate, in_axes=(0, 0))
     params = jnp.array([0.0, 1.0, 2.0])
     keys = jrand.split(base_key, 3)
-    vmap_traces = vmap_simulate(keys, (params,))
+    vmap_traces = vmap_simulate(keys, params)
 
     # For jax.vmap + seed, each choice should be vectorized individually
     choices = vmap_traces.get_choices()
@@ -471,7 +470,7 @@ def test_seed_with_scan_update_operations(base_key, standard_tolerance, helpers)
 
     # Update some scan choices
     new_choices = {"noise": jnp.array([0.5, old_choices["noise"][1], -0.2])}
-    new_trace, weight, discarded = scan_gf.update(args, initial_trace, new_choices)
+    new_trace, weight, discarded = scan_gf.update(initial_trace, new_choices, *args)
     new_score = new_trace.get_score()
 
     # Test weight invariant

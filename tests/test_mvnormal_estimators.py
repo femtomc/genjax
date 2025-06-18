@@ -86,9 +86,9 @@ class TestMultivariateNormalEstimators:
 
         @expectation
         def elbo(data: dict, theta):
-            tr = variational_family.simulate((data, theta))
+            tr = variational_family.simulate(data, theta)
             q_score = tr.get_score()
-            p = target_model.log_density((), {**data, **tr.get_choices()})
+            p, _ = target_model.assess({**data, **tr.get_choices()})
             return p + q_score
 
         # Test gradient computation

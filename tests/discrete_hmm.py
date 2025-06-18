@@ -324,7 +324,7 @@ def sample_hmm_dataset(
     from genjax.core import const
 
     trace = discrete_hmm_model.simulate(
-        (const(T), initial_probs, transition_matrix, emission_matrix)
+        const(T), initial_probs, transition_matrix, emission_matrix
     )
 
     # Extract states and observations from trace

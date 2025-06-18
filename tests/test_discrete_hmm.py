@@ -186,7 +186,7 @@ class TestDiscreteHMMAgainstTFP:
         discrete_hmm_model = discrete_hmm_model_factory(T)
         vectorized_model = discrete_hmm_model.repeat(n_samples)
         vectorized_trace = seed(vectorized_model.simulate)(
-            key, (initial_probs, transition_matrix, emission_matrix)
+            key, initial_probs, transition_matrix, emission_matrix
         )
         genjax_samples = vectorized_trace.get_retval()
 

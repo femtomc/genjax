@@ -74,15 +74,14 @@ def elbo_factory(
         where q is the variational family and p is the target model.
         """
         # Sample from variational family (with access to constraints and parameters)
-        tr = variational_family.simulate((constraint, *variational_params))
+        tr = variational_family.simulate(constraint, *variational_params)
 
         # Get variational score: log(1/q(z|theta)) = -log(q(z|theta))
         q_score = tr.get_score()
 
         # Evaluate target density: log p(x,z)
-        p_density = target_gf.log_density(
-            target_args, target_gf.merge(constraint, tr.get_choices())
-        )
+        merged_choices = target_gf.merge(constraint, tr.get_choices())
+        p_density, _ = target_gf.assess(merged_choices, *target_args)
 
         # ELBO = log p(x,z) - log q(z|theta) = p_density - (-log q) = p_density + q_score
         return p_density + q_score
