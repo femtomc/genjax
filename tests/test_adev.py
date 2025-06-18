@@ -81,7 +81,7 @@ class TestADEVSeedCompatibility:
             return x
 
         # This should not raise KeyError: 'flat_keyful_sampler'
-        result = seed(simple_model.simulate)(jrand.key(42), ())
+        result = seed(simple_model.simulate)(jrand.key(42))
 
         assert isinstance(result.get_retval(), (float, jnp.ndarray))
         assert "x" in result.get_choices()
@@ -95,7 +95,7 @@ class TestADEVSeedCompatibility:
             x = normal_reinforce(0.0, 1.0) @ "x"
             return x
 
-        result = seed(simple_model.simulate)(jrand.key(43), ())
+        result = seed(simple_model.simulate)(jrand.key(43))
 
         assert isinstance(result.get_retval(), (float, jnp.ndarray))
         assert "x" in result.get_choices()
@@ -111,7 +111,7 @@ class TestADEVSeedCompatibility:
             x = multivariate_normal_reparam(loc, cov) @ "x"
             return x
 
-        result = seed(mvn_model.simulate)(jrand.key(44), ())
+        result = seed(mvn_model.simulate)(jrand.key(44))
 
         assert result.get_retval().shape == (2,)
         assert "x" in result.get_choices()
@@ -127,7 +127,7 @@ class TestADEVSeedCompatibility:
             x = multivariate_normal_reinforce(loc, cov) @ "x"
             return x
 
-        result = seed(mvn_model.simulate)(jrand.key(45), ())
+        result = seed(mvn_model.simulate)(jrand.key(45))
 
         assert result.get_retval().shape == (2,)
         assert "x" in result.get_choices()
@@ -145,7 +145,7 @@ class TestADEVSeedCompatibility:
             x3 = multivariate_normal_reparam(loc, cov) @ "x3"
             return x1 + x2 + jnp.sum(x3)
 
-        result = seed(multi_estimator_model.simulate)(jrand.key(46), ())
+        result = seed(multi_estimator_model.simulate)(jrand.key(46))
         choices = result.get_choices()
 
         assert "x1" in choices
@@ -173,7 +173,7 @@ class TestADEVGradientComputation:
         def elbo(data, theta):
             tr = variational_family.simulate(data, theta)
             q_score = tr.get_score()
-            p = target_model.log_density((), {**data, **tr.get_choices()})
+            p, _ = target_model.assess({**data, **tr.get_choices()})
             return p + q_score
 
         # This should not raise any errors
@@ -203,7 +203,7 @@ class TestADEVGradientComputation:
         def elbo(theta):
             tr = variational_family.simulate(theta)
             q_score = tr.get_score()
-            p = target_model.log_density((), tr.get_choices())
+            p, _ = target_model.assess(tr.get_choices())
             return p + q_score
 
         theta = jnp.array([0.1, -0.1])
@@ -241,7 +241,7 @@ class TestADEVNoSeedCompatibility:
             return x
 
         # Should work without seed
-        result = simple_model.simulate(())
+        result = simple_model.simulate()
 
         assert isinstance(result.get_retval(), (float, jnp.ndarray))
         assert "x" in result.get_choices()
@@ -256,7 +256,7 @@ class TestADEVNoSeedCompatibility:
             x = multivariate_normal_reparam(loc, cov) @ "x"
             return x
 
-        result = mvn_model.simulate(())
+        result = mvn_model.simulate()
 
         assert result.get_retval().shape == (2,)
         assert "x" in result.get_choices()
@@ -275,7 +275,7 @@ class TestADEVErrorConditions:
             return x
 
         # This should not raise "unexpected keyword argument 'sample_shape'"
-        result = seed(model_with_shape.simulate)(jrand.key(50), ())
+        result = seed(model_with_shape.simulate)(jrand.key(50))
         assert isinstance(result.get_retval(), (float, jnp.ndarray))
 
     def test_flat_keyful_sampler_error_prevention(self):
@@ -293,7 +293,7 @@ class TestADEVErrorConditions:
 
         # This exact pattern previously caused KeyError: 'flat_keyful_sampler'
         try:
-            result = seed(adev_with_addressing.simulate)(jrand.key(999), ())
+            result = seed(adev_with_addressing.simulate)(jrand.key(999))
             # If we get here, the error is fixed
             assert "param" in result.get_choices()
             assert "mvn_param" in result.get_choices()

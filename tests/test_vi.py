@@ -63,7 +63,7 @@ class TestBasicVIFunctionality:
         def elbo(data: dict, theta):
             tr = variational_family.simulate(data, theta)
             q_score = tr.get_score()  # log(1/q) = -log(q)
-            p = variational_model.log_density((), {**data, **tr.get_choices()})
+            p, _ = variational_model.assess({**data, **tr.get_choices()})
             # ELBO = log(p) - log(q) = log(p) + q_score
             return p + q_score
 
