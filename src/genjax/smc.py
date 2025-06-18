@@ -200,7 +200,6 @@ def init(
                 merged_choices, *target_args
             )
 
-
             # Compute importance weight: P/Q
             # target_weight is the weight from generate (density of model at merged choices)
             # proposal_score is log(1/P_proposal)
@@ -339,12 +338,10 @@ def extend(
             args = particle_args
         else:
             args = (particle_args,)
-            
+
         if extension_proposal is None:
             # Generate with extended target using constraints
-            new_trace, log_weight = extended_target_gf.generate(
-                constraints, *args
-            )
+            new_trace, log_weight = extended_target_gf.generate(constraints, *args)
 
             # Weight is just the target weight (no proposal correction needed)
             new_log_weight = old_log_weight + log_weight
@@ -359,10 +356,7 @@ def extend(
             merged_choices = extended_target_gf.merge(constraints, extension_choices)
 
             # Generate with extended target
-            new_trace, log_weight = extended_target_gf.generate(
-                merged_choices, *args
-            )
-
+            new_trace, log_weight = extended_target_gf.generate(merged_choices, *args)
 
             # Importance weight: target_weight + proposal_score + old_weight
             new_log_weight = old_log_weight + log_weight + proposal_score
@@ -539,7 +533,7 @@ def rejuvenation_smc(
         # Extract return values from current particles to use as next model args
         # Get vectorized return values from all particles
         current_retvals = particles.traces.get_retval()
-        
+
         # Extend particles with new observation constraints
         # Use current return values as the model arguments for the next step
         particles = extend(

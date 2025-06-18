@@ -6,7 +6,7 @@ import pytest
 import jax
 import jax.numpy as jnp
 
-from genjax.state import state, tag_state, save, State
+from genjax.state import state, tag_state, save, State, namespace
 
 
 class TestTagState:
@@ -464,3 +464,229 @@ class TestStateWithScan:
         expected_scan_steps = jnp.array([4, 6])  # 3+1, 4+2
         assert jnp.allclose(state_dict["scan_step"], expected_scan_steps)
         assert state_dict["final"] == 60
+
+
+# =============================================================================
+# NAMESPACE TESTS
+# =============================================================================
+
+
+class TestNamespace:
+    """Test the namespace functionality for organizing state."""
+
+    def test_single_namespace(self):
+        """Test basic single namespace functionality."""
+
+        @state
+        def computation(x):
+            # Root level state
+            save(root_val=x)
+
+            # Namespaced state
+            inner_fn = namespace(lambda y: save(nested_val=y * 2), "inner")
+            inner_fn(x)
+
+            return x * 3
+
+        result, state_dict = computation(5)
+        assert result == 15
+        assert state_dict == {"root_val": 5, "inner": {"nested_val": 10}}
+
+    def test_nested_namespaces(self):
+        """Test nested namespace functionality."""
+
+        @state
+        def computation(x):
+            # Root level
+            save(root=x)
+
+            # Single namespace
+            level1_fn = namespace(lambda y: save(l1_val=y + 1), "level1")
+            level1_fn(x)
+
+            # Nested namespace: level1.level2
+            level2_fn = namespace(
+                namespace(lambda z: save(l2_val=z + 2), "level2"), "level1"
+            )
+            level2_fn(x)
+
+            # Different top-level namespace
+            other_fn = namespace(lambda w: save(other_val=w + 3), "other")
+            other_fn(x)
+
+            return x
+
+        result, state_dict = computation(10)
+        assert result == 10
+        assert state_dict == {
+            "root": 10,
+            "level1": {"l1_val": 11, "level2": {"l2_val": 12}},
+            "other": {"other_val": 13},
+        }
+
+    def test_multiple_values_in_namespace(self):
+        """Test multiple values saved in the same namespace."""
+
+        @state
+        def computation(x):
+            save(root=x)
+
+            # Multiple values in same namespace
+            multi_fn = namespace(
+                lambda y: save(first=y * 2, second=y * 3, third=y * 4), "multi"
+            )
+            multi_fn(x)
+
+            return x
+
+        result, state_dict = computation(3)
+        assert result == 3
+        assert state_dict == {
+            "root": 3,
+            "multi": {"first": 6, "second": 9, "third": 12},
+        }
+
+    def test_namespace_with_function_calls(self):
+        """Test namespace with nested function calls."""
+
+        def inner_computation(x):
+            save(inner=x * 2)
+            return x + 1
+
+        @state
+        def computation(x):
+            save(start=x)
+
+            # Namespace a function that calls other functions
+            namespaced_fn = namespace(inner_computation, "ns")
+            result = namespaced_fn(x)
+
+            save(end=result)
+            return result
+
+        result, state_dict = computation(5)
+        assert result == 6  # 5 + 1
+        assert state_dict == {
+            "start": 5,
+            "ns": {"inner": 10},  # 5 * 2
+            "end": 6,
+        }
+
+    def test_namespace_error_handling(self):
+        """Test that namespace stack is properly cleaned up on errors."""
+
+        @state
+        def computation_with_error(x):
+            save(before=x)
+
+            # This should clean up namespace even if error occurs
+            error_fn = namespace(
+                lambda y: (_ for _ in ()).throw(ValueError("test error")), "error_ns"
+            )
+
+            try:
+                error_fn(x)
+            except ValueError:
+                pass  # Expected error
+
+            # This should still work at root level
+            save(after=x + 1)
+            return x
+
+        result, state_dict = computation_with_error(5)
+        assert result == 5
+        assert state_dict == {"before": 5, "after": 6}
+        # Namespace should not appear since error occurred before save
+
+    def test_namespace_with_jax_arrays(self):
+        """Test namespace with JAX arrays."""
+
+        @state
+        def computation(x):
+            arr = jnp.array([1, 2, 3]) + x
+            save(root_array=arr)
+
+            # Namespace with array computation
+            array_fn = namespace(
+                lambda y: save(doubled=y * 2, summed=jnp.sum(y)), "arrays"
+            )
+            array_fn(arr)
+
+            return jnp.sum(arr)
+
+        result, state_dict = computation(2)
+        expected_arr = jnp.array([3, 4, 5])
+
+        assert result == 12  # sum([3, 4, 5])
+        assert jnp.allclose(state_dict["root_array"], expected_arr)
+        assert jnp.allclose(state_dict["arrays"]["doubled"], expected_arr * 2)
+        assert state_dict["arrays"]["summed"] == 12
+
+    def test_deep_nested_namespaces(self):
+        """Test deeply nested namespace structures."""
+
+        @state
+        def computation(x):
+            save(root=x)
+
+            # Create a deeply nested structure: a.b.c.d
+            deep_fn = namespace(
+                namespace(
+                    namespace(namespace(lambda y: save(deep_val=y * 10), "d"), "c"), "b"
+                ),
+                "a",
+            )
+            deep_fn(x)
+
+            return x
+
+        result, state_dict = computation(3)
+        assert result == 3
+        assert state_dict == {"root": 3, "a": {"b": {"c": {"d": {"deep_val": 30}}}}}
+
+    def test_namespace_with_tag_state_directly(self):
+        """Test namespace works with tag_state as well as save."""
+
+        @state
+        def computation(x):
+            tag_state(x, name="root_tag")
+
+            # Use tag_state inside namespace
+            tag_fn = namespace(
+                lambda y: tag_state(y * 5, name="namespaced_tag"), "tagged"
+            )
+            tag_fn(x)
+
+            return x
+
+        result, state_dict = computation(4)
+        assert result == 4
+        assert state_dict == {"root_tag": 4, "tagged": {"namespaced_tag": 20}}
+
+    def test_namespace_overwrite_same_key(self):
+        """Test that namespace handles key overwrites properly."""
+
+        @state
+        def computation(x):
+            # Same key in different namespaces
+            ns1_fn = namespace(lambda y: save(same_key=y * 2), "ns1")
+            ns2_fn = namespace(lambda y: save(same_key=y * 3), "ns2")
+
+            ns1_fn(x)
+            ns2_fn(x)
+
+            # Same key overwritten in same namespace
+            overwrite_fn = namespace(
+                lambda y: [save(key=y), save(key=y * 10)], "overwrite"
+            )
+            overwrite_fn(x)
+
+            return x
+
+        result, state_dict = computation(2)
+        assert result == 2
+        assert state_dict == {
+            "ns1": {"same_key": 4},
+            "ns2": {"same_key": 6},
+            "overwrite": {"key": 20},  # Second save overwrites first
+        }

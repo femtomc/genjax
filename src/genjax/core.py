@@ -438,19 +438,19 @@ def const(a: A) -> Const[A]:
 
 class NotFixedException(Exception):
     """Exception raised when trace verification finds unfixed values.
-    
+
     This exception provides a clear visualization of which parts of the choice map
     are properly fixed (True) vs. unfixed (False), helping users debug model
     structure issues during constrained inference.
     """
-    
+
     def __init__(self, choice_map_status: X):
         self.choice_map_status = choice_map_status
         super().__init__(self._format_message())
-    
+
     def _format_message(self) -> str:
         """Format a helpful error message showing the choice map status."""
-        
+
         def format_choice_status(status, indent=2):
             """Format choice map status, handling both dict and non-dict types."""
             if isinstance(status, dict):
@@ -468,14 +468,14 @@ class NotFixedException(Exception):
                 # For non-dict types (e.g., scalar boolean), format directly
                 status_str = "Fixed" if status else "NOT_FIXED"
                 return [f"{'  ' * (indent // 2)}{status_str}"]
-        
+
         lines = [
             "Found unfixed values in trace choices during constrained inference.",
             "All random choices should be wrapped with Fixed during constrained inference.",
             "",
             "Choice map status (Fixed = properly constrained, NOT_FIXED = missing constraint):",
         ]
-        
+
         if isinstance(self.choice_map_status, dict):
             lines.append("{")
             lines.extend(format_choice_status(self.choice_map_status, 2))
@@ -483,43 +483,45 @@ class NotFixedException(Exception):
         else:
             # For scalar choice maps, don't use dict notation
             lines.extend(format_choice_status(self.choice_map_status, 0))
-        
+
         lines.append("")
-        lines.append("Unfixed values indicate missing temporal dependencies or incorrect model structure.")
-        
+        lines.append(
+            "Unfixed values indicate missing temporal dependencies or incorrect model structure."
+        )
+
         return "\n".join(lines)
 
 
 @Pytree.dataclass
 class Fixed(Generic[A], Pytree):
-    """A Pytree wrapper that denotes a random choice was provided (fixed), 
+    """A Pytree wrapper that denotes a random choice was provided (fixed),
     not proposed by a GFI's internal proposal family.
-    
-    This wrapper is used internally by Distribution implementations in 
-    `generate`, `update`, and `regenerate` methods to mark values that 
-    were constrained or provided externally rather than sampled from the 
+
+    This wrapper is used internally by Distribution implementations in
+    `generate`, `update`, and `regenerate` methods to mark values that
+    were constrained or provided externally rather than sampled from the
     distribution's internal proposal.
-    
+
     The `Fixed` wrapper helps debug model structure issues during inference
-    by tracking which random choices were externally constrained vs. 
+    by tracking which random choices were externally constrained vs.
     internally proposed.
-    
+
     Args:
         value: The fixed value that was provided externally
     """
-    
+
     value: A
-    
+
     def __repr__(self):
         return f"Fixed({self.value!r})"
 
 
 def fixed(a: A) -> Fixed[A]:
     """Create a Fixed wrapper for a constrained value.
-    
+
     Args:
         a: The value that was provided/constrained externally.
-        
+
     Returns:
         A Fixed wrapper indicating the value was not proposed internally.
     """
@@ -543,7 +545,7 @@ class Trace(Generic[X, R], Pytree):
     @abstractmethod
     def get_fixed_choices(self) -> X:
         """Get choices preserving Fixed wrappers.
-        
+
         Returns the raw choice structure with Fixed wrappers intact,
         used for verification that values were constrained during inference.
         """
@@ -560,33 +562,35 @@ class Trace(Generic[X, R], Pytree):
     @abstractmethod
     def get_score(self) -> Score:
         pass
-    
+
     def verify(self) -> None:
         """Verify that all leaf values in the trace choices were fixed (constrained).
-        
+
         Checks that all random choices in the trace are wrapped with Fixed,
         indicating they were provided externally rather than proposed by the
         GFI's internal proposal family. This helps debug model structure issues
         during inference.
-        
+
         Raises:
             NotFixedException: If any leaf value is not wrapped with Fixed.
                               The exception includes a detailed choice map showing
                               which values are fixed vs. unfixed.
         """
-        # Get choices preserving Fixed wrappers  
+        # Get choices preserving Fixed wrappers
         choice_values = get_fixed_choices(self)
-        
+
         # Check if value is Fixed
         def check_instance_fixed(x):
             return isinstance(x, Fixed)
-        
+
         # Flatten the tree to get all leaf choice values
-        leaf_values, tree_def = jtu.tree_flatten(choice_values, is_leaf=check_instance_fixed)
-        
+        leaf_values, tree_def = jtu.tree_flatten(
+            choice_values, is_leaf=check_instance_fixed
+        )
+
         # Check if all leaves are Fixed
         all_fixed = all(isinstance(leaf, Fixed) for leaf in leaf_values)
-        
+
         if not all_fixed:
             # Create a boolean choice map showing which values are fixed
             def make_bool_status(x):
@@ -594,13 +598,11 @@ class Trace(Generic[X, R], Pytree):
                     return True
                 else:
                     return False
-            
+
             choice_map_status = jtu.tree_map(
-                make_bool_status,
-                choice_values,
-                is_leaf=check_instance_fixed
+                make_bool_status, choice_values, is_leaf=check_instance_fixed
             )
-            
+
             raise NotFixedException(choice_map_status)
 
     def update(self, x: X, *args, **kwargs):
@@ -673,7 +675,7 @@ class Tr(Trace[X, R], Pytree):
 
 def get_choices(x: Trace[X, R] | X) -> X:
     """Extract choices from a trace or nested structure containing traces.
-    
+
     Also strips Fixed wrappers from the choices, returning the unwrapped values.
     Fixed wrappers are used internally to track constrained vs. proposed values.
 
@@ -698,14 +700,14 @@ def get_choices(x: Trace[X, R] | X) -> X:
         x,
         is_leaf=lambda x: isinstance(x, Trace),
     )
-    
+
     # Then strip Fixed wrappers
     def _strip_fixed(x):
         if isinstance(x, Fixed):
             return x.value  # Unwrap Fixed wrapper
         else:
             return x
-    
+
     return jtu.tree_map(
         _strip_fixed,
         x,
@@ -715,7 +717,7 @@ def get_choices(x: Trace[X, R] | X) -> X:
 
 def get_fixed_choices(x: Trace[X, R] | X) -> X:
     """Extract choices from a trace or nested structure containing traces, preserving Fixed wrappers.
-    
+
     Similar to get_choices() but preserves Fixed wrappers around the choices,
     which is needed for verification that values were constrained during inference.
 
@@ -1566,7 +1568,7 @@ class Distribution(Generic[X], GFI[X, X]):
             tr_ = self.simulate(*args, **kwargs)
             return tr_, jnp.array(0.0), get_choices(tr)
         else:
-            # Address not selected - keep existing value 
+            # Address not selected - keep existing value
             x_ = get_choices(tr)
             log_density_ = self.logpdf(get_choices(tr), *args, **kwargs)
             return (

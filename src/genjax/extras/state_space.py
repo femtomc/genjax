@@ -519,8 +519,11 @@ def kalman_filter(
         filtered_cov = predicted_cov - kalman_gain @ C @ predicted_cov
 
         # Update log marginal likelihood
-        new_log_marginal = cum_log_marginal + jax.scipy.stats.multivariate_normal.logpdf(
-            innovation, jnp.zeros_like(innovation), innovation_cov
+        new_log_marginal = (
+            cum_log_marginal
+            + jax.scipy.stats.multivariate_normal.logpdf(
+                innovation, jnp.zeros_like(innovation), innovation_cov
+            )
         )
 
         new_carry = (filtered_mean, filtered_cov, new_log_marginal)
@@ -529,7 +532,9 @@ def kalman_filter(
     # Run filtering for t = 1, ..., T-1
     if T > 1:
         init_carry = (filtered_mean, filtered_cov, log_marginal)
-        final_carry, step_results = jax.lax.scan(scan_step, init_carry, jnp.arange(1, T))
+        final_carry, step_results = jax.lax.scan(
+            scan_step, init_carry, jnp.arange(1, T)
+        )
         final_means, final_covs = step_results
         filtered_means = filtered_means.at[1:].set(final_means)
         filtered_covs = filtered_covs.at[1:].set(final_covs)
@@ -593,8 +598,13 @@ def kalman_smoother(
         smoother_gain = filtered_covs[t] @ A.T @ jnp.linalg.inv(predicted_cov)
 
         # Smoothed estimates for time t
-        smoothed_mean = filtered_means[t] + smoother_gain @ (next_smoothed_mean - predicted_mean)
-        smoothed_cov = filtered_covs[t] + smoother_gain @ (next_smoothed_cov - predicted_cov) @ smoother_gain.T
+        smoothed_mean = filtered_means[t] + smoother_gain @ (
+            next_smoothed_mean - predicted_mean
+        )
+        smoothed_cov = (
+            filtered_covs[t]
+            + smoother_gain @ (next_smoothed_cov - predicted_cov) @ smoother_gain.T
+        )
 
         return (smoothed_mean, smoothed_cov), (smoothed_mean, smoothed_cov)
 
@@ -844,9 +854,7 @@ def linear_gaussian_inference_problem(
         - dataset: Dictionary with keys "z" (latent) and "obs" (observed)
         - exact_log_marginal: Log marginal likelihood of observations
     """
-    dataset = linear_gaussian_test_dataset(
-        initial_mean, initial_cov, A, Q, C, R, T
-    )
+    dataset = linear_gaussian_test_dataset(initial_mean, initial_cov, A, Q, C, R, T)
     log_marginal = linear_gaussian_exact_log_marginal(
         dataset["obs"], initial_mean, initial_cov, A, Q, C, R
     )
