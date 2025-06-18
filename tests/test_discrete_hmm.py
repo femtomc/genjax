@@ -21,10 +21,10 @@ from genjax.pjax import seed
 
 # Import HMM implementation from extras module
 from genjax.extras.state_space import (
-    discrete_hmm,
     forward_filter,
     forward_filtering_backward_sampling,
     compute_sequence_log_prob,
+    sample_hmm_dataset,
 )
 
 tfd = tfp.distributions
@@ -183,11 +183,16 @@ class TestDiscreteHMMAgainstTFP:
         T = 10
         n_samples = 1000
 
-        vectorized_model = discrete_hmm.repeat(n_samples)
-        vectorized_trace = seed(vectorized_model.simulate)(
-            key, const(T), initial_probs, transition_matrix, emission_matrix
+        # Use sample_hmm_dataset to generate multiple sequences with K parameter
+        seeded_sample = seed(sample_hmm_dataset)
+        _, genjax_samples, _ = seeded_sample(
+            key,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
+            const(T),
+            const(n_samples),
         )
-        genjax_samples = vectorized_trace.get_retval()
 
         # Sample from TFP model
         tfp_hmm = self.create_tfp_hmm(

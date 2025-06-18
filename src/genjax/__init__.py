@@ -61,15 +61,13 @@ from .distributions import (  # noqa: E402
     poisson,
     multivariate_normal,
 )
-from .mcmc import (  # noqa: E402
+from .inference import (  # noqa: E402
+    # MCMC
     MCMCResult,
     chain,
     mh,
     mala,
-    compute_rhat,
-    compute_ess,
-)
-from .smc import (  # noqa: E402
+    # SMC
     ParticleCollection,
     init,
     change,
@@ -97,12 +95,12 @@ from .extras import (  # noqa: E402
     sample_hmm_dataset,
     DiscreteHMMTrace,
     # Linear Gaussian state space model functionality
-    linear_gaussian_ssm,
+    linear_gaussian,
     kalman_filter,
     kalman_smoother,
     sample_linear_gaussian_dataset,
     LinearGaussianTrace,
-    # Unified testing API
+    # Inference testing API
     discrete_hmm_test_dataset,
     discrete_hmm_exact_log_marginal,
     linear_gaussian_test_dataset,
@@ -190,7 +188,7 @@ __all__ = [
     "kalman_smoother",
     "sample_linear_gaussian_dataset",
     "LinearGaussianTrace",
-    # Unified testing API
+    # Inference testing API
     "discrete_hmm_test_dataset",
     "discrete_hmm_exact_log_marginal",
     "linear_gaussian_test_dataset",

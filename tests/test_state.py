@@ -5,6 +5,7 @@ Tests for the state interpreter functionality.
 import pytest
 import jax
 import jax.numpy as jnp
+from jax.lax import scan
 
 from genjax.state import state, tag_state, save, State, namespace
 
@@ -436,7 +437,6 @@ class TestStateWithScan:
 
     def test_state_with_simple_scan(self):
         """Test state collection within scan body."""
-        from jax.lax import scan
 
         @state
         def scan_computation(init_carry, xs):
@@ -463,7 +463,6 @@ class TestStateWithScan:
 
     def test_state_with_multiple_scan_tags(self):
         """Test multiple state tags within scan body."""
-        from jax.lax import scan
 
         @state
         def multi_tag_scan(init_carry, xs):
@@ -500,7 +499,6 @@ class TestStateWithScan:
 
     def test_state_outside_and_inside_scan(self):
         """Test state collection both outside and inside scan."""
-        from jax.lax import scan
 
         @state
         def mixed_state_computation(init_carry, xs):

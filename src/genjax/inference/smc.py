@@ -15,9 +15,9 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.special
 
-from .core import GFI, Trace, Pytree, X, R, Any, Weight, Const, Callable, const
-from .pjax import modular_vmap
-from .distributions import categorical, uniform
+from genjax.core import GFI, Trace, Pytree, X, R, Any, Weight, Const, Callable, const
+from genjax.pjax import modular_vmap
+from genjax.distributions import categorical, uniform
 import jax.tree_util as jtu
 
 

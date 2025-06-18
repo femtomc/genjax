@@ -30,7 +30,7 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from .core import (
+from genjax.core import (
     Trace,
     Pytree,
     X,
@@ -41,8 +41,9 @@ from .core import (
     const,
     Callable,
 )
-from .distributions import uniform, normal
-from .state import save, state
+from genjax.distributions import uniform, normal
+from genjax.state import save, state
+from genjax.pjax import modular_vmap
 
 # Type alias for MCMC kernel functions
 MCMCKernel = Callable[[Trace[X, R]], Trace[X, R]]
@@ -414,8 +415,6 @@ def chain(mcmc_kernel: MCMCKernel):
 
         else:
             # Multiple chains case - use vmap to run parallel chains
-            from .pjax import modular_vmap
-
             # Vectorize the scan function over chains
             vectorized_run = modular_vmap(
                 lambda trace: run_chain(
