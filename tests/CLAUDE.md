@@ -29,13 +29,13 @@ tests/
 pixi run test
 
 # Run specific test file
-pixi run python -m pytest tests/test_<module>.py
+pixi run test -m tests/test_<module>.py
 
 # Run tests with verbose output
-pixi run python -m pytest tests/test_<module>.py -v
+pixi run test -m tests/test_<module>.py -v
 
 # Run specific test function
-pixi run python -m pytest tests/test_<module>.py::test_function_name
+pixi run test -m tests/test_<module>.py::test_function_name
 ```
 
 ### Test File Organization
