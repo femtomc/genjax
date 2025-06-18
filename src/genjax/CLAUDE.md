@@ -104,28 +104,6 @@ logp = normal.logpdf(x, mu, sigma)  # ✅ CORRECT
 normal.simulate(mu, sigma) # ✅ CORRECT
 ```
 
-**Creating Custom Distributions with `distribution()` helper**:
-
-When working with static parameters that need to survive JAX transformations, use the `distribution()` helper function:
-
-```python
-from genjax import distribution, const
-
-# ✅ CORRECT - Using distribution() helper for custom distributions
-@gen
-def model_with_custom_dist():
-    # Create distribution with static parameters using Const pattern
-    custom_normal = distribution(
-        _sample=lambda key, mu, sigma: ...,     # Sampling function
-        _logpdf=lambda x, mu, sigma: ...,       # Log density function
-        mu=const(0.0),                          # Static mean parameter
-        sigma=const(1.0)                        # Static std parameter
-    )
-    return custom_normal.simulate() @ "x"
-
-# The distribution() helper automatically handles Const fields properly
-```
-
 ### `@gen` Functions (`Fn` type)
 
 Transform JAX-compatible Python functions into generative functions:
@@ -189,13 +167,14 @@ result = cond_gf(condition) @ "conditional"
 
 ```python
 # ✅ CORRECT patterns
-x = normal(mu, sigma) @ "x"                    # In @gen functions
-log_density, retval = normal.assess(sample, mu, sigma)  # GFI calls with unpacked args
+x = normal(mu, sigma) @ "x"                           # Positional args in @gen functions
+x = normal(mu=mu, sigma=sigma) @ "x"                  # Keyword args in @gen functions
+log_density, retval = normal.assess(sample, mu, sigma)        # GFI calls with positional args
+log_density, retval = normal.assess(sample, mu=mu, sigma=sigma)  # GFI calls with keyword args
 
 # ❌ WRONG patterns
-x = normal(mu, sigma)                         # Not traced
-x = normal(mu=mu, sigma=sigma) @ "x"          # No kwargs
-normal.assess((mu, sigma), sample)           # Wrong arg structure (old format)
+x = normal(mu, sigma)                                 # Not traced (missing @ "address")
+normal.assess((mu, sigma), sample)                   # Wrong arg structure (old format)
 ```
 
 ## JAX Integration & Constraints
@@ -246,51 +225,42 @@ vmap_model = modular_vmap(model.simulate, in_axes=(0,))
 
 ### State Interpreter: Tagged Value Inspection
 
-The state interpreter allows you to inspect intermediate values within JAX computations using tagged values:
+The state interpreter allows you to inspect intermediate values within JAX computations using two core APIs:
 
 ```python
-from genjax.state import state, tag_state, save
+from genjax.state import state, save
 
-# Tag single values for inspection
+# Core pattern: @state decorator + save() function
 @state
 def computation(x):
     y = x + 1
-    tagged_y = tag_state(y, name="intermediate")
-    return tagged_y * 2
+    z = x * 2
+    # Save intermediate values for inspection
+    save(intermediate=y, doubled=z)
+    return y + z
 
 result, state_dict = computation(5)
-# result = 12, state_dict = {"intermediate": 6}
+# result = 16, state_dict = {"intermediate": 6, "doubled": 10}
 
-# Tag multiple values at once
+# Use in MCMC for acceptance tracking
 @state
-def multi_value_computation(x):
-    y = x + 1
-    z = x * 2
-    tagged_y, tagged_z = tag_state(y, z, name="pair")
-    return tagged_y + tagged_z
+def mcmc_step(trace):
+    new_trace = some_mcmc_move(trace)
+    accept = compute_acceptance(new_trace, trace)
+    save(accept=accept)  # Save acceptance for diagnostics
+    return new_trace
 
-result, state_dict = multi_value_computation(5)
-# result = 16, state_dict = {"pair": [6, 10]}
-
-# Convenience function for multiple named values
-@state
-def convenient_computation(x):
-    y = x + 1
-    z = x * 2
-    values = save(first=y, second=z)  # Returns {"first": y, "second": z}
-    return values["first"] + values["second"]
-
-result, state_dict = convenient_computation(5)
-# result = 16, state_dict = {"first": 6, "second": 10}
+new_trace, diagnostics = mcmc_step(trace)
+# diagnostics = {"accept": True/False}
 ```
 
 **JAX Compatibility**: The state interpreter works with all JAX transformations (`jit`, `vmap`, `grad`) by using `initial_style_bind` for proper JAX primitive handling.
 
 **Key Features**:
-- **Multiple value tagging**: `tag_state(a, b, c, name="multi")`
-- **Required naming**: All tags must have a `name` parameter
+- **Simple API**: Only `@state` decorator and `save()` function
+- **Named value collection**: `save(name1=val1, name2=val2)`
 - **JAX transformation compatibility**: Works with `jit`, `vmap`, `grad`
-- **Convenience functions**: `save(x=val1, y=val2)` for multiple named values
+- **MCMC integration**: Used internally for acceptance tracking
 
 ### Static vs Dynamic Arguments
 
@@ -348,7 +318,7 @@ trace = configurable_model.simulate(config, data)
 
 ### Address Collision Detection
 
-**GenJAX now automatically detects duplicate addresses** at the same level in `@gen` functions:
+**GenJAX detects duplicate addresses** at the same level in `@gen` functions:
 
 ```python
 # ❌ ERROR - Address collision detected
@@ -394,15 +364,15 @@ def valid_model():
     return x + y
 ```
 
-### Enhanced Error Reporting
+### Error Reporting
 
-**GenJAX provides enhanced error messages** with source location information for debugging:
+**GenJAX provides error messages** with source location information for debugging:
 
 ```python
-# Error messages now include:
+# Error messages include:
 # 1. Function name and file location where error occurs
 # 2. Specific line number of the problematic code
-# 3. Clear description of the issue and how to fix it
+# 3. Description of the issue and how to fix it
 
 # Example error output:
 # ValueError: Address collision detected: 'x' is used multiple times at the same level.
@@ -411,7 +381,7 @@ def valid_model():
 # Location: model.py:18
 
 # Benefits:
-# - Quickly locate problematic code in large generative functions
+# - Locate problematic code in large generative functions
 # - Stack trace filtering removes internal GenJAX frames
 # - Filters out beartype wrapper noise for cleaner error messages
 ```
@@ -438,19 +408,164 @@ seeded_model = seed(model_with_scan.simulate)
 trace = seeded_model(key)
 ```
 
-## Glossary
+## Inference Algorithms
 
-- **GFI**: Generative Function Interface (simulate, assess, generate, update, regenerate)
-- **PJAX**: Probabilistic extension to JAX with primitives `sample_p`, `log_density_p`
-- **State Interpreter**: JAX interpreter for inspecting tagged intermediate values
-- **Trace**: Execution record with choices, args, return value, score
-- **Score**: `log(1/P(choices))` - negative log probability
+GenJAX provides implementations of standard inference algorithms with vectorization and diagnostics.
+
+### MCMC (Markov Chain Monte Carlo)
+
+**Core MCMC Components**:
+
+```python
+from genjax import mh, chain, seed, MCMCResult
+
+# Basic Metropolis-Hastings step
+def mh_kernel(trace):
+    selection = sel("param")  # Select which addresses to resample
+    return mh(trace, selection)
+
+# Create MCMC chain algorithm
+mcmc_chain = chain(mh_kernel)
+seeded_chain = seed(mcmc_chain)
+
+# Run single chain
+result = seeded_chain(key, initial_trace, n_steps=const(1000))
+```
+
+**Multi-Chain MCMC with Diagnostics**:
+
+```python
+# Run multiple parallel chains with diagnostics
+result = seeded_chain(
+    key, 
+    initial_trace, 
+    n_steps=const(1000),
+    n_chains=const(4),              # Number of parallel chains
+    burn_in=const(200),             # Burn-in samples to discard
+    autocorrelation_resampling=const(2)  # Thinning (keep every N-th sample)
+)
+
+# MCMCResult contains diagnostics
+assert isinstance(result, MCMCResult)
+assert result.n_chains.value == 4
+assert result.rhat is not None          # R-hat convergence diagnostic
+assert result.ess_bulk is not None      # Bulk effective sample size
+assert result.ess_tail is not None      # Tail effective sample size
+
+# Access diagnostics (same structure as choices)
+choices = result.traces.get_choices()
+print(f"R-hat for param: {result.rhat['param']}")
+print(f"Bulk ESS: {result.ess_bulk['param']}")
+print(f"Tail ESS: {result.ess_tail['param']}")
+```
+
+**MCMC Diagnostics**:
+
+- **R-hat (Potential Scale Reduction Factor)**: Convergence assessment comparing between-chain and within-chain variance. Values close to 1.0 indicate convergence.
+- **Effective Sample Size (ESS)**: 
+  - **Bulk ESS**: Efficiency for bulk of the distribution
+  - **Tail ESS**: Efficiency for distribution tails (5th and 95th percentiles)
+- **Acceptance Rate**: Proportion of proposed moves that were accepted
+
+**Chain Function Architecture**:
+
+The `chain` higher-order function transforms simple MCMC kernels into full algorithms:
+
+```python
+# Transform into full MCMC algorithm
+mcmc_algorithm = chain(mh)
+```
+
+**Key Features**:
+- Parallel chain execution using `modular_vmap`
+- Burn-in and thinning support
+- Pytree-structured diagnostics matching choice structure
+- State collection for acceptance tracking
+- JAX-compatible design for JIT compilation
+
+### SMC (Sequential Monte Carlo)
+
+**Particle Collection System**:
+
+```python
+from genjax import init, change, extend, rejuvenate, resample, ParticleCollection
+
+# Initialize particle collection with importance sampling
+particles = init(
+    target_gf=model,
+    target_args=args,
+    n_samples=const(1000),
+    constraints={"obs": observed_data},
+    proposal_gf=custom_proposal  # Optional custom proposal
+)
+
+# Access particle statistics
+ess = particles.effective_sample_size()
+log_marginal = particles.log_marginal_likelihood()
+```
+
+**SMC Move Types**:
+
+**Change Move** - Translate particles between models:
+```python
+def map_choices(old_choices):
+    # Transform choice structure for new model
+    return {"new_param": old_choices["old_param"]}
+
+particles = change(
+    particles,
+    new_target_gf=new_model,
+    new_target_args=new_args,
+    choice_map_fn=map_choices
+)
+```
+
+**Extension Move** - Add new random choices:
+```python
+# Proposal takes (old_choices, *extended_target_args)
+@gen
+def extension_proposal(old_choices, *target_args):
+    # Propose new choices based on existing ones
+    return normal(old_choices["mu"], 1.0) @ "new_param"
+
+particles = extend(
+    particles,
+    proposal_gf=extension_proposal,
+    extended_target_gf=extended_model,
+    extended_target_args=extended_args
+)
+```
+
+**Rejuvenation Move** - Apply MCMC to combat degeneracy:
+```python
+# Use MCMC kernel from mcmc.py
+def mcmc_kernel(trace):
+    return mh(trace, sel("param"))
+
+particles = rejuvenate(particles, mcmc_kernel)
+```
+
+**Resampling** - Combat particle degeneracy:
+```python
+# Resample when effective sample size is low
+if particles.effective_sample_size() < threshold:
+    particles = resample(particles, method="systematic")  # or "categorical"
+```
+
+**SMC Algorithm Composition**:
+
+For a complete SMC algorithm implementation, see `rejuvenation_smc` in `src/genjax/smc.py`. This function demonstrates how to compose the SMC moves into a full sequential inference algorithm using `jax.lax.scan`.
+
+**Key SMC Features**:
+- **Vectorized Operations**: All moves use `modular_vmap` for parallel processing
+- **Weight Tracking**: Importance weights maintained across all moves
+- **Marginal Likelihood Estimation**: Computation via importance sampling
+- **Proposals**: Support for both default and custom proposal distributions
+- **Method Compatibility**: MCMC kernels from `mcmc.py` work directly with `rejuvenate`
 
 ## References
 
 ### Theoretical Foundation
-
-- **SMCP3: Sequential Monte Carlo with Probabilistic Program Proposals (SMCP3)**: Lew, A. K., Matheos, G., Zhi-Xuan, T., Ghavamizadeh, M., Russell, N., Cusumano-Towner, M., & Mansinghka, V. K. (2023). Sequential Monte Carlo with programmable proposals. In Proceedings of the 39th Conference on Uncertainty in Artificial Intelligence (UAI 2023). [Paper](https://proceedings.mlr.press/v206/lew23a/lew23a.pdf)
 
 ### Gen Julia Implementation
 
@@ -460,4 +575,12 @@ trace = seeded_model(key)
 
 ### Notes
 
-GenJAX implements the same mathematical foundations as Gen Julia, with the GFI methods (`simulate`, `assess`, `generate`, `update`, `regenerate`) following identical mathematical specifications. The `update` and `regenerate` methods are examples of SMCP3 edit moves that enable efficient probabilistic inference.
+GenJAX implements the same mathematical foundations as Gen Julia, with the GFI methods (`simulate`, `assess`, `generate`, `update`, `regenerate`) following identical mathematical specifications. The `update` and `regenerate` methods are edit moves that enable probabilistic inference. The MCMC and SMC implementations provide JAX-native vectorization and diagnostics.
+
+## Glossary
+
+- **GFI**: Generative Function Interface (simulate, assess, generate, update, regenerate)
+- **PJAX**: Probabilistic extension to JAX with primitives `sample_p`, `log_density_p`
+- **State Interpreter**: JAX interpreter for inspecting tagged intermediate values
+- **Trace**: Execution record with choices, args, return value, score
+- **Score**: `log(1/P(choices))` - negative log probability

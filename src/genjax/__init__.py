@@ -71,6 +71,7 @@ from .smc import (  # noqa: E402
     extend,
     rejuvenate,
     resample,
+    rejuvenation_smc,
 )
 
 __all__ = [
@@ -124,4 +125,5 @@ __all__ = [
     "extend",
     "rejuvenate",
     "resample",
+    "rejuvenation_smc",
 ]
