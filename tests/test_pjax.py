@@ -40,7 +40,7 @@ def test_seed_transform_scan_simulate(base_key, standard_tolerance, helpers):
     # Create scan generative function with Const[int] for static length
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(add_normal_step, length=length.value)
+        scan_gf = Scan(add_normal_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
@@ -90,7 +90,7 @@ def test_seed_transform_simulate_assess_consistency(
     # Create scan generative function with Const[int] for static length
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(complex_step, length=length.value)
+        scan_gf = Scan(complex_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     # Test parameters
@@ -159,7 +159,7 @@ def test_seed_transform_different_lengths(
 
     @gen
     def scan_model(length: Const[int], init_carry, xs):
-        scan_gf = Scan(accumulating_step, length=length.value)
+        scan_gf = Scan(accumulating_step, length=length)
         return scan_gf(init_carry, xs) @ "scan"
 
     init_carry = 0.0
@@ -457,7 +457,7 @@ def test_seed_with_scan_update_operations(base_key, standard_tolerance, helpers)
         new_carry = carry + noise + x
         return new_carry, noise
 
-    scan_gf = Scan(scan_step, length=3)
+    scan_gf = Scan(scan_step, length=const(3))
     init_carry = 1.0
     xs = jnp.array([0.1, 0.2, 0.3])
     args = (init_carry, xs)

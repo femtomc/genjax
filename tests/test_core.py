@@ -907,7 +907,7 @@ class TestGenerateConsistency:
         def scan_model():
             init_carry = 0.0
             inputs = jnp.array([0.1, 0.2, 0.3])
-            scan_gf = Scan(step_function, length=3)
+            scan_gf = Scan(step_function, length=const(3))
             final_carry, outputs = scan_gf(init_carry, inputs) @ "scan_result"
             return outputs
 
@@ -1496,7 +1496,7 @@ class TestUpdateAndRegenerate:
             new_carry = carry + noise + x
             return new_carry, noise
 
-        scan_gf = Scan(scan_step, length=3)
+        scan_gf = Scan(scan_step, length=const(3))
         init_carry = 1.0
         xs = jnp.array([0.1, 0.2, 0.3])
         args = (init_carry, xs)

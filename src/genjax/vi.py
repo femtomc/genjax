@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from jax.lax import scan
 from typing import Any
 
-from .core import GFI, Pytree, gen, X, R
+from .core import GFI, Pytree, gen, X, R, const, Const
 from .adev import (
     expectation,
     multivariate_normal_reparam,
@@ -32,7 +32,7 @@ class VariationalApproximation(Pytree):
     final_params: jnp.ndarray
     param_history: jnp.ndarray
     loss_history: jnp.ndarray
-    n_iterations: int = Pytree.static()
+    n_iterations: Const[int]
 
     def get_final_params(self) -> jnp.ndarray:
         """Get the final optimized parameters."""
@@ -140,7 +140,7 @@ def optimize_vi(
         final_params=final_params,
         param_history=param_history,
         loss_history=loss_history,
-        n_iterations=n_iterations,
+        n_iterations=const(n_iterations),
     )
 
 

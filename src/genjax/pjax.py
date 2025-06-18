@@ -1378,8 +1378,8 @@ class SeedInterpreter:
 
         return safe_map(env.read, jaxpr.outvars)
 
-    def eval(self, fn, *args):
-        closed_jaxpr, (flat_args, _, out_tree) = stage(fn)(*args)
+    def eval(self, fn, *args, **kwargs):
+        closed_jaxpr, (flat_args, _, out_tree) = stage(fn)(*args, **kwargs)
         jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.literals
         flat_out = self.eval_jaxpr_seed(
             jaxpr,
@@ -1419,11 +1419,12 @@ def seed(
     """
 
     @wraps(f)
-    def wrapped(key: PRNGKey, *args):
+    def wrapped(key: PRNGKey, *args, **kwargs):
         interpreter = SeedInterpreter(key)
         return interpreter.eval(
             f,
             *args,
+            **kwargs,
         )
 
     return wrapped

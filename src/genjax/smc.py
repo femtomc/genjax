@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.special
 
-from .core import GFI, Trace, Pytree, X, R, Any, Weight, Const
+from .core import GFI, Trace, Pytree, X, R, Any, Weight, Const, Callable, const
 from .pjax import modular_vmap
 from .distributions import categorical, uniform
 import jax.tree_util as jtu
@@ -77,7 +77,7 @@ def resample_vectorized_trace(
     """
     if method == "categorical":
         # Sample indices using categorical distribution
-        indices = categorical(logits=log_weights).sample(sample_shape=(n_samples,))
+        indices = categorical.sample(log_weights, sample_shape=(n_samples,))
     elif method == "systematic":
         # Use systematic resampling
         indices = systematic_resample(log_weights, n_samples)
@@ -99,7 +99,10 @@ class ParticleCollection(Pytree):
 
     traces: Trace[X, R]  # Vectorized trace containing all samples
     log_weights: jnp.ndarray
-    n_samples: int = Pytree.static()
+    n_samples: Const[int]
+    log_marginal_estimate: jnp.ndarray = Pytree.field(
+        default_factory=lambda: jnp.array(0.0)
+    )  # Accumulated log marginal likelihood estimate
 
     def effective_sample_size(self) -> jnp.ndarray:
         return effective_sample_size(self.log_weights)
@@ -110,140 +113,329 @@ class ParticleCollection(Pytree):
 
         Returns:
             Log marginal likelihood estimate using log-sum-exp of importance weights
+            plus any accumulated marginal estimate from previous resampling steps
         """
-        return jax.scipy.special.logsumexp(self.log_weights) - jnp.log(self.n_samples)
+        current_marginal = jax.scipy.special.logsumexp(self.log_weights) - jnp.log(
+            self.n_samples.value
+        )
+        return self.log_marginal_estimate + current_marginal
 
 
-def default_importance_sampling(
+def init(
     target_gf: GFI[X, R],
     target_args: tuple,
     n_samples: Const[int],
     constraints: X,
+    proposal_gf: GFI[X, Any] = None,
 ) -> ParticleCollection:
     """
-    Importance sampling using the target's default internal proposal.
+    Initialize particle collection using importance sampling.
 
-    Uses the target generative function's built-in `generate` method, which
-    uses its default internal proposal to fill in unconstrained choices.
+    Uses either the target's default internal proposal or a custom proposal.
+    Proposals use signature (constraints, *target_args).
 
     Args:
         target_gf: Target generative function (model)
         target_args: Arguments for target generative function
         n_samples: Number of importance samples to draw (static value)
         constraints: Dictionary of constrained random choices
+        proposal_gf: Optional custom proposal generative function.
+                    If None, uses target's default internal proposal.
 
     Returns:
         ParticleCollection with traces, weights, and diagnostics
     """
+    if proposal_gf is None:
+        # Use default importance sampling with target's internal proposal
+        def _single_default_importance_sample(
+            target_gf: GFI[X, R],
+            target_args: tuple,
+            constraints: X,
+        ) -> tuple[Trace[X, R], Weight]:
+            """Single importance sampling step using target's default proposal."""
+            # Use target's generate method with constraints
+            # This will use the target's internal proposal to fill in missing choices
+            target_trace, log_weight = target_gf.generate(constraints, *target_args)
+            return target_trace, log_weight
 
-    def _single_default_importance_sample(
-        target_gf: GFI[X, R],
-        target_args: tuple,
-        constraints: X,
-    ) -> tuple[Trace[X, R], Weight]:
-        """Single importance sampling step using target's default proposal."""
-        # Use target's generate method with constraints
-        # This will use the target's internal proposal to fill in missing choices
-        target_trace, log_weight = target_gf.generate(constraints, *target_args)
-        return target_trace, log_weight
+        # Vectorize the single importance sampling step
+        vectorized_sample = modular_vmap(
+            _single_default_importance_sample,
+            in_axes=(None, None, None),
+            axis_size=n_samples.value,
+        )
 
-    # Vectorize the single importance sampling step
-    vectorized_sample = modular_vmap(
-        _single_default_importance_sample,
-        in_axes=(None, None, None),
-        axis_size=n_samples.value,
-    )
+        # Run vectorized importance sampling
+        traces, log_weights = vectorized_sample(target_gf, target_args, constraints)
+    else:
+        # Use custom proposal importance sampling
+        def _single_importance_sample(
+            target_gf: GFI[X, R],
+            proposal_gf: GFI[X, Any],
+            target_args: tuple,
+            constraints: X,
+        ) -> tuple[Trace[X, R], Weight]:
+            """
+            Single importance sampling step using custom proposal.
 
-    # Run vectorized importance sampling
-    traces, log_weights = vectorized_sample(target_gf, target_args, constraints)
+            Proposal uses signature (constraints, *target_args).
+            """
+            # Sample from proposal using new signature
+            proposal_trace = proposal_gf.simulate(constraints, *target_args)
+            proposal_choices = proposal_trace.get_choices()
+
+            # Get proposal score: log(1/P_proposal)
+            proposal_score = proposal_trace.get_score()
+
+            # Merge proposal choices with constraints
+            merged_choices = target_gf.merge(proposal_choices, constraints)
+
+            # Generate from target using merged choices
+            target_trace, target_weight = target_gf.generate(
+                merged_choices, *target_args
+            )
+
+            # Compute importance weight: P/Q
+            # target_weight is the weight from generate (density of model at merged choices)
+            # proposal_score is log(1/P_proposal)
+            # importance_weight = target_weight + proposal_score
+            log_weight = target_weight + proposal_score
+
+            return target_trace, log_weight
+
+        # Vectorize the single importance sampling step
+        vectorized_sample = modular_vmap(
+            _single_importance_sample,
+            in_axes=(None, None, None, None),
+            axis_size=n_samples.value,
+        )
+
+        # Run vectorized importance sampling
+        traces, log_weights = vectorized_sample(
+            target_gf, proposal_gf, target_args, constraints
+        )
 
     return ParticleCollection(
         traces=traces,  # vectorized
         log_weights=log_weights,
-        n_samples=n_samples.value,
+        n_samples=const(n_samples.value),
+        log_marginal_estimate=jnp.array(0.0),
     )
 
 
-def _single_importance_sample(
-    target_gf: GFI[X, R],
-    proposal_gf: GFI[X, Any],
-    target_args: tuple,
-    proposal_args: tuple,
-    constraints: X,
-) -> tuple[Trace[X, R], Weight]:
-    """
-    Single importance sampling step for use with modular_vmap.
-
-    Args:
-        target_gf: Target generative function
-        proposal_gf: Proposal generative function
-        target_args: Arguments for target
-        proposal_args: Arguments for proposal
-        constraints: Optional constraints
-
-    Returns:
-        Tuple of (target_trace, log_weight)
-    """
-    # Sample from proposal using simulate
-    proposal_trace = proposal_gf.simulate(*proposal_args)
-    proposal_choices = proposal_trace.get_choices()
-
-    # Get proposal score: log(1/P_proposal)
-    proposal_score = proposal_trace.get_score()
-
-    # Merge proposal choices with constraints
-    merged_choices = target_gf.merge(proposal_choices, constraints)
-
-    # Generate from target using merged choices
-    target_trace, target_weight = target_gf.generate(merged_choices, *target_args)
-
-    # Compute importance weight: P/Q
-    # target_weight is the weight from generate (density of model at merged choices)
-    # proposal_score is log(1/P_proposal)
-    # importance_weight = target_weight + proposal_score
-    log_weight = target_weight + proposal_score
-
-    return target_trace, log_weight
-
-
-def importance_sampling(
-    target_gf: GFI[X, R],
-    proposal_gf: GFI[X, Any],
-    target_args: tuple,
-    proposal_args: tuple,
-    n_samples: Const[int],
-    constraints: X,
+def change(
+    particles: ParticleCollection,
+    new_target_gf: GFI[X, R],
+    new_target_args: tuple,
+    choice_map_fn: Callable[[X], X],
 ) -> ParticleCollection:
     """
-    Basic importance sampling using proposal and target generative functions.
+    Change target move for particle collection.
 
-    Uses modular_vmap for efficient vectorized computation without explicit loops.
+    Translates particles from one model to another by:
+    1. Mapping each particle's choices using choice_map_fn
+    2. Using generate with the new model to get new weights
+    3. Accumulating importance weights
 
     Args:
-        target_gf: Target generative function (model)
-        proposal_gf: Proposal generative function
-        target_args: Arguments for target generative function
-        proposal_args: Arguments for proposal generative function
-        n_samples: Number of importance samples to draw (static value)
-        constraints: Optional dictionary of constrained random choices
+        particles: Current particle collection
+        new_target_gf: New target generative function
+        new_target_args: Arguments for new target
+        choice_map_fn: Function mapping choices X -> X
 
     Returns:
-        ParticleCollection with traces, weights, and diagnostics
+        New ParticleCollection with translated particles
     """
-    # Vectorize the single importance sampling step
-    vectorized_sample = modular_vmap(
-        _single_importance_sample,
-        in_axes=(None, None, None, None, None),
-        axis_size=n_samples.value,
+
+    def _single_change_target(
+        old_trace: Trace[X, R], old_log_weight: jnp.ndarray
+    ) -> tuple[Trace[X, R], jnp.ndarray]:
+        # Map choices to new space
+        old_choices = old_trace.get_choices()
+        mapped_choices = choice_map_fn(old_choices)
+
+        # Generate with new model using mapped choices as constraints
+        new_trace, log_weight = new_target_gf.generate(mapped_choices, *new_target_args)
+
+        # Accumulate importance weight
+        new_log_weight = old_log_weight + log_weight
+
+        return new_trace, new_log_weight
+
+    # Vectorize across particles
+    vectorized_change = modular_vmap(
+        _single_change_target,
+        in_axes=(0, 0),
+        axis_size=particles.n_samples.value,
     )
 
-    # Run vectorized importance sampling
-    traces, log_weights = vectorized_sample(
-        target_gf, proposal_gf, target_args, proposal_args, constraints
+    new_traces, new_log_weights = vectorized_change(
+        particles.traces, particles.log_weights
     )
 
     return ParticleCollection(
-        traces=traces,  # vectorized
-        log_weights=log_weights,
-        n_samples=n_samples.value,
+        traces=new_traces,
+        log_weights=new_log_weights,
+        n_samples=particles.n_samples,
+        log_marginal_estimate=particles.log_marginal_estimate,
+    )
+
+
+def extend(
+    particles: ParticleCollection,
+    proposal_gf: GFI[X, Any],
+    extended_target_gf: GFI[X, R],
+    extended_target_args: tuple,
+) -> ParticleCollection:
+    """
+    Extension move for particle collection.
+
+    Extends each particle by:
+    1. Sampling an extension from the proposal using (old_choices, *extended_target_args)
+    2. Merging with existing particle choices
+    3. Evaluating under the extended target model
+
+    Args:
+        particles: Current particle collection
+        proposal_gf: Proposal for the extension using signature (old_choices, *extended_target_args)
+        extended_target_gf: Extended target generative function
+        extended_target_args: Arguments for extended target
+
+    Returns:
+        New ParticleCollection with extended particles
+    """
+
+    def _single_extension(
+        old_trace: Trace[X, R], old_log_weight: jnp.ndarray
+    ) -> tuple[Trace[X, R], jnp.ndarray]:
+        # Get existing choices to pass to proposal
+        old_choices = old_trace.get_choices()
+
+        # Sample extension from proposal using new signature
+        proposal_trace = proposal_gf.simulate(old_choices, *extended_target_args)
+        extension_choices = proposal_trace.get_choices()
+        proposal_score = proposal_trace.get_score()
+
+        # Merge with existing choices
+        merged_choices = extended_target_gf.merge(old_choices, extension_choices)
+
+        # Generate with extended target
+        new_trace, log_weight = extended_target_gf.generate(
+            merged_choices, *extended_target_args
+        )
+
+        # Importance weight: target_weight + proposal_score + old_weight
+        new_log_weight = old_log_weight + log_weight + proposal_score
+
+        return new_trace, new_log_weight
+
+    # Vectorize across particles
+    vectorized_extension = modular_vmap(
+        _single_extension,
+        in_axes=(0, 0),
+        axis_size=particles.n_samples.value,
+    )
+
+    new_traces, new_log_weights = vectorized_extension(
+        particles.traces, particles.log_weights
+    )
+
+    return ParticleCollection(
+        traces=new_traces,
+        log_weights=new_log_weights,
+        n_samples=particles.n_samples,
+        log_marginal_estimate=particles.log_marginal_estimate,
+    )
+
+
+def rejuvenate(
+    particles: ParticleCollection,
+    mcmc_kernel: Callable[[Trace[X, R]], tuple[Trace[X, R], Any]],
+) -> ParticleCollection:
+    """
+    Rejuvenate move for particle collection.
+
+    Applies an MCMC kernel to each particle independently to improve
+    particle diversity and reduce degeneracy.
+
+    Args:
+        particles: Current particle collection
+        mcmc_kernel: MCMC kernel function that takes a trace and returns
+                    (new_trace, diagnostics). Should be compatible with
+                    kernels from mcmc.py like metropolis_hastings_step.
+
+    Returns:
+        New ParticleCollection with rejuvenated particles
+    """
+
+    def _single_rejuvenate(
+        old_trace: Trace[X, R], old_log_weight: jnp.ndarray
+    ) -> tuple[Trace[X, R], jnp.ndarray]:
+        # Apply MCMC kernel
+        new_trace, _ = mcmc_kernel(old_trace)
+
+        # Weights remain unchanged for MCMC moves (detailed balance)
+        return new_trace, old_log_weight
+
+    # Vectorize across particles
+    vectorized_rejuvenate = modular_vmap(
+        _single_rejuvenate,
+        in_axes=(0, 0),
+        axis_size=particles.n_samples.value,
+    )
+
+    new_traces, new_log_weights = vectorized_rejuvenate(
+        particles.traces, particles.log_weights
+    )
+
+    return ParticleCollection(
+        traces=new_traces,
+        log_weights=new_log_weights,
+        n_samples=particles.n_samples,
+        log_marginal_estimate=particles.log_marginal_estimate,
+    )
+
+
+def resample(
+    particles: ParticleCollection,
+    method: str = "categorical",
+) -> ParticleCollection:
+    """
+    Resample particle collection to combat degeneracy.
+
+    After resampling, weights are reset to uniform (zero in log space)
+    and the marginal likelihood estimate is updated to include the
+    average weight before resampling.
+
+    Args:
+        particles: Current particle collection
+        method: Resampling method - "categorical" or "systematic"
+
+    Returns:
+        New ParticleCollection with resampled particles and updated marginal estimate
+    """
+    # Compute current marginal contribution before resampling
+    current_marginal = jax.scipy.special.logsumexp(particles.log_weights) - jnp.log(
+        particles.n_samples.value
+    )
+
+    # Update accumulated marginal estimate
+    new_log_marginal_estimate = particles.log_marginal_estimate + current_marginal
+
+    # Resample traces using existing function
+    resampled_traces = resample_vectorized_trace(
+        particles.traces,
+        particles.log_weights,
+        particles.n_samples.value,
+        method=method,
+    )
+
+    # Reset weights to uniform (zero in log space)
+    uniform_log_weights = jnp.zeros(particles.n_samples.value)
+
+    return ParticleCollection(
+        traces=resampled_traces,
+        log_weights=uniform_log_weights,
+        n_samples=particles.n_samples,
+        log_marginal_estimate=new_log_marginal_estimate,
     )
