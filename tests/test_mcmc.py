@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import jax.random as jrand
 import pytest
 
-from genjax.core import gen, sel, Const
+from genjax.core import gen, sel, Const, const
 from genjax.pjax import seed
 from genjax.distributions import beta, flip, exponential
 from genjax.mcmc import (
@@ -95,7 +95,7 @@ def apply_burn_in(result: MCMCResult, burn_in_frac: float = 0.2) -> MCMCResult:
     Returns:
         New MCMCResult with burn-in samples removed
     """
-    burn_in_steps = int(result.n_steps * burn_in_frac)
+    burn_in_steps = int(result.n_steps.value * burn_in_frac)
 
     # Apply burn-in using tree_map to handle all trace structures
     post_burn_in_traces = jax.tree_util.tree_map(
@@ -105,7 +105,7 @@ def apply_burn_in(result: MCMCResult, burn_in_frac: float = 0.2) -> MCMCResult:
 
     return MCMCResult(
         traces=post_burn_in_traces,
-        n_steps=result.n_steps - burn_in_steps,
+        n_steps=result.n_steps - const(burn_in_steps),
         acceptance_rate=result.acceptance_rate,  # Keep original acceptance rate
     )
 
@@ -547,7 +547,7 @@ def test_mcmc_result_structure(simple_normal_model, base_key, n_steps_val, helpe
     result = seeded_mh(base_key, initial_trace, selection, n_steps)
 
     # Check result structure
-    assert result.n_steps == n_steps_val
+    assert result.n_steps.value == n_steps_val
     assert result.traces.get_choices()["x"].shape == (n_steps_val,)
 
     # Validate traces

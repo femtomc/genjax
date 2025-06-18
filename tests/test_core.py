@@ -15,7 +15,7 @@ import jax.random as jrand
 import pytest
 from jax.lax import scan
 
-from genjax.core import gen, Scan, Cond, sel, Const, const
+from genjax.core import gen, Scan, Cond, sel, Const, const, distribution
 from genjax.pjax import seed
 from genjax.distributions import normal, exponential
 
@@ -1083,7 +1083,6 @@ class TestDistributionClass:
 
     def test_distribution_basic_functionality(self):
         """Test basic Distribution operations."""
-        from genjax.core import Distribution
         import jax.numpy as jnp
         import jax.random as jrand
 
@@ -1098,7 +1097,9 @@ class TestDistributionClass:
                 - 0.5 * jnp.log(2 * jnp.pi)
             )
 
-        normal_dist = Distribution(sample_normal, logpdf_normal, name="normal")
+        from genjax.core import distribution
+
+        normal_dist = distribution(sample_normal, logpdf_normal, name="normal")
 
         # Test simulate
         args = (0.0, 1.0)
@@ -1120,7 +1121,7 @@ class TestDistributionClass:
 
     def test_distribution_generate_method(self):
         """Test Distribution.generate with various inputs."""
-        from genjax.core import Distribution
+        from genjax.core import distribution
         import jax.numpy as jnp
         import jax.random as jrand
 
@@ -1130,7 +1131,7 @@ class TestDistributionClass:
         def logpdf_exponential(x, rate):
             return jnp.log(rate) - rate * x
 
-        exp_dist = Distribution(
+        exp_dist = distribution(
             sample_exponential, logpdf_exponential, name="exponential"
         )
         args = (2.0,)
@@ -1149,7 +1150,7 @@ class TestDistributionClass:
 
     def test_distribution_update_method(self):
         """Test Distribution.update with different scenarios."""
-        from genjax.core import Distribution
+        from genjax.core import distribution
         import jax.numpy as jnp
 
         def dummy_sample(mu):
@@ -1158,7 +1159,7 @@ class TestDistributionClass:
         def logpdf_delta(x, mu):
             return jnp.array(0.0) if jnp.allclose(x, mu) else jnp.array(-jnp.inf)
 
-        delta_dist = Distribution(dummy_sample, logpdf_delta, name="delta")
+        delta_dist = distribution(dummy_sample, logpdf_delta, name="delta")
 
         # Create initial trace
         args = (1.0,)
@@ -1208,7 +1209,7 @@ class TestDistributionClass:
 
     def test_distribution_error_handling(self):
         """Test Distribution error cases."""
-        from genjax.core import Distribution
+        from genjax.core import distribution
 
         def dummy_sample():
             return 1.0
@@ -1216,7 +1217,7 @@ class TestDistributionClass:
         def dummy_logpdf(x):
             return 0.0
 
-        dist = Distribution(dummy_sample, dummy_logpdf)
+        dist = distribution(dummy_sample, dummy_logpdf)
 
         # Test merge raises exception
         try:
@@ -1314,7 +1315,6 @@ class TestErrorHandlingAndEdgeCases:
 
     def test_distribution_with_empty_args(self):
         """Test Distribution behavior with empty arguments."""
-        from genjax.core import Distribution
         import jax.numpy as jnp
 
         def sample_func():
@@ -1323,7 +1323,7 @@ class TestErrorHandlingAndEdgeCases:
         def logpdf_func(x):
             return jnp.array(0.0)
 
-        dist = Distribution(sample_func, logpdf_func)
+        dist = distribution(sample_func, logpdf_func)
 
         # Test with empty args
         trace = dist.simulate()

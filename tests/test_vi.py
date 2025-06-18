@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import jax.random as jrand
 from jax.lax import scan
 
-from genjax.core import gen
+from genjax.core import gen, const
 from genjax.pjax import seed
 from genjax.adev import (
     expectation,
@@ -96,7 +96,7 @@ class TestBasicVIFunctionality:
         final_params = jnp.array(1.5)
         param_history = jnp.linspace(0.0, 1.5, 50)
         loss_history = jnp.exp(-jnp.linspace(0, 5, 50))  # Decreasing loss
-        n_iterations = 50
+        n_iterations = const(50)
 
         result = VariationalApproximation(
             final_params=final_params,
