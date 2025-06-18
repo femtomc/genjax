@@ -59,7 +59,10 @@ from .distributions import (  # noqa: E402
 )
 from .mcmc import (  # noqa: E402
     MCMCResult,
-    metropolis_hastings,
+    chain,
+    mh,
+    compute_rhat,
+    compute_ess,
 )
 from .smc import (  # noqa: E402
     ParticleCollection,
@@ -99,7 +102,10 @@ __all__ = [
     "geometric_reinforce",
     "get_choices",
     "MCMCResult",
-    "metropolis_hastings",
+    "chain",
+    "mh",
+    "compute_rhat",
+    "compute_ess",
     "modular_vmap",
     "normal",
     "normal_reinforce",
