@@ -140,7 +140,7 @@ dataset, exact_log_marginal = seeded_problem(key)
 
 #### Discrete HMM Parameters
 - `initial_probs`: Initial state distribution (K,)
-- `transition_matrix`: State transition probabilities (K, K)  
+- `transition_matrix`: State transition probabilities (K, K)
 - `emission_matrix`: Observation emission probabilities (K, M)
 - `T`: Number of time steps
 
@@ -187,7 +187,7 @@ Common issues and solutions:
 # ❌ Wrong
 dataset = discrete_hmm_test_dataset(...)
 
-# ✅ Correct  
+# ✅ Correct
 seeded_fn = seed(lambda: discrete_hmm_test_dataset(...))
 dataset = seeded_fn(key)
 ```
@@ -215,7 +215,7 @@ dataset = seeded_fn(key)
 ### Performance Notes
 
 - **Kalman filtering**: O(T * d_state^3) complexity
-- **HMM forward filtering**: O(T * K^2) complexity  
+- **HMM forward filtering**: O(T * K^2) complexity
 - **Memory usage**: Linear in T for all algorithms
 - **JAX compilation**: First call slower due to compilation, subsequent calls fast
 

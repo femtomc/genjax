@@ -119,7 +119,7 @@ except NotFixedException as e:
 
 **Distribution Methods Automatically Use Fixed**:
 - `generate(constrained_value, ...)` → stores `Fixed(constrained_value)` in choices
-- `update(trace, constrained_value, ...)` → stores `Fixed(constrained_value)` in choices  
+- `update(trace, constrained_value, ...)` → stores `Fixed(constrained_value)` in choices
 - `regenerate(trace, selection, ...)` → keeps unselected values as `Fixed`
 
 **`get_choices()` Strips Fixed Wrappers**:
@@ -145,7 +145,7 @@ trace.get_choices()  # {"x": 1.5, "y": 2.0}
   "t2": {"state": NOT_FIXED, "obs": Fixed}  # State proposed from t1, obs constrained
 }
 
-# ❌ PROBLEM: All states unfixed in sequential models  
+# ❌ PROBLEM: All states unfixed in sequential models
 {
   "t0": {"state": NOT_FIXED, "obs": Fixed}, # Missing temporal constraint
   "t1": {"state": NOT_FIXED, "obs": Fixed}, # Missing temporal constraint
@@ -346,14 +346,16 @@ jit_model = jax.jit(seeded_model)
 vmap_model = modular_vmap(model.simulate, in_axes=(0,))
 ```
 
-### State Interpreter: Tagged Value Inspection
+### State Interpreter: Tagged Value Inspection & Organization
 
-The state interpreter allows you to inspect intermediate values within JAX computations using two core APIs:
+The state interpreter allows you to inspect and organize intermediate values within JAX computations using a powerful API for hierarchical state collection.
+
+#### Core API
 
 ```python
-from genjax.state import state, save
+from genjax.state import state, save, namespace
 
-# Core pattern: @state decorator + save() function
+# Basic pattern: @state decorator + save() function
 @state
 def computation(x):
     y = x + 1
@@ -364,8 +366,62 @@ def computation(x):
 
 result, state_dict = computation(5)
 # result = 16, state_dict = {"intermediate": 6, "doubled": 10}
+```
 
-# Use in MCMC for acceptance tracking
+#### Namespace Organization
+
+**Hierarchical State Collection**: Use `namespace(fn, ns)` to organize state into nested structures:
+
+```python
+@state
+def complex_computation(x):
+    # Root level state
+    save(input=x, stage="preprocessing")
+
+    # Organized under "processing" namespace
+    processing_fn = namespace(
+        lambda y: save(step1=y*2, step2=y+10),
+        "processing"
+    )
+    processing_fn(x)
+
+    # Nested namespaces: analysis.statistics
+    stats_fn = namespace(
+        namespace(lambda z: save(mean=z, variance=z**2), "statistics"),
+        "analysis"
+    )
+    stats_fn(x)
+
+    return x * 3
+
+result, state_dict = complex_computation(5)
+# state_dict = {
+#     "input": 5,
+#     "stage": "preprocessing",
+#     "processing": {"step1": 10, "step2": 15},
+#     "analysis": {"statistics": {"mean": 5, "variance": 25}}
+# }
+```
+
+**Namespace Composition**: Namespaces can be nested to arbitrary depth:
+
+```python
+# Create deeply nested organization
+deep_analysis = namespace(
+    namespace(
+        namespace(lambda data: save(metric=data), "metrics"),
+        "detailed"
+    ),
+    "analysis"
+)
+# Results in: {"analysis": {"detailed": {"metrics": {...}}}}
+```
+
+#### MCMC Integration
+
+**Acceptance Tracking**: Used internally for MCMC diagnostics:
+
+```python
 @state
 def mcmc_step(trace):
     new_trace = some_mcmc_move(trace)
@@ -375,15 +431,62 @@ def mcmc_step(trace):
 
 new_trace, diagnostics = mcmc_step(trace)
 # diagnostics = {"accept": True/False}
+
+# Organized MCMC diagnostics
+@state
+def organized_mcmc_step(trace):
+    # Proposals under "proposal" namespace
+    proposal_fn = namespace(
+        lambda: save(type="mh", step_size=0.1),
+        "proposal"
+    )
+    proposal_fn()
+
+    # Acceptance under "diagnostics" namespace
+    diag_fn = namespace(
+        lambda: save(accepted=True, log_ratio=-0.5),
+        "diagnostics"
+    )
+    diag_fn()
+
+    return new_trace
+# Result: {"proposal": {"type": "mh", "step_size": 0.1},
+#          "diagnostics": {"accepted": True, "log_ratio": -0.5}}
 ```
 
-**JAX Compatibility**: The state interpreter works with all JAX transformations (`jit`, `vmap`, `grad`) by using `initial_style_bind` for proper JAX primitive handling.
+#### JAX Compatibility
 
-**Key Features**:
-- **Simple API**: Only `@state` decorator and `save()` function
-- **Named value collection**: `save(name1=val1, name2=val2)`
-- **JAX transformation compatibility**: Works with `jit`, `vmap`, `grad`
-- **MCMC integration**: Used internally for acceptance tracking
+**Full JAX Integration**: Works with all JAX transformations using JAX primitives:
+
+```python
+# Works with jit
+jitted_computation = jax.jit(computation)
+result, state_dict = jitted_computation(5)
+
+# Works with vmap
+vmapped_computation = jax.vmap(computation)
+results, state_dicts = vmapped_computation(jnp.array([1, 2, 3]))
+
+# Works with grad (on the result, not the state)
+grad_fn = jax.grad(lambda x: computation(x)[0])  # Differentiate result
+gradient = grad_fn(5.0)
+```
+
+**Implementation Details**:
+- Uses `initial_style_bind` for proper JAX primitive handling
+- Namespace stack managed via JAX primitives (`namespace_push_p`, `namespace_pop_p`)
+- Error-safe: namespace stack cleaned up even when functions raise exceptions
+- Compatible with scan, vmap, and other JAX combinators
+
+#### Key Features
+
+- **Hierarchical Organization**: `namespace(fn, ns)` for structured state collection
+- **Composable Namespaces**: Unlimited nesting depth through function composition
+- **JAX Transformation Safety**: Full compatibility with `jit`, `vmap`, `grad`, `scan`
+- **Error Handling**: Automatic namespace stack cleanup on exceptions
+- **MCMC Integration**: Used internally for acceptance tracking and diagnostics
+- **Mixed State**: Combine root-level and namespaced state in same computation
+- **Performance**: Zero overhead when not using `@state` decorator
 
 ### Static vs Dynamic Arguments
 

@@ -28,9 +28,7 @@ from genjax.extras.state_space import (
     forward_filter,
     sample_hmm_dataset,
     # Linear Gaussian model imports for new tests
-    linear_gaussian_ssm,
     linear_gaussian_inference_problem,
-    linear_gaussian_exact_log_marginal,
     kalman_filter,
     kalman_smoother,
 )
@@ -808,7 +806,9 @@ class TestRejuvenationSMC:
         @gen
         def sequential_model(prev_obs):
             # Use previous observation to inform the next state (creating dependency)
-            x = normal(prev_obs * 0.8, 1.0) @ "x"  # State depends on previous observation
+            x = (
+                normal(prev_obs * 0.8, 1.0) @ "x"
+            )  # State depends on previous observation
             obs = normal(x, 0.1) @ "obs"
             return obs  # Return value feeds into next timestep
 
@@ -1115,9 +1115,11 @@ class TestRejuvenationSMC:
         R = jnp.array([[0.2]])  # Observation noise
 
         # Generate inference problem using the unified API
-        seeded_problem = seed(lambda: linear_gaussian_inference_problem(
-            initial_mean, initial_cov, A, Q, C, R, T
-        ))
+        seeded_problem = seed(
+            lambda: linear_gaussian_inference_problem(
+                initial_mean, initial_cov, A, Q, C, R, T
+            )
+        )
         dataset, exact_log_marginal = seeded_problem(key1)
 
         # Create simplified linear Gaussian models for SMC
@@ -1137,7 +1139,7 @@ class TestRejuvenationSMC:
         def lg_transition_proposal(*args):
             """Proposal for next state."""
             # Simple proposal around predicted state (could be improved)
-            next_state = normal(0.0, jnp.sqrt(Q[0, 0] + A[0, 0]**2)) @ "state"
+            next_state = normal(0.0, jnp.sqrt(Q[0, 0] + A[0, 0] ** 2)) @ "state"
             return next_state
 
         # MCMC kernel for continuous state space
@@ -1178,11 +1180,15 @@ class TestRejuvenationSMC:
             errors.append(error)
 
             # Verify basic properties
-            assert jnp.isfinite(estimated_log_marginal), f"Invalid log marginal for n_particles={n_particles}"
-            assert final_particles.effective_sample_size() > 0, f"Zero ESS for n_particles={n_particles}"
+            assert jnp.isfinite(estimated_log_marginal), (
+                f"Invalid log marginal for n_particles={n_particles}"
+            )
+            assert final_particles.effective_sample_size() > 0, (
+                f"Zero ESS for n_particles={n_particles}"
+            )
 
         # Test convergence properties following CLAUDE.md guidelines
-        print(f"\nLinear Gaussian SMC convergence test:")
+        print("\nLinear Gaussian SMC convergence test:")
         print(f"Exact log marginal (Kalman): {exact_log_marginal:.6f}")
         for i, (n, error) in enumerate(zip(sample_sizes, errors)):
             print(f"n_particles={n:4d}: error={error:.6f}")
@@ -1191,10 +1197,10 @@ class TestRejuvenationSMC:
         # Allow for some Monte Carlo variance but expect overall improvement
         large_errors = jnp.array(errors[:2])  # First two (smaller sizes)
         small_errors = jnp.array(errors[2:])  # Last two (larger sizes)
-        
+
         avg_large_error = jnp.mean(large_errors)
         avg_small_error = jnp.mean(small_errors)
-        
+
         assert avg_small_error < avg_large_error * 1.5, (
             f"Larger sample sizes should generally perform better: "
             f"avg_small_error={avg_small_error:.6f}, avg_large_error={avg_large_error:.6f}"
@@ -1206,7 +1212,7 @@ class TestRejuvenationSMC:
         assert final_error < tolerance, (
             f"Final error {final_error:.6f} should be less than {tolerance}"
         )
-        
+
         # Check that the errors are not completely unreasonable (within order of magnitude)
         assert all(error < 10.0 for error in errors), (
             f"All errors should be reasonable: {errors}"
@@ -1225,24 +1231,34 @@ class TestRejuvenationSMC:
 
         initial_mean = jnp.array([0.0, 0.0])  # [position, velocity]
         initial_cov = jnp.eye(2) * 0.5
-        
+
         # Simple dynamics: position += velocity, velocity has some noise
-        A = jnp.array([[1.0, 1.0],   # position = position + velocity
-                       [0.0, 0.8]])  # velocity = 0.8 * velocity (damping)
-        Q = jnp.array([[0.01, 0.0],   # Small position noise
-                       [0.0, 0.1]])   # Velocity noise
-        
+        A = jnp.array(
+            [
+                [1.0, 1.0],  # position = position + velocity
+                [0.0, 0.8],
+            ]
+        )  # velocity = 0.8 * velocity (damping)
+        Q = jnp.array(
+            [
+                [0.01, 0.0],  # Small position noise
+                [0.0, 0.1],
+            ]
+        )  # Velocity noise
+
         C = jnp.array([[1.0, 0.0]])  # Observe only position
-        R = jnp.array([[0.2]])       # Observation noise
+        R = jnp.array([[0.2]])  # Observation noise
 
         # Generate inference problem using the unified API
-        seeded_problem = seed(lambda: linear_gaussian_inference_problem(
-            initial_mean, initial_cov, A, Q, C, R, T
-        ))
+        seeded_problem = seed(
+            lambda: linear_gaussian_inference_problem(
+                initial_mean, initial_cov, A, Q, C, R, T
+            )
+        )
         dataset, exact_log_marginal = seeded_problem(key1)
 
         # Create multidimensional linear Gaussian model for SMC
-        @gen  
+        @gen
         def initial_2d_model():
             # Sample initial state (position, velocity)
             pos = normal(initial_mean[0], jnp.sqrt(initial_cov[0, 0])) @ "pos"
@@ -1297,8 +1313,8 @@ class TestRejuvenationSMC:
         # Check accuracy against exact Kalman filtering
         error = jnp.abs(estimated_log_marginal - exact_log_marginal)
         tolerance = 10.0  # More lenient for multidimensional case
-        
-        print(f"\n2D Linear Gaussian SMC test:")
+
+        print("\n2D Linear Gaussian SMC test:")
         print(f"Exact log marginal (Kalman): {exact_log_marginal:.6f}")
         print(f"SMC log marginal: {estimated_log_marginal:.6f}")
         print(f"Error: {error:.6f}")
@@ -1329,27 +1345,29 @@ class TestRejuvenationSMC:
         Q = jnp.array([[0.1]])  # Not used for T=1
         C = jnp.array([[1.0]])  # Direct observation
         R = jnp.array([[0.5]])  # Observation noise
-        
+
         # Known observation
         y_obs = jnp.array([[1.5]])  # Shape (T, d_obs)
-        
+
         # Run Kalman filter
         filtered_means, filtered_covs, log_marginal = kalman_filter(
             y_obs, initial_mean, initial_cov, A, Q, C, R
         )
-        
+
         # Analytical solution for Bayesian linear regression
         # Posterior: p(x|y) ∝ p(y|x)p(x) = N(y|Cx,R)N(x|μ₀,Σ₀)
         # μ_post = (C^T R^-1 C + Σ₀^-1)^-1 (C^T R^-1 y + Σ₀^-1 μ₀)
         # Σ_post = (C^T R^-1 C + Σ₀^-1)^-1
-        
+
         precision_prior = jnp.linalg.inv(initial_cov)  # Σ₀^-1
         precision_likelihood = C.T @ jnp.linalg.inv(R) @ C  # C^T R^-1 C
         precision_post = precision_likelihood + precision_prior
         cov_post = jnp.linalg.inv(precision_post)
-        
-        mean_post = cov_post @ (C.T @ jnp.linalg.inv(R) @ y_obs[0] + precision_prior @ initial_mean)
-        
+
+        mean_post = cov_post @ (
+            C.T @ jnp.linalg.inv(R) @ y_obs[0] + precision_prior @ initial_mean
+        )
+
         # Also compute analytical log marginal likelihood
         # log p(y) = log N(y | C μ₀, C Σ₀ C^T + R)
         pred_mean = C @ initial_mean
@@ -1357,21 +1375,21 @@ class TestRejuvenationSMC:
         analytical_log_marginal = jax.scipy.stats.multivariate_normal.logpdf(
             y_obs[0], pred_mean.flatten(), pred_cov
         )
-        
-        print(f"\nKalman Filter Analytical Validation (T=1):")
+
+        print("\nKalman Filter Analytical Validation (T=1):")
         print(f"Analytical posterior mean: {mean_post.flatten()}")
         print(f"Kalman posterior mean: {filtered_means[0]}")
         print(f"Analytical posterior var: {jnp.diag(cov_post)}")
         print(f"Kalman posterior var: {jnp.diag(filtered_covs[0])}")
         print(f"Analytical log marginal: {analytical_log_marginal:.6f}")
         print(f"Kalman log marginal: {log_marginal:.6f}")
-        
+
         # Check that Kalman filter matches analytical solution
         assert jnp.allclose(filtered_means[0], mean_post.flatten(), atol=1e-5), (
             f"Posterior means don't match: Kalman={filtered_means[0]}, Analytical={mean_post.flatten()}"
         )
         assert jnp.allclose(filtered_covs[0], cov_post, atol=1e-5), (
-            f"Posterior covariances don't match"
+            "Posterior covariances don't match"
         )
         assert jnp.allclose(log_marginal, analytical_log_marginal, atol=1e-5), (
             f"Log marginals don't match: Kalman={log_marginal:.6f}, Analytical={analytical_log_marginal:.6f}"
@@ -1381,7 +1399,7 @@ class TestRejuvenationSMC:
     def test_smc_vs_kalman_posterior_statistics_simple(self):
         """Compare SMC vs Kalman posterior statistics on very simple case."""
         key = jrand.key(999)
-        
+
         # Very simple 1D case, short sequence
         T = 3
         initial_mean = jnp.array([0.0])
@@ -1390,10 +1408,10 @@ class TestRejuvenationSMC:
         Q = jnp.array([[0.2]])  # Process noise
         C = jnp.array([[1.0]])  # Direct observation
         R = jnp.array([[0.3]])  # Observation noise
-        
+
         # Generate a specific dataset for reproducible testing
         observations = jnp.array([[0.5], [1.0], [0.2]])  # Shape (T, d_obs)
-        
+
         # Get exact Kalman results
         filtered_means, filtered_covs, kalman_log_marginal = kalman_filter(
             observations, initial_mean, initial_cov, A, Q, C, R
@@ -1401,7 +1419,7 @@ class TestRejuvenationSMC:
         smoothed_means, smoothed_covs = kalman_smoother(
             observations, initial_mean, initial_cov, A, Q, C, R
         )
-        
+
         # Set up SMC with the exact same model structure
         @gen
         def time0_model():
@@ -1409,18 +1427,18 @@ class TestRejuvenationSMC:
             x0 = normal(initial_mean[0], jnp.sqrt(initial_cov[0, 0])) @ "x"
             y0 = normal(C[0, 0] * x0, jnp.sqrt(R[0, 0])) @ "y"
             return y0
-            
-        @gen  
+
+        @gen
         def time1_model():
             """Model for times 0 and 1."""
             # Time 0
             x0 = normal(initial_mean[0], jnp.sqrt(initial_cov[0, 0])) @ "x0"
             y0 = normal(C[0, 0] * x0, jnp.sqrt(R[0, 0])) @ "y0"
-            # Time 1  
+            # Time 1
             x1 = normal(A[0, 0] * x0, jnp.sqrt(Q[0, 0])) @ "x1"
             y1 = normal(C[0, 0] * x1, jnp.sqrt(R[0, 0])) @ "y1"
             return jnp.array([y0, y1])
-            
+
         @gen
         def time2_model():
             """Model for times 0, 1, and 2."""
@@ -1434,53 +1452,56 @@ class TestRejuvenationSMC:
             x2 = normal(A[0, 0] * x1, jnp.sqrt(Q[0, 0])) @ "x2"
             y2 = normal(C[0, 0] * x2, jnp.sqrt(R[0, 0])) @ "y2"
             return jnp.array([y0, y1, y2])
-        
+
         # Test with standard importance sampling on the full model to start
         constraints = {
             "y0": observations[0, 0],
-            "y1": observations[1, 0], 
-            "y2": observations[2, 0]
+            "y1": observations[1, 0],
+            "y2": observations[2, 0],
         }
-        
+
         # Use importance sampling to get SMC result for comparison
         from genjax.smc import init
+
         n_particles = 5000  # Use many particles for accuracy
-        
+
         smc_result = seed(init)(
             key,
             time2_model,
             (),  # no args
             const(n_particles),
-            constraints
+            constraints,
         )
-        
+
         smc_log_marginal = smc_result.log_marginal_likelihood()
-        
+
         # Extract posterior means from SMC particles
         smc_choices = smc_result.traces.get_choices()
         smc_x0_mean = jnp.mean(smc_choices["x0"])
-        smc_x1_mean = jnp.mean(smc_choices["x1"]) 
+        smc_x1_mean = jnp.mean(smc_choices["x1"])
         smc_x2_mean = jnp.mean(smc_choices["x2"])
         smc_x0_var = jnp.var(smc_choices["x0"])
         smc_x1_var = jnp.var(smc_choices["x1"])
         smc_x2_var = jnp.var(smc_choices["x2"])
-        
+
         print(f"\nSMC vs Kalman Posterior Statistics (T={T}):")
-        print(f"Log marginal - Kalman: {kalman_log_marginal:.6f}, SMC: {smc_log_marginal:.6f}, Error: {abs(kalman_log_marginal - smc_log_marginal):.6f}")
-        print(f"Posterior means:")
+        print(
+            f"Log marginal - Kalman: {kalman_log_marginal:.6f}, SMC: {smc_log_marginal:.6f}, Error: {abs(kalman_log_marginal - smc_log_marginal):.6f}"
+        )
+        print("Posterior means:")
         print(f"  x0 - Kalman: {smoothed_means[0, 0]:.4f}, SMC: {smc_x0_mean:.4f}")
         print(f"  x1 - Kalman: {smoothed_means[1, 0]:.4f}, SMC: {smc_x1_mean:.4f}")
         print(f"  x2 - Kalman: {smoothed_means[2, 0]:.4f}, SMC: {smc_x2_mean:.4f}")
-        print(f"Posterior variances:")
+        print("Posterior variances:")
         print(f"  x0 - Kalman: {smoothed_covs[0, 0, 0]:.4f}, SMC: {smc_x0_var:.4f}")
         print(f"  x1 - Kalman: {smoothed_covs[1, 0, 0]:.4f}, SMC: {smc_x1_var:.4f}")
         print(f"  x2 - Kalman: {smoothed_covs[2, 0, 0]:.4f}, SMC: {smc_x2_var:.4f}")
-        
+
         # Check that SMC and Kalman agree on posterior statistics
         mean_tolerance = 0.1  # Allow some Monte Carlo error
-        var_tolerance = 0.2   # Variance estimates are noisier
+        var_tolerance = 0.2  # Variance estimates are noisier
         log_marginal_tolerance = 0.2  # This is the key test
-        
+
         assert abs(smc_x0_mean - smoothed_means[0, 0]) < mean_tolerance, (
             f"x0 posterior means disagree: SMC={smc_x0_mean:.4f}, Kalman={smoothed_means[0, 0]:.4f}"
         )
@@ -1490,7 +1511,7 @@ class TestRejuvenationSMC:
         assert abs(smc_x2_mean - smoothed_means[2, 0]) < mean_tolerance, (
             f"x2 posterior means disagree: SMC={smc_x2_mean:.4f}, Kalman={smoothed_means[2, 0]:.4f}"
         )
-        
+
         assert abs(smc_log_marginal - kalman_log_marginal) < log_marginal_tolerance, (
             f"Log marginals disagree: SMC={smc_log_marginal:.6f}, Kalman={kalman_log_marginal:.6f}, "
             f"Error={abs(smc_log_marginal - kalman_log_marginal):.6f}"
@@ -1501,39 +1522,47 @@ class TestRejuvenationSMC:
         # Simple 2-step case that we can verify by hand
         T = 2
         initial_mean = jnp.array([0.0])
-        initial_cov = jnp.array([[1.0]]) 
+        initial_cov = jnp.array([[1.0]])
         A = jnp.array([[1.0]])  # No dynamics (random walk)
         Q = jnp.array([[1.0]])  # Unit process noise
         C = jnp.array([[1.0]])  # Direct observation
         R = jnp.array([[1.0]])  # Unit observation noise
-        
+
         observations = jnp.array([[1.0], [2.0]])  # Simple observations
-        
+
         # Run Kalman filter
         filtered_means, filtered_covs, log_marginal = kalman_filter(
             observations, initial_mean, initial_cov, A, Q, C, R
         )
-        
+
         # Hand computation for verification
         # Step 0: Update with y0 = 1.0
         # Prior: x0 ~ N(0, 1), Likelihood: y0 | x0 ~ N(x0, 1)
         # Posterior: x0 | y0 ~ N(0.5, 0.5)  [conjugate Gaussian update]
         expected_mean_0 = 0.5
         expected_var_0 = 0.5
-        
+
         # Step 1: Predict x1 | y0 ~ N(x0|y0, Q) = N(0.5, 0.5 + 1.0) = N(0.5, 1.5)
         # Update with y1 = 2.0: x1 | y0,y1 ~ N(μ, σ²) where
         # μ = (1.5 * 2.0 + 1.0 * 0.5) / (1.5 + 1.0) = (3.0 + 0.5) / 2.5 = 1.4
         # σ² = (1.5 * 1.0) / (1.5 + 1.0) = 1.5 / 2.5 = 0.6
         expected_mean_1 = 1.4
         expected_var_1 = 0.6
-        
-        print(f"\nKalman Filter 2-Step Hand Verification:")
-        print(f"Step 0 - Expected: mean={expected_mean_0:.3f}, var={expected_var_0:.3f}")
-        print(f"Step 0 - Kalman:   mean={filtered_means[0, 0]:.3f}, var={filtered_covs[0, 0, 0]:.3f}")
-        print(f"Step 1 - Expected: mean={expected_mean_1:.3f}, var={expected_var_1:.3f}")
-        print(f"Step 1 - Kalman:   mean={filtered_means[1, 0]:.3f}, var={filtered_covs[1, 0, 0]:.3f}")
-        
+
+        print("\nKalman Filter 2-Step Hand Verification:")
+        print(
+            f"Step 0 - Expected: mean={expected_mean_0:.3f}, var={expected_var_0:.3f}"
+        )
+        print(
+            f"Step 0 - Kalman:   mean={filtered_means[0, 0]:.3f}, var={filtered_covs[0, 0, 0]:.3f}"
+        )
+        print(
+            f"Step 1 - Expected: mean={expected_mean_1:.3f}, var={expected_var_1:.3f}"
+        )
+        print(
+            f"Step 1 - Kalman:   mean={filtered_means[1, 0]:.3f}, var={filtered_covs[1, 0, 0]:.3f}"
+        )
+
         # Check against hand computation
         assert jnp.allclose(filtered_means[0, 0], expected_mean_0, atol=1e-6), (
             f"Step 0 mean mismatch: got {filtered_means[0, 0]:.6f}, expected {expected_mean_0:.6f}"

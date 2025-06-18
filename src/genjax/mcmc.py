@@ -177,13 +177,12 @@ def mh(
         current_trace, selection, *args[0], **args[1]
     )
 
-    # MH acceptance step
-    log_alpha = jnp.minimum(0.0, log_weight)  # min(1, exp(log_weight))
-    accept_prob = jnp.exp(log_alpha)
+    # MH acceptance step in log space
+    log_alpha = jnp.minimum(0.0, log_weight)  # log(min(1, exp(log_weight)))
 
-    # Accept or reject using GenJAX uniform distribution
-    u = uniform.sample(0.0, 1.0)
-    accept = u < accept_prob
+    # Accept or reject using GenJAX uniform distribution in log space
+    log_u = jnp.log(uniform.sample(0.0, 1.0))
+    accept = log_u < log_alpha
 
     # Use tree_map to apply select across all leaves of the traces
     final_trace = jtu.tree_map(

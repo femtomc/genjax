@@ -78,6 +78,12 @@ from .smc import (  # noqa: E402
     resample,
     rejuvenation_smc,
 )
+from .state import (  # noqa: E402
+    state,
+    save,
+    tag_state,
+    namespace,
+)
 
 # Import extras module for additional functionality
 from . import extras  # noqa: E402
@@ -163,6 +169,11 @@ __all__ = [
     "rejuvenate",
     "resample",
     "rejuvenation_smc",
+    # State functionality
+    "state",
+    "save",
+    "tag_state",
+    "namespace",
     # Extras
     "extras",
     # Discrete HMM

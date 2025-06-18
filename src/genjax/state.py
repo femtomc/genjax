@@ -1,16 +1,100 @@
 """
-JAX interpreter for inspecting tagged state inside JAX Python functions.
+JAX interpreter for inspecting and organizing tagged state inside JAX Python functions.
 
-This module provides a State interpreter that can collect tagged values from
-within JAX computations using a special `state_p` primitive. The interpreter
-follows the same patterns as the Seed interpreter for consistency.
+This module provides a State interpreter that can collect and hierarchically organize
+tagged values from within JAX computations using JAX primitives. The interpreter
+works seamlessly with all JAX transformations while providing powerful state
+organization capabilities.
+
+Core Features:
+============
+
+**State Collection**: Tag intermediate values during computation for inspection
+**Hierarchical Organization**: Use namespaces to create nested state structures
+**JAX Integration**: Full compatibility with jit, vmap, grad, scan, and other JAX transforms
+**Error Safety**: Automatic cleanup of namespace stack on exceptions
+**Zero Overhead**: No performance cost when not using the @state decorator
 
 Primary API:
-- `save(**tagged_values)`: Recommended way to tag multiple values by name
+===========
+
+Basic State Collection:
 - `state(f)`: Transform function to collect tagged state values
+- `save(**tagged_values)`: Recommended way to tag multiple values by name
+
+Hierarchical Organization:
+- `namespace(fn, ns)`: Transform function to collect state under namespace
+- Supports arbitrary nesting: `namespace(namespace(fn, "inner"), "outer")`
 
 Lower-level API:
+===============
+
 - `tag_state(*values, name="...")`: Tag individual values for collection
+
+Usage Examples:
+==============
+
+Basic state collection:
+```python
+@state
+def computation(x):
+    y = x + 1
+    save(intermediate=y, doubled=x*2)
+    return y
+
+result, state_dict = computation(5)
+# state_dict = {"intermediate": 6, "doubled": 10}
+```
+
+Hierarchical organization:
+```python
+@state
+def complex_computation(x):
+    save(input=x)
+
+    # Namespace for processing steps
+    processing = namespace(
+        lambda: save(step1=x*2, step2=x+1),
+        "processing"
+    )
+    processing()
+
+    # Nested namespaces
+    analysis = namespace(
+        namespace(lambda: save(mean=x), "stats"),
+        "analysis"
+    )
+    analysis()
+
+    return x
+
+result, state_dict = complex_computation(5)
+# state_dict = {
+#     "input": 5,
+#     "processing": {"step1": 10, "step2": 6},
+#     "analysis": {"stats": {"mean": 5}}
+# }
+```
+
+JAX Integration:
+```python
+# Works with all JAX transformations
+jitted_fn = jax.jit(computation)
+vmapped_fn = jax.vmap(computation)
+grad_fn = jax.grad(lambda x: computation(x)[0])
+```
+
+Implementation Details:
+======================
+
+The state interpreter uses JAX primitives (`state_p`, `namespace_push_p`,
+`namespace_pop_p`) to integrate with JAX's transformation system. This ensures
+proper behavior under jit, vmap, grad, and other JAX transforms.
+
+The namespace functionality is implemented using a stack-based approach where
+namespace push/pop operations are tracked via JAX primitives, allowing the
+interpreter to maintain correct hierarchical structure even under complex
+JAX transformations.
 """
 
 from functools import wraps
@@ -41,9 +125,41 @@ state_p = InitialStylePrimitive(
     f"{TerminalStyle.BOLD}{TerminalStyle.GREEN}state.tag{TerminalStyle.RESET}",
 )
 
+# Namespace primitives for organizing state
+namespace_push_p = InitialStylePrimitive(
+    f"{TerminalStyle.BOLD}{TerminalStyle.PURPLE}namespace.push{TerminalStyle.RESET}",
+)
 
-# The state_p primitive will use initial_style_bind for dynamic rule creation
+namespace_pop_p = InitialStylePrimitive(
+    f"{TerminalStyle.BOLD}{TerminalStyle.YELLOW}namespace.pop{TerminalStyle.RESET}",
+)
+
+
+# The primitives will use initial_style_bind for dynamic rule creation
 # No need for static impl/abstract registration
+
+
+# Helper functions for nested dictionary operations
+
+
+def _nested_dict_set(d, path, key, value):
+    """Set a value in a nested dictionary using the given path."""
+    current = d
+    for namespace in path:
+        if namespace not in current:
+            current[namespace] = {}
+        current = current[namespace]
+    current[key] = value
+
+
+def _nested_dict_get(d, path):
+    """Get a nested dictionary using the given path."""
+    current = d
+    for namespace in path:
+        if namespace not in current:
+            current[namespace] = {}
+        current = current[namespace]
+    return current
 
 
 @Pytree.dataclass
@@ -56,6 +172,7 @@ class State(Pytree):
     """
 
     collected_state: dict[str, Any]
+    namespace_stack: list[str] = Pytree.field(default_factory=list)
 
     def eval_jaxpr_state(
         self,
@@ -75,16 +192,39 @@ class State(Pytree):
             primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
 
             if primitive == state_p:
-                # Collect the tagged values
+                # Collect the tagged values with namespace support
                 name = params.get("name", inner_params.get("name"))
                 if name is None:
                     raise ValueError("tag_state requires a 'name' parameter")
                 values = list(invals) if invals else []
-                self.collected_state[name] = (
-                    values if len(values) > 1 else (values[0] if values else None)
-                )
+                value = values if len(values) > 1 else (values[0] if values else None)
+
+                # Handle namespace path using interpreter's stack
+                namespace_path = tuple(self.namespace_stack)
+                if namespace_path:
+                    _nested_dict_set(self.collected_state, namespace_path, name, value)
+                else:
+                    self.collected_state[name] = value
+
                 # The state primitive returns the values as-is due to multiple_results
                 outvals = values
+
+            elif primitive == namespace_push_p:
+                # Push namespace onto interpreter's stack
+                namespace = params.get("namespace", inner_params.get("namespace"))
+                if namespace is None:
+                    raise ValueError("namespace_push requires a 'namespace' parameter")
+                self.namespace_stack.append(namespace)
+                # Namespace push doesn't take or return values
+                outvals = []
+
+            elif primitive == namespace_pop_p:
+                # Pop namespace from interpreter's stack
+                if not self.namespace_stack:
+                    raise ValueError("namespace_pop called with empty namespace stack")
+                self.namespace_stack.pop()
+                # Namespace pop doesn't take or return values
+                outvals = []
 
             elif primitive == scan_p:
                 # Handle scan primitive by transforming body to collect state
@@ -185,10 +325,40 @@ def state(f: Callable[..., Any]):
 
     @wraps(f)
     def wrapped(*args):
-        interpreter = State(collected_state={})
+        interpreter = State(collected_state={}, namespace_stack=[])
         return interpreter.eval(f, *args)
 
     return wrapped
+
+
+def _namespace_push(namespace: str) -> None:
+    """Push a namespace onto the interpreter's stack (internal function)."""
+
+    def empty_fn():
+        return None
+
+    def batch_rule(vector_args, dims, **params):
+        return (), ()
+
+    initial_style_bind(
+        namespace_push_p,
+        batch=batch_rule,
+    )(empty_fn, namespace=namespace)()
+
+
+def _namespace_pop() -> None:
+    """Pop a namespace from the interpreter's stack (internal function)."""
+
+    def empty_fn():
+        return None
+
+    def batch_rule(vector_args, dims, **params):
+        return (), ()
+
+    initial_style_bind(
+        namespace_pop_p,
+        batch=batch_rule,
+    )(empty_fn)()
 
 
 def tag_state(*values: Any, name: str) -> Any:
@@ -271,3 +441,58 @@ def save(**tagged_values) -> dict[str, Any]:
     for name, value in tagged_values.items():
         result[name] = tag_state(value, name=name)
     return result
+
+
+def namespace(f: Callable[..., Any], ns: str) -> Callable[..., Any]:
+    """Transform a function to collect state under a namespace.
+
+    This function wraps another function so that any state collected within
+    it will be organized under the specified namespace. Namespaces can be
+    nested by applying this function multiple times.
+
+    Args:
+        f: Function to wrap with namespace context
+        ns: Namespace string to organize state under
+
+    Returns:
+        Function that collects state under the specified namespace
+
+    Example:
+        >>> @state
+        >>> def computation(x):
+        ...     # State collected directly at root level
+        ...     save(root_val=x)
+        ...
+        ...     # State collected under "inner" namespace
+        ...     inner_fn = namespace(lambda y: save(nested_val=y * 2), "inner")
+        ...     inner_fn(x)
+        ...
+        ...     # Nested namespaces: state under "outer.deep"
+        ...     deep_fn = namespace(
+        ...         namespace(lambda z: save(deep_val=z * 3), "deep"),
+        ...         "outer"
+        ...     )
+        ...     deep_fn(x)
+        ...
+        ...     return x
+        >>>
+        >>> result, state_dict = computation(5)
+        >>> # state_dict == {
+        >>> #     "root_val": 5,
+        >>> #     "inner": {"nested_val": 10},
+        >>> #     "outer": {"deep": {"deep_val": 15}}
+        >>> # }
+    """
+
+    @wraps(f)
+    def namespaced_fn(*args, **kwargs):
+        # Push namespace using JAX primitive
+        _namespace_push(ns)
+        try:
+            result = f(*args, **kwargs)
+            return result
+        finally:
+            # Always pop namespace, even if function raises
+            _namespace_pop()
+
+    return namespaced_fn
