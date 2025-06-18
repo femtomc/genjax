@@ -2664,12 +2664,12 @@ packages:
 - pypi: .
   name: genjax
   version: 0.1.0
-  sha256: e9cdecdd5b3e3c00df121d79103f6f76caf95d9b51e1169888a3e4c190e7dd71
+  sha256: 65e60555de2d146bf1f0ed779a37db63ab9a83a3076b99359c90134ad3c88e8e
   requires_dist:
-  - penzai
-  - beartype
-  - jaxtyping
-  - tensorflow-probability
+  - penzai>=0.2.5,<0.3
+  - beartype>=0.21.0,<0.22
+  - jaxtyping>=0.3.2,<0.4
+  - tensorflow-probability>=0.25.0,<0.26
   requires_python: '>=3.12'
   editable: true
 - pypi: https://files.pythonhosted.org/packages/f8/6f/2c89e21fb6cc68bb5fbdeb448d63579d1a9194210c351f6bb77ad54434c9/genstudio-2025.4.1-py3-none-any.whl

@@ -64,6 +64,7 @@ def beta_ber_multi(num_obs: Const[int]):
 ### Data Pattern
 
 All frameworks use **80% heads, 20% tails** observations:
+
 - `num_heads = int(0.8 * num_obs)`
 - `num_tails = num_obs - num_heads`
 - `data = jnp.concatenate([jnp.ones(num_heads), jnp.zeros(num_tails)])`
@@ -129,7 +130,6 @@ pixi run -e faircoin faircoin-combined
 ```bash
 pixi run -e faircoin python -m examples.faircoin.main --posterior
 ```
-
 
 ### All Figures
 
