@@ -75,6 +75,18 @@ from .smc import (  # noqa: E402
     rejuvenation_smc,
 )
 
+# Import extras module for additional functionality
+from . import extras  # noqa: E402
+from .extras import (  # noqa: E402
+    discrete_hmm,
+    forward_filter,
+    backward_sample,
+    forward_filtering_backward_sampling,
+    compute_sequence_log_prob,
+    sample_hmm_dataset,
+    DiscreteHMMTrace,
+)
+
 __all__ = [
     "GFI",
     "Distribution",
@@ -128,4 +140,12 @@ __all__ = [
     "rejuvenate",
     "resample",
     "rejuvenation_smc",
+    "extras",
+    "discrete_hmm",
+    "forward_filter",
+    "backward_sample",
+    "forward_filtering_backward_sampling",
+    "compute_sequence_log_prob",
+    "sample_hmm_dataset",
+    "DiscreteHMMTrace",
 ]
