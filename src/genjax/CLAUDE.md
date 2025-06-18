@@ -262,7 +262,7 @@ result, state_dict = computation(5)
 # result = 12, state_dict = {"intermediate": 6}
 
 # Tag multiple values at once
-@state  
+@state
 def multi_value_computation(x):
     y = x + 1
     z = x * 2
@@ -287,7 +287,7 @@ result, state_dict = convenient_computation(5)
 **JAX Compatibility**: The state interpreter works with all JAX transformations (`jit`, `vmap`, `grad`) by using `initial_style_bind` for proper JAX primitive handling.
 
 **Key Features**:
-- **Multiple value tagging**: `tag_state(a, b, c, name="multi")` 
+- **Multiple value tagging**: `tag_state(a, b, c, name="multi")`
 - **Required naming**: All tags must have a `name` parameter
 - **JAX transformation compatibility**: Works with `jit`, `vmap`, `grad`
 - **Convenience functions**: `save(x=val1, y=val2)` for multiple named values

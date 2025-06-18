@@ -359,3 +359,108 @@ class TestComplexStateScenarios:
         result, state_dict = overwrite_computation(5)
         assert result == 13  # 6 + 7
         assert state_dict == {"value": 7}  # Should be the second value
+
+
+class TestStateWithScan:
+    """Test state functionality with jax.lax.scan."""
+
+    def test_state_with_simple_scan(self):
+        """Test state collection within scan body."""
+        from jax.lax import scan
+
+        @state
+        def scan_computation(init_carry, xs):
+            def step_fn(carry, x):
+                new_carry = carry + x
+                tag_state(new_carry, name="step_carry")
+                return new_carry, new_carry * 2
+
+            final_carry, ys = scan(step_fn, init_carry, xs)
+            return final_carry, ys
+
+        xs = jnp.array([1, 2, 3])
+        result, state_dict = scan_computation(0, xs)
+
+        final_carry, ys = result
+        assert final_carry == 6  # 0 + 1 + 2 + 3
+        assert jnp.allclose(ys, jnp.array([2, 6, 12]))  # (1, 3, 6) * 2
+
+        # Check that state was collected from each scan iteration
+        assert "step_carry" in state_dict
+        collected_carries = state_dict["step_carry"]
+        expected_carries = jnp.array([1, 3, 6])  # Accumulated carries
+        assert jnp.allclose(collected_carries, expected_carries)
+
+    def test_state_with_multiple_scan_tags(self):
+        """Test multiple state tags within scan body."""
+        from jax.lax import scan
+
+        @state
+        def multi_tag_scan(init_carry, xs):
+            def step_fn(carry, x):
+                intermediate = carry + x
+                tag_state(intermediate, name="intermediate")
+
+                doubled = intermediate * 2
+                tag_state(doubled, name="doubled")
+
+                return intermediate, doubled
+
+            final_carry, ys = scan(step_fn, init_carry, xs)
+            return final_carry, ys
+
+        xs = jnp.array([1, 2, 3])
+        result, state_dict = multi_tag_scan(5, xs)
+
+        final_carry, ys = result
+        assert final_carry == 11  # 5 + 1 + 2 + 3
+        assert jnp.allclose(ys, jnp.array([12, 16, 22]))  # (6, 8, 11) * 2
+
+        # Check both state collections
+        assert "intermediate" in state_dict
+        assert "doubled" in state_dict
+
+        intermediates = state_dict["intermediate"]
+        doubled_vals = state_dict["doubled"]
+
+        expected_intermediates = jnp.array([6, 8, 11])  # 5+1, 6+2, 8+3
+        expected_doubled = jnp.array([12, 16, 22])  # intermediates * 2
+        assert jnp.allclose(intermediates, expected_intermediates)
+        assert jnp.allclose(doubled_vals, expected_doubled)
+
+    def test_state_outside_and_inside_scan(self):
+        """Test state collection both outside and inside scan."""
+        from jax.lax import scan
+
+        @state
+        def mixed_state_computation(init_carry, xs):
+            # Tag state before scan
+            tag_state(init_carry, name="initial")
+
+            def step_fn(carry, x):
+                new_carry = carry + x
+                tag_state(new_carry, name="scan_step")
+                return new_carry, new_carry
+
+            final_carry, ys = scan(step_fn, init_carry, xs)
+
+            # Tag state after scan
+            result = final_carry * 10
+            tag_state(result, name="final")
+
+            return result
+
+        xs = jnp.array([1, 2])
+        result, state_dict = mixed_state_computation(3, xs)
+
+        assert result == 60  # (3 + 1 + 2) * 10
+
+        # Check all collected state
+        assert "initial" in state_dict
+        assert "scan_step" in state_dict
+        assert "final" in state_dict
+
+        assert state_dict["initial"] == 3
+        expected_scan_steps = jnp.array([4, 6])  # 3+1, 4+2
+        assert jnp.allclose(state_dict["scan_step"], expected_scan_steps)
+        assert state_dict["final"] == 60
