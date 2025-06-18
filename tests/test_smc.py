@@ -12,6 +12,9 @@ from genjax.distributions import categorical
 
 from genjax.smc import (
     init,
+    change,
+    extend,
+    rejuvenate,
     resample,
 )
 from genjax.core import gen, const
@@ -24,6 +27,8 @@ from discrete_hmm import (
 )
 from genjax.distributions import normal
 import jax.scipy.stats as jstats
+from genjax.mcmc import mh
+from genjax import sel
 
 
 @gen
@@ -564,4 +569,168 @@ class TestResampling:
             categorical_resampled.log_marginal_estimate,
             systematic_resampled.log_marginal_estimate,
             rtol=1e-6,
+        )
+
+
+class TestSMCComponents:
+    """Test individual SMC components separately."""
+
+    def test_extend_basic_functionality(self):
+        """Test basic extend functionality."""
+        # Create initial particles
+        particles = init(
+            hierarchical_normal_model,
+            (),
+            const(100),
+            {"y": 1.0},
+        )
+
+        # Create extended model that adds a new variable
+        @gen
+        def extended_model():
+            mu = normal(0.0, 1.0) @ "mu"
+            y = normal(mu, 0.5) @ "y"
+            z = normal(mu, 0.3) @ "z"  # New variable
+            return (y, z)
+
+        # Extend particles with constraint on new variable
+        extended_particles = extend(
+            particles,
+            extended_model,
+            (),
+            {"z": 0.5},  # Constraint on new variable
+        )
+
+        # Verify structure
+        assert extended_particles.n_samples == particles.n_samples
+        assert extended_particles.traces is not None
+        assert jnp.isfinite(extended_particles.log_marginal_likelihood())
+
+        # Check that new variable is present
+        choices = extended_particles.traces.get_choices()
+        assert "z" in choices
+
+    def test_extend_with_custom_proposal(self):
+        """Test extend with custom extension proposal."""
+        particles = init(
+            hierarchical_normal_model,
+            (),
+            const(50),
+            {"y": 1.0},
+        )
+
+        @gen
+        def extended_model():
+            mu = normal(0.0, 1.0) @ "mu"
+            y = normal(mu, 0.5) @ "y"
+            z = normal(mu, 0.3) @ "z"
+            return (y, z)
+
+        @gen
+        def custom_proposal():
+            # Custom proposal for z
+            z = normal(0.5, 0.2) @ "z"  # Different parameters than target
+            return z
+
+        extended_particles = extend(
+            particles,
+            extended_model,
+            (),
+            {},  # No constraints, let proposal handle it
+            extension_proposal=custom_proposal,
+        )
+
+        # Should work with custom proposal
+        assert extended_particles.n_samples == particles.n_samples
+        assert jnp.isfinite(extended_particles.log_marginal_likelihood())
+
+    def test_change_basic_functionality(self):
+        """Test basic change functionality."""
+        particles = init(
+            hierarchical_normal_model,
+            (),
+            const(75),
+            {"y": 1.0},
+        )
+
+        # Create slightly different model
+        @gen
+        def new_model():
+            mu = normal(0.1, 1.0) @ "mu"  # Slightly different prior
+            y = normal(mu, 0.5) @ "y"
+            return y
+
+        # Change to new model with identity mapping
+        changed_particles = change(
+            particles,
+            new_model,
+            (),
+            lambda x: x,  # Identity mapping
+        )
+
+        # Verify basic properties
+        assert changed_particles.n_samples == particles.n_samples
+        assert jnp.isfinite(changed_particles.log_marginal_likelihood())
+
+    def test_change_with_address_mapping(self):
+        """Test change with non-trivial address mapping."""
+
+        # Create model with one address name
+        @gen
+        def initial_model():
+            param = normal(0.0, 1.0) @ "param"
+            obs = normal(param, 0.5) @ "obs"
+            return obs
+
+        particles = init(
+            initial_model,
+            (),
+            const(60),
+            {"obs": 1.0},
+        )
+
+        # Create model with different address name
+        @gen
+        def new_model():
+            mu = normal(0.0, 1.0) @ "mu"  # Different address name
+            obs = normal(mu, 0.5) @ "obs"
+            return obs
+
+        # Map addresses
+        def address_mapping(choices):
+            return {"mu": choices["param"]}
+
+        changed_particles = change(particles, new_model, (), address_mapping)
+
+        # Verify mapping worked
+        assert changed_particles.n_samples == particles.n_samples
+        choices = changed_particles.traces.get_choices()
+        assert "mu" in choices  # Should have new address name
+        assert "obs" in choices
+
+    def test_rejuvenate_basic_functionality(self):
+        """Test basic rejuvenate functionality."""
+        particles = init(
+            hierarchical_normal_model,
+            (),
+            const(80),
+            {"y": 1.0},
+        )
+
+        # MCMC kernel for rejuvenation
+        def mcmc_kernel(trace):
+            return mh(trace, sel("mu"))
+
+        rejuvenated_particles = rejuvenate(particles, mcmc_kernel)
+
+        # Weights should be unchanged (detailed balance)
+        assert jnp.allclose(
+            rejuvenated_particles.log_weights, particles.log_weights, rtol=1e-10
+        )
+
+        # Other properties should be preserved
+        assert rejuvenated_particles.n_samples == particles.n_samples
+        assert (
+            rejuvenated_particles.log_marginal_estimate
+            == particles.log_marginal_estimate
         )
