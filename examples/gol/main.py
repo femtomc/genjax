@@ -1,31 +1,14 @@
-import time
-
 import jax
 import core
-from jax import block_until_ready
-import jax.numpy as jnp
 import numpy as np
 import jax.random as jrand
 from data import get_blinker_n
+from examples.utils import timing
 import matplotlib.pyplot as plt
 import matplotlib
 
 
 matplotlib.rcParams.update({"font.size": 26})
-
-
-def timing(fn, repeats=200, inner_repeats=200):
-    times = []
-    for i in range(repeats):
-        possible = []
-        for i in range(inner_repeats):
-            start_time = time.perf_counter()
-            block_until_ready(fn())
-            interval = time.perf_counter() - start_time
-            possible.append(interval)
-        times.append(jnp.array(possible).min())
-    times = jnp.array(times)
-    return times, (jnp.mean(times), jnp.std(times))
 
 
 def task(n: int):

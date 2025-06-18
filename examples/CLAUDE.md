@@ -13,7 +13,6 @@ The `examples/utils.py` module provides shared utilities for all case studies:
 - **`timing()`**: Standard benchmarking function with consistent methodology
 - **`benchmark_with_warmup()`**: Automatic JIT warm-up before timing
 - **`compare_timings()`**: Formatted comparison of multiple timing results
-- **`timing_legacy()`**: Backward compatibility for existing case studies
 
 **Always use `examples.utils.timing()` instead of duplicating timing code.**
 
