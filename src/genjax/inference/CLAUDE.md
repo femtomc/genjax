@@ -12,7 +12,7 @@ The `inference` module provides implementations of standard probabilistic infere
 src/genjax/inference/
 ├── __init__.py          # Module exports
 ├── mcmc.py             # Markov Chain Monte Carlo algorithms
-├── smc.py              # Sequential Monte Carlo algorithms  
+├── smc.py              # Sequential Monte Carlo algorithms
 ├── vi.py               # Variational Inference algorithms
 └── CLAUDE.md           # This file
 ```
@@ -55,8 +55,8 @@ mcmc_algorithm = chain(mh_kernel)
 
 # Run with diagnostics
 result = seed(mcmc_algorithm)(
-    key, 
-    initial_trace, 
+    key,
+    initial_trace,
     n_steps=const(1000),
     n_chains=const(4),           # Multiple parallel chains
     burn_in=const(200),          # Burn-in samples to discard
@@ -107,7 +107,7 @@ target_acceptance = 0.6  # Optimal for MALA
 for step_size in step_sizes:
     result = run_mala_chain(step_size)
     acceptance_rate = compute_acceptance_rate(result)
-    
+
     if abs(acceptance_rate - target_acceptance) < 0.1:
         optimal_step_size = step_size
         break
@@ -121,7 +121,7 @@ result = mcmc_algorithm(key, trace, n_steps=const(1000), n_chains=const(4))
 # Check R-hat < 1.1 for convergence
 converged = all(r_hat < 1.1 for r_hat in jax.tree.leaves(result.rhat))
 
-# Check effective sample size > 100 for reliable estimates  
+# Check effective sample size > 100 for reliable estimates
 adequate_ess = all(ess > 100 for ess in jax.tree.leaves(result.ess_bulk))
 ```
 
@@ -231,10 +231,10 @@ n_particles_large = const(5000)   # High-precision applications
 def adaptive_resampling(particles, threshold=0.5):
     ess = particles.effective_sample_size()
     n_particles = particles.n_particles
-    
+
     if ess / n_particles < threshold:
         particles = resample(particles)
-    
+
     return particles
 ```
 
@@ -336,10 +336,10 @@ optimizer = optax.adam(scheduler)
 def check_vi_convergence(losses, window=100, threshold=1e-4):
     if len(losses) < window:
         return False
-    
+
     recent_losses = losses[-window:]
     loss_change = abs(recent_losses[-1] - recent_losses[0]) / window
-    
+
     return loss_change < threshold
 ```
 
@@ -364,13 +364,13 @@ for n_samples, n_steps in sample_schedule:
 
 #### MCMC
 - **Best for**: Exact sampling from posterior (asymptotically)
-- **Use when**: 
+- **Use when**:
   - High-precision posterior estimates needed
   - Model has complex dependencies
   - Computational time is not critical
 - **Avoid when**: Real-time inference required
 
-#### SMC  
+#### SMC
 - **Best for**: Sequential/temporal models, particle filtering
 - **Use when**:
   - Time series data
@@ -431,7 +431,7 @@ def adaptive_particle_count(model_complexity):
     if model_complexity < 10:
         return const(5000)
     elif model_complexity < 100:
-        return const(1000) 
+        return const(1000)
     else:
         return const(500)
 ```
@@ -450,12 +450,12 @@ def progressive_vi(target, constraints):
     # Start with simple approximation
     simple_family = MeanFieldNormalFamily(["param1"])
     result1 = variational_inference(..., variational_family=simple_family)
-    
+
     # Expand to full approximation
     full_family = FullCovarianceNormalFamily(["param1", "param2"])
     result2 = variational_inference(..., variational_family=full_family,
                                    initial_params=expand_params(result1.params))
-    
+
     return result2
 ```
 
@@ -469,7 +469,7 @@ def test_inference_accuracy():
     # Use conjugate models with known posteriors
     true_posterior = analytical_solution(data)
     mcmc_posterior = mcmc_inference(model, data)
-    
+
     # Compare moments
     assert jnp.allclose(true_posterior.mean, mcmc_posterior.mean, rtol=0.1)
     assert jnp.allclose(true_posterior.std, mcmc_posterior.std, rtol=0.2)
@@ -482,7 +482,7 @@ def test_convergence():
         result = inference_algorithm(..., n_samples=const(n_samples))
         error = compute_error(result, ground_truth)
         errors.append(error)
-    
+
     # Errors should generally decrease
     assert errors[-1] < errors[0]
 ```
@@ -495,12 +495,12 @@ def cross_validate_algorithms():
     mcmc_result = mcmc_inference(simple_model, data)
     smc_result = smc_inference(simple_model, data)
     vi_result = vi_inference(simple_model, data)
-    
+
     # Compare posterior means (within tolerance)
     mcmc_mean = mcmc_result.posterior.mean
     smc_mean = smc_result.posterior.mean
     vi_mean = vi_result.posterior.mean
-    
+
     assert jnp.allclose(mcmc_mean, smc_mean, rtol=0.2)
     assert jnp.allclose(mcmc_mean, vi_mean, rtol=0.3)  # VI less precise
 ```
@@ -512,20 +512,20 @@ def cross_validate_algorithms():
 ```python
 def process_time_series(data_stream):
     particles = init(initial_model, initial_args, n_particles=const(1000), {})
-    
+
     results = []
     for t, observation in enumerate(data_stream):
         # Extend model with new timestep
-        particles = extend(particles, extended_model, new_args, 
+        particles = extend(particles, extended_model, new_args,
                          constraints={f"obs_{t}": observation})
-        
+
         # Rejuvenate if needed
         if particles.effective_sample_size() < 500:
             particles = rejuvenate(particles, mcmc_kernel)
             particles = resample(particles)
-        
+
         results.append(particles.log_marginal_likelihood())
-    
+
     return results
 ```
 
@@ -534,18 +534,18 @@ def process_time_series(data_stream):
 ```python
 def hierarchical_inference(grouped_data):
     # Use different algorithms at different levels
-    
+
     # Global parameters with VI (fast)
     global_vi_result = variational_inference(global_model, global_data, ...)
-    
+
     # Group-specific parameters with MCMC (precise)
     group_results = {}
     for group_id, group_data in grouped_data.items():
         # Initialize from global VI result
         initial_trace = create_trace_from_global_params(global_vi_result.params)
-        group_results[group_id] = mcmc_inference(group_model, group_data, 
+        group_results[group_id] = mcmc_inference(group_model, group_data,
                                                 initial_trace=initial_trace)
-    
+
     return global_vi_result, group_results
 ```
 
@@ -555,12 +555,12 @@ def hierarchical_inference(grouped_data):
 def model_selection(models, data):
     # Use SMC for marginal likelihood computation
     evidences = {}
-    
+
     for model_name, model in models.items():
-        particles = init(model, model_args, n_particles=const(2000), 
+        particles = init(model, model_args, n_particles=const(2000),
                         constraints={"obs": data})
         evidences[model_name] = particles.log_marginal_likelihood()
-    
+
     # Select model with highest evidence
     best_model = max(evidences, key=evidences.get)
     return best_model, evidences
@@ -576,10 +576,10 @@ from genjax.extras.state_space import discrete_hmm, linear_gaussian
 def state_space_inference(model, observations):
     # Use exact inference for validation
     exact_result = forward_filter(observations, ...)
-    
+
     # Use SMC for approximate inference
     smc_result = rejuvenation_smc(model, observations, ...)
-    
+
     # Compare log marginal likelihoods
     error = abs(exact_result.log_marginal - smc_result.log_marginal)
     return smc_result, error
@@ -606,7 +606,7 @@ result = variational_inference(
 
 ### Theoretical Background
 - **MCMC**: Robert & Casella, "Monte Carlo Statistical Methods"
-- **SMC**: Doucet & Johansen, "A Tutorial on Particle Filtering and Smoothing"  
+- **SMC**: Doucet & Johansen, "A Tutorial on Particle Filtering and Smoothing"
 - **VI**: Blei et al., "Variational Inference: A Review for Statisticians"
 
 ### Implementation Details

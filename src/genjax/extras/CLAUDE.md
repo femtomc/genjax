@@ -2,7 +2,7 @@
 
 This file provides guidance for Claude Code when working with the GenJAX extras module.
 
-**For core GenJAX concepts**, see `../CLAUDE.md`  
+**For core GenJAX concepts**, see `../CLAUDE.md`
 **For inference algorithms to test**, see `../inference/CLAUDE.md`
 
 ## Overview

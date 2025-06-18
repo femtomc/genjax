@@ -57,11 +57,11 @@ genjax/
    - Only add to test suite after validating locally
 
 2. **Prefer localized testing over full suite**
-   - Run specific test: `pixi run python -m pytest tests/test_<module>.py -k test_name`
+   - Run specific test: `pixi run test -m tests/test_<module>.py -k test_name`
    - Full suite is slow - use only for final validation
    - Example: after changing `src/genjax/inference/mcmc.py`, test with:
      ```bash
-     pixi run python -m pytest tests/test_mcmc.py -k test_metropolis
+     pixi run test -m tests/test_mcmc.py -k test_metropolis
      ```
 
 3. **Check for corresponding test files**
