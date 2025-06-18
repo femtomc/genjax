@@ -31,7 +31,11 @@ from .core import (  # noqa: E402
     Pytree,
     Const,
     const,
+    Fixed,
+    fixed,
+    NotFixedException,
     Trace,
+    Tr,
     Vmap,
     Scan,
     Cond,
@@ -78,6 +82,7 @@ from .smc import (  # noqa: E402
 # Import extras module for additional functionality
 from . import extras  # noqa: E402
 from .extras import (  # noqa: E402
+    # Discrete HMM functionality
     discrete_hmm,
     forward_filter,
     backward_sample,
@@ -85,6 +90,20 @@ from .extras import (  # noqa: E402
     compute_sequence_log_prob,
     sample_hmm_dataset,
     DiscreteHMMTrace,
+    # Linear Gaussian state space model functionality
+    linear_gaussian_ssm,
+    kalman_filter,
+    kalman_smoother,
+    sample_linear_gaussian_dataset,
+    LinearGaussianTrace,
+    # Unified testing API
+    discrete_hmm_test_dataset,
+    discrete_hmm_exact_log_marginal,
+    linear_gaussian_test_dataset,
+    linear_gaussian_exact_log_marginal,
+    # Inference problem generators
+    discrete_hmm_inference_problem,
+    linear_gaussian_inference_problem,
 )
 
 __all__ = [
@@ -95,7 +114,11 @@ __all__ = [
     "Pytree",
     "Const",
     "const",
+    "Fixed",
+    "fixed",
+    "NotFixedException",
     "Trace",
+    "Tr",
     "Vmap",
     "Scan",
     "Cond",
@@ -140,7 +163,9 @@ __all__ = [
     "rejuvenate",
     "resample",
     "rejuvenation_smc",
+    # Extras
     "extras",
+    # Discrete HMM
     "discrete_hmm",
     "forward_filter",
     "backward_sample",
@@ -148,4 +173,18 @@ __all__ = [
     "compute_sequence_log_prob",
     "sample_hmm_dataset",
     "DiscreteHMMTrace",
+    # Linear Gaussian state space model
+    "linear_gaussian_ssm",
+    "kalman_filter",
+    "kalman_smoother",
+    "sample_linear_gaussian_dataset",
+    "LinearGaussianTrace",
+    # Unified testing API
+    "discrete_hmm_test_dataset",
+    "discrete_hmm_exact_log_marginal",
+    "linear_gaussian_test_dataset",
+    "linear_gaussian_exact_log_marginal",
+    # Inference problem generators
+    "discrete_hmm_inference_problem",
+    "linear_gaussian_inference_problem",
 ]

@@ -20,7 +20,7 @@ from genjax.core import const
 from genjax.pjax import seed
 
 # Import HMM implementation from extras module
-from genjax import (
+from genjax.extras.state_space import (
     discrete_hmm,
     forward_filter,
     forward_filtering_backward_sampling,

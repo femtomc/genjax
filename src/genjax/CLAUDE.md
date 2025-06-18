@@ -86,6 +86,129 @@ new_trace, weight, discarded = model.regenerate(trace, selection, *args, **kwarg
 - Empty selection → no regeneration, weight = 0
 - Full selection → equivalent to `simulate()` from scratch
 
+### Fixed Values & Model Structure Debugging
+
+**The `Fixed` Infrastructure** tracks whether random choices were externally constrained (provided by user/constraints) versus internally proposed (sampled by the model). This enables debugging model structure issues during inference.
+
+#### Core Components
+
+**`Fixed[A]` Wrapper**:
+```python
+from genjax import Fixed, fixed
+
+# Create Fixed wrapper for constrained values
+constrained_value = fixed(1.5)
+print(constrained_value)  # Fixed(1.5)
+
+# Access the underlying value
+actual_value = constrained_value.value  # 1.5
+```
+
+**`trace.verify()` Method**:
+```python
+# Check if all choices were properly constrained
+try:
+    trace.verify()
+    print("✅ All values properly constrained")
+except NotFixedException as e:
+    print("❌ Model structure issue detected:")
+    print(e)  # Shows detailed choice map with Fixed/NOT_FIXED status
+```
+
+#### How Fixed Works
+
+**Distribution Methods Automatically Use Fixed**:
+- `generate(constrained_value, ...)` → stores `Fixed(constrained_value)` in choices
+- `update(trace, constrained_value, ...)` → stores `Fixed(constrained_value)` in choices  
+- `regenerate(trace, selection, ...)` → keeps unselected values as `Fixed`
+
+**`get_choices()` Strips Fixed Wrappers**:
+```python
+# Internal storage (with Fixed wrappers)
+trace._choices = {"x": Fixed(1.5), "y": Fixed(2.0)}
+
+# User-facing interface (Fixed wrappers stripped)
+trace.get_choices()  # {"x": 1.5, "y": 2.0}
+```
+
+**Return values are NEVER Fixed** - only internal choice storage uses Fixed wrappers.
+
+#### Debugging Model Structure Issues
+
+**Common Patterns**:
+
+```python
+# ✅ CORRECT: Mixed Fixed/Unfixed in sequential models
+{
+  "t0": {"state": Fixed, "obs": Fixed},      # Initial state constrained by prior+data
+  "t1": {"state": NOT_FIXED, "obs": Fixed}, # State proposed from t0, obs constrained
+  "t2": {"state": NOT_FIXED, "obs": Fixed}  # State proposed from t1, obs constrained
+}
+
+# ❌ PROBLEM: All states unfixed in sequential models  
+{
+  "t0": {"state": NOT_FIXED, "obs": Fixed}, # Missing temporal constraint
+  "t1": {"state": NOT_FIXED, "obs": Fixed}, # Missing temporal constraint
+  "t2": {"state": NOT_FIXED, "obs": Fixed}  # Missing temporal constraint
+}
+```
+
+**Interpreting verify() Results**:
+
+- **All Fixed**: Perfect constraint (may indicate over-constrained model)
+- **Mixed Fixed/NOT_FIXED**: Normal for sequential models with temporal dependencies
+- **All NOT_FIXED**: Missing constraints (indicates model structure problems)
+
+#### Debugging Sequential Models
+
+**Example: SMC vs Kalman Filter Issues**
+```python
+# Run SMC inference
+particles = init(model, args, n_particles, constraints)
+
+# Check if model structure is correct
+try:
+    particles.traces.verify()
+    print("✅ Model has proper temporal structure")
+except NotFixedException as e:
+    print("❌ Model structure issue - likely missing temporal dependencies:")
+    print(e)
+    # Output shows which states are NOT_FIXED when they should be Fixed
+```
+
+**What Fixed Status Indicates**:
+- **Observations Fixed**: ✅ Properly constrained by data
+- **States Fixed**: ✅ Properly constrained by previous timestep or prior
+- **States NOT_FIXED**: Either correctly proposed OR missing constraints
+
+**Use Cases**:
+1. **Sequential Models**: Verify temporal dependencies are properly captured
+2. **Constraint Debugging**: Ensure all required values are constrained
+3. **SMC Troubleshooting**: Diagnose particle filter model structure issues
+4. **MCMC Validation**: Check that regeneration properly maintains constraints
+
+#### Technical Implementation
+
+**Tree Operations with Fixed**:
+```python
+# Fixed detection using is_leaf
+def check_instance_fixed(x):
+    return isinstance(x, Fixed)
+
+# Flatten to check all leaves
+leaf_values, tree_def = jtu.tree_flatten(choices, is_leaf=check_instance_fixed)
+all_fixed = all(isinstance(leaf, Fixed) for leaf in leaf_values)
+
+# Create boolean status map
+choice_map_status = jtu.tree_map(
+    lambda x: isinstance(x, Fixed),
+    choices,
+    is_leaf=check_instance_fixed
+)
+```
+
+**JAX Compatibility**: Fixed wrappers work seamlessly with all JAX transformations and tree operations.
+
 ## Generative Function Types
 
 ### Distributions

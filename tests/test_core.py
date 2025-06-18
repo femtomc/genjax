@@ -1857,3 +1857,4 @@ class TestSelection:
         assert "x" in discarded2
         assert "z" in discarded2
         assert jnp.allclose(new_trace2.get_choices()["y"], old_choices["y"], rtol=1e-10)
+
