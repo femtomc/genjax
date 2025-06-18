@@ -36,14 +36,12 @@ matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.faircoin.pypi-dependencies]
-torch = "*"
 numpyro = "*"
-pyro-ppl = "*"
 
 [tool.pixi.feature.faircoin.tasks]
 setup = "mkdir -p examples/faircoin/figs"
 faircoin-timing = "pixi run python -m examples.faircoin.main"
-faircoin-comparison = "pixi run python -m examples.faircoin.main --comparison"
+faircoin-combined = "pixi run python -m examples.faircoin.main --combined"
 
 [tool.pixi.feature.curvefit.dependencies]
 matplotlib = "*"

@@ -6,7 +6,7 @@ import jax.random as jrand
 import time
 from genjax import seed
 from genjax import modular_vmap as vmap
-from genjax import beta, flip, gen
+from genjax import beta, flip, gen, Const, const
 
 
 def timing(fn, repeats=200, inner_repeats=200, number=100):
@@ -54,10 +54,10 @@ def genjax_timing(
     num_samples=1000,
 ):
     """Time GenJAX importance sampling implementation."""
-    data = {"obs": jnp.ones(num_obs)}
+    data = {"obs": jnp.ones(num_obs)}  # Multiple observations to match other frameworks
 
     def importance_(data):
-        _, w = beta_ber.generate(data)
+        _, w = beta_ber_multi.generate(data, const(num_obs))
         return w
 
     imp_jit = jax.jit(
@@ -154,14 +154,14 @@ def handcoded_timing(
     num_samples=1000,
 ):
     """Time handcoded JAX importance sampling implementation."""
-    data = jnp.ones(num_obs)
+    data = jnp.ones(num_obs)  # Multiple observations to match other frameworks
 
     def importance_(data):
         alpha0 = 10.0
         beta0 = 10.0
         f = beta.sample(alpha0, beta0)
-        w = flip.logpdf(data, f)
-        return jnp.sum(w)
+        w = flip.logpdf(data, f)  # Returns scalar regardless of observation shape
+        return w
 
     imp_jit = jax.jit(
         seed(
@@ -183,76 +183,191 @@ def handcoded_timing(
     return times, (time_mu, time_std)
 
 
-def pyro_timing(
-    num_obs=50,
-    repeats=200,
-    num_samples=1000,
-):
-    """Time Pyro importance sampling implementation."""
-    import torch
-    import pyro
-    import pyro.distributions as dist
+# Posterior sampling functions for comparison visualization
 
-    # Set PyTorch to use CPU for fair comparison with JAX CPU
-    if hasattr(torch, "set_default_device"):
-        torch.set_default_device("cpu")
 
-    # Convert JAX data to PyTorch tensor
-    data = torch.ones(num_obs, dtype=torch.float32)
+@gen
+def beta_ber_multi(num_obs: Const[int]):
+    """Beta-Bernoulli model for multiple coin flips.
 
-    def model(data):
-        # Define hyperparameters for Beta prior
-        alpha0 = torch.tensor(10.0, dtype=torch.float32)
-        beta0 = torch.tensor(10.0, dtype=torch.float32)
+    Models coin fairness with Beta(10, 10) prior and multiple Bernoulli observations.
+    """
+    # define the hyperparameters that control the Beta prior
+    alpha0 = jnp.array(10.0)
+    beta0 = jnp.array(10.0)
+    # sample f from the Beta prior
+    f = beta(alpha0, beta0) @ "latent_fairness"
+    # observe multiple coin flips
+    return flip.repeat(n=num_obs.value)(f) @ "obs"
 
-        # Sample fairness parameter from Beta prior
-        f = pyro.sample("latent_fairness", dist.Beta(alpha0, beta0))
 
-        # Observe data using Bernoulli likelihood
-        with pyro.plate("data", len(data)):
-            pyro.sample("obs", dist.Bernoulli(f), obs=data)
+def genjax_posterior_samples(num_obs=50, num_samples=1000):
+    """Generate posterior samples using GenJAX importance sampling.
 
-    def guide(data):
-        # Prior as guide (importance sampling)
-        alpha0 = torch.tensor(10.0, dtype=torch.float32)
-        beta0 = torch.tensor(10.0, dtype=torch.float32)
-        pyro.sample("latent_fairness", dist.Beta(alpha0, beta0))
+    Args:
+        num_obs: Number of observations
+        num_samples: Number of importance samples
 
-    def single_importance_sample():
-        """Single importance sampling step."""
-        pyro.clear_param_store()
+    Returns:
+        Tuple of (samples, weights) where samples are fairness parameter values
+    """
+    # Generate 80% heads (1s) and 20% tails (0s)
+    num_heads = int(0.8 * num_obs)
+    num_tails = num_obs - num_heads
+    data = {"obs": jnp.concatenate([jnp.ones(num_heads), jnp.zeros(num_tails)])}
+    key = jrand.key(123)  # Different seed for GenJAX
 
-        # Sample from guide and compute weight
-        guide_trace = pyro.poutine.trace(guide).get_trace(data)
-        model_trace = pyro.poutine.trace(
-            pyro.poutine.replay(model, trace=guide_trace)
-        ).get_trace(data)
+    def importance_sample(data):
+        trace, weight = beta_ber_multi.generate(data, const(num_obs))
+        fairness = trace.get_choices()["latent_fairness"]
+        return fairness, weight
 
-        # Compute importance weight (log space)
-        weight = model_trace.log_prob_sum() - guide_trace.log_prob_sum()
-        return weight
+    # Vectorized importance sampling with proper seed handling
+    seeded_importance = seed(importance_sample)
 
-    # Vectorized importance sampling
-    def run_inference():
-        weights = []
-        for _ in range(num_samples):
-            weight = single_importance_sample()
-            weights.append(weight)
-        return torch.tensor(weights)
+    keys = jrand.split(key, num_samples)
 
-    # Warm up
-    try:
-        _ = run_inference()
-        _ = run_inference()
-    except Exception as e:
-        print(f"Pyro warmup failed: {e}")
-        raise
-
-    # Time the inference
-    times, (time_mu, time_std) = timing(
-        lambda: run_inference(),
-        repeats=repeats,
-        inner_repeats=5,  # Fewer inner repeats for Pyro as it's typically slower
+    samples, log_weights = jax.vmap(seeded_importance, in_axes=(0, None))(
+        keys,
+        data,
     )
 
-    return times, (time_mu, time_std)
+    # Convert log weights to normalized weights
+    weights = jnp.exp(log_weights - jnp.max(log_weights))  # Numerical stability
+    weights = weights / jnp.sum(weights)
+
+    return samples, weights
+
+
+def handcoded_posterior_samples(num_obs=50, num_samples=1000):
+    """Generate posterior samples using handcoded JAX importance sampling.
+
+    Args:
+        num_obs: Number of observations
+        num_samples: Number of importance samples
+
+    Returns:
+        Tuple of (samples, weights) where samples are fairness parameter values
+    """
+    # Generate 80% heads (1s) and 20% tails (0s)
+    num_heads = int(0.8 * num_obs)
+    num_tails = num_obs - num_heads
+    data = jnp.concatenate([jnp.ones(num_heads), jnp.zeros(num_tails)])
+    key = jrand.key(456)  # Different seed for handcoded JAX
+
+    def importance_sample(data):
+        alpha0 = 10.0
+        beta0 = 10.0
+        # Sample from prior (which is also our proposal)
+        f = beta.sample(alpha0, beta0)
+        # Compute likelihood of data given f
+        log_weight = jnp.sum(flip.logpdf(data, f))
+        return f, log_weight
+
+    # Vectorized importance sampling with proper seed handling
+    seeded_importance = seed(importance_sample)
+
+    keys = jrand.split(key, num_samples)
+
+    samples, log_weights = jax.vmap(seeded_importance, in_axes=(0, None))(
+        keys,
+        data,
+    )
+
+    # Convert log weights to normalized weights
+    weights = jnp.exp(log_weights - jnp.max(log_weights))  # Numerical stability
+    weights = weights / jnp.sum(weights)
+
+    return samples, weights
+
+
+def numpyro_posterior_samples(num_obs=50, num_samples=1000):
+    """Generate posterior samples using NumPyro importance sampling.
+
+    Args:
+        num_obs: Number of observations
+        num_samples: Number of importance samples
+
+    Returns:
+        Tuple of (samples, weights) where samples are fairness parameter values
+    """
+    import numpyro
+    import numpyro.distributions as dist
+    from numpyro.handlers import block, replay, seed
+    from numpyro.infer.util import log_density
+
+    key = jax.random.PRNGKey(42)  # Fixed seed for reproducibility
+    # Generate 80% heads (1s) and 20% tails (0s)
+    num_heads = int(0.8 * num_obs)
+    num_tails = num_obs - num_heads
+    data = jnp.concatenate([jnp.ones(num_heads), jnp.zeros(num_tails)])
+
+    def model(data):
+        alpha0 = 10.0
+        beta0 = 10.0
+        f = numpyro.sample("latent_fairness", dist.Beta(alpha0, beta0))
+        with numpyro.plate("data", size=len(data)):
+            numpyro.sample("obs", dist.Bernoulli(f), obs=data)
+
+    guide = block(model, hide=["obs"])
+
+    def importance_sample(key, data):
+        key, sub_key = jax.random.split(key)
+        seeded_guide = seed(guide, sub_key)
+        guide_log_density, guide_trace = log_density(seeded_guide, (data,), {}, {})
+
+        seeded_model = seed(model, key)
+        replay_model = replay(seeded_model, guide_trace)
+        model_log_density, model_trace = log_density(replay_model, (data,), {}, {})
+
+        weight = model_log_density - guide_log_density
+        fairness = guide_trace["latent_fairness"]["value"]
+        return fairness, weight
+
+    # Vectorized importance sampling
+    vmap_importance = jax.vmap(importance_sample, in_axes=(0, None))
+
+    keys = jax.random.split(key, num_samples)
+    samples, log_weights = vmap_importance(keys, data)
+
+    # Convert log weights to normalized weights
+    weights = jnp.exp(log_weights - jnp.max(log_weights))  # Numerical stability
+    weights = weights / jnp.sum(weights)
+
+    return samples, weights
+
+
+def exact_beta_posterior_stats(num_obs=50):
+    """Compute exact Beta posterior statistics.
+
+    Args:
+        num_obs: Number of observations (80% heads, 20% tails)
+
+    Returns:
+        Tuple of (alpha_post, beta_post, mean, mode, std)
+    """
+    # Prior parameters
+    alpha_prior = 10.0
+    beta_prior = 10.0
+
+    # Observed data: 80% heads (1s), 20% tails (0s)
+    num_heads = int(0.8 * num_obs)
+    num_tails = num_obs - num_heads
+
+    # Posterior parameters for Beta distribution
+    alpha_post = alpha_prior + num_heads
+    beta_post = beta_prior + num_tails
+
+    # Posterior statistics
+    mean = alpha_post / (alpha_post + beta_post)
+    mode = (
+        (alpha_post - 1) / (alpha_post + beta_post - 2)
+        if alpha_post > 1 and beta_post > 1
+        else mean
+    )
+    variance = (alpha_post * beta_post) / (
+        (alpha_post + beta_post) ** 2 * (alpha_post + beta_post + 1)
+    )
+    std = jnp.sqrt(variance)
+
+    return alpha_post, beta_post, mean, mode, std
