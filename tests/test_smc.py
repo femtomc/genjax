@@ -661,11 +661,12 @@ class TestSMCComponents:
             return y
 
         # Change to new model with identity mapping
+        # Satisfies choice_fn spec: identity is the simplest valid bijection
         changed_particles = change(
             particles,
             new_model,
             (),
-            lambda x: x,  # Identity mapping
+            lambda x: x,  # Identity mapping - preserves all addresses and values
         )
 
         # Verify basic properties
@@ -696,9 +697,10 @@ class TestSMCComponents:
             obs = normal(mu, 0.5) @ "obs"
             return obs
 
-        # Map addresses
+        # Map addresses - satisfies choice_fn spec: bijection on address space only
+        # Preserves all values exactly, only remaps key "param" -> "mu"
         def address_mapping(choices):
-            return {"mu": choices["param"]}
+            return {"mu": choices["param"], "obs": choices["obs"]}
 
         changed_particles = change(particles, new_model, (), address_mapping)
 

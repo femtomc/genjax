@@ -508,31 +508,44 @@ log_marginal = particles.log_marginal_likelihood()
 
 **Change Move** - Translate particles between models:
 ```python
-def map_choices(old_choices):
-    # Transform choice structure for new model
-    return {"new_param": old_choices["old_param"]}
+# choice_fn must be a bijection on address space only
+# Valid: remap keys while preserving all values exactly
+def choice_fn(old_choices):
+    return {"new_param": old_choices["old_param"], "obs": old_choices["obs"]}
 
 particles = change(
     particles,
     new_target_gf=new_model,
     new_target_args=new_args,
-    choice_map_fn=map_choices
+    choice_fn=choice_fn  # Bijective mapping of address space
 )
+
+# Identity mapping (simplest valid choice_fn)
+particles = change(particles, new_model, new_args, lambda x: x)
 ```
 
 **Extension Move** - Add new random choices:
 ```python
-# Proposal takes (old_choices, *extended_target_args)
+# Use extended target's internal proposal (default)
+particles = extend(
+    particles,
+    extended_target_gf=extended_model,
+    extended_target_args=extended_args,
+    constraints={"new_obs": observed_value}  # Constraints on new variables
+)
+
+# Or use custom extension proposal
 @gen
-def extension_proposal(old_choices, *target_args):
-    # Propose new choices based on existing ones
-    return normal(old_choices["mu"], 1.0) @ "new_param"
+def custom_proposal():
+    # Proposal for new variables only
+    return normal(0.5, 0.2) @ "new_param"
 
 particles = extend(
     particles,
-    proposal_gf=extension_proposal,
     extended_target_gf=extended_model,
-    extended_target_args=extended_args
+    extended_target_args=extended_args,
+    constraints={},  # No hard constraints
+    extension_proposal=custom_proposal
 )
 ```
 
@@ -543,6 +556,8 @@ def mcmc_kernel(trace):
     return mh(trace, sel("param"))
 
 particles = rejuvenate(particles, mcmc_kernel)
+# Weights remain unchanged due to detailed balance
+# Model density ratio cancels with proposal density ratio
 ```
 
 **Resampling** - Combat particle degeneracy:
@@ -552,16 +567,60 @@ if particles.effective_sample_size() < threshold:
     particles = resample(particles, method="systematic")  # or "categorical"
 ```
 
+**Choice Function Specification**:
+
+For the `change` move, the `choice_fn` parameter has strict requirements:
+
+```python
+# CRITICAL: choice_fn must be a bijection on address space only
+
+# Valid examples (preserve all values exactly):
+lambda x: x                                    # Identity mapping
+lambda d: {"mu": d["param"], "obs": d["obs"]}  # Key remapping only
+lambda d: {"new_key": d["old_key"]}            # Single key remap
+
+# Invalid examples (break probability density):
+lambda x: x + 1                               # Modifies scalar values
+lambda d: {"key": d["key"] * 2}               # Modifies dict values
+lambda d: {"key": d["key1"] + d["key2"]}      # Combines values
+
+# Mathematical requirement:
+# If choice_fn(x) = y, then probability density p(x) must equal p(y)
+# This is only possible if choice_fn preserves values exactly
+```
+
 **SMC Algorithm Composition**:
 
-For a complete SMC algorithm implementation, see `rejuvenation_smc` in `src/genjax/smc.py`. This function demonstrates how to compose the SMC moves into a full sequential inference algorithm using `jax.lax.scan`.
+```python
+# Complete SMC algorithm with rejuvenation
+final_particles = rejuvenation_smc(
+    initial_model=model_t0,
+    extended_model=model_extended,
+    transition_proposal=transition_proposal,
+    mcmc_kernel=lambda trace: mh(trace, sel("latent")),
+    observations=time_series_data,
+    choice_fn=lambda x: x,  # Identity mapping for same address space
+    n_particles=const(1000)
+)
+
+# The algorithm automatically handles:
+# 1. Initialization with first observation
+# 2. Sequential extension with remaining observations
+# 3. Adaptive resampling based on effective sample size
+# 4. MCMC rejuvenation to maintain particle diversity
+```
+
+For implementation details, see `rejuvenation_smc` in `src/genjax/smc.py`.
 
 **Key SMC Features**:
 - **Vectorized Operations**: All moves use `modular_vmap` for parallel processing
 - **Weight Tracking**: Importance weights maintained across all moves
 - **Marginal Likelihood Estimation**: Computation via importance sampling
-- **Proposals**: Support for both default and custom proposal distributions
-- **Method Compatibility**: MCMC kernels from `mcmc.py` work directly with `rejuvenate`
+- **Flexible Proposals**: Support for both default and custom proposal distributions
+- **MCMC Integration**: Kernels from `mcmc.py` work directly with `rejuvenate`
+- **Mathematical Correctness**: Choice functions enforce bijection constraints
+- **Detailed Balance**: Rejuvenation preserves weights via MCMC detailed balance
+- **JAX Compatibility**: Full integration with JAX transformations via `jax.lax.scan`
 
 ## References
 
