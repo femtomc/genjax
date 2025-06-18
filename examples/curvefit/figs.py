@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import time
 import jax.numpy as jnp
 import jax.random as jrand
 import jax
+from examples.utils import timing
 
 from core import (
     onepoint_curve,
@@ -152,17 +152,31 @@ def get_inference_scaling_data():
     mean_times = []
     _, (xs, ys) = get_points_for_inference()
     for n in n_samples:
-        times = []
         lml_ests = []
+
+        # Warm-up run
         infer_latents(jrand.key(1), ys, n)
-        for _ in range(200):
-            s = time.time()
+
+        # Use shared timing utility
+        def inference_task():
             samples, weights = infer_latents(jrand.key(1), ys, n)
-            jax.block_until_ready(weights)
-            times.append(time.time() - s)
-            lml_ests.append(jax.scipy.special.logsumexp(weights) - jnp.log(n))
-        print(n, np.min(times), np.std(times))
-        mean_times.append(np.min(times) * 1000)
+            return weights
+
+        times_array, (mean_time, std_time) = timing(
+            inference_task,
+            repeats=200,
+            inner_repeats=1,
+            auto_sync=True,  # Let timing handle jax.block_until_ready
+        )
+
+        # Collect LML estimates separately (not part of timing)
+        for _ in range(200):
+            samples, weights = infer_latents(jrand.key(1), ys, n)
+            lml_est = jax.scipy.special.logsumexp(weights) - jnp.log(n)
+            lml_ests.append(lml_est)
+
+        print(n, mean_time, std_time)
+        mean_times.append(mean_time * 1000)  # Convert to milliseconds
         mean_lml_ests.append(np.mean(lml_ests))
     return n_samples, mean_lml_ests, mean_times
 

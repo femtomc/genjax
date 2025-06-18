@@ -52,10 +52,12 @@ def timing(
         possible = []
         for j in range(inner_repeats):
             start_time = time.perf_counter()
-            result = fn()
             if auto_sync:
                 # Automatically synchronize JAX computations
+                result = fn()
                 jax.block_until_ready(result)
+            else:
+                result = fn()
             interval = time.perf_counter() - start_time
             possible.append(interval)
         times.append(jnp.array(possible).min())
@@ -132,13 +134,3 @@ def compare_timings(*timing_results, labels: Optional[list] = None) -> None:
         std_ms = std * 1000
         relative = (mean / baseline_mean) * 100
         print(f"{label:<15} {mean_ms:<12.3f} {std_ms:<12.3f} {relative:<12.1f}%")
-
-
-# Legacy compatibility functions for existing case studies
-def timing_legacy(fn, repeats=200, inner_repeats=200, number=100):
-    """Legacy timing function for backward compatibility.
-
-    This maintains the exact signature from faircoin/core.py for compatibility.
-    The 'number' parameter is ignored (legacy from timeit module).
-    """
-    return timing(fn, repeats=repeats, inner_repeats=inner_repeats, auto_sync=False)
