@@ -3,35 +3,10 @@
 import jax
 import jax.numpy as jnp
 import jax.random as jrand
-import time
 from genjax import seed
 from genjax import modular_vmap as vmap
 from genjax import beta, flip, gen, Const, const
-
-
-def timing(fn, repeats=200, inner_repeats=200, number=100):
-    """Benchmark function execution time with multiple runs.
-
-    Args:
-        fn: Function to benchmark
-        repeats: Number of outer timing runs
-        inner_repeats: Number of inner timing runs per outer run
-        number: Legacy parameter for compatibility
-
-    Returns:
-        Tuple of (times_array, (mean_time, std_time))
-    """
-    times = []
-    for i in range(repeats):
-        possible = []
-        for i in range(inner_repeats):
-            start_time = time.perf_counter()
-            fn()
-            interval = time.perf_counter() - start_time
-            possible.append(interval)
-        times.append(jnp.array(possible).min())
-    times = jnp.array(times)
-    return times, (jnp.mean(times), jnp.std(times))
+from examples.utils import timing
 
 
 @gen
@@ -75,6 +50,7 @@ def genjax_timing(
     times, (time_mu, time_std) = timing(
         lambda: imp_jit(key, data).block_until_ready(),
         repeats=repeats,
+        auto_sync=False,  # Using manual block_until_ready()
     )
     return times, (time_mu, time_std)
 
@@ -144,6 +120,7 @@ def numpyro_timing(
     times, (time_mu, time_std) = timing(
         lambda: vectorized_importance_weights(sub_keys, data).block_until_ready(),
         repeats=repeats,
+        auto_sync=False,  # Using manual block_until_ready()
     )
     return times, (time_mu, time_std)
 
@@ -179,6 +156,7 @@ def handcoded_timing(
     times, (time_mu, time_std) = timing(
         lambda: imp_jit(key, data).block_until_ready(),
         repeats=repeats,
+        auto_sync=False,  # Using manual block_until_ready()
     )
     return times, (time_mu, time_std)
 
