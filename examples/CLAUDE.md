@@ -6,6 +6,17 @@ This file provides guidance to Claude Code when working with case studies in the
 
 The `examples/` directory contains case studies that demonstrate GenJAX capabilities across different domains. Each case study follows a standardized structure to ensure consistency, maintainability, and ease of development.
 
+## Shared Utilities
+
+The `examples/utils.py` module provides shared utilities for all case studies:
+
+- **`timing()`**: Standard benchmarking function with consistent methodology
+- **`benchmark_with_warmup()`**: Automatic JIT warm-up before timing
+- **`compare_timings()`**: Formatted comparison of multiple timing results
+- **`timing_legacy()`**: Backward compatibility for existing case studies
+
+**Always use `examples.utils.timing()` instead of duplicating timing code.**
+
 ## Standard Case Study Structure
 
 Every case study MUST follow this exact directory structure:
@@ -79,12 +90,22 @@ def model_name(param: Const[type]):
 
 ### Timing Benchmarks
 
+**Use `examples.utils.timing()` or `examples.utils.benchmark_with_warmup()` instead of duplicating timing code.**
+
 ```python
+from examples.utils import timing, benchmark_with_warmup
+
 def framework_timing(num_obs=50, repeats=200, num_samples=1000):
-    """Standard timing function signature."""
-    # Warm-up runs (2x)
-    # Proper timing with block_until_ready()
-    # Return (times_array, (mean, std))
+    """Standard timing function signature using shared utilities."""
+    # Setup computation
+    jitted_fn = jax.jit(my_function)
+
+    # Use shared timing utility with automatic warm-up
+    times, (mean, std) = benchmark_with_warmup(
+        lambda: jitted_fn(args),
+        repeats=repeats
+    )
+    return times, (mean, std)
 ```
 
 ### Data Generation
