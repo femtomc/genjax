@@ -11,8 +11,8 @@ capabilities by introducing:
 
 2. **JAX-aware Interpreters**: Specialized interpreters that handle probabilistic
    primitives while preserving JAX's transformation semantics:
-   - `SeedInterpreter`: Eliminates PJAX's sampling primitive for JAX PRNG implementations
-   - `ModularVmapInterpreter`: Vectorizes probabilistic computations
+   - `Seed`: Eliminates PJAX's sampling primitive for JAX PRNG implementations
+   - `ModularVmap`: Vectorizes probabilistic computations
 
 3. **Staging Infrastructure**: Tools for converting Python functions to JAX's
    intermediate representation (Jaxpr) while preserving probabilistic semantics.
@@ -543,8 +543,8 @@ drawing a random sample from a probability distribution. It appears in
 Jaxpr when probabilistic functions are staged, and different interpreters
 handle it in different ways:
 
-- `SeedInterpreter`: Replaces with actual sampling using provided PRNG key
-- `ModularVmapInterpreter`: Vectorizes the sampling operation
+- `Seed`: Replaces with actual sampling using provided PRNG key
+- `ModularVmap`: Vectorizes the sampling operation
 - Standard JAX: Raises warning/exception (requires transformation)
 
 The primitive carries metadata about the sampler function, distribution
@@ -1253,10 +1253,10 @@ class Environment:
 
 
 @dataclass
-class SeedInterpreter:
+class Seed:
     """Interpreter that eliminates probabilistic primitives with explicit randomness.
 
-    The `SeedInterpreter` is PJAX's core mechanism for making probabilistic
+    The `Seed` interpreter is PJAX's core mechanism for making probabilistic
     computations compatible with standard JAX transformations. It works by
     traversing a Jaxpr and replacing `sample_p` primitives with actual sampling
     operations using explicit PRNG keys.
@@ -1276,7 +1276,7 @@ class SeedInterpreter:
 
         ```python
         # Instead of using the interpreter directly:
-        # interpreter = SeedInterpreter(key)
+        # interpreter = Seed(key)
         # result = interpreter.eval(fn, args)
 
         # Use the seed transformation:
@@ -1420,7 +1420,7 @@ def seed(
 
     @wraps(f)
     def wrapped(key: PRNGKey, *args, **kwargs):
-        interpreter = SeedInterpreter(key)
+        interpreter = Seed(key)
         return interpreter.eval(
             f,
             *args,
@@ -1436,10 +1436,10 @@ def seed(
 
 
 @dataclass
-class ModularVmapInterpreter:
+class ModularVmap:
     """Vectorization interpreter that preserves probabilistic primitives.
 
-    The `ModularVmapInterpreter` extends JAX's `vmap` to handle
+    The `ModularVmap` interpreter extends JAX's `vmap` to handle
     PJAX's probabilistic primitives correctly. Unlike standard `vmap`, which isn't aware
     of PJAX primitives, this interpreter knows how to vectorize probabilistic
     operations while preserving their semantic meaning.
@@ -1470,7 +1470,7 @@ class ModularVmapInterpreter:
 
     Technical Details:
         The interpreter maintains PJAX primitives in the Jaxpr rather than
-        eliminating them (unlike SeedInterpreter). This allows proper
+        eliminating them (unlike Seed). This allows proper
         vectorization semantics for probabilistic operations.
     """
 
@@ -1506,7 +1506,7 @@ class ModularVmapInterpreter:
                 branch_closed_jaxprs = params["branches"]
                 branches = tuple(
                     partial(
-                        ModularVmapInterpreter.stage_and_run,
+                        ModularVmap.stage_and_run,
                         axis_size,
                         jex.core.jaxpr_as_fun(branch),
                     )
@@ -1532,7 +1532,7 @@ class ModularVmapInterpreter:
                 )
 
                 body_fun = partial(
-                    ModularVmapInterpreter.stage_and_run,
+                    ModularVmap.stage_and_run,
                     axis_size,
                     jex.core.jaxpr_as_fun(body_jaxpr),
                 )
@@ -1576,7 +1576,7 @@ class ModularVmapInterpreter:
         )(*args)
         jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.literals
         assert axis_size is not None
-        flat_out = ModularVmapInterpreter.eval_jaxpr_modular_vmap(
+        flat_out = ModularVmap.eval_jaxpr_modular_vmap(
             axis_size,
             jaxpr,
             consts,
@@ -1603,7 +1603,7 @@ class ModularVmapInterpreter:
         )
         return jax.vmap(
             partial(
-                ModularVmapInterpreter.stage_and_run,
+                ModularVmap.stage_and_run,
                 axis_size,
                 fn,
             ),
@@ -1684,7 +1684,7 @@ def modular_vmap(
             spmd_axis_name=spmd_axis_name,
         )(*args)
 
-        interpreter = ModularVmapInterpreter()
+        interpreter = ModularVmap()
         return interpreter.eval(
             in_axes,
             axis_size,

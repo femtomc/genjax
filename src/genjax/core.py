@@ -1232,7 +1232,7 @@ class Distribution(Generic[X], GFI[X, X]):
     Example:
         >>> import jax
         >>> import jax.numpy as jnp
-        >>> from genjax import Distribution
+        >>> from genjax import Distribution, const
         >>>
         >>> # Create a custom normal distribution
         >>> def sample_normal(mu, sigma):
@@ -1242,7 +1242,7 @@ class Distribution(Generic[X], GFI[X, X]):
         >>> def logpdf_normal(x, mu, sigma):
         ...     return -0.5 * ((x - mu) / sigma)**2 - jnp.log(sigma) - 0.5 * jnp.log(2 * jnp.pi)
         >>>
-        >>> normal = Distribution(sample_normal, logpdf_normal, name="normal")
+        >>> normal = Distribution(const(sample_normal), const(logpdf_normal), const("normal"))
         >>> trace = normal.simulate(0.0, 1.0)  # mu=0.0, sigma=1.0
     """
 
@@ -1972,7 +1972,7 @@ class Scan(Generic[X, R], GFI[X, R]):
         length: Fixed length for the scan
 
     Example:
-        >>> from genjax import gen, normal, Scan, seed
+        >>> from genjax import gen, normal, Scan, seed, const
         >>> import jax.numpy as jnp
         >>> import jax.random as jrand
         >>>
@@ -1982,7 +1982,7 @@ class Scan(Generic[X, R], GFI[X, R]):
         ...     new_carry = carry + x + noise
         ...     return new_carry, new_carry  # output equals new carry
         >>>
-        >>> scan_fn = Scan(step, length=3)
+        >>> scan_fn = Scan(step, length=const(3))
         >>> init_carry = 0.0
         >>> xs = jnp.array([1.0, 2.0, 3.0])
         >>> # Use seed transformation for PJAX primitives

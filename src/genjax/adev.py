@@ -354,10 +354,10 @@ class Dual(Pytree):
 
 
 @Pytree.dataclass
-class ADEVInterpreter(Pytree):
+class ADEV(Pytree):
     """Interpreter for ADEV's continuation-passing style automatic differentiation.
 
-    The ADEVInterpreter processes JAX computation graphs (Jaxpr) and transforms them
+    The ADEV interpreter processes JAX computation graphs (Jaxpr) and transforms them
     to support stochastic automatic differentiation. It implements a continuation-passing
     style (CPS) transformation that reflects the law of iterated expectation, allowing
     different gradient estimation strategies for each stochastic operation.
@@ -453,7 +453,7 @@ class ADEVInterpreter(Pytree):
                         in_tree = inner_params["in_tree"]
                         num_consts = inner_params["num_consts"]
 
-                        flat_primals, flat_tangents = ADEVInterpreter.flat_unzip(
+                        flat_primals, flat_tangents = ADEV.flat_unzip(
                             Dual.tree_leaves(Dual.tree_pure(duals[num_consts:]))
                         )
                         adev_prim, *primals = jtu.tree_unflatten(in_tree, flat_primals)
@@ -481,7 +481,7 @@ class ADEVInterpreter(Pytree):
 
                         branch_adev_functions = list(
                             map(
-                                lambda fn: ADEVInterpreter.forward_mode(
+                                lambda fn: ADEV.forward_mode(
                                     jaxpr_as_fun(fn),
                                     _cond_dual_kont,
                                 ),
@@ -499,7 +499,7 @@ class ADEVInterpreter(Pytree):
 
                     # Default JVP rule for other JAX primitives.
                     else:
-                        flat_primals, flat_tangents = ADEVInterpreter.flat_unzip(
+                        flat_primals, flat_tangents = ADEV.flat_unzip(
                             Dual.tree_leaves(Dual.tree_pure(duals))
                         )
                         if len(flat_primals) == 0:
@@ -537,7 +537,7 @@ class ADEVInterpreter(Pytree):
             closed_jaxpr, (_, _, out_tree) = stage(f)(*primals)
             jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.literals
             dual_leaves = Dual.tree_leaves(Dual.tree_pure(duals))
-            out_duals = ADEVInterpreter.eval_jaxpr_adev(
+            out_duals = ADEV.eval_jaxpr_adev(
                 jaxpr,
                 consts,
                 dual_leaves,
@@ -578,7 +578,7 @@ class ADEVProgram(Pytree):
 
     The ADEVProgram handles the integration between:
     1. User source code containing ADEV primitives
-    2. The ADEVInterpreter's CPS transformation
+    2. The ADEV interpreter's CPS transformation
     3. Continuation-based gradient estimation strategies
 
     Attributes:
@@ -612,16 +612,14 @@ class ADEVProgram(Pytree):
 
         Note:
             This method coordinates between the user's source function and the
-            ADEVInterpreter to apply the appropriate gradient estimation strategies
+            ADEV interpreter to apply the appropriate gradient estimation strategies
             for each stochastic primitive encountered during execution.
         """
 
         def adev_jvp(f):
             @wraps(f)
             def wrapped(*duals: DualTree):
-                return ADEVInterpreter.forward_mode(self.source.value, dual_kont)(
-                    *duals
-                )
+                return ADEV.forward_mode(self.source.value, dual_kont)(*duals)
 
             return wrapped
 
