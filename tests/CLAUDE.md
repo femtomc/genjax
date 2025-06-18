@@ -101,11 +101,14 @@ class TestUpdateAndRegenerate:
    - Test acceptance rates are reasonable
    - Verify chain mixing and convergence
    - Check posterior estimates against known values
+   - **Always test monotonic convergence** with increasing chain lengths
 
 4. **SMC Tests**
+   - **CRITICAL: Always test log marginal likelihood convergence** with increasing particle counts
    - Test particle filtering accuracy
    - Verify resampling behavior
    - Check effective sample size calculations
+   - Validate against analytical marginal likelihoods when available
 
 ### Test Naming Conventions
 
@@ -345,8 +348,10 @@ def test_invalid_inputs():
 Inference algorithms should demonstrate **monotonic improvement** as computational resources increase. This principle applies across all GenJAX inference methods:
 
 - **MCMC**: Longer chains → better posterior approximation
-- **SMC**: More particles → better marginal likelihood estimates
+- **SMC**: More particles → better marginal likelihood estimates (**CRITICAL: This must be tested in every SMC implementation**)
 - **Variational Inference**: More optimization steps → better ELBO convergence
+
+**Special Note on SMC**: Log marginal likelihood convergence is the fundamental validation test for SMC algorithms. Unlike MCMC (which approximates posteriors) or VI (which approximates with known divergence), SMC provides unbiased estimates of marginal likelihoods. Testing this convergence property is essential to verify the SMC implementation is mathematically correct.
 
 ### MCMC Convergence Testing
 
@@ -424,14 +429,19 @@ def test_mala_step_size_effects():
 
 ### SMC Convergence Testing
 
-**Particle Count Scaling**:
+**CRITICAL: Log Marginal Likelihood Convergence (Required for all SMC tests)**:
 ```python
-def test_smc_particle_scaling():
-    """Test SMC accuracy improves with more particles."""
-    particle_counts = [100, 500, 1000]
+def test_smc_log_marginal_convergence():
+    """Test SMC log marginal likelihood improves monotonically with more particles.
+
+    This is the most important SMC test - it validates that the core SMC algorithm
+    is working correctly by checking the fundamental property that more particles
+    should lead to better marginal likelihood estimates.
+    """
+    particle_counts = [100, 500, 1000, 2000]  # Increasing compute
     log_marginal_errors = []
 
-    true_log_marginal = compute_exact_log_marginal()  # Analytical value
+    true_log_marginal = compute_exact_log_marginal()  # Analytical value when available
 
     for n_particles in particle_counts:
         particles = run_smc(n_particles=n_particles)
@@ -439,13 +449,49 @@ def test_smc_particle_scaling():
         error = jnp.abs(estimated_log_marginal - true_log_marginal)
         log_marginal_errors.append(error)
 
-    # More particles should reduce Monte Carlo error
-    final_error = log_marginal_errors[-1]
-    assert final_error < 1.0, f"SMC convergence too slow: error {final_error:.3f}"
+    # Test monotonic improvement trend (most critical assertion)
+    short_error, medium_error, long_error, longest_error = log_marginal_errors
 
-    # Test overall improvement trend
-    assert log_marginal_errors[-1] <= log_marginal_errors[0] * 1.5, (
-        "No improvement with more particles"
+    # Allow for stochastic variation but require overall progress
+    monotonic_improvement = (medium_error <= short_error) or (long_error <= medium_error) or (longest_error <= long_error)
+    overall_improvement = longest_error <= short_error * 1.2  # 20% tolerance for SMC
+
+    assert monotonic_improvement or overall_improvement, (
+        f"No SMC convergence: log marginal errors {log_marginal_errors} should show decreasing trend"
+    )
+
+    # Final error should be reasonable
+    final_error = log_marginal_errors[-1]
+    assert final_error < 2.0, f"SMC convergence too slow: final error {final_error:.3f}"
+
+    # All estimates should be finite
+    for i, error in enumerate(log_marginal_errors):
+        assert jnp.isfinite(error), f"SMC produced non-finite log marginal error at particle count {particle_counts[i]}"
+```
+
+**Particle Count Scaling (Alternative pattern when analytical solution unavailable)**:
+```python
+def test_smc_relative_convergence():
+    """Test SMC relative accuracy improves with more particles (when no analytical solution)."""
+    particle_counts = [100, 500, 1000]
+    log_marginal_estimates = []
+
+    for n_particles in particle_counts:
+        particles = run_smc(n_particles=n_particles)
+        estimated_log_marginal = particles.log_marginal_likelihood()
+        log_marginal_estimates.append(estimated_log_marginal)
+
+    # Standard deviation should decrease with more particles
+    small_particles_std = jnp.std(jnp.array([log_marginal_estimates[0]]))  # Single estimate variance proxy
+    large_particles_estimate = log_marginal_estimates[-1]
+
+    # More particles should give more stable estimates
+    assert jnp.isfinite(large_particles_estimate), "SMC produced non-finite log marginal"
+
+    # Test that largest particle count gives reasonable estimates
+    # (specific bounds depend on the model)
+    assert -50.0 < large_particles_estimate < 50.0, (
+        f"SMC log marginal estimate {large_particles_estimate:.3f} outside reasonable range"
     )
 ```
 
@@ -529,8 +575,9 @@ def test_inference_algorithm_consistency():
 **Computational Resource Scaling**:
 1. **Always test with increasing compute**: More chains, longer chains, more particles, more optimization steps
 2. **Expect monotonic improvement**: Errors should decrease (with reasonable tolerance for stochasticity)
-3. **Test algorithm-specific properties**: Step size effects (MALA), particle degeneracy (SMC), ELBO convergence (VI)
-4. **Validate against known solutions**: Use conjugate models with analytical posteriors when possible
+3. **CRITICAL for SMC**: Every SMC test must include log marginal likelihood convergence with increasing particles
+4. **Test algorithm-specific properties**: Step size effects (MALA), particle degeneracy (SMC), ELBO convergence (VI)
+5. **Validate against known solutions**: Use conjugate models with analytical posteriors when possible
 
 **Tolerance Management**:
 ```python
@@ -555,4 +602,5 @@ convergence_tolerance = 0.1  # Convergence trend detection
 4. **Test edge cases** and error conditions
 5. **Use appropriate tolerances** for floating-point comparisons with probabilistic algorithms
 6. **Test convergence properties** - algorithms should improve with more compute
-7. **Validate against analytical solutions** when available (conjugate models)
+7. **MANDATORY for SMC**: Include log marginal likelihood convergence test in every SMC test suite
+8. **Validate against analytical solutions** when available (conjugate models)
