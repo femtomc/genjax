@@ -18,6 +18,7 @@ from .core import (
     FloatArray,
     Selection,
     Const,
+    const,
 )
 from .distributions import uniform
 
@@ -27,7 +28,7 @@ class MCMCResult(Pytree):
     """Result of MCMC sampling containing chain traces and diagnostics."""
 
     traces: Trace[X, R]  # Vectorized over chain steps
-    n_steps: int = Pytree.static()
+    n_steps: Const[int]
     acceptance_rate: FloatArray
 
 
@@ -110,6 +111,6 @@ def metropolis_hastings(
 
     return MCMCResult(
         traces=traces,
-        n_steps=n_steps.value,
+        n_steps=const(n_steps.value),
         acceptance_rate=acceptance_rate,
     )

@@ -61,6 +61,14 @@ from .mcmc import (  # noqa: E402
     MCMCResult,
     metropolis_hastings,
 )
+from .smc import (  # noqa: E402
+    ParticleCollection,
+    init,
+    change,
+    extend,
+    rejuvenate,
+    resample,
+)
 
 __all__ = [
     "GFI",
@@ -104,4 +112,10 @@ __all__ = [
     "Selection",
     "tfp_distribution",
     "trace",
+    "ParticleCollection",
+    "init",
+    "change",
+    "extend",
+    "rejuvenate",
+    "resample",
 ]

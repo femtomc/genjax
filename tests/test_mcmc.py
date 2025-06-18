@@ -182,7 +182,7 @@ def test_mcmc_result_creation(simple_normal_model, mcmc_steps_small, mcmc_key, h
 
     # Validate result structure
     assert isinstance(result, MCMCResult)
-    assert result.n_steps == mcmc_steps_small.value
+    assert result.n_steps.value == mcmc_steps_small.value
     assert 0.0 <= result.acceptance_rate <= 1.0
     assert result.traces is not None
 

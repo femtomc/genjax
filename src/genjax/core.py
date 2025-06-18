@@ -404,10 +404,10 @@ class StrSel(Pytree):
         s: The string address to match.
     """
 
-    s: str = Pytree.static()
+    s: Const[str]
 
     def match(self, addr) -> tuple[bool, AllSel | NoneSel]:
-        check = addr == self.s
+        check = addr == self.s.value
         return check, AllSel() if check else NoneSel()
 
 
@@ -574,7 +574,7 @@ def sel(*v: tuple[()] | str | dict[str, Any] | None) -> Selection:
             return Selection(DictSel(v[0]))
         else:
             assert isinstance(v[0], str)
-            return Selection(StrSel(v[0]))
+            return Selection(StrSel(const(v[0])))
     else:
         return Selection(NoneSel())
 
@@ -838,10 +838,10 @@ class GFI(Generic[X, R], Pytree):
     ) -> "Vmap[X, R]":
         return Vmap(
             self,
-            in_axes,
-            axis_size,
-            axis_name,
-            spmd_axis_name,
+            const(in_axes),
+            const(axis_size),
+            const(axis_name),
+            const(spmd_axis_name),
         )
 
     def repeat(self, n: int):
@@ -923,10 +923,10 @@ class Vmap(Generic[X, R], GFI[X, R]):
     """
 
     gen_fn: GFI[X, R]
-    in_axes: int | tuple[int | None, ...] | Sequence[Any] | None = Pytree.static()
-    axis_size: int | None = Pytree.static()
-    axis_name: str | None = Pytree.static()
-    spmd_axis_name: str | None = Pytree.static()
+    in_axes: Const[int | tuple[int | None, ...] | Sequence[Any] | None]
+    axis_size: Const[int | None]
+    axis_name: Const[str | None]
+    spmd_axis_name: Const[str | None]
 
     def simulate(
         self,
@@ -935,10 +935,10 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> Tr[X, R]:
         return modular_vmap(
             self.gen_fn.simulate,
-            in_axes=self.in_axes,
-            axis_size=self.axis_size,
-            axis_name=self.axis_name,
-            spmd_axis_name=self.spmd_axis_name,
+            in_axes=self.in_axes.value,
+            axis_size=self.axis_size.value,
+            axis_name=self.axis_name.value,
+            spmd_axis_name=self.spmd_axis_name.value,
         )(*args, **kwargs)
 
     def generate(
@@ -949,10 +949,10 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Tr[X, R], Weight]:
         tr, w = modular_vmap(
             self.gen_fn.generate,
-            in_axes=(0, self.in_axes),
-            axis_size=self.axis_size,
-            axis_name=self.axis_name,
-            spmd_axis_name=self.spmd_axis_name,
+            in_axes=(0, self.in_axes.value),
+            axis_size=self.axis_size.value,
+            axis_name=self.axis_name.value,
+            spmd_axis_name=self.spmd_axis_name.value,
         )(x, *args, **kwargs)
         return tr, jnp.sum(w)
 
@@ -964,10 +964,10 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Density, R]:
         density, retval = modular_vmap(
             self.gen_fn.assess,
-            in_axes=(0, self.in_axes),
-            axis_size=self.axis_size,
-            axis_name=self.axis_name,
-            spmd_axis_name=self.spmd_axis_name,
+            in_axes=(0, self.in_axes.value),
+            axis_size=self.axis_size.value,
+            axis_name=self.axis_name.value,
+            spmd_axis_name=self.spmd_axis_name.value,
         )(x, *args, **kwargs)
         return jnp.sum(density), retval
 
@@ -980,10 +980,10 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Tr[X, R], Weight, X | None]:
         new_tr, w, discard = modular_vmap(
             self.gen_fn.update,
-            in_axes=(0, 0, self.in_axes),
-            axis_size=self.axis_size,
-            axis_name=self.axis_name,
-            spmd_axis_name=self.spmd_axis_name,
+            in_axes=(0, 0, self.in_axes.value),
+            axis_size=self.axis_size.value,
+            axis_name=self.axis_name.value,
+            spmd_axis_name=self.spmd_axis_name.value,
         )(tr, x_, *args, **kwargs)
         return new_tr, jnp.sum(w), discard
 
@@ -996,10 +996,10 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Tr[X, R], Weight, X | None]:
         new_tr, w, discard = modular_vmap(
             self.gen_fn.regenerate,
-            in_axes=(0, None, self.in_axes),
-            axis_size=self.axis_size,
-            axis_name=self.axis_name,
-            spmd_axis_name=self.spmd_axis_name,
+            in_axes=(0, None, self.in_axes.value),
+            axis_size=self.axis_size.value,
+            axis_name=self.axis_name.value,
+            spmd_axis_name=self.spmd_axis_name.value,
         )(tr, s, *args, **kwargs)
         return new_tr, jnp.sum(w), discard
 
@@ -1047,9 +1047,17 @@ class Distribution(Generic[X], GFI[X, X]):
         >>> trace = normal.simulate(0.0, 1.0)  # mu=0.0, sigma=1.0
     """
 
-    sample: Callable[..., X] = Pytree.static()
-    logpdf: Callable[..., Weight] = Pytree.static()
-    name: str | None = Pytree.static(default=None)
+    _sample: Const[Callable[..., X]]
+    _logpdf: Const[Callable[..., Weight]]
+    name: Const[str | None]
+
+    def sample(self, *args, **kwargs) -> X:
+        """Sample from the distribution."""
+        return self._sample.value(*args, **kwargs)
+
+    def logpdf(self, x: X, *args, **kwargs) -> Weight:
+        """Compute log probability density."""
+        return self._logpdf.value(x, *args, **kwargs)
 
     def simulate(
         self,
@@ -1091,14 +1099,14 @@ class Distribution(Generic[X], GFI[X, X]):
     ) -> tuple[Tr[X, X], Weight, X | None]:
         if x_ is None:
             x_ = get_choices(tr)
-            log_density_ = self.logpdf(x_, *args, **kwargs)
+            log_density_ = self.logpdf.value(x_, *args, **kwargs)
             return (
                 Tr(self, (args, kwargs), x_, x_, -log_density_),
                 log_density_ + tr.get_score(),
                 tr.get_retval(),
             )
         else:
-            log_density_ = self.logpdf(x_, *args, **kwargs)
+            log_density_ = self.logpdf.value(x_, *args, **kwargs)
             return (
                 Tr(self, (args, kwargs), x_, x_, -log_density_),
                 log_density_ + tr.get_score(),
@@ -1117,7 +1125,7 @@ class Distribution(Generic[X], GFI[X, X]):
             return tr_, jnp.array(0.0), get_choices(tr)
         else:
             x_ = get_choices(tr)
-            log_density_ = self.logpdf(get_choices(tr), *args, **kwargs)
+            log_density_ = self.logpdf.value(get_choices(tr), *args, **kwargs)
             return (
                 Tr(self, (args, kwargs), x_, x_, -log_density_),
                 log_density_ + tr.get_score(),
@@ -1147,9 +1155,9 @@ def distribution(
         A Distribution instance implementing the Generative Function Interface.
     """
     return Distribution(
-        sampler,
-        logpdf,
-        name,
+        _sample=const(sampler),
+        _logpdf=const(logpdf),
+        name=const(name),
     )
 
 
@@ -1398,7 +1406,7 @@ class Fn(
         >>> choices = trace.get_choices()  # dict with keys "slope", "intercept", "noise", "y"
     """
 
-    source: Callable[..., R] = Pytree.static()
+    source: Const[Callable[..., R]]
 
     def simulate(
         self,
@@ -1406,7 +1414,7 @@ class Fn(
         **kwargs,
     ) -> Tr[dict[str, Any], R]:
         handler_stack.append(Simulate(jnp.array(0.0), {}))
-        r = self.source(*args, **kwargs)
+        r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Simulate)
         score, trace_map = handler.score, handler.trace_map
@@ -1423,7 +1431,7 @@ class Fn(
             return tr, jnp.array(0.0)
         else:
             handler_stack.append(Generate(x, jnp.array(0.0), jnp.array(0.0), {}))
-            r = self.source(*args, **kwargs)
+            r = self.source.value(*args, **kwargs)
             handler = handler_stack.pop()
             assert isinstance(handler, Generate)
             score, weight, trace_map = handler.score, handler.weight, handler.trace_map
@@ -1436,7 +1444,7 @@ class Fn(
         **kwargs,
     ) -> tuple[Density, R]:
         handler_stack.append(Assess(x, jnp.array(0.0)))
-        r = self.source(*args, **kwargs)
+        r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Assess)
         logp = handler.logp
@@ -1451,7 +1459,7 @@ class Fn(
     ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any] | None]:
         x_ = {} if x_ is None else x_
         handler_stack.append(Update(tr, x_, {}, {}, jnp.array(0.0), jnp.array(0.0)))
-        r = self.source(*args, **kwargs)
+        r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Update)
         trace_map, score, w, discard = (
@@ -1470,7 +1478,7 @@ class Fn(
         **kwargs,
     ) -> tuple[Tr[dict[str, Any], R], Weight, dict[str, Any] | None]:
         handler_stack.append(Regenerate(tr, s, {}, {}, jnp.array(0.0), jnp.array(0.0)))
-        r = self.source(*args, **kwargs)
+        r = self.source.value(*args, **kwargs)
         handler = handler_stack.pop()
         assert isinstance(handler, Regenerate)
         trace_map, score, w, discard = (
@@ -1541,7 +1549,7 @@ def gen(fn: Callable[..., R]) -> Fn[R]:
         >>> choices = trace.get_choices()
         >>> # choices will contain {"x": <value>, "y": <value>}
     """
-    return Fn(source=fn)
+    return Fn(source=const(fn))
 
 
 ########
@@ -1614,7 +1622,7 @@ class Scan(Generic[X, R], GFI[X, R]):
     """
 
     callee: GFI[X, R]
-    length: int = Pytree.static()
+    length: Const[int]
 
     def merge(self, x: X, x_: X):
         return self.callee.merge(x, x_)
@@ -1636,7 +1644,7 @@ class Scan(Generic[X, R], GFI[X, R]):
             scan_fn,
             init_carry,
             xs,
-            length=self.length,
+            length=self.length.value,
         )
 
         return ScanTr(self, (args, kwargs), traces, final_carry, outs)
@@ -1660,7 +1668,7 @@ class Scan(Generic[X, R], GFI[X, R]):
             scan_fn,
             carry_args,
             (scanned_args, x),
-            length=self.length,
+            length=self.length.value,
         )
 
         total_weight = jnp.sum(weights)
@@ -1688,7 +1696,7 @@ class Scan(Generic[X, R], GFI[X, R]):
             scan_fn,
             carry_args,
             (scanned_args, x),
-            length=self.length,
+            length=self.length.value,
         )
         return jnp.sum(density), (final_carry, scanned_outs)
 
@@ -1722,7 +1730,7 @@ class Scan(Generic[X, R], GFI[X, R]):
             scan_fn,
             carry_args,
             scan_inputs,
-            length=self.length,
+            length=self.length.value,
         )
 
         total_weight = jnp.sum(weights)
@@ -1757,7 +1765,7 @@ class Scan(Generic[X, R], GFI[X, R]):
         scan_inputs = (xs, old_traces)
 
         final_carry, (new_traces, weights, discards, outs) = scan(
-            scan_fn, init_carry, scan_inputs, length=self.length
+            scan_fn, init_carry, scan_inputs, length=self.length.value
         )
 
         total_weight = jnp.sum(weights)

@@ -61,6 +61,8 @@ from beartype.typing import Annotated, Any, Callable
 from beartype.vale import Is
 from genjax.core import (
     Pytree,
+    Const,
+    const,
     distribution,
 )
 from genjax.pjax import (
@@ -587,7 +589,7 @@ class ADEVProgram(Pytree):
         by the @expectation decorator and managed by the Expectation class.
     """
 
-    source: Callable[..., Any] = Pytree.static()
+    source: Const[Callable[..., Any]]
 
     def jvp_estimate(
         self,
@@ -617,11 +619,13 @@ class ADEVProgram(Pytree):
         def adev_jvp(f):
             @wraps(f)
             def wrapped(*duals: DualTree):
-                return ADEVInterpreter.forward_mode(self.source, dual_kont)(*duals)
+                return ADEVInterpreter.forward_mode(self.source.value, dual_kont)(
+                    *duals
+                )
 
             return wrapped
 
-        return adev_jvp(self.source)(*duals)
+        return adev_jvp(self.source.value)(*duals)
 
 
 ###############
@@ -832,7 +836,7 @@ def expectation(source: Callable[..., Any]) -> Expectation:
         argument to JAX-transformed functions. Use modular_vmap instead of regular
         vmap for proper handling of probabilistic primitives within ADEV programs.
     """
-    prog = ADEVProgram(source)
+    prog = ADEVProgram(const(source))
     return Expectation(prog)
 
 
@@ -943,12 +947,12 @@ class REINFORCE(ADEVPrimitive):
         is preferred when available, as proven more efficient in the ADEV paper.
     """
 
-    sample_function: Callable[..., Any] = Pytree.static()
-    differentiable_logpdf: Callable[..., Any] = Pytree.static()
+    sample_function: Const[Callable[..., Any]]
+    differentiable_logpdf: Const[Callable[..., Any]]
 
     def sample(self, *args):
         """Forward sampling using the provided sample function."""
-        return self.sample_function(*args)
+        return self.sample_function.value(*args)
 
     def prim_jvp_estimate(
         self,
@@ -989,7 +993,7 @@ class REINFORCE(ADEVPrimitive):
             else jnp.zeros_like(v)
         )
         _, lp_tangent = jax.jvp(
-            self.differentiable_logpdf,
+            self.differentiable_logpdf.value,
             (v, *primals),
             (v_tangent, *tangents),
         )
@@ -1012,7 +1016,7 @@ def reinforce(sample_func, logpdf_func):
     Example:
         >>> normal_reinforce_prim = reinforce(normal.sample, normal.logpdf)
     """
-    return REINFORCE(sample_func, logpdf_func)
+    return REINFORCE(const(sample_func), const(logpdf_func))
 
 
 ######################################

@@ -11,8 +11,8 @@ from genjax.core import Scan, Const
 from genjax.distributions import categorical
 
 from genjax.smc import (
-    importance_sampling,
-    default_importance_sampling,
+    init,
+    resample,
 )
 from genjax.core import gen, const
 from genjax.pjax import seed
@@ -99,11 +99,15 @@ def create_complex_hmm_params():
 
 
 @gen
-def hmm_proposal(T: Const[int], initial_probs, transition_matrix, emission_matrix):
+def hmm_proposal(
+    constraints, T: Const[int], initial_probs, transition_matrix, emission_matrix
+):
     """
     HMM proposal that only samples latent states using Const parameters.
+    Uses new signature: (constraints, *target_args).
 
     Args:
+        constraints: Dictionary of constrained choices (not used in this proposal)
         T: Number of time steps wrapped in Const
         initial_probs: Initial state probabilities
         transition_matrix: State transition probabilities
@@ -148,7 +152,7 @@ class TestImportanceSampling:
         exact_log_marginal = exact_log_marginal_normal(y_obs)
 
         # Estimate using default importance sampling
-        result = default_importance_sampling(
+        result = init(
             hierarchical_normal_model,
             (),  # no arguments for this simple model
             const(n_samples),
@@ -171,10 +175,11 @@ class TestImportanceSampling:
 
         # Create a custom proposal for the hierarchical normal model
         @gen
-        def hierarchical_normal_proposal():
+        def hierarchical_normal_proposal(constraints):
             """
             Custom proposal that samples from a different normal distribution.
             This tests that custom proposals work correctly.
+            Proposal uses signature (constraints, *target_args).
             """
             mu = normal(0.5, 1.5) @ "mu"  # Different parameters than target prior
             return mu
@@ -189,13 +194,12 @@ class TestImportanceSampling:
         exact_log_marginal = exact_log_marginal_normal(y_obs)
 
         # Estimate using custom proposal importance sampling
-        result = importance_sampling(
+        result = init(
             hierarchical_normal_model,
-            hierarchical_normal_proposal,
             (),  # target args
-            (),  # proposal args
             const(n_samples),
             constraints,
+            proposal_gf=hierarchical_normal_proposal,
         )
 
         estimated_log_marginal = result.log_marginal_likelihood()
@@ -239,7 +243,7 @@ class TestImportanceSampling:
 
         # Use discrete_hmm_model directly with Const[...] passed as argument
         # Estimate using default importance sampling with seeded function
-        result = seed(default_importance_sampling)(
+        result = seed(init)(
             key2,
             discrete_hmm_model,
             (const(T), initial_probs, transition_matrix, emission_matrix),
@@ -286,14 +290,13 @@ class TestImportanceSampling:
 
         # Use models directly with Const[...] passed as arguments
         # Estimate using importance sampling with seeded function
-        result = seed(importance_sampling)(
+        result = seed(init)(
             key2,
             discrete_hmm_model,
-            hmm_proposal,
-            (const(T), initial_probs, transition_matrix, emission_matrix),
             (const(T), initial_probs, transition_matrix, emission_matrix),
             const(n_samples),
             constraints,
+            proposal_gf=hmm_proposal,
         )
 
         estimated_log_marginal = result.log_marginal_likelihood()
@@ -335,14 +338,13 @@ class TestImportanceSampling:
 
         # Use models directly with Const[...] passed as arguments
         # Estimate using importance sampling with seeded function
-        result = seed(importance_sampling)(
+        result = seed(init)(
             key2,
             discrete_hmm_model,
-            hmm_proposal,
-            (const(T), initial_probs, transition_matrix, emission_matrix),
             (const(T), initial_probs, transition_matrix, emission_matrix),
             const(n_samples),
             constraints,
+            proposal_gf=hmm_proposal,
         )
 
         estimated_log_marginal = result.log_marginal_likelihood()
@@ -388,14 +390,13 @@ class TestImportanceSampling:
             iteration_key = jrand.fold_in(key2, i)
 
             # Use models directly with Const[...] passed as arguments
-            result = seed(importance_sampling)(
+            result = seed(init)(
                 iteration_key,
                 discrete_hmm_model,
-                hmm_proposal,
-                (const(T), initial_probs, transition_matrix, emission_matrix),
                 (const(T), initial_probs, transition_matrix, emission_matrix),
                 const(n_samples),
                 constraints,
+                proposal_gf=hmm_proposal,
             )
 
             error = jnp.abs(result.log_marginal_likelihood() - exact_log_marginal)
@@ -445,14 +446,13 @@ class TestRobustness:
 
         # Use models directly with Const[...] passed as arguments
         # Should not crash and should give reasonable results
-        result = seed(importance_sampling)(
+        result = seed(init)(
             key2,
             discrete_hmm_model,
-            hmm_proposal,
-            (const(T), initial_probs, transition_matrix, emission_matrix),
             (const(T), initial_probs, transition_matrix, emission_matrix),
             const(n_samples),
             constraints,
+            proposal_gf=hmm_proposal,
         )
 
         # With T=2 and more samples, should converge well
@@ -494,17 +494,74 @@ class TestRobustness:
 
         # Use models directly with Const[...] passed as arguments
         # Should handle deterministic case
-        result = seed(importance_sampling)(
+        result = seed(init)(
             key2,
             discrete_hmm_model,
-            hmm_proposal,
-            (const(T), initial_probs, transition_matrix, emission_matrix),
             (const(T), initial_probs, transition_matrix, emission_matrix),
             const(n_samples),
             constraints,
+            proposal_gf=hmm_proposal,
         )
 
         tolerance = 2.5e-2  # Realistic tolerance for deterministic T=2 case with systematic bias
         assert (
             jnp.abs(result.log_marginal_likelihood() - exact_log_marginal) < tolerance
+        )
+
+
+class TestResampling:
+    """Test resampling functionality."""
+
+    def test_resample_basic_functionality(self):
+        """Test that resampling properly updates weights and marginal estimate."""
+        # Create a simple particle collection
+        particles = init(
+            hierarchical_normal_model,
+            (),
+            const(1000),
+            {"y": 1.0},  # Fixed observation
+        )
+
+        # Check initial state
+        assert particles.log_marginal_estimate == 0.0
+        initial_marginal = particles.log_marginal_likelihood()
+
+        # Resample
+        resampled_particles = resample(particles)
+
+        # Check that weights are now uniform (zero in log space)
+        assert jnp.allclose(resampled_particles.log_weights, 0.0, atol=1e-10)
+
+        # Check that marginal estimate was updated
+        assert resampled_particles.log_marginal_estimate != 0.0
+
+        # Check that the new marginal likelihood includes the old contribution
+        new_marginal = resampled_particles.log_marginal_likelihood()
+        assert jnp.allclose(new_marginal, initial_marginal, rtol=1e-6)
+
+        # Check that number of samples is preserved
+        assert resampled_particles.n_samples == particles.n_samples
+
+    def test_resample_methods(self):
+        """Test different resampling methods."""
+        particles = init(
+            hierarchical_normal_model,
+            (),
+            const(100),
+            {"y": 0.5},
+        )
+
+        # Test categorical resampling
+        categorical_resampled = resample(particles, method="categorical")
+        assert jnp.allclose(categorical_resampled.log_weights, 0.0, atol=1e-10)
+
+        # Test systematic resampling
+        systematic_resampled = resample(particles, method="systematic")
+        assert jnp.allclose(systematic_resampled.log_weights, 0.0, atol=1e-10)
+
+        # Both should give similar marginal estimates
+        assert jnp.allclose(
+            categorical_resampled.log_marginal_estimate,
+            systematic_resampled.log_marginal_estimate,
+            rtol=1e-6,
         )
