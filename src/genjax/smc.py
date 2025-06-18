@@ -227,13 +227,13 @@ def change(
     particles: ParticleCollection,
     new_target_gf: GFI[X, R],
     new_target_args: tuple,
-    choice_map_fn: Callable[[X], X],
+    choice_fn: Callable[[X], X],
 ) -> ParticleCollection:
     """
     Change target move for particle collection.
 
     Translates particles from one model to another by:
-    1. Mapping each particle's choices using choice_map_fn
+    1. Mapping each particle's choices using choice_fn
     2. Using generate with the new model to get new weights
     3. Accumulating importance weights
 
@@ -241,7 +241,23 @@ def change(
         particles: Current particle collection
         new_target_gf: New target generative function
         new_target_args: Arguments for new target
-        choice_map_fn: Function mapping choices X -> X
+        choice_fn: Bijective function mapping choices X -> X
+
+    Choice Function Specification:
+        CRITICAL: choice_fn must be a bijection on address space only.
+
+        - If X is a scalar type (e.g., float): Must be identity function
+        - If X is dict[str, Any]: May remap keys but CANNOT modify values
+        - Values must be preserved exactly to maintain probability density
+
+        Valid Examples:
+        - lambda x: x  (identity mapping)
+        - lambda d: {"new_key": d["old_key"]}  (key remapping)
+        - lambda d: {"mu": d["mean"], "sigma": d["std"]}  (multiple key remap)
+
+        Invalid Examples:
+        - lambda x: x + 1  (modifies scalar values - breaks assumptions)
+        - lambda d: {"key": d["key"] * 2}  (modifies dict values - breaks assumptions)
 
     Returns:
         New ParticleCollection with translated particles
@@ -252,7 +268,7 @@ def change(
     ) -> tuple[Trace[X, R], jnp.ndarray]:
         # Map choices to new space
         old_choices = old_trace.get_choices()
-        mapped_choices = choice_map_fn(old_choices)
+        mapped_choices = choice_fn(old_choices)
 
         # Generate with new model using mapped choices as constraints
         new_trace, log_weight = new_target_gf.generate(mapped_choices, *new_target_args)
@@ -372,7 +388,28 @@ def rejuvenate(
     Rejuvenate move for particle collection.
 
     Applies an MCMC kernel to each particle independently to improve
-    particle diversity and reduce degeneracy.
+    particle diversity and reduce degeneracy. The importance weights remain
+    unchanged due to detailed balance.
+
+    Mathematical Foundation:
+        For an MCMC kernel satisfying detailed balance, the log incremental weight is 0:
+
+        log_incremental_weight = log[p(x_new | args) / p(x_old | args)]
+                                + log[q(x_old | x_new) / q(x_new | x_old)]
+
+        Where:
+        - p(x_new | args) / p(x_old | args) is the model density ratio
+        - q(x_old | x_new) / q(x_new | x_old) is the proposal density ratio
+
+        Detailed balance ensures: p(x_old) * q(x_new | x_old) = p(x_new) * q(x_old | x_new)
+
+        Therefore: p(x_new) / p(x_old) = q(x_new | x_old) / q(x_old | x_new)
+
+        The model density ratio and proposal density ratio exactly cancel:
+        log[p(x_new) / p(x_old)] + log[q(x_old | x_new) / q(x_new | x_old)] = 0
+
+        This means the importance weight contribution from the MCMC move is 0,
+        preserving the particle weights while improving sample diversity.
 
     Args:
         particles: Current particle collection
@@ -390,6 +427,7 @@ def rejuvenate(
         new_trace = mcmc_kernel(old_trace)
 
         # Weights remain unchanged for MCMC moves (detailed balance)
+        # Log incremental weight = 0 because model density ratio cancels with proposal density ratio
         return new_trace, old_log_weight
 
     # Vectorize across particles
@@ -462,7 +500,7 @@ def rejuvenation_smc(
     transition_proposal: GFI[X, Any],
     mcmc_kernel: Callable[[Trace[X, R]], Trace[X, R]],
     observations: X,
-    change_mapping: Callable[[X], X],
+    choice_fn: Callable[[X], X],
     n_particles: Const[int] = const(1000),
 ) -> ParticleCollection:
     """
@@ -477,7 +515,7 @@ def rejuvenation_smc(
         transition_proposal: Proposal for extending particles at each timestep
         mcmc_kernel: MCMC kernel for particle rejuvenation
         observations: Sequence of observations (can be Pytree structure)
-        change_mapping: Function to map initial particles to extended model address space
+        choice_fn: Function to map initial particles to extended model address space
         n_particles: Number of particles to maintain
 
     Returns:
@@ -490,7 +528,7 @@ def rejuvenation_smc(
     particles = init(initial_model, (), n_particles, {"obs": first_obs})
 
     # Map initial particles to extended model address space
-    particles = change(particles, extended_model, (), change_mapping)
+    particles = change(particles, extended_model, (), choice_fn)
 
     def smc_step(particles, obs):
         # Extend particles with new observation constraints
