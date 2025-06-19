@@ -24,7 +24,7 @@ def quick_exact_solution(state: jnp.ndarray) -> dict:
 
     # Get current player
     num_moves = jnp.sum(jnp.abs(state))
-    is_x_turn = (num_moves % 2) == 0
+    (num_moves % 2) == 0
 
     # For empty board, all corners and center are optimal (value 0.0 - draw)
     if num_moves == 0:

@@ -47,7 +47,7 @@ examples/programmable_mcts/
 
 **Implementation**:
 - **`GameModelProgram` interface**: Abstract API wrapping GenJAX generative functions
-- **`MCTS` class**: Generic tree search parametric over probabilistic models  
+- **`MCTS` class**: Generic tree search parametric over probabilistic models
 - **`tic_tac_toe_model`**: Probabilistic GenJAX model with observation noise
 - **Core algorithms**: Selection (UCB1), expansion, rollout, backpropagation
 - **Exact solution comparison**: Validation against known optimal Tic-Tac-Toe theory
@@ -57,7 +57,7 @@ examples/programmable_mcts/
 
 **Validation Results**:
 - MCTS achieves "OPTIMAL" or "GOOD" classification on most positions
-- Correctly prioritizes corners (0.0) and center (0.0) over edges (-0.2) 
+- Correctly prioritizes corners (0.0) and center (0.0) over edges (-0.2)
 - Model uncertainty creates realistic behavioral diversity
 - Performance scales predictably with simulation count
 
@@ -79,11 +79,11 @@ def tic_tac_toe_model(action, state):
     # Deterministic game logic
     new_state = apply_game_rules(action, state)
     reward = compute_reward(new_state)
-    
+
     # Add observation noise (model uncertainty)
     noise_scale = 0.01
     noisy_state = new_state + normal(0.0, noise_scale) @ "noise"
-    
+
     return reward, jnp.round(noisy_state).astype(jnp.int32)
 ```
 
@@ -120,13 +120,13 @@ def tic_tac_toe_model(action, state):
 **Required Methods**:
 ```python
 def get_legal_actions(self, state) -> List[Any]
-def simulate_action(self, key, state, action) -> Any  
+def simulate_action(self, key, state, action) -> Any
 def is_terminal(self, state) -> bool
 def get_reward(self, state, player) -> float
 def get_current_player(self, state) -> int
 ```
 
-**Design Rationale**: 
+**Design Rationale**:
 - **Parametric over models**: MCTS works with any model implementing this interface
 - **Stochastic support**: `simulate_action` takes random key for probabilistic models
 - **Multi-player ready**: Supports 2+ player games via `get_current_player`
@@ -135,7 +135,7 @@ def get_current_player(self, state) -> int
 
 **Core Loop**:
 1. **Selection**: Traverse tree using UCB1 until leaf
-2. **Expansion**: Add new child node for untried action  
+2. **Expansion**: Add new child node for untried action
 3. **Rollout**: Simulate random play using game model
 4. **Backpropagation**: Update visit counts and rewards
 
@@ -158,7 +158,7 @@ def get_current_player(self, state) -> int
 # Test MCTS on fixed position
 pixi run python -m examples.programmable_mcts.main --mode basic
 
-# Play single game with visualization  
+# Play single game with visualization
 pixi run python -m examples.programmable_mcts.main --mode single
 
 # Multi-game win rate testing
@@ -177,7 +177,7 @@ pixi run python -m examples.programmable_mcts.main --mode performance
 
 **Playing Strength**:
 - Win rate vs random player
-- Win rate vs fixed heuristic player  
+- Win rate vs fixed heuristic player
 - Convergence to optimal play in solved positions
 
 **Computational Efficiency**:
@@ -205,17 +205,17 @@ pixi run python -m examples.programmable_mcts.main --mode performance
 
 **Model Expressiveness vs Search Efficiency**:
 - More complex models → more accurate dynamics
-- But: slower simulation → fewer MCTS iterations  
+- But: slower simulation → fewer MCTS iterations
 - **Trade-off**: Find sweet spot for overall playing strength
 
-**Learning Speed vs Planning Quality**:  
+**Learning Speed vs Planning Quality**:
 - Frequent model updates → better adaptation
 - But: less search time → weaker immediate play
 - **Trade-off**: Meta-learning the update schedule
 
 **Exploration vs Exploitation**:
 - Model uncertainty should drive exploration
-- But: too much exploration → poor short-term performance  
+- But: too much exploration → poor short-term performance
 - **Trade-off**: Thompson sampling with annealing
 
 ## Future Extensions
@@ -270,7 +270,7 @@ pixi run -e programmable-mcts programmable-mcts-all         # Complete test suit
 
 **🎨 Generated Visualizations:**
 1. `empty_board_analysis.png` - MCTS action evaluation on empty board
-2. `mid_game_analysis.png` - MCTS strategy in mid-game positions  
+2. `mid_game_analysis.png` - MCTS strategy in mid-game positions
 3. `search_tree.png` - Actual MCTS search tree structure
 4. `consistency_analysis.png` - Multiple run comparison showing uncertainty
 5. `convergence_analysis.png` - Performance vs simulation count
@@ -281,7 +281,7 @@ pixi run -e programmable-mcts programmable-mcts-all         # Complete test suit
 **🔬 Validation Results:**
 - MCTS correctly learns corner/center preference (0.0 value)
 - Edges show expected disadvantage (-0.2 value)
-- Classification: "OPTIMAL", "GOOD", or "SUBOPTIMAL" 
+- Classification: "OPTIMAL", "GOOD", or "SUBOPTIMAL"
 - Strategic accuracy validated against game theory
 
 **🐛 Critical Bug Fix:**
@@ -327,7 +327,7 @@ The programmable MCTS framework provides a foundation for studying how agents ca
 
 1. **Programmable MCTS**: Algorithm parametric over any GenJAX generative function
 2. **Probabilistic Game Models**: Working example with observation noise and uncertainty
-3. **Exact Solution Validation**: Comparison against known optimal Tic-Tac-Toe theory  
+3. **Exact Solution Validation**: Comparison against known optimal Tic-Tac-Toe theory
 4. **Comprehensive Visualizations**: 8 different analysis types showing system behavior
 5. **Performance Classification**: Automatic assessment of MCTS decisions as optimal/good/suboptimal
 6. **Strategic Learning**: MCTS correctly learns corner/center preference over edges

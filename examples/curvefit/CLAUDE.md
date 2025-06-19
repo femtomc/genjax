@@ -74,10 +74,48 @@ examples/curvefit/
 - **Scaling studies**: Performance and quality analysis across sample sizes
 - **Density visualizations**: Log-density comparisons
 
+### `figs.py` - Comprehensive Visualization Suite
+
+**Standard Visualizations:**
+- **Trace visualizations**: Single and multi-point curve traces
+- **Inference visualizations**: Posterior curve overlays with uncertainty
+- **Scaling studies**: Performance and quality analysis across sample sizes
+- **Density visualizations**: Log-density comparisons
+- **Comprehensive benchmark**: Cross-framework comparison with timing analysis
+
+**Advanced Analysis Functions:**
+
+**`save_genjax_scaling_benchmark()` - GenJAX Performance Analysis:**
+- **Importance sampling scaling**: Performance and posterior quality vs N_samples
+- **HMC scaling**: Performance and posterior quality vs chain length
+- **Comprehensive metrics**: Timing, bias, variance, ESS, acceptance rates
+- **JIT-compiled functions**: Uses optimized GenJAX functions for accurate benchmarks
+- **Research-quality output**: 12-panel figure showing complete scaling analysis
+- **Standard interface**: Integrated with main.py CLI system
+
+**`save_genjax_posterior_comparison()` - Comprehensive Method Comparison:**
+- **Three-method comparison**: GenJAX IS, GenJAX HMC, and NumPyro HMC with JIT compilation
+- **Visual posterior comparison**: Side-by-side posterior curve visualizations for each method
+- **Parameter space visualization**: Joint posterior distributions showing parameter estimates
+- **Comprehensive overlay**: Combined view showing all three methods with observed data
+- **Performance benchmarking**: JIT-compiled timing comparisons across all methods
+- **Statistical diagnostics**: Posterior means, uncertainties, bias, and HMC acceptance rates
+- **Professional visualization**: 4-row layout with publication-ready formatting
+  - **Row 1**: Individual method posterior plots + parameter estimates scatter plot
+  - **Row 2**: Combined overlay comparison spanning full width
+  - **Row 3**: Performance comparison bar chart (unlabeled bars, color-coded)
+  - **Row 4**: Comprehensive shared legend (3-column, 3-row layout, 20pt font)
+- **JIT-compiled inference**: Uses optimized functions for fair performance comparison
+- **Parameter alignment**: Ensures identical HMC parameters between GenJAX and NumPyro (step_size=0.01, num_steps=20)
+- **Font standardization**: Matches faircoin publication standards (18-22pt fonts, bold titles)
+- **Legend organization**: Groups elements logically (ground truth, posteriors, means)
+- **Standard interface**: Integrated with main.py CLI system
+
 ### `main.py` - Figure Generation
 
 - **Orchestrates all visualizations**: Calls figure generation functions in sequence
 - **Produces complete paper-ready figures**: For research and documentation
+- **Multiple modes**: Support for traces, inference, scaling, benchmark, genjax-scaling, and posterior-comparison
 
 ## Key Implementation Details
 
@@ -240,16 +278,26 @@ trace = model.simulate()  # No args needed for this model
 ### Running Examples
 
 ```bash
-# Generate all figures
+# Generate all figures (complete case study)
 pixi run -e curvefit curvefit
+# or equivalently:
+python -m examples.curvefit.main --mode all
 
-# Run core implementation with all frameworks
+# Specific figure types
+python -m examples.curvefit.main --mode traces              # Basic trace visualizations
+python -m examples.curvefit.main --mode inference          # Inference visualization
+python -m examples.curvefit.main --mode scaling            # Original scaling analysis
+python -m examples.curvefit.main --mode benchmark          # Cross-framework benchmark
+python -m examples.curvefit.main --mode genjax-scaling     # GenJAX scaling analysis
+python -m examples.curvefit.main --mode posterior-comparison # Three-method comparison
+
+# Customize parameters
+python -m examples.curvefit.main --mode posterior-comparison --n-points 20 --timing-repeats 5
+python -m examples.curvefit.main --mode genjax-scaling --n-points 15 --timing-repeats 3
+
+# Legacy compatibility (still supported)
 pixi run -e curvefit curvefit-core
-
-# Generate visualization figures only
 pixi run -e curvefit curvefit-figs
-
-# Run all components
 pixi run -e curvefit curvefit-all
 ```
 
@@ -330,7 +378,24 @@ assert weights.shape == (1000,)
 
 ### JIT Compilation
 
-- **Static arguments**: Use `static_argnums=(2,)` for `n_samples` parameter
+GenJAX functions use JAX JIT compilation for performance, following the proper `seed()` → `jit()` order:
+
+**Correct Pattern**:
+```python
+# Apply seed() before jit() for GenJAX functions
+seeded_fn = seed(my_probabilistic_function)
+jit_fn = jax.jit(seeded_fn)  # No static_argnums needed with Const pattern
+```
+
+**Available JIT-compiled functions**:
+- `infer_latents_jit`: JIT-compiled GenJAX importance sampling (~5x speedup)
+- `hmc_infer_latents_jit`: JIT-compiled GenJAX HMC inference (~4-5x speedup)
+- `numpyro_run_importance_sampling_jit`: JIT-compiled NumPyro importance sampling
+- `numpyro_run_hmc_inference_jit`: JIT-compiled NumPyro HMC with `jit_model_args=True`
+
+**Key benefits**:
+- **Const pattern**: Use `Const[int]`, `Const[float]` instead of `static_argnums`
+- **Significant speedups**: 4-5x performance improvement for GenJAX inference
 - **Factory benefits**: Eliminates repeated model compilation
 - **Closure benefits**: Enables efficient SMC vectorization
 
@@ -363,18 +428,78 @@ This case study serves as:
 - **Solution**: Use closure pattern to capture static arguments
 - **Pattern**: See `test_smc.py` lines 242-256 for reference
 
+### NumPyro JAX Transformation Issues
+
+- **Issue**: NumPyro's HMC diagnostics contain format strings that fail when values are JAX tracers
+- **Error**: `TypeError: unsupported format string passed to Array.__format__`
+- **Root Cause**: JAX tracers cannot be directly formatted with Python string formatting
+- **Solution**: Convert JAX arrays to Python floats before string formatting using `.item()` or `float()`
+- **Context**: This is a known issue when running NumPyro under JAX transformations
+
+**Example Fix**:
+```python
+# ❌ WRONG - JAX tracer formatting fails
+f"Value: {jax_array:.2f}"
+
+# ✅ CORRECT - Convert to Python float first
+f"Value: {float(jax_array):.2f}"
+```
+
 ### Import Dependencies
 
 - **Matplotlib required**: For figure generation in `figs.py`
 - **NumPy compatibility**: Used alongside JAX for some visualizations
 - **Environment**: Use `pixi run -e curvefit` for proper dependencies
 
-## Evolution Notes
+## Recent Developments
 
-The implementation has evolved from manual SMC replication to proper SMC library usage:
+### Standard Case Study Integration (2025)
+
+The case study has been fully integrated into the standard GenJAX examples format:
+
+**Structural Improvements**:
+- **Unified `figs.py`**: All visualization functions consolidated into single file following examples standards
+- **Standard CLI interface**: Full integration with `main.py` supporting all standard modes and parameters
+- **Removed standalone scripts**: Eliminated `genjax_scaling_benchmark.py` and `genjax_posterior_comparison.py`
+- **Consistent API**: All functions follow `save_*()` naming convention with standardized parameters
+
+**Advanced Analysis Integration**:
+- **`save_genjax_scaling_benchmark()`**: 12-panel GenJAX performance analysis fully integrated
+- **`save_genjax_posterior_comparison()`**: 4-row three-method comparison fully integrated
+- **Parameter customization**: CLI arguments for sample sizes, timing repeats, and seeds
+- **Error handling**: Robust exception handling with graceful degradation
+
+### Comprehensive Framework Comparison (2025)
+
+The case study includes a complete three-way comparison between GenJAX and NumPyro:
+
+**Implementation Features**:
+- **JIT compilation**: All methods use optimized JIT compilation for fair performance comparison
+- **Parameter alignment**: GenJAX and NumPyro HMC use identical parameters (step_size=0.01, num_steps=20)
+- **Chain length optimization**: Increased to 5000 samples + 3000 warmup for better mixing
+- **Thinning for autocorrelation**: Every 5th sample used for visualization to reduce correlation
+- **Professional visualization**: 4-row layout with publication-ready formatting and comprehensive legend
+
+**Key Insights**:
+- **GenJAX performance**: Competitive with NumPyro on JIT-compiled implementations
+- **Method comparison**: Clear visual comparison between importance sampling and HMC approaches
+- **Publication quality**: Matches font standards and formatting of other GenJAX examples
+
+**Technical Achievements**:
+- **Font standardization**: All figures match faircoin publication standards (18-22pt fonts)
+- **Legend organization**: 3-column, 3-row layout grouping ground truth, posteriors, and means
+- **Bar chart design**: Clean unlabeled bars with color-coding for method identification
+- **Statistical rigor**: Proper timing benchmarks with warm-up and multiple repetitions
+- **Standard compliance**: Follows all GenJAX examples directory standards
+
+### Evolution Notes
+
+The implementation has evolved from manual SMC replication to a standard-compliant case study:
 
 - **Original**: Manual `modular_vmap` + `generate` pattern
-- **Current**: Factory pattern + closure pattern + `genjax.smc.default_importance_sampling`
-- **Benefits**: Better maintainability, consistency with GenJAX patterns, educational value
+- **SMC Integration**: Factory pattern + closure pattern + `genjax.smc.default_importance_sampling`
+- **Framework Comparison**: Added NumPyro integration with JIT compilation and comprehensive visualization
+- **Standard Integration**: Unified into standard examples format with consolidated `figs.py` and standard CLI
+- **Benefits**: Better maintainability, consistency with GenJAX patterns, educational value, competitive benchmarking, and standard compliance
 
-This case study should remain stable and serve as a reference for proper factory and SMC usage patterns in GenJAX.
+This case study now serves as both a reference for proper GenJAX patterns and a demonstration of competitive performance against established probabilistic programming frameworks, while fully conforming to GenJAX examples directory standards.

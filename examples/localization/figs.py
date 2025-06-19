@@ -935,10 +935,10 @@ def plot_weight_evolution(weight_history, save_path=None):
     if weight_max / weight_min > 1000:
         use_log = True
         log_min, log_max = jnp.log10(weight_min + 1e-12), jnp.log10(weight_max + 1e-12)
-        bins = jnp.logspace(log_min, log_max, 50)
+        jnp.logspace(log_min, log_max, 50)
     else:
         use_log = False
-        bins = jnp.linspace(weight_min, weight_max, 50)
+        jnp.linspace(weight_min, weight_max, 50)
 
     for i, timestep in enumerate(timesteps_to_show):
         ax = axes[i]

@@ -132,7 +132,7 @@ def gen2d_transition_proposal(
     prev_positions, prev_velocities = prev_state
 
     # Sample new weights
-    weights = dirichlet(alpha.value * jnp.ones(K)) @ "weights"
+    dirichlet(alpha.value * jnp.ones(K)) @ "weights"
 
     # Sample positions using dynamics
     for k in range(K):
@@ -317,7 +317,6 @@ def run_gen2d_inference(
         obs_std_const: Const[float],
     ):
         # Extract values from Const wrappers
-        K = n_components_const.value
         dt_val = dt_const.value
         process_noise_val = process_noise_const.value
 

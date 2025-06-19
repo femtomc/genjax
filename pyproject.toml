@@ -35,9 +35,10 @@ seaborn = "*"
 numpyro = "*"
 
 [tool.pixi.feature.faircoin.tasks]
-setup = "mkdir -p examples/faircoin/figs"
-faircoin-timing = "pixi run python -m examples.faircoin.main"
-faircoin-combined = "pixi run python -m examples.faircoin.main --combined"
+# Beta-Bernoulli framework comparison (GenJAX vs NumPyro vs handcoded JAX)
+setup = "mkdir -p examples/faircoin/figs"  # Create output directory
+faircoin-timing = "pixi run python -m examples.faircoin.main"  # Timing comparison only
+faircoin-combined = "pixi run python -m examples.faircoin.main --combined"  # Combined timing + posterior figure (recommended)
 
 [tool.pixi.feature.curvefit.dependencies]
 matplotlib = "*"
@@ -49,96 +50,108 @@ numpyro = "*"
 pyro-ppl = "*"
 
 [tool.pixi.feature.curvefit.tasks]
-setup = "mkdir -p examples/curvefit/figs"
-curvefit = "pixi run python examples/curvefit/main.py"
-curvefit-data = "pixi run python examples/curvefit/data.py"
-curvefit-core = "pixi run python examples/curvefit/core.py"
-curvefit-figs = "pixi run python examples/curvefit/figs.py"
-curvefit-all = "pixi run curvefit-core && pixi run curvefit-figs"
+# Curve fitting with multiple frameworks
+setup = "mkdir -p examples/curvefit/figs"  # Create output directory
+curvefit = "pixi run python examples/curvefit/main.py"  # Run main curvefit example
+curvefit-data = "pixi run python examples/curvefit/data.py"  # Generate/process data
+curvefit-core = "pixi run python examples/curvefit/core.py"  # Run core analysis
+curvefit-figs = "pixi run python examples/curvefit/figs.py"  # Generate figures
+curvefit-all = "pixi run curvefit-core && pixi run curvefit-figs"  # Run core + generate figures
 
 [tool.pixi.feature.format.tasks]
-format = "ruff format . && ruff check . --fix"
-format-md = "npx prettier --write '**/*.md'"
-format-all = "ruff format . && ruff check . --fix && npx prettier --write '**/*.md'"
-vulture = "vulture"
-precommit-install = "pre-commit install"
-precommit-run = "pre-commit run --all-files"
+# Code formatting and linting
+format = "ruff format . && ruff check . --fix"  # Format and lint Python code with ruff
+format-md = "npx prettier --write '**/*.md'"  # Format Markdown files with prettier
+format-all = "ruff format . && ruff check . --fix && npx prettier --write '**/*.md'"  # Format both Python and Markdown files
+vulture = "vulture"  # Find unused code
+precommit-install = "pre-commit install"  # Install pre-commit hooks
+precommit-run = "pre-commit run --all-files"  # Run pre-commit hooks
 
 
 [tool.pixi.feature.test.tasks]
-test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"
-coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=term && echo 'Coverage report available at htmlcov/index.html'"
-doctest = "xdoctest src/genjax --verbose=2"
-doctest-module = "xdoctest src/genjax/{module} --verbose=2"
-test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"
+# Testing and coverage
+test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"  # Run tests with coverage
+coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=term && echo 'Coverage report available at htmlcov/index.html'"  # Generate coverage report
+doctest = "xdoctest src/genjax --verbose=2"  # Run doctests only
+doctest-module = "xdoctest src/genjax/{module} --verbose=2"  # Run doctests for specific module
+test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"  # Run tests + doctests
 
 [tool.pixi.feature.gol.dependencies]
 matplotlib = "*"
 
 [tool.pixi.feature.gol.tasks]
-gol-timing = "pixi run python examples/gol/main.py"
-gol = "pixi run python examples/gol/figs.py"
+# Game of Life inference
+gol = "pixi run python -m examples.gol.main"  # Generate all figures
+gol-blinker = "pixi run python -m examples.gol.main --mode blinker"  # Blinker reconstruction
+gol-logo = "pixi run python -m examples.gol.main --mode logo"  # Logo reconstruction
+gol-timing = "pixi run python -m examples.gol.main --mode timing"  # Timing analysis
+gol-quick = "pixi run python -m examples.gol.main --chain-length 10 --grid-sizes 10 20"  # Quick run
 
 [tool.pixi.feature.localization.dependencies]
 matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.localization.tasks]
-localization = "pixi run python -m examples.localization.main"
+# Particle filter localization
+localization = "pixi run python -m examples.localization.main"  # Run localization example
 
 [tool.pixi.feature.state_space.dependencies]
 matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.state_space.tasks]
-state-space = "pixi run python -m examples.state_space.main"
-state-space-all = "pixi run python -m examples.state_space.main --all"
-state-space-convergence = "pixi run python -m examples.state_space.main --convergence"
-state-space-quick = "pixi run python -m examples.state_space.main --time-steps 10 --particles 100,500"
-state-space-comparison = "pixi run python -m examples.state_space.main --rejuvenation-comparison"
-state-space-challenging = "pixi run python -m examples.state_space.main --rejuvenation-comparison --challenging"
-state-space-extreme = "pixi run python -m examples.state_space.main --rejuvenation-comparison --extreme"
-state-space-difficulty = "pixi run python -m examples.state_space.main --difficulty-comparison"
-state-space-comprehensive = "pixi run python -m examples.state_space.main --rejuvenation-comparison --difficulty-comparison"
+# State space models
+state-space = "pixi run python -m examples.state_space.main"  # Basic state space example
+state-space-all = "pixi run python -m examples.state_space.main --all"  # All analyses
+state-space-convergence = "pixi run python -m examples.state_space.main --convergence"  # Convergence analysis
+state-space-quick = "pixi run python -m examples.state_space.main --time-steps 10 --particles 100,500"  # Quick run (reduced params)
+state-space-comparison = "pixi run python -m examples.state_space.main --rejuvenation-comparison"  # Rejuvenation comparison
+state-space-challenging = "pixi run python -m examples.state_space.main --rejuvenation-comparison --challenging"  # Challenging + rejuvenation
+state-space-extreme = "pixi run python -m examples.state_space.main --rejuvenation-comparison --extreme"  # Extreme + rejuvenation
+state-space-difficulty = "pixi run python -m examples.state_space.main --difficulty-comparison"  # Difficulty comparison
+state-space-comprehensive = "pixi run python -m examples.state_space.main --rejuvenation-comparison --difficulty-comparison"  # All comparisons
 
 [tool.pixi.feature.gen2d.dependencies]
 matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.gen2d.tasks]
-gen2d = "pixi run python -m examples.gen2d.main"
-gen2d-all = "pixi run python -m examples.gen2d.main --all"
-gen2d-quick = "pixi run python -m examples.gen2d.main --n-frames 10 --n-particles 50"
+# 2D generative models
+gen2d = "pixi run python -m examples.gen2d.main"  # Basic gen2d example
+gen2d-all = "pixi run python -m examples.gen2d.main --all"  # All analyses
+gen2d-quick = "pixi run python -m examples.gen2d.main --n-frames 10 --n-particles 50"  # Quick run (reduced params)
 
 [tool.pixi.feature.intuitive_physics.dependencies]
 matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.intuitive_physics.tasks]
-setup = "mkdir -p examples/intuitive_physics/figs"
-intuitive-physics = "pixi run python -m examples.intuitive_physics.main"
-intuitive-physics-env = "pixi run python -m examples.intuitive_physics.main --environment"
-intuitive-physics-trajectory = "pixi run python -m examples.intuitive_physics.main --trajectory"
-intuitive-physics-action-space = "pixi run python -m examples.intuitive_physics.main --action-space"
-intuitive-physics-samples = "pixi run python -m examples.intuitive_physics.main --samples"
-intuitive-physics-timing = "pixi run python -m examples.intuitive_physics.main --timing"
-intuitive-physics-inference = "pixi run python -m examples.intuitive_physics.main --inference"
-intuitive-physics-all = "pixi run python -m examples.intuitive_physics.main --all"
+# Physics simulation inference
+setup = "mkdir -p examples/intuitive_physics/figs"  # Create output directory
+intuitive-physics = "pixi run python -m examples.intuitive_physics.main"  # Basic run
+intuitive-physics-env = "pixi run python -m examples.intuitive_physics.main --environment"  # Environment analysis
+intuitive-physics-trajectory = "pixi run python -m examples.intuitive_physics.main --trajectory"  # Trajectory analysis
+intuitive-physics-action-space = "pixi run python -m examples.intuitive_physics.main --action-space"  # Action space analysis
+intuitive-physics-samples = "pixi run python -m examples.intuitive_physics.main --samples"  # Sample analysis
+intuitive-physics-timing = "pixi run python -m examples.intuitive_physics.main --timing"  # Timing analysis
+intuitive-physics-inference = "pixi run python -m examples.intuitive_physics.main --inference"  # Inference analysis
+intuitive-physics-all = "pixi run python -m examples.intuitive_physics.main --all"  # All analyses
 
 [tool.pixi.feature.programmable_mcts.dependencies]
 matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.programmable_mcts.tasks]
-setup = "mkdir -p examples/programmable_mcts/figs"
-programmable-mcts = "pixi run python -m examples.programmable_mcts.main"
-programmable-mcts-basic = "pixi run python -m examples.programmable_mcts.main --mode basic"
-programmable-mcts-positions = "pixi run python -m examples.programmable_mcts.main --mode positions"
-programmable-mcts-uncertainty = "pixi run python -m examples.programmable_mcts.main --mode uncertainty"
-programmable-mcts-exact = "pixi run python -m examples.programmable_mcts.main --mode exact"
-programmable-mcts-demo = "pixi run python -m examples.programmable_mcts.main --mode demo"
-programmable-mcts-visualizations = "pixi run python -m examples.programmable_mcts.main --mode visualizations"
-programmable-mcts-all = "pixi run python -m examples.programmable_mcts.main --mode all"
+# Monte Carlo Tree Search
+setup = "mkdir -p examples/programmable_mcts/figs"  # Create output directory
+programmable-mcts = "pixi run python -m examples.programmable_mcts.main"  # Basic run
+programmable-mcts-basic = "pixi run python -m examples.programmable_mcts.main --mode basic"  # Basic mode
+programmable-mcts-positions = "pixi run python -m examples.programmable_mcts.main --mode positions"  # Position analysis
+programmable-mcts-uncertainty = "pixi run python -m examples.programmable_mcts.main --mode uncertainty"  # Uncertainty analysis
+programmable-mcts-exact = "pixi run python -m examples.programmable_mcts.main --mode exact"  # Exact solver comparison
+programmable-mcts-demo = "pixi run python -m examples.programmable_mcts.main --mode demo"  # Demo mode
+programmable-mcts-visualizations = "pixi run python -m examples.programmable_mcts.main --mode visualizations"  # Visualizations
+programmable-mcts-all = "pixi run python -m examples.programmable_mcts.main --mode all"  # All modes
 
 [tool.pixi.environments]
 default = { solve-group = "default" }

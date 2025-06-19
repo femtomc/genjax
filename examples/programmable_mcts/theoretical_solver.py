@@ -19,7 +19,7 @@ def get_theoretical_action_values(state: jnp.ndarray) -> Dict[Tuple[int, int], f
 
     # Check if terminal
     if is_terminal_ttt(state):
-        winner = _check_winner(state)
+        _check_winner(state)
         # Determine current player
         num_moves = jnp.sum(jnp.abs(state))
         is_x_turn = (num_moves % 2) == 0

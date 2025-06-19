@@ -1,0 +1,48 @@
+{
+  "hmm": {
+    "model": "discrete_hmm",
+    "T": 10,
+    "n_states": 3,
+    "n_obs": 5,
+    "exact_log_marginal": -16.681804656982422,
+    "results": [
+      {
+        "n_particles": 100,
+        "log_marginal": -16.37478256225586,
+        "error": 0.3070220947265625,
+        "relative_error": 0.018404608592391014,
+        "ess": 100.0
+      },
+      {
+        "n_particles": 500,
+        "log_marginal": -16.775012969970703,
+        "error": 0.09320831298828125,
+        "relative_error": 0.00558742368593812,
+        "ess": 355.8779602050781
+      }
+    ]
+  },
+  "linear_gaussian": {
+    "model": "linear_gaussian",
+    "T": 10,
+    "d_state": 2,
+    "d_obs": 2,
+    "exact_log_marginal": -11.807748794555664,
+    "results": [
+      {
+        "n_particles": 100,
+        "log_marginal": -13.455087661743164,
+        "error": 1.6473388671875,
+        "relative_error": 0.13951337337493896,
+        "ess": 100.0
+      },
+      {
+        "n_particles": 500,
+        "log_marginal": -11.831953048706055,
+        "error": 0.024204254150390625,
+        "relative_error": 0.002049861941486597,
+        "ess": 499.9998474121094
+      }
+    ]
+  }
+}

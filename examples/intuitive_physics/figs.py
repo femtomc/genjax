@@ -624,7 +624,7 @@ def inference_demonstration_fig():
     x = np.arange(len(representative_actions))
     width = 0.35
 
-    bars1 = ax3.bar(
+    ax3.bar(
         x - width / 2,
         goal_focused_prefs,
         width,
@@ -632,7 +632,7 @@ def inference_demonstration_fig():
         color="darkgreen",
         alpha=0.7,
     )
-    bars2 = ax3.bar(
+    ax3.bar(
         x + width / 2,
         effort_focused_prefs,
         width,
@@ -688,7 +688,7 @@ def inference_demonstration_fig():
     )
 
     insight_text = """• High-impulse, low-angle trajectories reveal wall collisions
-• Different agent types show distinct action preferences  
+• Different agent types show distinct action preferences
 • Action informativeness varies dramatically across action space
 • Model-inference co-design enables tractable 'inverse psychology'"""
 

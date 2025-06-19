@@ -19,7 +19,6 @@ def simple_model(
 ):
     """Very simple tracking model with just positions."""
     K = n_components_const.value
-    dt_val = dt_const.value
     process_noise_val = process_noise_const.value
 
     is_initial = time_index == 0
@@ -61,7 +60,6 @@ def simple_proposal(
 ):
     """Simple proposal matching the model."""
     K = n_components_const.value
-    dt_val = dt_const.value
     process_noise_val = process_noise_const.value
 
     is_initial = time_index == 0

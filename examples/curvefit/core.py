@@ -836,6 +836,4 @@ if __name__ == "__main__":
     print(f"  Mean acceptance probability: {summary['mean_accept_prob']:.3f}")
 
     # Pyro comparison (disabled - implementation not included in this version)
-    print(
-        "\n=== Pyro: Not Available (implementation not included in this version) ==="
-    )
+    print("\n=== Pyro: Not Available (implementation not included in this version) ===")

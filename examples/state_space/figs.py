@@ -162,8 +162,7 @@ def plot_log_marginal_comparison(
     colors = sns.color_palette("husl", 2)
 
     # Create grouped bar chart
-    all_particle_lm = []
-    exact_lm = lg_results["exact_log_marginal"]
+    lg_results["exact_log_marginal"]
 
     for i, n_p in enumerate(n_particles_list):
         hmm_lm = [
@@ -235,10 +234,8 @@ def plot_ess_comparison(
     width = 0.35
     x = np.arange(len(n_particles))
 
-    bars1 = ax.bar(x - width / 2, hmm_ess, width, label="HMM", color=colors[0])
-    bars2 = ax.bar(
-        x + width / 2, lg_ess, width, label="Linear Gaussian", color=colors[1]
-    )
+    ax.bar(x - width / 2, hmm_ess, width, label="HMM", color=colors[0])
+    ax.bar(x + width / 2, lg_ess, width, label="Linear Gaussian", color=colors[1])
 
     # Add reference line at n_particles
     for i, n in enumerate(n_particles):
@@ -530,7 +527,7 @@ def plot_particle_density_evolution(
         )
 
         # Plot density
-        im = ax.imshow(
+        ax.imshow(
             H.T,
             origin="lower",
             aspect="auto",

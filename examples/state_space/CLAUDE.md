@@ -104,14 +104,14 @@ pixi run -e state-space state-space-all
 
 ### Challenging Inference Scenarios
 - **Standard**: Baseline noise and drift for algorithm comparison
-- **Challenging**: 3× observation noise, drift > 1σ process noise  
+- **Challenging**: 3× observation noise, drift > 1σ process noise
 - **Extreme**: 5× observation noise, nonlinear spiral drift
 
 ### New Pixi Tasks
 ```bash
 pixi run -e state-space state-space-comparison      # Standard rejuvenation comparison
 pixi run -e state-space state-space-challenging     # Challenging scenario
-pixi run -e state-space state-space-extreme         # Extreme scenario  
+pixi run -e state-space state-space-extreme         # Extreme scenario
 pixi run -e state-space state-space-difficulty      # Cross-scenario analysis
 pixi run -e state-space state-space-comprehensive   # All scenarios
 ```

@@ -730,7 +730,7 @@ def get_gol_figure_and_updater(
     ax2.tick_params(axis="both", which="major", labelsize=8)
 
     # Skip tight_layout since we're using constrained_layout=True
-    
+
     # Define number of frames for animation
     n_frames = len(run_summary.predictive_posterior_scores)
 

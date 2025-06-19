@@ -81,3 +81,17 @@ def get_mit_logo():
 
     # Apply a threshold to convert to black and white
     return jnp.where(gray_img < 0.5, 1, 0)
+
+
+def get_small_mit_logo(size=128):
+    """Get a downsampled version of the MIT logo for faster computation."""
+    full_logo = get_mit_logo()
+    small_logo = jax.image.resize(full_logo, (size, size), method="nearest")
+    return jnp.where(small_logo > 0.5, 1, 0)  # Re-binarize after resize
+
+
+def get_small_popl_logo(size=128):
+    """Get a downsampled version of the POPL logo for faster computation."""
+    full_logo = get_popl_logo()
+    small_logo = jax.image.resize(full_logo, (size, size), method="nearest")
+    return jnp.where(small_logo > 0.5, 1, 0)  # Re-binarize after resize

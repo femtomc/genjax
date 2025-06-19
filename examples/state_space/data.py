@@ -107,7 +107,7 @@ def generate_hmm_data(
     Returns:
         HMMData with true states and observations
     """
-    n_states = initial_probs.shape[0]
+    initial_probs.shape[0]
 
     def sample_trajectory():
         states = []
@@ -257,7 +257,7 @@ def generate_linear_gaussian_data(
     Returns:
         LinearGaussianData with true states and observations
     """
-    d_state = initial_mean.shape[0]
+    initial_mean.shape[0]
 
     def sample_trajectory():
         states = []

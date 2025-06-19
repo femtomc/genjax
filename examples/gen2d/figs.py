@@ -604,7 +604,7 @@ def plot_pattern_comparison(save_dir=None):
         )
 
         # Color palette for different patterns
-        pattern_colors = sns.color_palette("Set2", len(patterns))
+        sns.color_palette("Set2", len(patterns))
         active_colors = sns.color_palette("viridis", 4)
 
         for row, pattern in enumerate(patterns):

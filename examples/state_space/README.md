@@ -10,7 +10,7 @@ The case study implements:
 2. **Linear Gaussian Model**: SMC with MALA (gradient-based) rejuvenation steps
 
 Both models are tested against exact inference algorithms:
-- HMM: Forward filtering backward sampling (FFBS) 
+- HMM: Forward filtering backward sampling (FFBS)
 - Linear Gaussian: Kalman filtering and smoothing
 
 ## Running the Experiments

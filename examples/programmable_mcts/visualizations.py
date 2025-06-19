@@ -330,7 +330,7 @@ def compare_mcts_runs(
         )
 
     # Create visualization
-    fig = plt.figure(figsize=(15, 10))
+    plt.figure(figsize=(15, 10))
 
     # Top: Board state
     ax_board = plt.subplot(2, 3, (1, 2))
@@ -363,7 +363,7 @@ def compare_mcts_runs(
         for (row, col), (visits, _) in result["action_stats"].items():
             visits_grid[row, col] = visits
 
-        im = ax.imshow(visits_grid, cmap="Blues", aspect="equal")
+        ax.imshow(visits_grid, cmap="Blues", aspect="equal")
 
         # Add text annotations
         for (row, col), (visits, avg_reward) in result["action_stats"].items():
@@ -453,7 +453,7 @@ def demonstrate_mcts_progression(
         # Combined metric: visits weighted by reward
         heatmap_data = visits_grid * (reward_grid + 1) / 2  # Normalize rewards to [0,1]
 
-        im = ax.imshow(heatmap_data, cmap="RdYlGn", aspect="equal")
+        ax.imshow(heatmap_data, cmap="RdYlGn", aspect="equal")
 
         # Add annotations
         for (row, col), child in root.children.items():

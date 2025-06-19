@@ -151,7 +151,7 @@ utility = goal_weight * (goal_reward + distance_penalty) + (1-goal_weight) * eff
 
 **Typical Performance** (CPU, optimized):
 - Single trajectory: ~1-2ms
-- Batch physics (100 trajectories): ~10-20ms  
+- Batch physics (100 trajectories): ~10-20ms
 - Rational agent simulation: ~200-800ms (vectorized utility computation)
 - Full model simulation: ~200-300ms
 - Wall inference (1000 samples): ~1-5 seconds
@@ -291,7 +291,7 @@ This case study demonstrates:
 
 ### Theoretical Foundation
 
-- **Liu, S., Outa, J., & Akbiyik, S. (2024)**. Naive psychology depends on naive physics. 
+- **Liu, S., Outa, J., & Akbiyik, S. (2024)**. Naive psychology depends on naive physics.
 - **Csibra, G., et al. (2003)**. Teleological reasoning in infancy: The naive psychology of rational action.
 
 ### Technical Implementation

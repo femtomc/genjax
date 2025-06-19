@@ -46,7 +46,6 @@ def test_empty_board_values():
     print(f"Edge values: {edge_values}")
 
     # Validate expectations
-    expected_optimal_value = 0.0  # Draw with perfect play
 
     if corner_values:
         avg_corner = sum(corner_values) / len(corner_values)

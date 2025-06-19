@@ -1,62 +1,107 @@
-import jax
-import core
-import numpy as np
-import jax.random as jrand
-from data import get_blinker_n
-from examples.utils import timing
-import matplotlib.pyplot as plt
-import matplotlib
+import argparse
+from .figs import (
+    save_blinker_gibbs_figure,
+    save_logo_gibbs_figure,
+    save_timing_scaling_figure,
+)
 
 
-matplotlib.rcParams.update({"font.size": 26})
-
-
-def task(n: int):
-    run_summary = core.run_sampler_and_get_summary(
-        jrand.key(1), core.GibbsSampler(get_blinker_n(n), 0.03), 250, 1
+def main():
+    """Main CLI for Game of Life case study."""
+    parser = argparse.ArgumentParser(
+        description="GenJAX Game of Life Case Study - Probabilistic Conway's Game of Life Inference"
     )
-    final_pred_post = run_summary.predictive_posterior_scores[-1]
-    return final_pred_post
 
+    # Mode selection
+    parser.add_argument(
+        "--mode",
+        choices=["all", "blinker", "logo", "timing"],
+        default="all",
+        help="Which figures to generate (default: all)",
+    )
 
-def timing_figure(
-    ns=[10, 100, 200, 300, 400],
-    color="skyblue",
-):
-    times = []
-    for n in ns:
-        _, (mean, _) = timing(
-            lambda: task(n),
-            repeats=1,
-            inner_repeats=1,
+    # Inference parameters
+    parser.add_argument(
+        "--chain-length",
+        type=int,
+        default=250,
+        help="Number of Gibbs sampling steps (default: 250)",
+    )
+    parser.add_argument(
+        "--flip-prob",
+        type=float,
+        default=0.03,
+        help="Probability of rule violations (default: 0.03)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=1,
+        help="Random seed for reproducibility (default: 1)",
+    )
+
+    # Timing parameters
+    parser.add_argument(
+        "--grid-sizes",
+        type=int,
+        nargs="+",
+        default=[10, 100, 200, 300, 400],
+        help="Grid sizes for timing analysis (default: [10, 100, 200, 300, 400])",
+    )
+    parser.add_argument(
+        "--timing-repeats",
+        type=int,
+        default=5,
+        help="Number of timing repetitions (default: 5)",
+    )
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu", "both"],
+        default="cpu",
+        help="Device for computation (default: cpu)",
+    )
+
+    args = parser.parse_args()
+
+    print("=== GenJAX Game of Life Case Study ===")
+    print(f"Mode: {args.mode}")
+    print(
+        f"Parameters: chain_length={args.chain_length}, flip_prob={args.flip_prob}, seed={args.seed}"
+    )
+
+    if args.mode in ["all", "blinker"]:
+        print("\nGenerating blinker pattern reconstruction...")
+        save_blinker_gibbs_figure(
+            chain_length=args.chain_length, flip_prob=args.flip_prob, seed=args.seed
         )
-        times.append(mean)
 
-    arr = np.array(times)
-    # arr = arr / arr[0]
+    if args.mode in ["all", "logo"]:
+        print("\nGenerating logo pattern reconstruction...")
+        save_logo_gibbs_figure(
+            chain_length=args.chain_length,
+            flip_prob=args.flip_prob,
+            seed=args.seed,
+            small=True,  # Use small version for reasonable computation time
+            size=128,  # 128x128 logo for excellent logo preservation
+        )
 
-    fig = plt.figure(figsize=(12, 6))
-    plt.bar(
-        ns,
-        arr,
-        color="skyblue",
-        edgecolor="black",
-        width=50,
-    )
+    if args.mode in ["all", "timing"]:
+        print("\nGenerating timing scaling analysis...")
+        print(f"Grid sizes: {args.grid_sizes}")
+        print(f"Timing repeats: {args.timing_repeats}")
+        print(f"Device: {args.device}")
 
-    # Add labels and title
-    plt.xlabel("Linear dimension of image (N)")
-    plt.ylabel("Timing (s)")
-    plt.grid(True, alpha=0.3)
-    plt.xticks(ns)
-    plt.xlim(min(ns) - 50, max(ns) + 100)
-    plt.tight_layout()
-    fig.savefig("examples/gol/figs/timing_scaling.pdf")
+        save_timing_scaling_figure(
+            grid_sizes=args.grid_sizes,
+            repeats=args.timing_repeats,
+            device=args.device,
+            chain_length=args.chain_length,
+            flip_prob=args.flip_prob,
+            seed=args.seed,
+        )
+
+    print("\n=== Game of Life case study complete! ===")
 
 
 if __name__ == "__main__":
-    with jax.default_device(jax.devices("gpu")[0]):
-        timing_figure(color="orange")
-
-    with jax.default_device(jax.devices("cpu")[0]):
-        timing_figure(color="skyblue")
+    main()

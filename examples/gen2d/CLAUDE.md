@@ -61,7 +61,7 @@ The custom MCMC kernel chains together updates for different variable blocks:
 
 ### Visualization
 - Clean Game of Life frame sequences with bottom axis labels
-- Gaussian ellipses showing component locations and spread  
+- Gaussian ellipses showing component locations and spread
 - Trajectory paths showing motion over time
 - Professional seaborn styling with consistent color palettes
 
