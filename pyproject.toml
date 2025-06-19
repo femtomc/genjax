@@ -137,17 +137,17 @@ matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.intuitive_physics.tasks]
-cmd = "intuitive-physics"
+cmd = "intuitive-psych"
 # Physics simulation inference
 setup = "mkdir -p examples/intuitive_physics/figs"  # Create output directory
-intuitive-physics = "pixi run python -m examples.intuitive_physics.main"  # Basic run
-intuitive-physics-env = "pixi run python -m examples.intuitive_physics.main --environment"  # Environment analysis
-intuitive-physics-trajectory = "pixi run python -m examples.intuitive_physics.main --trajectory"  # Trajectory analysis
-intuitive-physics-action-space = "pixi run python -m examples.intuitive_physics.main --action-space"  # Action space analysis
-intuitive-physics-samples = "pixi run python -m examples.intuitive_physics.main --samples"  # Sample analysis
-intuitive-physics-timing = "pixi run python -m examples.intuitive_physics.main --timing"  # Timing analysis
-intuitive-physics-inference = "pixi run python -m examples.intuitive_physics.main --inference"  # Inference analysis
-intuitive-physics-all = "pixi run python -m examples.intuitive_physics.main --all"  # All analyses
+intuitive-psych = "pixi run python -m examples.intuitive_physics.main"  # Main command (basic run)
+intuitive-psych-env = "pixi run python -m examples.intuitive_physics.main --environment"  # Environment analysis
+intuitive-psych-trajectory = "pixi run python -m examples.intuitive_physics.main --trajectory"  # Trajectory analysis
+intuitive-psych-action-space = "pixi run python -m examples.intuitive_physics.main --action-space"  # Action space analysis
+intuitive-psych-samples = "pixi run python -m examples.intuitive_physics.main --samples"  # Sample analysis
+intuitive-psych-timing = "pixi run python -m examples.intuitive_physics.main --timing"  # Timing analysis
+intuitive-psych-inference = "pixi run python -m examples.intuitive_physics.main --inference"  # Inference analysis
+intuitive-psych-all = "pixi run python -m examples.intuitive_physics.main --all"  # All analyses
 
 [tool.pixi.feature.programmable_mcts.dependencies]
 matplotlib = "*"
@@ -177,7 +177,7 @@ gol = { features = ["gol"], solve-group = "default" }
 localization = { features = ["localization"], solve-group = "default" }
 state-space = { features = ["state_space"], solve-group = "default" }
 gen2d = { features = ["gen2d"], solve-group = "default" }
-intuitive-physics = { features = ["intuitive_physics"], solve-group = "default" }
+intuitive-psych = { features = ["intuitive_physics"], solve-group = "default" }
 programmable-mcts = { features = ["programmable_mcts"], solve-group = "default" }
 
 [tool.pixi.feature.format.dependencies]
