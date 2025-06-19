@@ -76,6 +76,10 @@ doctest = "xdoctest src/genjax --verbose=2"  # Run doctests only
 doctest-module = "xdoctest src/genjax/{module} --verbose=2"  # Run doctests for specific module
 test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"  # Run tests + doctests
 
+[tool.pixi.feature.examples.tasks]
+# Run all case studies
+examples-setup = "mkdir -p examples/faircoin/figs examples/curvefit/figs examples/gol/figs examples/localization/figs examples/state_space/figs examples/gen2d/figs examples/intuitive_physics/figs examples/programmable_mcts/figs"  # Create all output directories
+
 [tool.pixi.feature.gol.dependencies]
 matplotlib = "*"
 
@@ -157,6 +161,7 @@ programmable-mcts-all = "pixi run python -m examples.programmable_mcts.main --mo
 default = { solve-group = "default" }
 format = { features = ["format"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
+examples = { features = ["examples"], solve-group = "default" }
 faircoin = { features = ["faircoin"], solve-group = "default" }
 curvefit = { features = ["curvefit"], solve-group = "default" }
 gol = { features = ["gol"], solve-group = "default" }
