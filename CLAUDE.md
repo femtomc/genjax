@@ -14,6 +14,16 @@ When starting work in this codebase, ALWAYS read the relevant CLAUDE.md files fi
 
 GenJAX is a probabilistic programming language embedded in Python centered on programmable inference.
 
+## Recent Updates
+
+### Enhanced rejuvenation_smc API (June 2025)
+- **Optional Parameters**: `transition_proposal` and `mcmc_kernel` are now optional in `rejuvenation_smc`
+- **Simplified Usage**: Can use model's internal proposal without custom proposals
+- **Backwards Compatible**: All existing code continues to work unchanged
+- **Improved Documentation**: See `src/genjax/inference/CLAUDE.md` for updated API examples
+- **Case Study Update**: Localization example now demonstrates simplified usage pattern
+- **Simplified SMC**: Removed diagnostic weights to focus on core SMC functionality
+
 ## JAX Best Practices
 
 GenJAX uses JAX extensively. **ALWAYS enforce good JAX idioms**:
@@ -176,54 +186,25 @@ This approach ensures documentation stays in sync with the codebase and reduces 
 
 ## Development Commands
 
-### Setup
-
-```bash
-pixi install              # Install dependencies
-```
+**Setup**: Run `pixi install` to install dependencies.
 
 **JAX Backend**: GenJAX uses CPU-compatible JAX by default for maximum compatibility across environments. JAX will automatically detect and use GPU acceleration when available without requiring special configuration.
 
-### Testing
+**All available commands**: See `pyproject.toml` for the complete list of available pixi commands. The file is organized into features:
 
-```bash
-pixi run test             # Run tests with coverage
-pixi run test-all         # Run tests + doctests
-pixi run doctest          # Run doctests only
-pixi run coverage         # Generate coverage report
-```
+- **Testing**: `test`, `test-all`, `doctest`, `coverage` commands in `[tool.pixi.feature.test.tasks]`
+- **Code Quality**: `format`, `format-md`, `format-all`, `vulture`, `precommit-run` commands in `[tool.pixi.feature.format.tasks]`
+- **Examples**: Each example has its own feature section with specific commands:
+  - `faircoin`: Beta-Bernoulli framework comparison
+  - `curvefit`: Curve fitting with multiple frameworks
+  - `gol`: Game of Life inference
+  - `localization`: Particle filter localization
+  - `state-space`: State space models
+  - `gen2d`: 2D generative models
+  - `intuitive-physics`: Physics simulation inference
+  - `programmable-mcts`: Monte Carlo Tree Search
 
-### Code Quality
-
-```bash
-pixi run format           # Format and lint Python code with ruff
-pixi run format-md        # Format Markdown files with prettier
-pixi run format-all       # Format both Python and Markdown files
-pixi run vulture          # Find unused code
-pixi run precommit-run    # Run pre-commit hooks
-```
-
-### Examples
-
-```bash
-# Faircoin example - Beta-Bernoulli framework comparison
-pixi run -e faircoin faircoin-timing      # Timing comparison only
-pixi run -e faircoin faircoin-combined    # Combined timing + posterior figure (recommended)
-pixi run -e faircoin python -m examples.faircoin.main --posterior  # Posterior comparison only
-pixi run -e faircoin python -m examples.faircoin.main --all        # All figures
-
-# Curvefit example
-pixi run -e curvefit curvefit
-pixi run -e curvefit curvefit-all
-
-# Other examples
-pixi run -e localization localization
-pixi run -e gol gol
-```
-
-### Documentation
-
-```bash
-pixi run -e docs preview  # Preview docs locally
-pixi run -e docs deploy   # Deploy to GitHub Pages
-```
+**Usage Pattern**:
+- General commands: `pixi run <command>`
+- Example-specific commands: `pixi run -e <example> <command>`
+- Many examples have `setup`, `<name>-quick`, `<name>-all` variants for different use cases

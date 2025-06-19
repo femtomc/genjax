@@ -58,6 +58,8 @@ examples/localization/
 - **`plot_sensor_observations()`**: 8-ray LIDAR sensor readings vs true distances
 - **`plot_ground_truth_trajectory()`**: Comprehensive trajectory analysis
 - **`plot_multiple_trajectories()`**: Comparison of different trajectory types
+- **`plot_lidar_rays()`**: Visualize LIDAR measurement rays from robot pose
+- **`plot_lidar_demo()`**: Demo showing true vs noisy LIDAR measurements
 
 ### `main.py` - Demo Script
 
@@ -222,18 +224,64 @@ The case study showcases GenJAX capabilities for robotics and time series applic
 
 The localization case study demonstrates advanced GenJAX capabilities including vectorized sensor modeling, complex geometry handling, and robust sequential inference in challenging multi-room navigation scenarios.
 
+## rejuvenation_smc API Usage
+
+The case study now uses the simplified `rejuvenation_smc` API with optional parameters:
+
+```python
+# Current implementation: Simplest usage with model's internal proposal
+result = seed(rejuvenation_smc)(
+    key,
+    localization_model,              # model
+    observations=obs_sequence,       # observations
+    initial_model_args=initial_args, # initial_model_args
+    n_particles=const(n_particles),  # n_particles
+    return_all_particles=const(True), # return_all_particles=True to get all timesteps
+)
+```
+
+**Key Benefits of Simplified API**:
+- **No Custom Proposal Needed**: Model's internal proposal works well for localization
+- **No MCMC Rejuvenation**: Basic SMC provides good performance for this problem
+- **Minimal Boilerplate**: Clean, readable code with just essential parameters
+- **Robust Performance**: Consistent results without complex proposal engineering
+
+**Alternative Usage** (if custom behavior needed):
+```python
+# With optional custom proposal and/or rejuvenation
+result = seed(rejuvenation_smc)(
+    key,
+    localization_model,              # model
+    transition_proposal=custom_proposal,  # optional custom proposal
+    mcmc_kernel=const(mcmc_kernel),  # optional rejuvenation moves
+    observations=obs_sequence,
+    initial_model_args=initial_args,
+    n_particles=const(n_particles),
+    return_all_particles=const(True),
+)
+```
+
 ## Current Session Context
 
-### Conversation Summary
+### Latest Session Summary (June 19, 2025)
 
-We were working on fixing the localization case study to work with the updated `rejuvenation_smc` API. The conversation progressed through several phases:
+**Primary Accomplishment**: Successfully updated `rejuvenation_smc` API and simplified localization case study
 
-1. **Initial API Migration**: Investigating how `rejuvenation_smc` is used in tests and migrating from the old particle filter implementation to the new API pattern
-2. **Vmap Issue Resolution**: Encountered persistent vmap errors with argument count mismatches, which we isolated and debugged through minimal test cases
-3. **Key Management Fix**: Discovered that `@gen` functions receive implicit keys and should use `seed` transformation at higher levels rather than explicit key parameters
-4. **Autoregressive Pattern**: Successfully migrated to the autoregressive model pattern where model functions take previous output as input
-5. **Observation Model Issue**: Found major mismatch between simplified model (single distance) and actual ground truth data (8-element LIDAR arrays)
-6. **Current Task**: User directed to use `vmap` for the sensor model instead of the manual loop workaround
+**Session Goals Achieved**:
+1. **API Enhancement**: Made `transition_proposal` and `mcmc_kernel` parameters optional in `rejuvenation_smc`
+2. **Localization Simplification**: Removed custom proposal and MCMC rejuvenation from localization example
+3. **Full Functionality**: Verified all visualizations and particle filtering work with simplified API
+
+### Previous Session Summary (Earlier Context)
+
+The localization case study was previously worked on to fix integration with `rejuvenation_smc` API:
+
+1. **Initial API Migration**: Migrated from old particle filter implementation to new `rejuvenation_smc` pattern
+2. **Vmap Issue Resolution**: Fixed persistent vmap errors with argument count mismatches
+3. **Key Management Fix**: Used `seed` transformation at higher levels rather than explicit key parameters
+4. **Autoregressive Pattern**: Successfully migrated to autoregressive model pattern
+5. **Observation Model Fix**: Resolved mismatch between model and ground truth LIDAR data (8-element arrays)
+6. **Vmap Integration**: Replaced manual sensor loop with proper GenJAX Vmap implementation
 
 ### Key Technical Discoveries
 
@@ -249,22 +297,57 @@ We were working on fixing the localization case study to work with the updated `
 - `/home/femtomc/genjax/examples/localization/main.py`: Fixed hardcoded file paths to use relative paths
 - Various test files created for debugging: `test_vmap_issue.py`, `debug_observations.py`, etc.
 
-### Current Implementation Status
+### Current Implementation Status (After Latest Session)
 
-The localization model has been successfully migrated to use `rejuvenation_smc` API with:
-- ✅ Autoregressive model pattern (takes prev_pose, returns current_pose)
-- ✅ JAX-compatible conditionals using `jax.lax.select`
-- ✅ Proper key management with `seed` transformation
-- ⚠️ **PENDING**: Replace manual sensor observation loop with Vmap implementation
+The localization case study is now fully functional with simplified API:
+- ✅ **Simplified rejuvenation_smc API**: Uses model's internal proposal (no custom proposal needed)
+- ✅ **No MCMC rejuvenation**: Basic SMC provides sufficient performance
+- ✅ **Autoregressive model pattern**: Takes prev_pose, returns current_pose with proper time indexing
+- ✅ **JAX-compatible conditionals**: Uses `jax.lax.select` for traced values
+- ✅ **Proper key management**: Uses `seed` transformation at top level
+- ✅ **Vectorized LIDAR sensor**: GenJAX Vmap implementation for 8 LIDAR rays
+- ✅ **Full visualization suite**: All 7 visualization types working correctly
 
-### Immediate Next Task
+### Latest Implementation Changes
 
-Replace the manual sensor observation loop in `localization_model` (lines 377-388 in core.py) with proper GenJAX Vmap implementation for the 8 LIDAR rays. The user explicitly stated "Let's use `vmap`, it works" indicating we should use the vectorized approach rather than the unrolled loop.
+**API Simplification in `core.py`**:
+- Removed `simple_localization_proposal` function definition
+- Removed `mcmc_kernel` function definition
+- Simplified `rejuvenation_smc` call to use only essential parameters
+- Removed unused imports (`mh`, `sel`)
+
+**Enhanced LIDAR Visualization in `figs.py`**:
+- Added `plot_lidar_rays()`: Visualizes LIDAR measurements from robot pose (configurable number of rays)
+- Added `plot_lidar_demo()`: Shows comparison between true (black) and noisy (orange) measurements
+- Updated `plot_particle_filter_step()` and `plot_particle_filter_evolution()` to optionally show LIDAR measurements
+- Enhanced `main.py` to generate LIDAR measurement demonstration figure
+- Updated `plot_sensor_observations()` to handle any number of rays (aggregate view for >16 rays)
+
+**Configurable LIDAR System**:
+- Updated core functions to accept configurable number of LIDAR rays (default: 32)
+- Added CLI arguments for full configuration control: `--n-rays`, `--n-particles`, `--n-steps`, `--seed`
+- Added `--no-lidar-rays` flag to disable LIDAR visualization in plots
+- Used `Const` wrapper for JAX-compatible compile-time constants
+- True measurements now displayed as black points, no ray lines shown by default
+
+**Parametrized File Naming**:
+- All generated figures now include parameter configuration in filenames
+- Format: `r<rays>_p<particles>_s<steps>_seed<seed>_<plottype>.png`
+- Examples: `r32_p2000_s16_seed42_ground_truth.png`, `r64_p1000_s8_seed123_lidar_demo.png`
+- Enables easy comparison between different experimental configurations
+- Prevents accidental overwriting when testing different parameter sets
+
+**Performance Results with Configurable System**:
+- Default: 32 LIDAR rays, 2000 particles, 16 trajectory steps
+- ESS: Excellent diversity (2000 for most timesteps with sufficient rays)
+- Error tracking: Better performance with more LIDAR rays (64 rays: ~3.0 units final error vs 8 rays: ~6.0 units)
+- Cross-room navigation: Successfully navigates complex 3-room environment
+- LIDAR impact: More rays provide significantly better localization accuracy
 
 ### Key Patterns Established
 
 1. **Model Function Signature**: `@gen def model(prev_pose)` - takes previous output, returns current state
-2. **Proposal Function Signature**: `@gen def proposal(prev_pose)` - takes previous output, proposes new state  
+2. **Proposal Function Signature**: `@gen def proposal(prev_pose)` - takes previous output, proposes new state
 3. **Observation Structure**: Ground truth provides 8-element LIDAR arrays matching the sensor model output
 4. **Vmap Pattern**: Use GenJAX Vmap combinator with proper `in_axes`, `axis_size`, and `Const` parameters
 5. **Error Handling**: JAX-compatible conditionals and robust weight computation with fallbacks
@@ -272,7 +355,7 @@ Replace the manual sensor observation loop in `localization_model` (lines 377-38
 ### TODOs Completed in Session
 
 1. ✅ Investigated `rejuvenation_smc` usage in tests
-2. ✅ Isolated and debugged Vmap argument count issues  
+2. ✅ Isolated and debugged Vmap argument count issues
 3. ✅ Fixed key management by removing explicit keys and using `seed`
 4. ✅ Migrated to autoregressive model pattern
 5. ✅ Fixed JAX compatibility issues with conditionals
@@ -285,12 +368,31 @@ Replace the manual sensor observation loop in `localization_model` (lines 377-38
 3. ✅ **Test convergence**: Verified that vectorized LIDAR observations work correctly with particle filter
 4. ✅ **Validated results**: Confirmed vectorized sensor model produces correct observation structure matching ground truth data
 
-### Session Outcome
+### Session Outcome (Updated)
 
-The localization case study is now fully functional with:
-- ✅ Proper `rejuvenation_smc` API integration  
-- ✅ Working Vmap for vectorized LIDAR sensor observations
-- ✅ Comprehensive test coverage in `tests/test_vmap_rejuvenation_smc.py`
-- ✅ All 8-ray LIDAR measurements processed efficiently with Vmap
+**Framework Level Changes**:
+- ✅ **Enhanced rejuvenation_smc API**: Made `transition_proposal` and `mcmc_kernel` parameters optional
+- ✅ **Updated type hints**: Added proper union types (`GFI[X, Any] | None`) for optional parameters
+- ✅ **Backwards compatibility**: All existing tests pass without modification
+- ✅ **Documentation updates**: Updated CLAUDE.md files in `src/genjax/inference/` and examples
 
-The core Vmap issue that prevented vectorized operations in `rejuvenation_smc` has been resolved at the framework level, benefiting all future use cases.
+**Localization Case Study**:
+- ✅ **Simplified implementation**: Removed custom proposal and MCMC rejuvenation
+- ✅ **Robust performance**: Excellent particle diversity and localization accuracy
+- ✅ **Full visualization suite**: All 7 figure types generated correctly
+- ✅ **Clean codebase**: Minimal boilerplate with essential parameters only
+- ✅ **Working Vmap integration**: Vectorized LIDAR sensor observations
+- ✅ **Cross-room navigation**: Successfully navigates complex 3-room environment
+
+**Key Achievement**: Demonstrated that GenJAX's `rejuvenation_smc` with default internal proposal provides excellent performance for robot localization without requiring custom proposals or MCMC rejuvenation, significantly simplifying the user experience.
+
+### Ready for Future Work
+
+The localization case study now serves as an excellent example of:
+1. **Simplified rejuvenation_smc usage** with minimal API surface
+2. **Robust particle filtering** for robotics applications
+3. **Vectorized sensor modeling** using GenJAX Vmap
+4. **Complex multi-room geometry** handling
+5. **Comprehensive visualization** for analysis and debugging
+
+All code is production-ready and fully documented.

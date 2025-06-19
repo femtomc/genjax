@@ -636,7 +636,7 @@ def test_parameter_validation():
 
 @pytest.mark.distributions
 @pytest.mark.unit
-@pytest.mark.fast  
+@pytest.mark.fast
 def test_distributions_jit_compilation(key):
     """Test that distributions work correctly under JIT compilation."""
     from genjax.pjax import seed

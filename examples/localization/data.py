@@ -141,8 +141,8 @@ def create_waypoint_trajectory_room1_to_room3():
     - Doorway 2→3: x=8, y=[4, 6]
     """
     waypoints = [
-        # Start in lower-left corner of Room 1
-        (0.5, 0.5),
+        # Start offset from walls in Room 1
+        (1.2, 1.2),
         # Move toward first doorway center
         (1.5, 1.5),  # Diagonal movement toward doorway
         (2.5, 2.5),  # Continue diagonal
@@ -189,7 +189,9 @@ def create_waypoint_trajectory_exploration_room1():
     return waypoints
 
 
-def generate_synthetic_data_from_waypoints(waypoints, world, key, noise_std=0.15):
+def generate_synthetic_data_from_waypoints(
+    waypoints, world, key, noise_std=0.15, n_rays=128
+):
     """Generate synthetic trajectory data from waypoints using LIDAR sensor model.
 
     Args:
@@ -197,6 +199,7 @@ def generate_synthetic_data_from_waypoints(waypoints, world, key, noise_std=0.15
         world: World object for distance calculations
         key: JAX random key for sensor noise
         noise_std: Standard deviation for sensor noise
+        n_rays: Number of LIDAR rays for distance measurements
 
     Returns:
         tuple: (initial_pose, poses, observations)
@@ -204,9 +207,9 @@ def generate_synthetic_data_from_waypoints(waypoints, world, key, noise_std=0.15
     # Convert waypoints to poses (theta=0.0 since we'll use LIDAR in all directions)
     poses = [Pose(x=x, y=y, theta=0.0) for x, y in waypoints]
 
-    # Generate true LIDAR distances at each waypoint (8 angles)
+    # Generate true LIDAR distances at each waypoint
     true_lidar_distances = [
-        distance_to_wall_lidar(pose, world, n_angles=8) for pose in poses
+        distance_to_wall_lidar(pose, world, n_angles=n_rays) for pose in poses
     ]
 
     # Add noise to create realistic sensor observations
@@ -214,10 +217,10 @@ def generate_synthetic_data_from_waypoints(waypoints, world, key, noise_std=0.15
     observations = []
 
     for i, true_lidar in enumerate(true_lidar_distances):
-        # Add independent noise to each of the 8 distance measurements
-        angle_keys = jrand.split(noise_keys[i], 8)
+        # Add independent noise to each distance measurement
+        angle_keys = jrand.split(noise_keys[i], n_rays)
         noisy_lidar = []
-        for j in range(8):
+        for j in range(n_rays):
             noise = jrand.normal(angle_keys[j]) * noise_std
             observed_dist = jnp.maximum(
                 0.0, true_lidar[j] + noise
@@ -225,17 +228,14 @@ def generate_synthetic_data_from_waypoints(waypoints, world, key, noise_std=0.15
             noisy_lidar.append(observed_dist)
         observations.append(jnp.array(noisy_lidar))
 
-    # Return initial pose separately and remaining poses
-    initial_pose = poses[0]
-    trajectory_poses = poses[1:]
-    trajectory_observations = observations[
-        1:
-    ]  # Skip first observation since it's at initial pose
-
-    return initial_pose, trajectory_poses, trajectory_observations
+    # Return all poses and observations - no need to separate initial pose
+    # For rejuvenation_smc, we need observations for each pose including the initial one
+    return poses, observations
 
 
-def generate_ground_truth_data(world, key, trajectory_type="room_navigation"):
+def generate_ground_truth_data(
+    world, key, trajectory_type="room_navigation", n_steps=16, n_rays=128
+):
     """Generate ground truth trajectory and observations.
 
     Args:
@@ -243,36 +243,40 @@ def generate_ground_truth_data(world, key, trajectory_type="room_navigation"):
         key: JAX random key for reproducible generation
         trajectory_type: Type of trajectory to generate
                         ("room_navigation", "wall_bouncing", "exploration", "simple_bounce")
+        n_steps: Number of trajectory steps to generate
+        n_rays: Number of LIDAR rays for distance measurements
 
     Returns:
-        tuple: (initial_pose, controls, poses, observations)
+        tuple: (all_poses, controls, observations)
     """
     # For room_navigation, use waypoint-based approach for reliable cross-room travel
     if trajectory_type == "room_navigation":
         waypoints = create_waypoint_trajectory_room1_to_room3()
         key1, key2 = jrand.split(key)
-        initial_pose, poses, observations = generate_synthetic_data_from_waypoints(
-            waypoints, world, key1, noise_std=0.15
+        all_poses, observations = generate_synthetic_data_from_waypoints(
+            waypoints, world, key1, noise_std=0.15, n_rays=n_rays
         )
 
         # Create dummy controls (not used in waypoint approach but needed for compatibility)
         controls = [
-            Control(velocity=1.0, angular_velocity=0.0) for _ in range(len(poses))
+            Control(velocity=1.0, angular_velocity=0.0)
+            for _ in range(len(all_poses) - 1)
         ]
-        return initial_pose, controls, poses, observations
+        return all_poses, controls, observations
 
     elif trajectory_type == "exploration":
         waypoints = create_waypoint_trajectory_exploration_room1()
         key1, key2 = jrand.split(key)
-        initial_pose, poses, observations = generate_synthetic_data_from_waypoints(
-            waypoints, world, key1, noise_std=0.15
+        all_poses, observations = generate_synthetic_data_from_waypoints(
+            waypoints, world, key1, noise_std=0.15, n_rays=n_rays
         )
 
         # Create dummy controls
         controls = [
-            Control(velocity=1.0, angular_velocity=0.0) for _ in range(len(poses))
+            Control(velocity=1.0, angular_velocity=0.0)
+            for _ in range(len(all_poses) - 1)
         ]
-        return initial_pose, controls, poses, observations
+        return all_poses, controls, observations
 
     # For other trajectory types, use the original control-based approach
     elif trajectory_type == "wall_bouncing":
@@ -282,8 +286,8 @@ def generate_ground_truth_data(world, key, trajectory_type="room_navigation"):
     else:
         raise ValueError(f"Unknown trajectory_type: {trajectory_type}")
 
-    # Default initial pose for control-based trajectories
-    initial_pose = Pose(x=2.0, y=2.0, theta=0.0)
+    # Default initial pose for control-based trajectories - offset from walls
+    initial_pose = Pose(x=1.8, y=1.8, theta=0.0)
 
     # Sequential generation using individual models (original approach)
     # For control-based trajectories, we need to create a compatible step model
@@ -328,12 +332,8 @@ def generate_ground_truth_data(world, key, trajectory_type="room_navigation"):
         poses.append(current_pose)
         observations.append(observation)
 
-    return (
-        initial_pose,
-        controls,
-        poses[1:],
-        observations,
-    )  # Return initial pose separately
+    # Return all poses (including initial) for consistency
+    return poses, controls, observations
 
 
 def generate_multiple_trajectories(world, key, n_trajectories=5, trajectory_types=None):

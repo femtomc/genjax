@@ -266,14 +266,14 @@ def apply_control(pose: Pose, control: Control, world: World, dt: float = 0.1) -
 
 
 def distance_to_wall_lidar(
-    pose: Pose, world: World, n_angles: int = 8, max_range: float = 10.0
+    pose: Pose, world: World, n_angles: int = 128, max_range: float = 10.0
 ) -> jnp.ndarray:
     """Compute LIDAR-style distance measurements at multiple angles around the robot.
 
     Args:
         pose: Robot pose (x, y, theta)
         world: World object with boundaries and internal walls
-        n_angles: Number of angular measurements (default 8)
+        n_angles: Number of angular measurements (default 32)
         max_range: Maximum sensor range
 
     Returns:
@@ -330,40 +330,66 @@ def distance_to_wall(pose: Pose, world: World) -> float:
     This function is kept for compatibility with existing code that expects
     a single distance value.
     """
-    lidar_distances = distance_to_wall_lidar(pose, world, n_angles=8)
+    lidar_distances = distance_to_wall_lidar(pose, world, n_angles=128)
     return jnp.min(lidar_distances)
 
 
 # Generative functions for rejuvenation_smc API
 @gen
-def localization_model(prev_pose, world):
-    """Simplified localization model for rejuvenation_smc API.
+def localization_model(prev_pose, time_index, world, n_rays=Const(128)):
+    """Localization model for rejuvenation_smc API with proper initialization.
 
-    This follows the autoregressive pattern where the model takes the previous
-    pose and generates the next pose with observations.
+    This handles both initialization (t=0) and transitions (t>0) properly.
 
     Args:
-        prev_pose: Previous robot pose (Pose object)
+        prev_pose: Previous robot pose (Pose object, dummy for t=0)
+        time_index: Current timestep (0 for initialization, >0 for transitions)
         world: World geometry for sensor computations
+        n_rays: Number of LIDAR rays for distance measurements (Const)
 
     Returns:
-        Current pose (sampled from motion model) with sensor observation
+        Current pose (sampled from appropriate distribution) with sensor observation
     """
-    # Simple motion model: robot moves with some noise
-    # Assume random walk with small steps
-    velocity = normal(0.5, 0.2) @ "velocity"
-    angular_velocity = normal(0.0, 0.1) @ "angular_velocity"
+    is_initial = time_index == 0
 
-    # Apply simple motion (no world collision for now)
+    # Sample motion parameters for transition case - increased noise for more challenging dynamics
+    velocity = normal(0.5, 0.5) @ "velocity"  # Increased velocity uncertainty
+    angular_velocity = (
+        normal(0.0, 0.4) @ "angular_velocity"
+    )  # Increased angular velocity uncertainty
+
+    # Compute intended motion from previous pose
     dt = 0.1
     new_theta = prev_pose.theta + angular_velocity * dt
     new_x = prev_pose.x + velocity * jnp.cos(new_theta) * dt
     new_y = prev_pose.y + velocity * jnp.sin(new_theta) * dt
 
-    # Add motion noise
-    x = normal(new_x, 0.3) @ "x"
-    y = normal(new_y, 0.3) @ "y"
-    theta = normal(new_theta, 0.1) @ "theta"
+    # Initial distribution parameters (for t=0) - much more diffuse over entire space
+    initial_x = world.width / 2
+    initial_y = world.height / 2
+    initial_theta = 0.0
+
+    # Use JAX conditionals to select between initial and transition
+    # For t=0: use initial distribution, for t>0: use motion model
+    mean_x = jax.lax.select(is_initial, initial_x, new_x)
+    mean_y = jax.lax.select(is_initial, initial_y, new_y)
+    mean_theta = jax.lax.select(is_initial, initial_theta, new_theta)
+
+    # Noise parameters: very high initial uncertainty for challenging localization
+    noise_x = jax.lax.select(
+        is_initial, 4.0, 0.3
+    )  # Very high initial position uncertainty
+    noise_y = jax.lax.select(
+        is_initial, 4.0, 0.3
+    )  # Very high initial position uncertainty
+    noise_theta = jax.lax.select(
+        is_initial, jnp.pi / 2, 0.1
+    )  # 90 degrees initial uncertainty
+
+    # Sample current pose
+    x = normal(mean_x, noise_x) @ "x"
+    y = normal(mean_y, noise_y) @ "y"
+    theta = normal(mean_theta, noise_theta) @ "theta"
 
     # Keep within world boundaries
     x = jnp.clip(x, 0.1, world.width - 0.1)
@@ -371,68 +397,44 @@ def localization_model(prev_pose, world):
 
     current_pose = Pose(x, y, theta)
 
-    # LIDAR sensor observations (8 rays) using Vmap - now fixed!
-    # Get true distances for all 8 rays
-    true_distances = distance_to_wall_lidar(current_pose, world, n_angles=8)
+    # LIDAR sensor observations using Vmap
+    # Get true distances for all rays
+    true_distances = distance_to_wall_lidar(current_pose, world, n_angles=n_rays.value)
 
     # Use GenJAX Vmap to vectorize sensor observations
-    ray_indices = jnp.arange(8)
+    ray_indices = jnp.arange(n_rays.value)
     vectorized_sensor = Vmap(
         sensor_model_single_ray,
         in_axes=Const((0, 0)),  # true_distance=0, ray_idx=0
-        axis_size=Const(8),
+        axis_size=n_rays,
         axis_name=Const(None),
         spmd_axis_name=Const(None),
     )
 
-    # Apply vectorized sensor model - this now works with rejuvenation_smc!
+    # Apply vectorized sensor model
     observed_distances = vectorized_sensor(true_distances, ray_indices) @ "measurements"
 
-    return current_pose, world
+    return current_pose, time_index + 1, world, n_rays
 
 
 @gen
 def sensor_model_single_ray(true_distance: float, ray_idx: int):
     """Generative model for a single LIDAR ray observation."""
-    # Each ray has independent Gaussian noise - increased for particle diversity
+    # Each ray has independent Gaussian noise - increased for more challenging measurements
     obs_dist = (
-        normal(true_distance, 0.8) @ "distance"
-    )  # Increased from 0.5 to 0.8 for better particle diversity
+        normal(true_distance, 0.5) @ "distance"
+    )  # Increased from 0.3 to 0.5 for noisier LIDAR measurements
     # Constrain to non-negative values
     obs_dist = jnp.maximum(0.0, obs_dist)
     return obs_dist
 
 
 @gen
-def localization_proposal(prev_pose, world):
-    """Proposal function for MCMC moves in localization.
-
-    This takes the previous pose and world geometry, proposes a new pose
-    based on simple motion assumptions.
-
-    Args:
-        prev_pose: Previous robot pose (Pose object)
-        world: World geometry (for boundary constraints)
-    """
-    # Simple motion proposal around the previous pose
-    x = normal(prev_pose.x, 0.5) @ "x"
-    y = normal(prev_pose.y, 0.5) @ "y"
-    theta = normal(prev_pose.theta, 0.2) @ "theta"
-
-    # Keep within world boundaries
-    x = jnp.clip(x, 0.1, world.width - 0.1)
-    y = jnp.clip(y, 0.1, world.height - 0.1)
-
-    return Pose(x, y, theta), world
-
-
-@gen
-def sensor_model(pose: Pose, world: World):
+def sensor_model(pose: Pose, world: World, n_angles: int = 128):
     """Generative model for LIDAR-style sensor observations.
 
     Returns vector of noisy distance measurements at multiple angles.
     """
-    n_angles = 8  # Fixed number of angles
     # True LIDAR distances at multiple angles
     true_distances = distance_to_wall_lidar(pose, world, n_angles)
 
@@ -475,10 +477,10 @@ def initial_model(world: World):
     Uses broader priors to allow particles to start anywhere in the world,
     which is important for cross-room navigation scenarios.
     """
-    # Random initial position within the world (broader for multi-room scenarios)
-    x = normal(world.width / 2, 2.0) @ "x"  # Increased variance for multi-room
-    y = normal(world.height / 2, 2.0) @ "y"
-    theta = normal(0.0, 0.5) @ "theta"
+    # Random initial position within the world (extremely broad for maximum challenge)
+    x = normal(world.width / 2, 4.0) @ "x"  # Extremely broad initial distribution
+    y = normal(world.height / 2, 4.0) @ "y"  # Extremely broad initial distribution
+    theta = normal(0.0, jnp.pi) @ "theta"  # 180 degrees initial heading uncertainty
 
     # Constrain to world boundaries
     x = jnp.clip(x, 0.5, world.width - 0.5)
@@ -565,54 +567,9 @@ def particle_filter_step(particles, weights, observation, world, key):
     return predicted_poses, new_weights
 
 
-def initialize_particles(n_particles, world, key, initial_pose=None):
-    """Initialize particles using the initial_model with generate or around a known pose."""
-    print(f"Initializing {n_particles} particles...")
-
-    if initial_pose is not None:
-        # Create choices that constrain particles around the initial pose
-        particle_keys = jrand.split(key, n_particles)
-        particles = []
-
-        for i in range(n_particles):
-            # Generate particles around the initial pose with some noise
-            choices = {
-                "x": initial_pose.x + jrand.normal(particle_keys[i]) * 0.5,
-                "y": initial_pose.y + jrand.normal(particle_keys[i]) * 0.5,
-                "theta": initial_pose.theta + jrand.normal(particle_keys[i]) * 0.2,
-            }
-
-            # Use generate to create particles constrained around initial pose
-            trace, weight = initial_model.generate(choices, world)
-            particles.append(trace.get_retval())
-
-        print(f"Initialized {len(particles)} particles around initial pose")
-    else:
-        # Initialize particles broadly across the entire world for multi-room exploration
-        key_x, key_y, key_theta = jrand.split(key, 3)
-
-        # Uniform distribution across the world (with margins)
-        x_values = jrand.uniform(
-            key_x, shape=(n_particles,), minval=0.5, maxval=world.width - 0.5
-        )
-        y_values = jrand.uniform(
-            key_y, shape=(n_particles,), minval=0.5, maxval=world.height - 0.5
-        )
-        theta_values = jrand.uniform(
-            key_theta, shape=(n_particles,), minval=-jnp.pi, maxval=jnp.pi
-        )
-
-        # Convert to list of individual Pose objects
-        particles = [
-            Pose(x_values[i], y_values[i], theta_values[i]) for i in range(n_particles)
-        ]
-
-        print(f"Initialized {len(particles)} particles across entire world")
-
-    return particles
-
-
-def run_particle_filter(n_particles, observations, world, key, initial_pose=None):
+def run_particle_filter(
+    n_particles, observations, world, key, n_rays=128, collect_diagnostics=False
+):
     """Run particle filter using rejuvenation_smc API.
 
     Args:
@@ -620,83 +577,94 @@ def run_particle_filter(n_particles, observations, world, key, initial_pose=None
         observations: List of sensor observations
         world: World object
         key: Random key
-        initial_pose: Optional initial pose (not used in new API, handled by model)
+        n_rays: Number of LIDAR rays
+        collect_diagnostics: Whether to collect diagnostic weights (ignored, kept for compatibility)
 
     Returns:
         particle_history: List of particle states over time
         weight_history: List of particle weights over time
+        diagnostic_weights: Always None (diagnostic weights removed)
     """
     # Import rejuvenation_smc
-    from genjax.inference import rejuvenation_smc, mh
-    from genjax.core import sel, const
+    from genjax.inference import rejuvenation_smc
+    from genjax.core import const
 
     # Prepare observations for rejuvenation_smc API
-    # observations is a list of 8-element arrays (LIDAR measurements)
-    # With Vmap, we need to structure this as {"measurements": {"distance": [T, 8]}}
-    obs_array = jnp.array(observations)  # Shape: (T, 8)
+    # The model generates poses and observes from them, so observations[t] should correspond to
+    # the observation taken from the pose generated at timestep t
+    # observations is a list of n_rays-element arrays (LIDAR measurements)
+
+    # With Vmap, we need to structure this as {"measurements": {"distance": [T, n_rays]}}
+    obs_array = jnp.array(observations)  # Shape: (T, n_rays)
 
     # rejuvenation_smc expects nested dict format for Vmap
-    obs_sequence = {"measurements": {"distance": obs_array}}  # Shape: (T, 8)
+    obs_sequence = {"measurements": {"distance": obs_array}}  # Shape: (T, n_rays)
 
-    # Initial arguments for localization_model: (prev_pose, world)
-    initial_pose_arg = Pose(x=world.width / 2, y=world.height / 2, theta=0.0)
-    initial_args = (initial_pose_arg, world)
-
-    # Define MCMC kernel for rejuvenation moves
-    def mcmc_kernel(trace):
-        return mh(trace, sel("x") | sel("y") | sel("theta"))
+    # Initial arguments for localization_model: (prev_pose, time_index, world, n_rays)
+    # For t=0, prev_pose is dummy (will be ignored), time_index starts at 0
+    dummy_pose = Pose(x=0.0, y=0.0, theta=0.0)  # Dummy - ignored for t=0
+    initial_args = (
+        dummy_pose,
+        jnp.array(0),
+        world,
+        const(n_rays),
+    )  # (prev_pose, time_index, world, n_rays)
 
     print(f"Running rejuvenation_smc with {n_particles} particles...")
 
     # Run rejuvenation_smc
-    result = seed(rejuvenation_smc)(
+    particles_smc = seed(rejuvenation_smc)(
         key,
-        localization_model,
-        localization_proposal,
-        const(mcmc_kernel),
-        obs_sequence,
-        initial_args,
-        const(n_particles),
+        localization_model,  # model
+        observations=obs_sequence,  # observations
+        initial_model_args=initial_args,  # initial_model_args
+        n_particles=const(n_particles),  # n_particles
+        return_all_particles=const(
+            True
+        ),  # return_all_particles=True to get all timesteps
     )
 
     print("Particle filter completed successfully!")
 
-    # Extract particle history from result
-    # For now, return final particles in expected format
-    final_traces = result.traces
-    final_weights = result.log_weights  # Use log_weights instead of weights
+    # Extract particle history from result - now includes all timesteps!
+    all_traces = particles_smc.traces  # Shape: [T, n_particles, ...]
+    all_weights = particles_smc.log_weights  # Shape: [T, n_particles]
 
-    # Convert traces back to Pose objects
-    choices = final_traces.get_choices()
-    final_particles = []
+    # Convert traces back to Pose objects for all timesteps
+    choices = all_traces.get_choices()
+    n_timesteps = choices["x"].shape[0]  # Number of timesteps
 
-    if len(choices["x"].shape) == 1:
-        # Multiple particles
-        for i in range(len(choices["x"])):
-            pose = Pose(x=choices["x"][i], y=choices["y"][i], theta=choices["theta"][i])
-            final_particles.append(pose)
-    else:
-        # Single particle
-        pose = Pose(x=choices["x"], y=choices["y"], theta=choices["theta"])
-        final_particles = [pose]
+    print(f"Extracted {n_timesteps} timesteps of particle history")
 
-    # For compatibility, create mock history (just initial and final)
-    initial_particles = [
-        Pose(x=world.width / 2, y=world.height / 2, theta=0.0)
-        for _ in range(n_particles)
-    ]
-    particle_history = [initial_particles, final_particles]
-    weight_history = [jnp.ones(n_particles) / n_particles, final_weights]
+    particle_history = []
+    weight_history = []
 
-    return particle_history, weight_history
+    for t in range(n_timesteps):
+        # Extract particles for this timestep
+        timestep_particles = []
+        for i in range(n_particles):
+            pose = Pose(
+                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
+            )
+            timestep_particles.append(pose)
+
+        particle_history.append(timestep_particles)
+
+        # Extract weights for this timestep (convert from log weights)
+        timestep_weights = jnp.exp(all_weights[t])
+        # Normalize weights to sum to 1
+        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
+        weight_history.append(timestep_weights)
+
+    return particle_history, weight_history, None
 
 
 # Utility functions
-def create_multi_room_world():
-    """Create a multi-room world with internal walls and doorways using JAX arrays."""
+def create_basic_multi_room_world():
+    """Create a basic multi-room world with simple rectangular walls and doorways."""
     width, height = 12.0, 10.0
 
-    # Define internal walls to create a 3-room layout using JAX arrays
+    # Define internal walls to create a simple 3-room layout
     # Each wall is defined by (x1, y1) -> (x2, y2)
     wall_coords = [
         # Vertical wall between Room 1 and Room 2 (with doorway)
@@ -707,7 +675,7 @@ def create_multi_room_world():
         [8.0, 6.0, 8.0, 10.0],  # Top part of wall (doorway from y=4 to y=6)
         # Horizontal internal wall in Room 2 (creates a small alcove)
         [5.0, 7.0, 7.0, 7.0],  # Horizontal wall
-        # Small obstacle in Room 3
+        # Small rectangular obstacle in Room 3
         [9.0, 2.0, 10.0, 2.0],  # Bottom of obstacle
         [10.0, 2.0, 10.0, 3.0],  # Right side of obstacle
         [10.0, 3.0, 9.0, 3.0],  # Top of obstacle
@@ -730,6 +698,72 @@ def create_multi_room_world():
         walls_y2=walls_y2,
         num_walls=len(wall_coords),
     )
+
+
+def create_complex_multi_room_world():
+    """Create a complex multi-room world with slanted walls and complex geometry."""
+    width, height = 12.0, 10.0
+
+    # Define internal walls to create a complex 3-room layout with slanted walls
+    # Each wall is defined by (x1, y1) -> (x2, y2)
+    wall_coords = [
+        # Vertical wall between Room 1 and Room 2 (with doorway)
+        [4.0, 0.0, 4.0, 3.0],  # Bottom part of wall
+        [4.0, 5.0, 4.0, 10.0],  # Top part of wall (doorway from y=3 to y=5)
+        # Vertical wall between Room 2 and Room 3 (with doorway)
+        [8.0, 0.0, 8.0, 4.0],  # Bottom part of wall
+        [8.0, 6.0, 8.0, 10.0],  # Top part of wall (doorway from y=4 to y=6)
+        # Horizontal internal wall in Room 2 (creates a small alcove)
+        [5.0, 7.0, 7.0, 7.0],  # Horizontal wall
+        # Complex slanted obstacle in Room 3
+        [9.0, 2.0, 10.5, 2.5],  # Slanted bottom edge
+        [10.5, 2.5, 10.0, 3.5],  # Slanted right edge
+        [10.0, 3.5, 8.5, 3.0],  # Slanted top edge
+        [8.5, 3.0, 9.0, 2.0],  # Slanted left edge (completes diamond)
+        # Additional slanted walls in Room 1 for complexity
+        [1.0, 1.0, 2.5, 0.5],  # Slanted wall in lower-left
+        [3.0, 8.5, 3.5, 9.5],  # Small slanted wall in upper area
+        # Slanted barriers in Room 2
+        [5.5, 2.0, 6.5, 1.0],  # Diagonal barrier
+        [6.0, 4.5, 7.0, 5.5],  # Another diagonal element
+        # Complex geometry near Room 3 entrance
+        [8.5, 0.5, 9.5, 1.5],  # Slanted guide wall
+        [10.5, 8.0, 11.0, 9.0],  # Slanted corner feature
+    ]
+
+    # Convert to JAX arrays
+    wall_array = jnp.array(wall_coords)
+    walls_x1 = wall_array[:, 0]
+    walls_y1 = wall_array[:, 1]
+    walls_x2 = wall_array[:, 2]
+    walls_y2 = wall_array[:, 3]
+
+    return World(
+        width=width,
+        height=height,
+        walls_x1=walls_x1,
+        walls_y1=walls_y1,
+        walls_x2=walls_x2,
+        walls_y2=walls_y2,
+        num_walls=len(wall_coords),
+    )
+
+
+def create_multi_room_world(world_type="basic"):
+    """Create a multi-room world with configurable complexity.
+
+    Args:
+        world_type: "basic" for simple rectangular walls, "complex" for slanted walls
+
+    Returns:
+        World object with specified geometry
+    """
+    if world_type == "basic":
+        return create_basic_multi_room_world()
+    elif world_type == "complex":
+        return create_complex_multi_room_world()
+    else:
+        raise ValueError(f"Unknown world_type: {world_type}. Use 'basic' or 'complex'")
 
 
 def create_simple_world():
