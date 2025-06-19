@@ -51,7 +51,7 @@ genjax/
 ### CRITICAL Guidelines
 
 1. **🔥 ALWAYS write test scripts first**
-   - NEVER use inline Python snippets
+   - NEVER use command line Python snippets
    - Create test scripts in a temporary directory: `test_feature.py`
    - Run with: `pixi run python test_feature.py`
    - Only add to test suite after validating locally

@@ -42,6 +42,7 @@ Final = btyping.Final
 Generator = btyping.Generator
 Generic = btyping.Generic
 TypeVar = btyping.TypeVar
+Annotated = btyping.Annotated
 
 A = TypeVar("A")
 R = TypeVar("R")
