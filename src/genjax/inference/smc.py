@@ -544,6 +544,8 @@ def rejuvenation_smc(
     observations: X,
     initial_model_args: tuple,
     n_particles: Const[int] = const(1000),
+    return_all_particles: Const[bool] = const(False),
+    n_rejuvenation_moves: Const[int] = const(1),
 ) -> ParticleCollection:
     """
     Complete SMC algorithm with rejuvenation using jax.lax.scan.
@@ -553,6 +555,20 @@ def rejuvenation_smc(
     the return value becomes the next timestep's arguments, creating
     sequential dependencies.
 
+    Note on Return Value:
+        This function returns only the FINAL ParticleCollection after processing
+        all observations. Intermediate timesteps are computed but not returned.
+        If you need all timesteps, you can modify the return statement to:
+
+        ```python
+        final_particles, all_particles = jax.lax.scan(smc_step, particles, remaining_obs)
+        return all_particles  # Returns vectorized ParticleCollection with time dimension
+        ```
+
+        The all_particles object would have an additional leading time dimension
+        in all its fields (traces, log_weights, etc.), allowing access to the
+        full particle trajectory across all timesteps.
+
     Args:
         model: Single generative function where return value feeds into next timestep
         transition_proposal: Proposal for extending particles at each timestep
@@ -560,9 +576,12 @@ def rejuvenation_smc(
         observations: Sequence of observations (can be Pytree structure)
         initial_model_args: Arguments for the first timestep
         n_particles: Number of particles to maintain
+        return_all_particles: If True, returns all particles across time (default: const(False))
+        n_rejuvenation_moves: Number of MCMC rejuvenation moves per timestep (default: const(1))
 
     Returns:
-        Final ParticleCollection after processing all observations
+        If return_all_particles=False: Final ParticleCollection (no time dimension)
+        If return_all_particles=True: ParticleCollection with leading time dimension (T, ...)
     """
     # Extract first observation using tree_map (handles Pytree structure)
     first_obs = jtu.tree_map(lambda x: x[0], observations)
@@ -594,8 +613,15 @@ def rejuvenation_smc(
             particles,
         )
 
-        # Optional rejuvenation
-        particles = rejuvenate(particles, mcmc_kernel.value)
+        # Multiple rejuvenation moves
+        def rejuvenation_step(particles, _):
+            """Single rejuvenation move."""
+            return rejuvenate(particles, mcmc_kernel.value), None
+
+        # Apply n_rejuvenation_moves steps
+        particles, _ = jax.lax.scan(
+            rejuvenation_step, particles, jnp.arange(n_rejuvenation_moves.value)
+        )
 
         return particles, particles  # (carry, output)
 
@@ -605,4 +631,14 @@ def rejuvenation_smc(
 
     final_particles, all_particles = jax.lax.scan(smc_step, particles, remaining_obs)
 
-    return final_particles
+    if return_all_particles.value:
+        # Prepend initial particles to create complete sequence
+        # all_particles has shape (T-1, ...) from scan over remaining_obs
+        # We need to add the initial particles to get shape (T, ...)
+        return jtu.tree_map(
+            lambda init, rest: jnp.concatenate([init[None, ...], rest], axis=0),
+            particles,
+            all_particles,
+        )
+    else:
+        return final_particles

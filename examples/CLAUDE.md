@@ -2,6 +2,25 @@
 
 This file provides guidance to Claude Code when working with case studies in the `examples/` directory.
 
+## HIGH PRIORITY: Usage Pattern Reference
+
+**When working on new case studies or examples:**
+
+1. **FIRST**: Check existing tests in `tests/` for usage patterns
+   - `tests/test_*.py` files show correct API usage
+   - Tests demonstrate edge cases and proper error handling
+   - Tests provide minimal working examples
+
+2. **SECOND**: Review existing examples in `examples/` for implementation patterns
+   - Look for similar models or inference approaches
+   - Study how data generation is handled
+   - Observe visualization standards
+
+3. **THIRD**: Refer to source code only for detailed understanding
+   - After understanding usage from tests/examples
+   - When needing to understand internal implementation
+   - For performance optimization details
+
 ## Overview
 
 The `examples/` directory contains case studies that demonstrate GenJAX capabilities across different domains. Each case study follows a standardized structure to ensure consistency, maintainability, and ease of development.

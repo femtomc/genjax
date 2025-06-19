@@ -108,14 +108,18 @@ result = variational_inference(
 - **Computational cost**: Higher than REINFORCE
 - **Requirements**: Multiple samples for variance reduction
 
+## Implementation Details
+
+**Core Function**: `adev(**estimator_mapping)`
+**Location**: `__init__.py`
+**Design**: Builds on JAX's AD with specialized probabilistic handling
+
+**Key Features**:
+- Automatic estimator selection based on distribution type
+- Seamless integration with GenJAX's GFI
+- JAX compilation compatible
+- Preserves differentiability through expectation
+
 ## References
 
-### Theoretical Background
-
-- **Reparameterization Trick**: Kingma & Welling (2014), "Auto-Encoding Variational Bayes"
-- **REINFORCE**: Williams (1992), "Simple Statistical Gradient-Following Algorithms"
-- **Variance Reduction**: Mnih & Gregor (2014), "Neural Variational Inference"
-
-### Implementation Notes
-
-ADEV builds on JAX's automatic differentiation capabilities while providing specialized handling for probabilistic programs which denotes expectations. The estimators are designed to work seamlessly with GenJAX's generative function interface and JAX's compilation system.
+See `REFERENCES.md` in this directory for academic papers and theoretical background.

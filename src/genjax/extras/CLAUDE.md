@@ -42,94 +42,52 @@ Provides exact inference algorithms for discrete and continuous state space mode
 
 #### Core Testing Functions
 
-```python
-from genjax.extras.state_space import (
-    # Inference testing API - use these for testing
-    discrete_hmm_test_dataset,
-    discrete_hmm_exact_log_marginal,
-    discrete_hmm_inference_problem,
-    linear_gaussian_test_dataset,
-    linear_gaussian_exact_log_marginal,
-    linear_gaussian_inference_problem,
-)
-```
+**Location**: `state_space.py`
+**Purpose**: Generate test datasets and compute exact baselines
+
+**Discrete HMM Functions**:
+- `discrete_hmm_test_dataset()`: Generate synthetic data
+- `discrete_hmm_exact_log_marginal()`: Compute exact log p(y)
+- `discrete_hmm_inference_problem()`: One-call dataset + baseline
+
+**Linear Gaussian Functions**:
+- `linear_gaussian_test_dataset()`: Generate synthetic data
+- `linear_gaussian_exact_log_marginal()`: Compute exact log p(y)
+- `linear_gaussian_inference_problem()`: One-call dataset + baseline
 
 #### Standardized Dataset Format
 
-**All testing functions return datasets in this format**:
-```python
-dataset = {
-    "z": latent_states,    # True latent sequence for validation
-    "obs": observations    # Observed sequence for inference
-}
-```
+**All functions return**:
+- `"z"`: True latent states (for validation)
+- `"obs"`: Observations (for inference)
 
 #### Testing Patterns
 
-**Pattern 1: Generate dataset and evaluate separately**:
-```python
-# Generate test dataset
-dataset = discrete_hmm_test_dataset(initial_probs, transition_matrix, emission_matrix, T)
+**Pattern 1: Generate dataset and evaluate separately**
+- Call `*_test_dataset()` to generate data
+- Call `*_exact_log_marginal()` for baseline
+- Compare with approximate inference results
 
-# Compute exact log marginal likelihood
-exact_log_marginal = discrete_hmm_exact_log_marginal(
-    dataset["obs"], initial_probs, transition_matrix, emission_matrix
-)
-```
+**Pattern 2: One-call inference problem (RECOMMENDED)**
+- Call `*_inference_problem()` for dataset + baseline
+- Returns tuple: `(dataset, exact_log_marginal)`
+- More convenient for testing workflows
 
-**Pattern 2: One-call inference problem generation (RECOMMENDED)**:
-```python
-# Generate complete inference problem in one call
-dataset, exact_log_marginal = discrete_hmm_inference_problem(
-    initial_probs, transition_matrix, emission_matrix, T
-)
+### Example Use Cases
 
-# Now test your approximate algorithm
-approximate_log_marginal = your_inference_algorithm(dataset["obs"], ...)
-error = jnp.abs(approximate_log_marginal - exact_log_marginal)
-```
+#### Testing SMC vs Exact HMM Inference
+1. Use `discrete_hmm_inference_problem()` to generate test case
+2. Apply `seed()` transformation before calling with key
+3. Run SMC with `init()` using observations as constraints
+4. Compare `log_marginal_likelihood()` with exact baseline
+5. See test files for complete examples
 
-### Example: Testing SMC vs Exact HMM Inference
-
-```python
-from genjax.pjax import seed
-from genjax.smc import init
-from genjax.extras.state_space import discrete_hmm_inference_problem
-
-# Generate inference problem
-seeded_problem = seed(lambda: discrete_hmm_inference_problem(
-    initial_probs, transition_matrix, emission_matrix, T=20
-))
-dataset, exact_log_marginal = seeded_problem(key)
-
-# Test SMC approximation
-constraints = {"obs": dataset["obs"]}
-smc_result = init(discrete_hmm, model_args, n_particles=1000, constraints=constraints)
-smc_log_marginal = smc_result.log_marginal_likelihood()
-
-# Validate accuracy
-error = jnp.abs(smc_log_marginal - exact_log_marginal)
-assert error < tolerance, f"SMC error {error} exceeds tolerance {tolerance}"
-```
-
-### Example: Testing MCMC vs Exact Kalman Filtering
-
-```python
-from genjax.mcmc import mh, chain
-from genjax.extras.state_space import linear_gaussian_inference_problem
-
-# Generate inference problem
-seeded_problem = seed(lambda: linear_gaussian_inference_problem(
-    initial_mean, initial_cov, A, Q, C, R, T=15
-))
-dataset, exact_log_marginal = seeded_problem(key)
-
-# Test MCMC approximation (would need appropriate constraints setup)
-# ... MCMC inference code ...
-
-# Compare results
-# ... validation code ...
-```
+#### Testing MCMC vs Exact Kalman Filtering
+1. Use `linear_gaussian_inference_problem()` for test case
+2. Run MCMC chain on linear Gaussian model
+3. Compare posterior samples with exact Kalman smoother
+4. Validate log marginal likelihood estimates
+5. See test files for implementation patterns
 
 ### Critical Guidelines for Testing
 
@@ -161,14 +119,22 @@ dataset, exact_log_marginal = seeded_problem(key)
 #### Exact Inference Algorithms
 
 **Discrete HMM**:
-- Forward filtering: `forward_filter()` - computes p(x_t | y_{1:t}) in log space
-- Backward sampling: `backward_sample()` - samples states given forward messages
-- Log marginal: Sum over forward filter final messages
+- **Forward Filter**: `forward_filter()` in `state_space.py`
+  - Computes p(x_t | y_{1:t}) in log space
+  - Returns log messages for each timestep
+- **Backward Sampling**: `backward_sample()` in `state_space.py`
+  - Samples states given forward messages
+  - Used for FFBS algorithm
+- **Log Marginal**: Sum of final forward messages
 
 **Linear Gaussian**:
-- Kalman filtering: `kalman_filter()` - computes p(x_t | y_{1:t}) with Gaussian messages
-- Kalman smoothing: `kalman_smoother()` - computes p(x_t | y_{1:T}) using RTS smoother
-- Log marginal: Sum of innovation log-likelihoods
+- **Kalman Filter**: `kalman_filter()` in `state_space.py`
+  - Computes p(x_t | y_{1:t}) as Gaussian
+  - Returns means, covariances, log likelihoods
+- **Kalman Smoother**: `kalman_smoother()` in `state_space.py`
+  - Computes p(x_t | y_{1:T}) via RTS algorithm
+  - Returns smoothed means and covariances
+- **Log Marginal**: Sum of innovation log-likelihoods
 
 #### JAX Integration
 
@@ -183,17 +149,12 @@ dataset, exact_log_marginal = seeded_problem(key)
 
 ### Error Handling
 
-Common issues and solutions:
+#### Common Issues
 
 **LoweringSamplePrimitiveToMLIRException**:
-```python
-# ❌ Wrong
-dataset = discrete_hmm_test_dataset(...)
-
-# ✅ Correct
-seeded_fn = seed(lambda: discrete_hmm_test_dataset(...))
-dataset = seeded_fn(key)
-```
+- **Cause**: Calling PJAX functions without `seed()` transformation
+- **Solution**: Wrap function calls with `seed()` before using JAX key
+- **Pattern**: `seeded_fn = seed(lambda: fn(...)); result = seeded_fn(key)`
 
 **Shape Mismatches**:
 - Ensure covariance matrices are positive definite
@@ -224,8 +185,14 @@ dataset = seeded_fn(key)
 
 ### References
 
-See the comprehensive reference list in `state_space.py` for theoretical background on:
-- Hidden Markov Models (Rabiner, Bishop, Murphy)
-- Kalman Filtering (Kalman, Sarkka, Murphy)
-- Forward Filtering Backward Sampling (Carter & Kohn, Frühwirth-Schnatter)
-- Rauch-Tung-Striebel Smoothing (Rauch et al., Anderson & Moore)
+**Location**: See docstring in `state_space.py` for comprehensive reference list
+
+**Topics Covered**:
+- Hidden Markov Models theory and algorithms
+- Kalman filtering and smoothing
+- Forward filtering backward sampling (FFBS)
+- Rauch-Tung-Striebel (RTS) smoothing
+
+**Related Files**:
+- Test implementations: `tests/test_extras.py`
+- Example usage: Various test files using exact baselines

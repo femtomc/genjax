@@ -27,26 +27,36 @@ This guide covers the core GenJAX concepts implemented in:
 
 **Core GFI Methods** (all densities in log space):
 
-```python
-# Forward sampling
-trace = model.simulate(*args)                   # Sample (choices, retval) ~ P(·; args)
-# trace.get_score() = log(1/P(choices; args))   # Negative log probability
+#### simulate
+**Method**: `simulate(*args) -> Trace`
+**Location**: `core.py:GFI.simulate`
+**Purpose**: Forward sampling from the generative function
+- Samples `(choices, retval) ~ P(·; args)`
+- Returns trace with `score = log(1/P(choices; args))`
 
-# Density evaluation
-log_density, retval = model.assess(choices, *args)  # Compute log P(choices; args)
+#### assess
+**Method**: `assess(choices, *args) -> (float, R)`
+**Location**: `core.py:GFI.assess`
+**Purpose**: Evaluate density at given choices
+- Returns `(log P(choices; args), retval)`
 
-# Constrained generation (importance sampling)
-trace, weight = model.generate(constraints, *args)
-# weight = log[P(all_choices; args) / Q(unconstrained; constrained, args)]
+#### generate
+**Method**: `generate(constraints, *args) -> (Trace, float)`
+**Location**: `core.py:GFI.generate`
+**Purpose**: Constrained generation via importance sampling
+- Returns trace and weight: `log[P(all_choices) / Q(unconstrained | constrained)]`
 
-# Edit moves (MCMC, SMC)
-new_trace, weight, discarded = model.update(trace, constraints, *new_args)
-# weight = log[P(new_choices; new_args)/Q(new; old, constraints)] - log[P(old_choices; old_args)/Q(old)]
+#### update
+**Method**: `update(trace, constraints, *new_args) -> (Trace, float, X)`
+**Location**: `core.py:GFI.update`
+**Purpose**: Edit move for MCMC/SMC
+- Returns new trace, incremental weight, discarded choices
 
-# Selective regeneration (edit move)
-new_trace, weight, discarded = model.regenerate(trace, selection, *args, **kwargs)
-# weight = log P(new_selected | non_selected; args) - log P(old_selected | non_selected; args)
-```
+#### regenerate
+**Method**: `regenerate(trace, selection, *args, **kwargs) -> (Trace, float, X)`
+**Location**: `core.py:GFI.regenerate`
+**Purpose**: Selective regeneration of addresses
+- Weight: `log P(new_selected | non_selected) - log P(old_selected | non_selected)`
 
 **Mathematical Properties**:
 
@@ -57,131 +67,108 @@ new_trace, weight, discarded = model.regenerate(trace, selection, *args, **kwarg
 
 **Trace Interface**:
 
-```python
-trace.get_retval()     # Return value: R
-trace.get_choices()    # Random choices: X
-trace.get_score()      # Negative log probability: log(1/P(choices))
-trace.get_args()       # Function arguments: tuple
-trace.get_gen_fn()     # Source generative function: GFI[X, R]
-```
+**Type**: `Trace[X, R]`
+**Location**: `core.py:185-220`
+**Methods**:
+- `get_retval() -> R`: Return value
+- `get_choices() -> X`: Random choices
+- `get_score() -> float`: Negative log probability
+- `get_args() -> tuple`: Function arguments
+- `get_gen_fn() -> GFI[X, R]`: Source generative function
 
 ### Selection Interface
 
-**Selections** specify which addresses to target for regeneration and choice filter operations:
+**Selections** specify which addresses to target for regeneration and choice filter operations.
 
-```python
-from genjax import sel
+**Function**: `sel(addr: str = None) -> Selection`
+**Location**: `core.py:sel function`
+**Purpose**: Create selection objects for targeting specific addresses
 
-# Basic selections
-sel("x")                    # Select address "x"
-sel()                       # Select nothing (empty selection)
-Selection(AllSel())         # Select everything
-
-# Combinators
-sel("x") | sel("y")         # OR: select "x" or "y"
-sel("x") & sel("y")         # AND: select "x" and "y" (intersection)
-~sel("x")                   # NOT: select everything except "x" (complement)
-
-# Usage in regenerate
-selection = sel("mu") | sel("sigma")  # Select parameters to resample
-new_trace, weight, discarded = model.regenerate(trace, selection, *args, **kwargs)
-```
+**Selection Combinators**:
+- `sel("x")`: Select address "x"
+- `sel()`: Empty selection (selects nothing)
+- `Selection(AllSel())`: Select everything
+- `sel("x") | sel("y")`: OR combinator
+- `sel("x") & sel("y")`: AND combinator (intersection)
+- `~sel("x")`: NOT combinator (complement)
 
 **Selection Semantics**:
-
 - `match(addr) -> (bool, subselection)` determines if address is selected
 - Supports hierarchical addressing for nested generative functions
+- Used in `regenerate` and other GFI methods for selective operations
 
 ## Generative Function Types
 
 ### Distributions
 
-Built-in distributions implement the GFI and wrap TensorFlow Probability distributions:
+**Location**: `distributions.py`
+**Purpose**: Built-in probability distributions implementing the GFI
 
-```python
-from genjax import normal, beta, exponential, categorical, flip
+**Available Distributions**:
+- `normal`, `beta`, `exponential`, `gamma`, `poisson`
+- `categorical`, `flip`, `uniform`, `dirichlet`
+- `multivariate_normal`, `bernoulli`
 
-# Usage: parameters as args, not constructor arguments
-x = normal.sample(mu, sigma)        # ✅ CORRECT
-exponential.sample(rate)            # ✅ CORRECT
-logp = normal.logpdf(x, mu, sigma)  # ✅ CORRECT
+**API Pattern**:
+- Parameters passed as arguments, not constructor: `normal(mu, sigma)`
+- All distributions have: `sample()`, `logpdf()`, and full GFI methods
+- Wrap TensorFlow Probability distributions internally
 
-# Usage: GFI methods, same idea.
-normal.simulate(mu, sigma) # ✅ CORRECT
-```
+### `@gen` Functions
 
-### `@gen` Functions (`Fn` type)
+**Decorator**: `@gen`
+**Location**: `core.py:Fn class`
+**Purpose**: Transform Python functions into generative functions
 
-Transform JAX-compatible Python functions into generative functions:
+**Key Features**:
+- Use `@` operator for addressing random choices
+- Supports hierarchical composition
+- Full GFI implementation
+- JAX-compatible (with restrictions)
 
-```python
-@gen
-def beta_ber():
-    f = beta(10.0, 10.0) @ "fairness"  # @ operator for addressing
-    return flip(f) @ "obs"
-
-# Creates hierarchical addressing through composition
-@gen
-def nested_model():
-    result = beta_ber() @ "sub"
-    # choices["sub"]["fairness"]
-    # OR choices["sub"]["obs"]
-```
+**Addressing Pattern**:
+- Single level: `normal(0, 1) @ "x"`
+- Hierarchical: `sub_model() @ "sub"` creates nested addresses
 
 ### Combinators
 
-Higher-order generative functions that compose / call out to other generative functions:
+Higher-order generative functions for composition:
 
-**Scan** - Sequential iteration (like `jax.lax.scan`):
+#### Scan
+**Class**: `Scan(gf, length)`
+**Location**: `core.py:Scan`
+**Purpose**: Sequential iteration like `jax.lax.scan`
+- `length` must be static (use `Const[int]`)
+- Addresses indexed automatically: `x_0`, `x_1`, ...
+- Returns `(final_carry, stacked_outputs)`
 
-```python
-@gen
-def step_fn(carry, _):
-    x = normal(carry, 1.0) @ "x"  # ✅ Static addressing only
-    return x, x
+#### Vmap
+**Method**: `gf.vmap(in_axes)`
+**Location**: `core.py:GFI.vmap`
+**Purpose**: Vectorization over generative functions
+- Works like `jax.vmap` but for probabilistic programs
+- `repeat(n)` method for independent sampling
 
-scan_gf = Scan(step_fn, length=10)
-result = scan_gf(init_carry, None) @ "scan"
-```
-
-**Vmap** - Vectorization (like `jax.vmap` for generative functions):
-
-```python
-# Vectorize over parameters
-vectorized_normal = normal.vmap(in_axes=(0, None))
-traces = vectorized_normal.simulate(mus_array, sigma_scalar)
-
-# Independent sampling
-batch_sampler = single_sample.repeat(n=10)  # axis_size=10
-```
-
-**Cond** - Conditional branching:
-
-```python
-@gen
-def branch_a(): return exponential(1.0) @ "value"
-@gen
-def branch_b(): return exponential(2.0) @ "value"
-
-cond_gf = Cond(branch_a, branch_b)
-result = cond_gf(condition) @ "conditional"
-```
+#### Cond
+**Class**: `Cond(true_gf, false_gf)`
+**Location**: `core.py:Cond`
+**Purpose**: Conditional execution
+- First argument to resulting GF must be boolean condition
+- Both branches must have same return type
 
 ## Critical API Patterns
 
-**Generative Function Usage**:
+### Generative Function Usage
 
-```python
-# ✅ CORRECT patterns
-x = normal(mu, sigma) @ "x"                           # Positional args in @gen functions
-x = normal(mu=mu, sigma=sigma) @ "x"                  # Keyword args in @gen functions
-log_density, retval = normal.assess(sample, mu, sigma)        # GFI calls with positional args
-log_density, retval = normal.assess(sample, mu=mu, sigma=sigma)  # GFI calls with keyword args
+**Correct Patterns**:
+- In `@gen` functions: `x = normal(mu, sigma) @ "x"`
+- GFI method calls: `normal.assess(sample, mu, sigma)`
+- Both positional and keyword args supported
 
-# ❌ WRONG patterns
-x = normal(mu, sigma)                                 # Not traced (missing @ "address")
-normal.assess((mu, sigma), sample)                   # Wrong arg structure (old format)
-```
+**Common Mistakes**:
+- Missing `@` operator: Random choices not traced
+- Wrong argument order in `assess`: choices come first
+- Old tuple-based API no longer supported
 
 ## JAX Integration & Constraints
 
@@ -189,263 +176,129 @@ normal.assess((mu, sigma), sample)                   # Wrong arg structure (old 
 
 **NEVER use Python control flow in `@gen` functions**:
 
-```python
-# ❌ WRONG - These break JAX compilation
-@gen
-def bad_model():
-    if condition:        # Python if
-        x = normal(0, 1) @ "x"
-    for i in range(n):   # Python for loop
-        y = normal(0, 1) @ f"y_{i}"  # Dynamic addressing
+**Forbidden Patterns**:
+- Python `if`/`else` statements
+- Python `for`/`while` loops
+- Dynamic string formatting for addresses
+- Any Python construct that creates dynamic control flow
 
-# ✅ CORRECT - Use JAX-compatible patterns
-@gen
-def good_model():
-    # Use Cond combinator for conditionals
-    cond_gf = Cond(branch_a, branch_b)
-    x = cond_gf((condition,)) @ "x"
-
-    # Use Scan combinator for iteration
-    scan_gf = Scan(step_fn, length=n)
-    results = scan_gf(init, None) @ "scan"
-```
+**Required Patterns**:
+- Use `Cond` combinator for conditionals
+- Use `Scan` combinator for iteration
+- Use static addressing only
+- See combinators section for proper usage
 
 ### PJAX: Probabilistic JAX
 
-PJAX extends JAX with probabilistic primitives (`sample_p`, `log_density_p`).
+**Location**: `pjax.py`
+**Purpose**: Extends JAX with probabilistic primitives
+
+**Core Primitives**:
+- `sample_p`: Probabilistic sampling primitive
+- `log_density_p`: Density evaluation primitive
 
 **Key Transformations**:
 
-- **`seed`**: Eliminates PJAX primitives → enables standard JAX transformations → requires explicit keys. CRITICAL: `seed` should only be used external to `src`, NEVER IN `src`.
-- **`modular_vmap`**: Preserves PJAX primitives → specialized vectorization → automatic key management
+#### seed
+**Function**: `seed(fn) -> seeded_fn`
+**Location**: `pjax.py:seed`
+- Eliminates PJAX primitives for JAX compatibility
+- Requires explicit PRNG keys
+- **CRITICAL**: Only use external to `src/`, never inside library code
 
-```python
-# Use seed for JAX transformations
-seeded_model = seed(model.simulate)
-result = seeded_model(key, args)
-jit_model = jax.jit(seeded_model)
-
-# Use modular_vmap for probabilistic vectorization
-vmap_model = modular_vmap(model.simulate, in_axes=(0,))
-```
+#### modular_vmap
+**Function**: `modular_vmap(fn, in_axes, axis_size) -> vmapped_fn`
+**Location**: `pjax.py:modular_vmap`
+- Preserves PJAX primitives during vectorization
+- Automatic PRNG key management
+- Use for probabilistic operations inside library
 
 ### State Interpreter: Tagged Value Inspection & Organization
 
-The state interpreter allows you to inspect and organize intermediate values within JAX computations using a powerful API for hierarchical state collection.
+**Location**: `state.py`
+**Purpose**: Inspect and organize intermediate values in JAX computations
 
 #### Core API
 
-```python
-from genjax.state import state, save, namespace
+**Decorator**: `@state`
+**Location**: `state.py:state`
+- Transforms function to return `(result, state_dict)` tuple
+- Collects all `save()` calls during execution
 
-# Basic pattern: @state decorator + save() function (named mode)
-@state
-def computation(x):
-    y = x + 1
-    z = x * 2
-    # Save intermediate values for inspection
-    save(intermediate=y, doubled=z)
-    return y + z
+**Function**: `save(*args, **kwargs)`
+**Location**: `state.py:save`
+- Named mode: `save(key=value)` stores with explicit keys
+- Leaf mode: `save(value)` stores directly at namespace
 
-result, state_dict = computation(5)
-# result = 16, state_dict = {"intermediate": 6, "doubled": 10}
-```
-
-#### Leaf Mode for Direct Storage
-
-The `save()` function supports two modes:
-
-**Named Mode** (`save(**kwargs)`): Save values with explicit names (original behavior):
-```python
-save(first=value1, second=value2)  # → {"first": value1, "second": value2}
-```
-
-**Leaf Mode** (`save(*args)`): Save values directly at current namespace leaf:
-```python
-# Single value
-namespace(lambda: save(42), "coords")()  # → {"coords": 42}
-
-# Multiple values (stored as tuple)
-namespace(lambda: save(1, 2, 3), "coords")()  # → {"coords": (1, 2, 3)}
-```
+**Function**: `namespace(fn, name)`
+**Location**: `state.py:namespace`
+- Creates hierarchical state organization
+- Returns wrapped function that executes in namespace
 
 #### Namespace Organization
 
-**Hierarchical State Collection**: Use `namespace(fn, ns)` to organize state into nested structures:
+**Hierarchical State Collection**:
+- Use `namespace(fn, name)` to create nested state structures
+- Supports arbitrary nesting depth
+- Combines with both named and leaf save modes
 
-```python
-@state
-def complex_computation(x):
-    # Root level state (named mode)
-    save(input=x, stage="preprocessing")
-
-    # Named mode in namespace
-    processing_fn = namespace(
-        lambda y: save(step1=y*2, step2=y+10),
-        "processing"
-    )
-    processing_fn(x)
-
-    # Leaf mode in namespace - store values directly
-    coords_fn = namespace(
-        lambda z: save(z, z*2, z*3),  # Leaf mode: saves tuple at "coords"
-        "coords"
-    )
-    coords_fn(x)
-
-    # Nested namespaces with mixed modes
-    stats_fn = namespace(
-        namespace(lambda z: save(mean=z, variance=z**2), "statistics"),  # Named mode
-        "analysis"
-    )
-    stats_fn(x)
-
-    return x * 3
-
-result, state_dict = complex_computation(5)
-# state_dict = {
-#     "input": 5,
-#     "stage": "preprocessing",
-#     "processing": {"step1": 10, "step2": 15},  # Named mode
-#     "coords": (5, 10, 15),                     # Leaf mode: tuple directly
-#     "analysis": {"statistics": {"mean": 5, "variance": 25}}  # Named mode
-# }
-```
-
-**Namespace Composition**: Namespaces can be nested to arbitrary depth:
-
-```python
-# Create deeply nested organization
-deep_analysis = namespace(
-    namespace(
-        namespace(lambda data: save(metric=data), "metrics"),
-        "detailed"
-    ),
-    "analysis"
-)
-# Results in: {"analysis": {"detailed": {"metrics": {...}}}}
-```
+**Common Patterns**:
+- Root level: Direct `save()` calls
+- Single namespace: `namespace(fn, "section")`
+- Nested: `namespace(namespace(fn, "inner"), "outer")`
+- See `state.py` for implementation details
 
 #### MCMC Integration
 
-**Acceptance Tracking**: Used internally for MCMC diagnostics:
+**Purpose**: Track acceptance and diagnostics in MCMC algorithms
+**Usage**: See `mcmc.py` for actual implementation
 
-```python
-@state
-def mcmc_step(trace):
-    new_trace = some_mcmc_move(trace)
-    accept = compute_acceptance(new_trace, trace)
-    save(accept=accept)  # Save acceptance for diagnostics
-    return new_trace
-
-new_trace, diagnostics = mcmc_step(trace)
-# diagnostics = {"accept": True/False}
-
-# Organized MCMC diagnostics
-@state
-def organized_mcmc_step(trace):
-    # Proposals under "proposal" namespace
-    proposal_fn = namespace(
-        lambda: save(type="mh", step_size=0.1),
-        "proposal"
-    )
-    proposal_fn()
-
-    # Acceptance under "diagnostics" namespace
-    diag_fn = namespace(
-        lambda: save(accepted=True, log_ratio=-0.5),
-        "diagnostics"
-    )
-    diag_fn()
-
-    return new_trace
-# Result: {"proposal": {"type": "mh", "step_size": 0.1},
-#          "diagnostics": {"accepted": True, "log_ratio": -0.5}}
-```
+**Common Pattern**:
+- Wrap MCMC kernel with `@state`
+- Save acceptance decisions with `save(accept=...)`
+- Use namespaces for organized diagnostics
+- Enables acceptance rate computation
 
 #### JAX Compatibility
 
-**Full JAX Integration**: Works with all JAX transformations using JAX primitives:
+**Full JAX Integration**:
+- Compatible with all JAX transformations: `jit`, `vmap`, `grad`, `scan`
+- Uses JAX primitives for proper transformation behavior
+- Namespace stack managed safely across transformations
+- Zero overhead when `@state` decorator not used
 
-```python
-# Works with jit
-jitted_computation = jax.jit(computation)
-result, state_dict = jitted_computation(5)
+**Implementation Details**: See `state.py` for primitive definitions
 
-# Works with vmap
-vmapped_computation = jax.vmap(computation)
-results, state_dicts = vmapped_computation(jnp.array([1, 2, 3]))
+#### Key Features Summary
 
-# Works with grad (on the result, not the state)
-grad_fn = jax.grad(lambda x: computation(x)[0])  # Differentiate result
-gradient = grad_fn(5.0)
-```
-
-**Implementation Details**:
-- Uses `initial_style_bind` for proper JAX primitive handling
-- Namespace stack managed via JAX primitives (`namespace_push_p`, `namespace_pop_p`)
-- Error-safe: namespace stack cleaned up even when functions raise exceptions
-- Compatible with scan, vmap, and other JAX combinators
-
-#### Key Features
-
-- **Two Storage Modes**: Named mode (`save(**kwargs)`) and leaf mode (`save(*args)`)
-- **Hierarchical Organization**: `namespace(fn, ns)` for structured state collection
-- **Composable Namespaces**: Unlimited nesting depth through function composition
-- **JAX Transformation Safety**: Full compatibility with `jit`, `vmap`, `grad`, `scan`
-- **Error Handling**: Automatic namespace stack cleanup on exceptions
-- **MCMC Integration**: Used internally for acceptance tracking and diagnostics
-- **Mixed State**: Combine root-level and namespaced state in same computation
-- **Leaf Mode Benefits**: Store values directly at namespace paths without additional keys
-- **Performance**: Zero overhead when not using `@state` decorator
-
-**When to Use Each Mode**:
-- **Named Mode**: When you want explicit keys for multiple values in same namespace
-- **Leaf Mode**: When you want to store coordinates, vectors, or single values directly at namespace path
+- **Two Storage Modes**: Named (`save(**kwargs)`) and leaf (`save(*args)`)
+- **Hierarchical Organization**: Via `namespace(fn, name)`
+- **JAX Compatible**: Works with all transformations
+- **MCMC Integration**: Tracks acceptance diagnostics
+- **Error Safe**: Automatic cleanup on exceptions
 
 ### The `Const[...]` Pattern
 
-JAX transformations make all arguments dynamic, but some GenJAX operations need static values:
+**Type**: `Const[T]`
+**Function**: `const(value) -> Const[T]`
+**Location**: `core.py:Const`
+**Purpose**: Preserve static values across JAX transformations
 
-```python
-# ❌ PROBLEMATIC - length becomes a tracer
-def bad_scan_model(length, init_carry, xs):
-    scan_gf = Scan(step_fn, length=length)  # length must be static!
-    return scan_gf(init_carry, xs)
+**When to Use**:
+- Scan lengths: `Scan(gf, length=const_value)`
+- Configuration dictionaries
+- Any value that must remain static during JAX transformations
+- Type annotations: `param: Const[int]`
 
-# ✅ CORRECT - Use Const[...] for static values
-from genjax import Const, const
+**API Pattern**:
+- Wrap values: `const(10)`
+- Access values: `const_param.value`
+- Type safe with proper annotations
 
-@gen
-def scan_model(length: Const[int], init_carry, xs):
-    scan_gf = Scan(step_fn, length=length.value)  # length.value is static
-    return scan_gf(init_carry, xs) @ "scan"
-
-# Usage with static values
-args = (const(10), init_carry, xs)  # Wrap static value with const()
-trace = seed(scan_model.simulate)(key, *args)
-
-# Works with any static configuration
-@gen
-def configurable_model(config: Const[dict], data):
-    if config.value["use_hierarchical"]:
-        prior = normal(config.value["prior_mean"], config.value["prior_std"]) @ "prior"
-    else:
-        prior = exponential(config.value["rate"]) @ "prior"
-    return normal(prior, 1.0) @ "obs"
-
-# Pass static configuration
-config = const({"use_hierarchical": True, "prior_mean": 0.0, "prior_std": 1.0})
-trace = configurable_model.simulate(config, data)
-```
-
-**Const[...] Pattern Benefits**:
-
-- Preserves static values across JAX transformations like `seed(fn)(...)`
-- Enables type-safe static parameters with proper type hints
-- Works seamlessly with scan lengths, model configurations, conditionals
-- Cleaner and more explicit than closure-based alternatives
-- Integrates naturally with GenJAX's type system
+**Benefits**:
+- Prevents JAX tracer errors
+- Enables static configuration
+- Cleaner than closure workarounds
 
 ### Pytree Usage
 
@@ -459,95 +312,47 @@ trace = configurable_model.simulate(config, data)
 
 ### Address Collision Detection
 
-**GenJAX detects duplicate addresses** at the same level in `@gen` functions:
+**Feature**: Automatic duplicate address detection
+**Location**: Implemented in `core.py:Fn` class
+**Purpose**: Prevent accidentally reusing addresses at same level
 
-```python
-# ❌ ERROR - Address collision detected
-@gen
-def problematic_model():
-    x = normal(0.0, 1.0) @ "duplicate"  # First use
-    y = normal(2.0, 3.0) @ "duplicate"  # ❌ Same address!
-    return x + y
+**Detection Scope**:
+- Runs in all GFI methods
+- Checks addresses at same hierarchical level
+- Provides file location and line numbers in errors
 
-# Error message includes location information:
-# ValueError: Address collision detected: 'duplicate' is used multiple times at the same level.
-# Each address in a generative function must be unique.
-# Function: function 'problematic_model' at /path/to/file.py:42
-# Location: file.py:44
-```
+**Error Pattern**:
+- Using same address twice at same level triggers error
+- Error message includes function name and exact location
 
-**Address collision detection runs in all GFI methods**:
-
-- `simulate()`, `assess()`, `generate()`, `update()`, `regenerate()`
-- Provides clear error messages with function and line information
-- Helps debug complex generative functions with many addresses
-
-**Valid patterns that DON'T trigger collisions**:
-
-```python
-# ✅ CORRECT - Same address in different scopes
-@gen
-def inner():
-    return normal(0, 1) @ "x"
-
-@gen
-def outer():
-    a = inner() @ "call1"  # inner has address "x"
-    b = inner() @ "call2"  # inner has address "x" - this is fine!
-    return a + b
-    # Final structure: choices["call1"]["x"], choices["call2"]["x"]
-
-# ✅ CORRECT - Unique addresses at same level
-@gen
-def valid_model():
-    x = normal(0.0, 1.0) @ "first"
-    y = normal(2.0, 3.0) @ "second"  # Different address
-    return x + y
-```
+**Valid Patterns**:
+- Same address in different scopes (via composition) is allowed
+- Creates hierarchical structure: `choices["outer"]["inner"]`
 
 ### Error Reporting
 
-**GenJAX provides error messages** with source location information for debugging:
+**Enhanced Error Messages** include:
+- Function name and file location
+- Specific line number of error
+- Clear description and fix suggestions
+- Filtered stack traces (removes internal frames)
 
-```python
-# Error messages include:
-# 1. Function name and file location where error occurs
-# 2. Specific line number of the problematic code
-# 3. Description of the issue and how to fix it
-
-# Example error output:
-# ValueError: Address collision detected: 'x' is used multiple times at the same level.
-# Each address in a generative function must be unique.
-# Function: function 'my_model' at /path/to/model.py:15
-# Location: model.py:18
-
-# Benefits:
-# - Locate problematic code in large generative functions
-# - Stack trace filtering removes internal GenJAX frames
-# - Filters out beartype wrapper noise for cleaner error messages
-```
-
-**Error reporting improvements apply to**:
-
+**Error Types Covered**:
 - Address collision detection
 - Invalid trace operations
 - Type checking violations
 - GFI method constraint violations
 
+**Implementation**: See `core.py` for error formatting logic
+
 ### `LoweringSamplePrimitiveToMLIRException`
 
-**Cause**: PJAX primitives inside JAX control flow or JIT compilation.
+**Cause**: PJAX primitives inside JAX control flow or JIT compilation
 
-**Solution**: Apply `seed` transformation:
-
-```python
-# ❌ Problematic
-trace = model_with_scan.simulate()
-
-# ✅ Fixed
-seeded_model = seed(model_with_scan.simulate)
-trace = seeded_model(key)
-```
+**Solution**: Apply `seed` transformation before JAX operations
+- Transform: `seed(model.simulate)`
+- Then apply: `jax.jit`, `jax.vmap`, etc.
+- See `pjax.py:seed` for implementation
 
 ## Performance and Optimization
 

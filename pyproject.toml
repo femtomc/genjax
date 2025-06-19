@@ -86,15 +86,59 @@ seaborn = "*"
 [tool.pixi.feature.localization.tasks]
 localization = "pixi run python -m examples.localization.main"
 
-[tool.pixi.feature.rejuvenation_smc.dependencies]
+[tool.pixi.feature.state_space.dependencies]
 matplotlib = "*"
 seaborn = "*"
 
-[tool.pixi.feature.rejuvenation_smc.tasks]
-rejuv-smc = "pixi run python -m examples.rejuvenation_smc.main --benchmark"
-rejuv-smc-all = "pixi run python -m examples.rejuvenation_smc.main --all --quick"
-rejuv-smc-accuracy = "pixi run python -m examples.rejuvenation_smc.main --accuracy --quick"
-rejuv-smc-efficiency = "pixi run python -m examples.rejuvenation_smc.main --efficiency --quick"
+[tool.pixi.feature.state_space.tasks]
+state-space = "pixi run python -m examples.state_space.main"
+state-space-all = "pixi run python -m examples.state_space.main --all"
+state-space-convergence = "pixi run python -m examples.state_space.main --convergence"
+state-space-quick = "pixi run python -m examples.state_space.main --time-steps 10 --particles 100,500"
+state-space-comparison = "pixi run python -m examples.state_space.main --rejuvenation-comparison"
+state-space-challenging = "pixi run python -m examples.state_space.main --rejuvenation-comparison --challenging"
+state-space-extreme = "pixi run python -m examples.state_space.main --rejuvenation-comparison --extreme"
+state-space-difficulty = "pixi run python -m examples.state_space.main --difficulty-comparison"
+state-space-comprehensive = "pixi run python -m examples.state_space.main --rejuvenation-comparison --difficulty-comparison"
+
+[tool.pixi.feature.gen2d.dependencies]
+matplotlib = "*"
+seaborn = "*"
+
+[tool.pixi.feature.gen2d.tasks]
+gen2d = "pixi run python -m examples.gen2d.main"
+gen2d-all = "pixi run python -m examples.gen2d.main --all"
+gen2d-quick = "pixi run python -m examples.gen2d.main --n-frames 10 --n-particles 50"
+
+[tool.pixi.feature.intuitive_physics.dependencies]
+matplotlib = "*"
+seaborn = "*"
+
+[tool.pixi.feature.intuitive_physics.tasks]
+setup = "mkdir -p examples/intuitive_physics/figs"
+intuitive-physics = "pixi run python -m examples.intuitive_physics.main"
+intuitive-physics-env = "pixi run python -m examples.intuitive_physics.main --environment"
+intuitive-physics-trajectory = "pixi run python -m examples.intuitive_physics.main --trajectory"
+intuitive-physics-action-space = "pixi run python -m examples.intuitive_physics.main --action-space"
+intuitive-physics-samples = "pixi run python -m examples.intuitive_physics.main --samples"
+intuitive-physics-timing = "pixi run python -m examples.intuitive_physics.main --timing"
+intuitive-physics-inference = "pixi run python -m examples.intuitive_physics.main --inference"
+intuitive-physics-all = "pixi run python -m examples.intuitive_physics.main --all"
+
+[tool.pixi.feature.programmable_mcts.dependencies]
+matplotlib = "*"
+seaborn = "*"
+
+[tool.pixi.feature.programmable_mcts.tasks]
+setup = "mkdir -p examples/programmable_mcts/figs"
+programmable-mcts = "pixi run python -m examples.programmable_mcts.main"
+programmable-mcts-basic = "pixi run python -m examples.programmable_mcts.main --mode basic"
+programmable-mcts-positions = "pixi run python -m examples.programmable_mcts.main --mode positions"
+programmable-mcts-uncertainty = "pixi run python -m examples.programmable_mcts.main --mode uncertainty"
+programmable-mcts-exact = "pixi run python -m examples.programmable_mcts.main --mode exact"
+programmable-mcts-demo = "pixi run python -m examples.programmable_mcts.main --mode demo"
+programmable-mcts-visualizations = "pixi run python -m examples.programmable_mcts.main --mode visualizations"
+programmable-mcts-all = "pixi run python -m examples.programmable_mcts.main --mode all"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
@@ -104,7 +148,10 @@ faircoin = { features = ["faircoin"], solve-group = "default" }
 curvefit = { features = ["curvefit"], solve-group = "default" }
 gol = { features = ["gol"], solve-group = "default" }
 localization = { features = ["localization"], solve-group = "default" }
-rejuv-smc = { features = ["rejuvenation_smc"], solve-group = "default" }
+state-space = { features = ["state_space"], solve-group = "default" }
+gen2d = { features = ["gen2d"], solve-group = "default" }
+intuitive-physics = { features = ["intuitive_physics"], solve-group = "default" }
+programmable-mcts = { features = ["programmable_mcts"], solve-group = "default" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"
@@ -164,6 +211,7 @@ markers = [
     "hmm: marks tests for Hidden Markov Models",
     "core: marks tests for core GenJAX functionality",
     "pjax: marks tests for PJAX (Probabilistic JAX) functionality",
+    "distributions: marks tests for probability distributions",
     "tfp: marks tests requiring TensorFlow Probability",
     "requires_gpu: marks tests that need GPU acceleration",
 ]

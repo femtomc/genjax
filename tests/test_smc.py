@@ -1708,3 +1708,104 @@ class TestRejuvenationSMC:
         assert jnp.allclose(filtered_covs[1, 0, 0], expected_var_1, atol=1e-6), (
             f"Step 1 variance mismatch: got {filtered_covs[1, 0, 0]:.6f}, expected {expected_var_1:.6f}"
         )
+
+    def test_rejuvenation_smc_multiple_moves(self):
+        """Test rejuvenation_smc with multiple rejuvenation moves per timestep."""
+        # Simple parameters
+        T = 5
+        d_state = 2
+        d_obs = 2
+        n_particles = 50
+
+        # Model parameters
+        initial_mean = jnp.zeros(d_state)
+        initial_cov = jnp.eye(d_state)
+        A = jnp.eye(d_state) * 0.9
+        Q = jnp.eye(d_state) * 0.1
+        C = jnp.eye(d_obs)
+        R = jnp.eye(d_obs) * 0.5
+
+        # Generate synthetic observations
+        key = jrand.PRNGKey(123)
+        key, subkey = jrand.split(key)
+        observations = jrand.normal(subkey, (T, d_obs))
+        obs_dict = {"obs": observations}
+
+        # Prior proposal
+        @gen
+        def lg_proposal(prev_state, time_index, initial_mean, initial_cov, A, Q, C, R):
+            """Prior proposal for linear Gaussian."""
+            mean = jnp.where(time_index == 0, initial_mean, A @ prev_state)
+            cov = jnp.where(time_index == 0, initial_cov, Q)
+            return multivariate_normal(mean, cov) @ "state"
+
+        # MCMC kernel
+        def mcmc_kernel(trace):
+            return mh(trace, sel("state"))
+
+        # Initial arguments
+        initial_args = (
+            jnp.zeros(d_state),
+            jnp.array(0),
+            initial_mean,
+            initial_cov,
+            A,
+            Q,
+            C,
+            R,
+        )
+
+        # Test with different numbers of rejuvenation moves
+        n_moves_list = [1, 3, 5]
+        results = []
+
+        for n_moves in n_moves_list:
+            key, subkey = jrand.split(key)
+            result = seed(rejuvenation_smc)(
+                subkey,
+                linear_gaussian,
+                lg_proposal,
+                const(mcmc_kernel),
+                obs_dict,
+                initial_args,
+                const(n_particles),
+                const(False),  # return_all_particles
+                const(n_moves),  # n_rejuvenation_moves
+            )
+
+            log_ml = result.log_marginal_likelihood()
+            ess = result.effective_sample_size()
+            results.append((n_moves, log_ml, ess))
+
+            # Basic sanity checks
+            assert jnp.isfinite(log_ml), (
+                f"Log marginal likelihood should be finite, got {log_ml}"
+            )
+            assert 0 < ess <= n_particles, (
+                f"ESS should be between 0 and {n_particles}, got {ess}"
+            )
+
+        # Print results for inspection (more moves should generally help mixing)
+        print("\nRejuvenation SMC with multiple moves:")
+        for n_moves, log_ml, ess in results:
+            print(f"  n_moves={n_moves}: log_ml={log_ml:.4f}, ess={ess:.1f}")
+
+        # Test with return_all_particles and multiple moves
+        key, subkey = jrand.split(key)
+        all_particles = seed(rejuvenation_smc)(
+            subkey,
+            linear_gaussian,
+            lg_proposal,
+            const(mcmc_kernel),
+            obs_dict,
+            initial_args,
+            const(n_particles),
+            const(True),  # return_all_particles
+            const(5),  # n_rejuvenation_moves
+        )
+
+        # Check shape consistency
+        all_states = all_particles.traces.get_choices()["state"]
+        assert all_states.shape == (T, n_particles, d_state), (
+            f"Expected shape ({T}, {n_particles}, {d_state}), got {all_states.shape}"
+        )

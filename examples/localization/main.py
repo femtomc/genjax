@@ -4,6 +4,7 @@ Main execution script for the localization case study.
 Demonstrates probabilistic robot localization using particle filtering.
 """
 
+import os
 import jax.numpy as jnp
 import jax.random as jrand
 import matplotlib.pyplot as plt
@@ -36,6 +37,10 @@ def main():
     """Run the localization demo."""
     print("GenJAX Localization Case Study")
     print("=" * 40)
+
+    # Create figs directory if it doesn't exist
+    figs_dir = os.path.join(os.path.dirname(__file__), "figs")
+    os.makedirs(figs_dir, exist_ok=True)
 
     # Set random seed for reproducibility
     key = jrand.key(42)
@@ -134,7 +139,7 @@ def main():
         initial_pose, controls, true_poses, obs_list, world
     )
     plt.savefig(
-        "/Users/femtomc/Dev/genjax/examples/localization/figs/ground_truth_detailed.png",
+        os.path.join(figs_dir, "ground_truth_detailed.png"),
         dpi=150,
         bbox_inches="tight",
     )
@@ -158,7 +163,7 @@ def main():
     ax1b.set_title("Ground Truth Trajectory with Sensor Observations")
     plt.tight_layout()
     plt.savefig(
-        "/Users/femtomc/Dev/genjax/examples/localization/figs/ground_truth.png",
+        os.path.join(figs_dir, "ground_truth.png"),
         dpi=150,
         bbox_inches="tight",
     )
@@ -174,7 +179,7 @@ def main():
             world,
         )
         plt.savefig(
-            "/Users/femtomc/Dev/genjax/examples/localization/figs/particle_evolution.png",
+            os.path.join(figs_dir, "particle_evolution.png"),
             dpi=150,
             bbox_inches="tight",
         )
@@ -191,7 +196,7 @@ def main():
             step_num=len(particle_history),
         )
         plt.savefig(
-            "/Users/femtomc/Dev/genjax/examples/localization/figs/final_step.png",
+            os.path.join(figs_dir, "final_step.png"),
             dpi=150,
             bbox_inches="tight",
         )
@@ -204,7 +209,7 @@ def main():
             true_pose_list[: len(estimated_poses)], estimated_poses
         )
         plt.savefig(
-            "/Users/femtomc/Dev/genjax/examples/localization/figs/estimation_error.png",
+            os.path.join(figs_dir, "estimation_error.png"),
             dpi=150,
             bbox_inches="tight",
         )
@@ -221,7 +226,7 @@ def main():
 
     fig5, ax5 = plot_sensor_observations(obs_list, true_lidar_distances)
     plt.savefig(
-        "/Users/femtomc/Dev/genjax/examples/localization/figs/sensor_observations.png",
+        os.path.join(figs_dir, "sensor_observations.png"),
         dpi=150,
         bbox_inches="tight",
     )
@@ -240,7 +245,7 @@ def main():
 
     fig6, ax6 = plot_multiple_trajectories(multiple_trajectories, world)
     plt.savefig(
-        "/Users/femtomc/Dev/genjax/examples/localization/figs/multiple_trajectories.png",
+        os.path.join(figs_dir, "multiple_trajectories.png"),
         dpi=150,
         bbox_inches="tight",
     )

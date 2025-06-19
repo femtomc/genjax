@@ -271,7 +271,9 @@ def mala(
         # MALA proposal log probability: N(current + drift, step_size)
         drift = (step_size**2 / 2.0) * grad_val
         mean = current_val + drift
-        return normal.logpdf(proposed_val, mean, step_size)
+        log_probs = normal.logpdf(proposed_val, mean, step_size)
+        # Sum over all dimensions to get scalar log probability
+        return jnp.sum(log_probs)
 
     # Apply MALA proposal to all selected choices
     proposed_selected = jtu.tree_map(

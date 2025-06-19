@@ -7,12 +7,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 When starting work in this codebase, ALWAYS read the relevant CLAUDE.md files first:
 1. **Core concepts**: Read `src/genjax/CLAUDE.md` for GenJAX fundamentals
 2. **Inference algorithms**: Read `src/genjax/inference/CLAUDE.md` for MCMC, SMC, VI
-3. **ADEV**: Read `src/genjax/adev/CLAUDE.md` for gradient estimation
+3. **ADEV**: Read `src/genjax/adev/CLAUDE.md` for unbiased gradient estimation
 4. **Module-specific**: Check for CLAUDE.md in any directory you're working in
 
 ## Overview
 
 GenJAX is a probabilistic programming language embedded in Python centered on programmable inference.
+
+## JAX Best Practices
+
+GenJAX uses JAX extensively. **ALWAYS enforce good JAX idioms**:
+
+### Control Flow Rules
+- **NEVER use Python control flow** in JAX-compiled functions:
+  - ❌ `if`, `elif`, `else` statements
+  - ❌ `for`, `while` loops
+  - ❌ `break`, `continue` statements
+
+- **ALWAYS use JAX control flow** instead:
+  - ✅ `jax.lax.cond` for conditionals
+  - ✅ `jax.lax.scan` for loops with carry
+  - ✅ `jax.lax.fori_loop` for simple iteration
+  - ✅ `jax.lax.while_loop` for conditional loops
+  - ✅ `jax.lax.switch` for multiple branches
+
+### Exceptions
+- Only use Python control flow if explicitly told "it's okay to use Python control flow"
+- Static values (known at compile time) can use Python control flow
+- Outside of JIT-compiled functions, normal Python is fine
+
+### Common Patterns
+```python
+# ❌ WRONG - Python control flow
+if condition:
+    x = computation_a()
+else:
+    x = computation_b()
+
+# ✅ CORRECT - JAX control flow
+x = jax.lax.cond(condition,
+                  lambda: computation_a(),
+                  lambda: computation_b())
+
+# ❌ WRONG - Python loop
+for i in range(n):
+    x = update(x, i)
+
+# ✅ CORRECT - JAX loop
+def body(i, x):
+    return update(x, i)
+x = jax.lax.fori_loop(0, n, body, x)
+```
+
+### GenJAX-Specific JAX Tips
+- Use `Const[T]` for static values that must not become tracers
+- Use `seed()` transformation before JAX transformations on PJAX code
+- Prefer `modular_vmap` over `jax.vmap` for probabilistic operations
+- All GenJAX types inherit from `Pytree` for automatic vectorization
 
 ## Directory Structure
 
@@ -46,52 +97,35 @@ genjax/
 └── quarto/              # Documentation source files
 ```
 
-## Working in the Codebase
-
-### CRITICAL Guidelines
-
-1. **🔥 ALWAYS write test scripts first**
-   - NEVER use command line Python snippets
-   - Create test scripts in a temporary directory: `test_feature.py`
-   - Run with: `pixi run python test_feature.py`
-   - Only add to test suite after validating locally
-
-2. **Prefer localized testing over full suite**
-   - Run specific test: `pixi run test -m tests/test_<module>.py -k test_name`
-   - Full suite is slow - use only for final validation
-   - Example: after changing `src/genjax/inference/mcmc.py`, test with:
-     ```bash
-     pixi run test -m tests/test_mcmc.py -k test_metropolis
-     ```
-
-3. **Check for corresponding test files**
-   - Core modules: `src/genjax/*.py` → `tests/test_*.py`
-   - Inference: `src/genjax/inference/*.py` → `tests/test_*.py`
-   - ADEV: `src/genjax/adev/*.py` → `tests/test_adev.py`
-
-### CRITICAL Claude Code Workflow
-
-Follow this four-step workflow for effective development:
+## Development Workflow
 
 ### 1. Explore
-
-- Read relevant files and context first
+- Read relevant CLAUDE.md files first (see Initial Context Loading above)
+- **HIGH PRIORITY**: Check existing tests and examples for usage patterns
+  - `tests/` for API usage and edge cases
+  - `examples/` for implementation patterns
+- Only refer to source code after understanding usage
 - Explicitly state "don't write code yet" to focus on understanding
-- Use subagents for complex problems requiring extensive exploration
 
 ### 2. Plan
-
-- Ask Claude to create a detailed plan before coding
+- Create a detailed plan based on patterns found
 - Use "think" to trigger extended thinking mode for complex solutions
-- Ensure the plan addresses all requirements and edge cases
+- Ensure the plan addresses all requirements
 
 ### 3. Code
+- **🔥 NEVER use command line Python** - always write test scripts
+- Create `test_<feature>.py` scripts for experiments
+- Run with: `pixi run python test_feature.py`
+- Follow patterns from existing tests/examples
 
-- Implement the solution in code based on the plan
-- Verify the solution's reasonableness during implementation
-- Test and validate the implementation works correctly
+### 4. Test
+- Use localized testing: `pixi run test -m tests/test_<module>.py -k test_name`
+- Full suite only for final validation
+- Check corresponding test files exist:
+  - `src/genjax/*.py` → `tests/test_*.py`
+  - `src/genjax/inference/*.py` → `tests/test_*.py`
 
-### 4. Commit
+### 5. Commit
 
 Follow this enhanced commit workflow to avoid failed commits and wasted time:
 
@@ -103,61 +137,42 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 6. **Commit with message** - Use proper commit message format
 7. **Push if requested** - Only push when user explicitly asks
 
-**Key insight**: Steps 1-2 are crucial - without them, Claude tends to jump straight to coding without proper understanding.
+## Key Development Practices
 
-### CRITICAL Development Practices
-
-1. **Testing Protocol**
-   - 🔥 NEVER RUN INLINE PYTHON - always write test scripts
-   - Create `test_<feature>.py` scripts for all experiments
-   - Use localized tests during development
-   - Run full suite only before commits
-
-2. **Documentation Requirements**
-   - Add paper/website references to `REFERENCES.md` in module directory
-   - Keep CLAUDE.md files focused on their specific module
-   - Cross-reference related CLAUDE.md files explicitly
-
-3. **Communication Guidelines**
-   - Be concise - avoid unnecessary elaboration
-   - Ask questions rather than making assumptions
-   - Don't commit partial/broken solutions
-
-### CRITICAL Documentation Policy
-
+### Documentation
 - **NEVER create documentation files** unless explicitly requested
-- Focus on implementation tasks and working code
+- Add paper/website references to `REFERENCES.md` in module directory
+- Keep CLAUDE.md files focused on their specific module
+- Cross-reference related CLAUDE.md files explicitly
 
-### Module Organization
+### Communication
+- Be concise - avoid unnecessary elaboration
+- Ask questions rather than making assumptions
+- Don't commit partial/broken solutions
 
-```
-src/genjax/
-├── CLAUDE.md           # Core concepts: gen, traces, distributions, PJAX
-├── core.py            # Generative functions, traces, Fixed infrastructure
-├── distributions.py   # Probability distributions
-├── pjax.py           # Probabilistic JAX primitives
-├── state.py          # State inspection interpreter
-├── inference/
-│   ├── CLAUDE.md     # Inference algorithms guidance
-│   ├── mcmc.py       # MCMC algorithms
-│   ├── smc.py        # Sequential Monte Carlo
-│   └── vi.py         # Variational inference
-├── adev/
-│   ├── CLAUDE.md     # Gradient estimation guidance
-│   └── __init__.py   # ADEV implementation
-└── extras/
-    ├── CLAUDE.md     # Testing utilities guidance
-    └── state_space.py # Exact inference for testing
-```
+### Examples and Case Studies
+- Follow standardized structure in `examples/CLAUDE.md`
+- Use `examples.utils` for shared functionality
+- See existing examples for patterns before implementing
 
-Each CLAUDE.md file contains module-specific guidance. Always read the relevant files before working in a module.
+### Documentation Style for CLAUDE.md Files
+
+When working with CLAUDE.md files in the codebase:
+
+- **Use method signatures and file references** instead of raw code blocks
+- **Format**: `**Function**: name(params) -> return_type`
+- **Include location**: `**Location**: filename.py:line_numbers`
+- **Describe API contracts** and usage patterns, not implementation details
+- **Reference actual source files** for examples and detailed implementation
+- **Keep documentation maintainable** by avoiding code duplication
+
+This approach ensures documentation stays in sync with the codebase and reduces maintenance burden.
 
 ### Workflow Tips
 
 - Before any commit: `pixi run format` → `pixi run precommit-run` → `git add .` → commit
 - Use `pixi run test-all` for comprehensive validation (tests + doctests)
-- Check examples in the relevant directory for usage patterns
-- When unsure about approach, explore first with explicit "don't write code yet" statement
+- Each module has a CLAUDE.md file - always read it before working in that module
 
 ## Development Commands
 

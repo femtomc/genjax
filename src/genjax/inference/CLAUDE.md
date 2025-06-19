@@ -127,6 +127,30 @@ adequate_ess = all(ess > 100 for ess in jax.tree.leaves(result.ess_bulk))
 
 ## SMC Algorithms (`smc.py`)
 
+### Core Data Structure
+
+#### ParticleCollection
+Container for SMC particles with importance weights and diagnostics:
+
+```python
+from genjax.inference import ParticleCollection
+
+# ParticleCollection attributes:
+# - traces: Vectorized trace containing all particles
+# - log_weights: Log importance weights for each particle
+# - n_samples: Number of particles (static)
+# - log_marginal_estimate: Accumulated log marginal likelihood
+
+# Methods:
+ess = particles.effective_sample_size()  # Effective sample size
+log_ml = particles.log_marginal_likelihood()  # Marginal likelihood estimate
+
+# Weighted estimation of functions:
+posterior_mean = particles.estimate(lambda choices: choices["param"])
+posterior_variance = particles.estimate(lambda choices: choices["param"]**2) - posterior_mean**2
+custom_expectation = particles.estimate(lambda choices: jnp.sin(choices["x"]) + choices["y"])
+```
+
 ### Core Components
 
 #### Particle Initialization (`init`)
@@ -135,12 +159,23 @@ Initialize particle collection with importance sampling:
 ```python
 from genjax.inference import init
 
+# Basic initialization with target's internal proposal
 particles = init(
     target_gf=model,
-    target_args=args,
+    target_args=(),  # Args for the model
     n_samples=const(1000),
     constraints={"obs": observed_data},
-    proposal_gf=custom_proposal  # Optional custom proposal
+    proposal_gf=None  # Uses target's internal proposal
+)
+
+# Custom proposal initialization
+# Proposal signature: (constraints, *target_args) -> trace
+particles = init(
+    target_gf=model,
+    target_args=(param1, param2),
+    n_samples=const(1000),
+    constraints={"obs": observed_data},
+    proposal_gf=custom_proposal  # Custom importance sampling proposal
 )
 ```
 
@@ -170,11 +205,22 @@ particles = change(
 ```python
 from genjax.inference import extend
 
+# Basic extension with target's internal proposal
+particles = extend(
+    particles,
+    extended_target_gf=extended_model,
+    extended_target_args=extended_args,  # Can be tuple or vectorized
+    constraints={"new_obs": observed_value},
+    extension_proposal=None  # Uses extended target's internal proposal
+)
+
+# Extension with custom proposal
 particles = extend(
     particles,
     extended_target_gf=extended_model,
     extended_target_args=extended_args,
-    constraints={"new_obs": observed_value}
+    constraints={"new_obs": observed_value},
+    extension_proposal=transition_proposal  # Custom extension proposal
 )
 ```
 
@@ -187,67 +233,99 @@ def mcmc_kernel(trace):
 
 particles = rejuvenate(particles, mcmc_kernel)
 # Weights remain unchanged due to detailed balance
+# Mathematical foundation: log incremental weight = 0
 ```
 
 **Resampling** - Combat particle degeneracy:
 ```python
 from genjax.inference import resample
 
-# Resample when effective sample size drops
-ess = particles.effective_sample_size()
-if ess < threshold:
-    particles = resample(particles, method="systematic")
+# Categorical resampling (default)
+particles = resample(particles, method="categorical")
+
+# Systematic resampling (lower variance)
+particles = resample(particles, method="systematic")
+
+# After resampling:
+# - Weights reset to uniform (log 0)
+# - Marginal likelihood estimate updated
 ```
 
 ### Complete SMC Algorithm
 
-```python
-from genjax.inference import rejuvenation_smc
+#### Rejuvenation SMC
+**Function**: `rejuvenation_smc(model, transition_proposal, mcmc_kernel, observations, initial_model_args, n_particles, return_all_particles, n_rejuvenation_moves) -> ParticleCollection`
+**Location**: `smc.py:540-643`
+**Purpose**: Full SMC algorithm with automatic resampling and rejuvenation
 
-# Full SMC with rejuvenation
-final_particles = rejuvenation_smc(
-    initial_model=model_t0,
-    extended_model=model_extended,
+**API Contract**:
+- Model signature: `(*args) -> return_value` where return feeds next timestep
+- Uses feedback loop: return value from t becomes args for t+1
+- `mcmc_kernel` must be wrapped in `Const[]`
+- Observations can be any Pytree structure
+- `return_all_particles` must be wrapped in `Const[bool]` (default: `const(False)`)
+- `n_rejuvenation_moves` must be wrapped in `Const[int]` (default: `const(1)`)
+- Automatic resampling when ESS < n_particles/2
+
+**Return Behavior**:
+- `return_all_particles=const(False)`: Returns final `ParticleCollection` only
+- `return_all_particles=const(True)`: Returns `ParticleCollection` with leading time dimension (T, ...)
+
+**Rejuvenation Moves**:
+- Performs `n_rejuvenation_moves` MCMC steps at each timestep
+- Uses nested `jax.lax.scan` for efficient implementation
+- Each move applies the same `mcmc_kernel` to all particles
+
+### Getting All Timesteps from SMC
+
+**Built-in Support**: Use `return_all_particles=const(True)` parameter:
+```python
+# Get all timesteps with default single rejuvenation move
+all_particles = rejuvenation_smc(
+    model=model,
     transition_proposal=transition_proposal,
-    mcmc_kernel=lambda trace: mh(trace, sel("latent")),
-    observations=time_series_data,
-    choice_fn=lambda x: x,  # Identity mapping
-    n_particles=const(1000)
+    mcmc_kernel=const(mcmc_kernel),
+    observations=observations,
+    initial_model_args=initial_args,
+    n_particles=const(1000),
+    return_all_particles=const(True)  # Returns all timesteps
+)
+# all_particles has shape (T, n_particles, ...) for all fields
+
+# With multiple rejuvenation moves for better mixing
+all_particles = rejuvenation_smc(
+    model=model,
+    transition_proposal=transition_proposal,
+    mcmc_kernel=const(mcmc_kernel),
+    observations=observations,
+    initial_model_args=initial_args,
+    n_particles=const(1000),
+    return_all_particles=const(True),
+    n_rejuvenation_moves=const(5)  # 5 MCMC moves per timestep
 )
 ```
+
+**Alternative**: Implement custom SMC loop using building blocks (`init`, `extend`, `resample`, `rejuvenate`)
 
 ### SMC Best Practices
 
 #### Particle Count Guidelines
-```python
-# Start with moderate particle counts
-n_particles_small = const(100)    # Prototyping
-n_particles_medium = const(1000)  # Standard inference
-n_particles_large = const(5000)   # High-precision applications
-```
+- **Prototyping**: 100 particles (fast iteration)
+- **Standard inference**: 1000 particles (good accuracy/speed tradeoff)
+- **High precision**: 5000+ particles (publication quality)
+- Always use `const()` wrapper for static values
 
 #### Effective Sample Size Monitoring
-```python
-def adaptive_resampling(particles, threshold=0.5):
-    ess = particles.effective_sample_size()
-    n_particles = particles.n_particles
-
-    if ess / n_particles < threshold:
-        particles = resample(particles)
-
-    return particles
-```
+- ESS indicates particle diversity (higher is better)
+- Resample when ESS/n_particles < 0.5 (common threshold)
+- `rejuvenation_smc` automatically resamples at ESS < n_particles/2
+- Check ESS with `particles.effective_sample_size()`
 
 #### Choice Function Constraints
-```python
-# VALID choice functions (bijective on address space)
-identity_fn = lambda x: x
-remap_fn = lambda d: {"new_key": d["old_key"]}
-
-# INVALID choice functions (modify values)
-invalid_fn = lambda d: {"key": d["key"] + 1}     # Modifies values
-invalid_fn2 = lambda d: {"key": d["k1"] + d["k2"]}  # Combines values
-```
+- **Valid**: Identity (`lambda x: x`), key remapping
+- **Invalid**: Value modification, arithmetic operations
+- Must be bijective on address space
+- See `change` docstring in `smc.py:290-310` for detailed specs
 
 ## Variational Inference (`vi.py`)
 
@@ -255,108 +333,70 @@ invalid_fn2 = lambda d: {"key": d["k1"] + d["k2"]}  # Combines values
 
 #### Variational Families
 
-**Mean Field Normal Family**:
-```python
-from genjax.inference import MeanFieldNormalFamily
+**Mean Field Normal Family**
+**Function**: `mean_field_normal_family(parameter_names) -> VariationalApproximation`
+**Location**: `vi.py:115-156`
+**Purpose**: Creates independent normal distributions for each parameter
 
-family = MeanFieldNormalFamily(
-    parameter_names=["mu", "sigma"],
-    estimator_mapping={"normal": "reparam"}  # Uses ADEV
-)
-```
+**API Contract**:
+- Each parameter gets its own mean and log standard deviation
+- Parameters are independent (no covariance)
+- Supports reparameterization gradient estimation
+- Most efficient for high-dimensional problems
 
-**Full Covariance Normal Family**:
-```python
-from genjax.inference import FullCovarianceNormalFamily
+**Full Covariance Normal Family**
+**Function**: `full_covariance_normal_family(parameter_names) -> VariationalApproximation`
+**Location**: `vi.py:159-213`
+**Purpose**: Creates multivariate normal with full covariance matrix
 
-family = FullCovarianceNormalFamily(
-    parameter_names=["mu", "sigma"],
-    estimator_mapping={"normal": "reparam"}
-)
-```
+**API Contract**:
+- Parameters can be correlated
+- Uses Cholesky parameterization for positive definite covariance
+- More expressive but scales O(d²) in memory
+- Better for capturing parameter correlations
 
 #### ELBO Factory
-```python
-from genjax.inference import elbo_factory
+**Function**: `elbo_factory(target_gf, variational_gf, estimator_mapping) -> Callable`
+**Location**: `vi.py:34-71`
+**Purpose**: Creates ELBO computation function with gradient estimation
 
-# Create ELBO function
-elbo_fn = elbo_factory(
-    target_gf=target_model,
-    variational_gf=variational_model,
-    estimator_mapping={"normal": "reparam", "categorical": "reinforce"}
-)
-
-# Compute ELBO
-elbo_value = elbo_fn(
-    variational_params=var_params,
-    target_args=target_args,
-    constraints=constraints,
-    n_samples=const(100)
-)
-```
+**API Contract**:
+- Returns function: `(variational_params, target_args, constraints, n_samples) -> float`
+- `estimator_mapping` specifies gradient estimators (see `adev/CLAUDE.md`)
+- Computes variational lower bound on log marginal likelihood
+- Result is differentiable w.r.t. variational parameters
 
 #### Complete VI Pipeline
-```python
-from genjax.inference import variational_inference
+**Function**: `elbo_vi(target_gf, target_args, constraints, variational_approximation, ...) -> VIResult`
+**Location**: `vi.py:216-284`
+**Purpose**: Full variational inference with optimization
 
-result = variational_inference(
-    target_gf=target_model,
-    target_args=(),
-    constraints={"obs": observed_data},
-    variational_family=MeanFieldNormalFamily(["param1", "param2"]),
-    n_samples=const(100),
-    n_steps=const(1000),
-    learning_rate=0.01
-)
-
-# Access results
-final_params = result.params
-loss_history = result.losses
-```
+**API Contract**:
+- Uses optax for optimization (Adam by default)
+- Returns `VIResult` with final parameters and loss history
+- `n_samples` controls Monte Carlo approximation quality
+- `n_steps` sets optimization iterations
+- Supports custom optimizers and learning rate schedules
 
 ### VI Best Practices
 
 #### Learning Rate Scheduling
-```python
-# Use adaptive learning rates
-import optax
-
-# Start high, decay over time
-scheduler = optax.exponential_decay(
-    init_value=0.1,
-    transition_steps=100,
-    decay_rate=0.95
-)
-
-optimizer = optax.adam(scheduler)
-```
+- Use optax for advanced schedules (exponential decay, cosine annealing)
+- Start with learning rate 0.01-0.1, decay over time
+- Monitor loss plateaus to trigger decay
+- See `optax` documentation for scheduler options
 
 #### Convergence Monitoring
-```python
-def check_vi_convergence(losses, window=100, threshold=1e-4):
-    if len(losses) < window:
-        return False
-
-    recent_losses = losses[-window:]
-    loss_change = abs(recent_losses[-1] - recent_losses[0]) / window
-
-    return loss_change < threshold
-```
+- Check loss change over sliding window (e.g., 100 steps)
+- Convergence threshold: relative change < 1e-4
+- Early stopping prevents overfitting
+- Plot loss history to diagnose optimization issues
 
 #### Sample Size Guidelines
-```python
-# Progressive sample size increase
-sample_schedule = [
-    (100, 100),    # (n_samples, n_steps) - early exploration
-    (500, 500),    # medium precision
-    (1000, 1000)   # final high precision
-]
-
-for n_samples, n_steps in sample_schedule:
-    result = variational_inference(..., n_samples=const(n_samples), n_steps=const(n_steps))
-    if check_convergence(result.losses):
-        break
-```
+- **Early exploration**: 100 samples (fast, approximate)
+- **Refinement**: 500 samples (better gradient estimates)
+- **Final optimization**: 1000+ samples (low variance)
+- Trade-off: larger n_samples = better gradients but slower
 
 ## Algorithm Selection Guidelines
 

@@ -13,7 +13,7 @@ import pytest
 
 from genjax.core import gen, sel, Const, const
 from genjax.pjax import seed
-from genjax.distributions import beta, flip, exponential
+from genjax.distributions import beta, flip, exponential, multivariate_normal
 from genjax.inference import (
     MCMCResult,
     chain,
@@ -1132,6 +1132,111 @@ def test_mala_acceptance_logic_works(simple_normal_model, mcmc_steps_small, mcmc
 @pytest.mark.mcmc
 @pytest.mark.integration
 @pytest.mark.fast
+def test_mala_multivariate_log_prob_fix():
+    """Test MALA with multivariate parameters to ensure proper log probability summation.
+
+    This test specifically validates the fix for the vectorization issue where
+    normal.logpdf was returning arrays instead of scalars for multivariate parameters.
+    """
+    key = jrand.PRNGKey(0)
+
+    @gen
+    def multivariate_model():
+        # Test with 3D state to ensure the fix works for any dimensionality
+        x = multivariate_normal(jnp.zeros(3), jnp.eye(3)) @ "state"
+        return x
+
+    # Generate a trace
+    trace = seed(multivariate_model.simulate)(key)
+
+    # MALA kernel with moderate step size
+    def mala_kernel(trace):
+        return mala(trace, sel("state"), step_size=0.1)
+
+    # This should not raise shape errors (the bug we fixed)
+    new_trace = seed(mala_kernel)(jrand.split(key)[0], trace)
+
+    # Check that state has correct shape
+    old_state = trace.get_choices()["state"]
+    new_state = new_trace.get_choices()["state"]
+
+    assert old_state.shape == (3,)
+    assert new_state.shape == (3,)
+    # State should have changed (not identical)
+    assert not jnp.allclose(old_state, new_state, rtol=1e-10)
+
+
+def test_mala_in_smc_vectorization():
+    """Test MALA works correctly in vectorized SMC context.
+
+    This is a regression test for the vectorization bug where MALA failed
+    when used as a rejuvenation kernel in SMC due to shape mismatches.
+    """
+    from genjax.inference import rejuvenation_smc
+    from genjax.extras.state_space import linear_gaussian
+
+    key = jrand.PRNGKey(42)
+    d_state = 2
+    d_obs = 2
+    T = 3
+    n_particles = 10
+
+    # Model parameters
+    initial_mean = jnp.zeros(d_state)
+    initial_cov = jnp.eye(d_state)
+    A = jnp.eye(d_state) * 0.9
+    Q = jnp.eye(d_state) * 0.1
+    C = jnp.eye(d_obs)
+    R = jnp.eye(d_obs) * 0.05
+
+    # Generate observations
+    key, subkey = jrand.split(key)
+    observations = jax.random.normal(subkey, (T, d_obs))
+
+    # Proposal
+    @gen
+    def lg_proposal(prev_state, time_index, initial_mean, initial_cov, A, Q, C, R):
+        mean = jnp.where(time_index == 0, initial_mean, A @ prev_state)
+        cov = jnp.where(time_index == 0, initial_cov, Q)
+        return multivariate_normal(mean, cov) @ "state"
+
+    # MALA kernel
+    def mala_kernel(trace):
+        return mala(trace, sel("state"), step_size=0.05)
+
+    # SMC setup
+    obs_sequence = {"obs": observations}
+    initial_args = (
+        jnp.zeros(d_state),
+        jnp.array(0),
+        initial_mean,
+        initial_cov,
+        A,
+        Q,
+        C,
+        R,
+    )
+
+    # This should not raise shape errors
+    key, subkey = jrand.split(key)
+    result = seed(rejuvenation_smc)(
+        subkey,
+        linear_gaussian,
+        lg_proposal,
+        const(mala_kernel),
+        obs_sequence,
+        initial_args,
+        const(n_particles),
+        const(False),  # return_all_particles
+        const(2),  # n_rejuvenation_moves
+    )
+
+    # Basic validation
+    assert result.traces.get_choices()["state"].shape == (n_particles, d_state)
+    assert result.effective_sample_size() > 0
+    assert jnp.isfinite(result.log_marginal_likelihood())
+
+
 def test_mala_multiple_parameters(
     bivariate_normal_model, mcmc_steps_medium, mcmc_key, mcmc_tolerance
 ):

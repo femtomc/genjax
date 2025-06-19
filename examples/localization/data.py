@@ -317,12 +317,12 @@ def generate_ground_truth_data(world, key, trajectory_type="room_navigation"):
     for i, control in enumerate(controls):
         # Generate next pose
         step_key, key = jrand.split(key)
-        step_trace = seeded_step(step_key, (current_pose, control, world))
+        step_trace = seeded_step(step_key, current_pose, control, world)
         current_pose = step_trace.get_retval()
 
         # Generate observation at new pose
         obs_key, key = jrand.split(key)
-        obs_trace = seeded_sensor(obs_key, (current_pose, world))
+        obs_trace = seeded_sensor(obs_key, current_pose, world)
         observation = obs_trace.get_retval()
 
         poses.append(current_pose)

@@ -221,3 +221,76 @@ The case study showcases GenJAX capabilities for robotics and time series applic
 5. **Multi-Room Geometry**: 9 internal walls creating complex 3-room environment with doorways
 
 The localization case study demonstrates advanced GenJAX capabilities including vectorized sensor modeling, complex geometry handling, and robust sequential inference in challenging multi-room navigation scenarios.
+
+## Current Session Context
+
+### Conversation Summary
+
+We were working on fixing the localization case study to work with the updated `rejuvenation_smc` API. The conversation progressed through several phases:
+
+1. **Initial API Migration**: Investigating how `rejuvenation_smc` is used in tests and migrating from the old particle filter implementation to the new API pattern
+2. **Vmap Issue Resolution**: Encountered persistent vmap errors with argument count mismatches, which we isolated and debugged through minimal test cases
+3. **Key Management Fix**: Discovered that `@gen` functions receive implicit keys and should use `seed` transformation at higher levels rather than explicit key parameters
+4. **Autoregressive Pattern**: Successfully migrated to the autoregressive model pattern where model functions take previous output as input
+5. **Observation Model Issue**: Found major mismatch between simplified model (single distance) and actual ground truth data (8-element LIDAR arrays)
+6. **Current Task**: User directed to use `vmap` for the sensor model instead of the manual loop workaround
+
+### Key Technical Discoveries
+
+- **`rejuvenation_smc` API**: Uses autoregressive pattern with model(prev_output) → current_output
+- **Key Management**: Use `seed` transformation at top level, avoid explicit keys in generative functions
+- **JAX Compatibility**: Use `jax.lax.select` instead of Python if/else for traced values
+- **Observation Structure**: Ground truth has 8-element LIDAR arrays, model must match this format
+- **Vmap Usage**: GenJAX Vmap combinator works when used properly with correct argument patterns
+
+### Files Modified
+
+- `/home/femtomc/genjax/examples/localization/core.py`: Main implementation file containing models and particle filter
+- `/home/femtomc/genjax/examples/localization/main.py`: Fixed hardcoded file paths to use relative paths
+- Various test files created for debugging: `test_vmap_issue.py`, `debug_observations.py`, etc.
+
+### Current Implementation Status
+
+The localization model has been successfully migrated to use `rejuvenation_smc` API with:
+- ✅ Autoregressive model pattern (takes prev_pose, returns current_pose)
+- ✅ JAX-compatible conditionals using `jax.lax.select`
+- ✅ Proper key management with `seed` transformation
+- ⚠️ **PENDING**: Replace manual sensor observation loop with Vmap implementation
+
+### Immediate Next Task
+
+Replace the manual sensor observation loop in `localization_model` (lines 377-388 in core.py) with proper GenJAX Vmap implementation for the 8 LIDAR rays. The user explicitly stated "Let's use `vmap`, it works" indicating we should use the vectorized approach rather than the unrolled loop.
+
+### Key Patterns Established
+
+1. **Model Function Signature**: `@gen def model(prev_pose)` - takes previous output, returns current state
+2. **Proposal Function Signature**: `@gen def proposal(prev_pose)` - takes previous output, proposes new state  
+3. **Observation Structure**: Ground truth provides 8-element LIDAR arrays matching the sensor model output
+4. **Vmap Pattern**: Use GenJAX Vmap combinator with proper `in_axes`, `axis_size`, and `Const` parameters
+5. **Error Handling**: JAX-compatible conditionals and robust weight computation with fallbacks
+
+### TODOs Completed in Session
+
+1. ✅ Investigated `rejuvenation_smc` usage in tests
+2. ✅ Isolated and debugged Vmap argument count issues  
+3. ✅ Fixed key management by removing explicit keys and using `seed`
+4. ✅ Migrated to autoregressive model pattern
+5. ✅ Fixed JAX compatibility issues with conditionals
+6. ✅ Identified observation model mismatch (single vs 8-element arrays)
+
+### TODOs Completed ✅
+
+1. ✅ **Replaced manual sensor loop with Vmap**: Successfully converted manual unrolled loop to proper GenJAX Vmap implementation
+2. ✅ **Fixed Vmap + rejuvenation_smc integration**: Resolved core issue in `src/genjax/core.py` line 1421
+3. ✅ **Test convergence**: Verified that vectorized LIDAR observations work correctly with particle filter
+4. ✅ **Validated results**: Confirmed vectorized sensor model produces correct observation structure matching ground truth data
+
+### Session Outcome
+
+The localization case study is now fully functional with:
+- ✅ Proper `rejuvenation_smc` API integration  
+- ✅ Working Vmap for vectorized LIDAR sensor observations
+- ✅ Comprehensive test coverage in `tests/test_vmap_rejuvenation_smc.py`
+- ✅ All 8-ray LIDAR measurements processed efficiently with Vmap
+
+The core Vmap issue that prevented vectorized operations in `rejuvenation_smc` has been resolved at the framework level, benefiting all future use cases.

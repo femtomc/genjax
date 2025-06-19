@@ -1371,7 +1371,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Tr[X, R], Weight]:
         tr, w = modular_vmap(
             self.gen_fn.generate,
-            in_axes=(0, self.in_axes.value),
+            in_axes=(0,) + self.in_axes.value,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
@@ -1386,7 +1386,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Density, R]:
         density, retval = modular_vmap(
             self.gen_fn.assess,
-            in_axes=(0, self.in_axes.value),
+            in_axes=(0,) + self.in_axes.value,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
@@ -1402,7 +1402,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Tr[X, R], Weight, X | None]:
         new_tr, w, discard = modular_vmap(
             self.gen_fn.update,
-            in_axes=(0, 0, self.in_axes.value),
+            in_axes=(0, 0) + self.in_axes.value,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
@@ -1418,7 +1418,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
     ) -> tuple[Tr[X, R], Weight, X | None]:
         new_tr, w, discard = modular_vmap(
             self.gen_fn.regenerate,
-            in_axes=(0, None, self.in_axes.value),
+            in_axes=(0, None) + self.in_axes.value,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
