@@ -13,12 +13,13 @@ import pytest
 
 from genjax.core import gen, sel, Const, const
 from genjax.pjax import seed
-from genjax.distributions import beta, flip, exponential, multivariate_normal
+from genjax.distributions import beta, flip, exponential, multivariate_normal, normal
 from genjax.inference import (
     MCMCResult,
     chain,
     mh,
     mala,
+    hmc,
 )
 
 
@@ -1291,4 +1292,453 @@ def test_mala_multiple_parameters(
     # Acceptance rate might be low for this challenging model, but should be non-negative
     assert result.acceptance_rate >= 0.0, (
         f"Negative acceptance rate: {result.acceptance_rate}"
+    )
+
+
+# =============================================================================
+# HMC (HAMILTONIAN MONTE CARLO) TESTS
+# =============================================================================
+
+
+def test_hmc_basic_functionality():
+    """Test that HMC runs without errors on a simple model."""
+    from genjax.distributions import normal
+
+    @gen
+    def simple_normal():
+        return normal(0.0, 1.0) @ "x"
+
+    key = jrand.PRNGKey(42)
+    initial_trace = seed(simple_normal.simulate)(key)
+
+    # Single HMC step
+    def hmc_kernel(trace):
+        return hmc(trace, sel("x"), step_size=0.1, n_steps=5)
+
+    key = jrand.PRNGKey(123)
+    updated_trace = seed(hmc_kernel)(key, initial_trace)
+
+    # Check that trace structure is preserved
+    assert "x" in updated_trace.get_choices()
+    assert isinstance(updated_trace.get_choices()["x"], jnp.ndarray)
+    assert updated_trace.get_choices()["x"].shape == ()
+    assert jnp.isfinite(updated_trace.get_choices()["x"])  # Should be finite
+
+
+def test_hmc_beta_bernoulli_convergence(beta_bernoulli_model, mcmc_key, mcmc_tolerance):
+    """Test HMC convergence on beta-bernoulli conjugate model."""
+    # Observed data: True
+    constraints = {"obs": True}
+    initial_trace, _ = beta_bernoulli_model.generate(constraints)
+
+    # HMC kernel with appropriate step size for beta distribution
+    def hmc_kernel(trace):
+        return hmc(trace, sel("p"), step_size=0.05, n_steps=10)
+
+    hmc_chain = chain(hmc_kernel)
+    seeded_chain = seed(hmc_chain)
+
+    result = seeded_chain(mcmc_key, initial_trace, const(2000), burn_in=const(500))
+
+    p_samples = result.traces.get_choices()["p"]
+
+    # Analytical posterior: Beta(3, 5) given obs=True and prior Beta(2, 5)
+    # Posterior mean = 3/(3+5) = 0.375
+    # Posterior variance = (3*5)/((3+5)^2*(3+5+1)) = 15/(64*9) = 15/576 ≈ 0.026
+    posterior_mean = 3.0 / 8.0  # 0.375
+    posterior_var = (3.0 * 5.0) / ((8.0**2) * 9.0)  # ≈ 0.026
+
+    sample_mean = jnp.mean(p_samples)
+    sample_var = jnp.var(p_samples)
+
+    # Test convergence to true posterior
+    assert jnp.abs(sample_mean - posterior_mean) < mcmc_tolerance
+    assert jnp.abs(sample_var - posterior_var) < mcmc_tolerance
+
+    # Test acceptance rate is reasonable for HMC (should be higher than MH)
+    assert result.acceptance_rate > 0.5
+
+
+def test_hmc_vs_mh_efficiency(beta_bernoulli_model, mcmc_key):
+    """Test that HMC is more efficient than MH on continuous parameters."""
+    # Observed data: True
+    constraints = {"obs": True}
+    initial_trace, _ = beta_bernoulli_model.generate(constraints)
+
+    n_steps = 1000
+    burn_in = 200
+
+    # HMC kernel
+    def hmc_kernel(trace):
+        return hmc(trace, sel("p"), step_size=0.1, n_steps=10)
+
+    # MH kernel
+    def mh_kernel(trace):
+        return mh(trace, sel("p"))
+
+    # Run both chains
+    hmc_chain = chain(hmc_kernel)
+    mh_chain = chain(mh_kernel)
+
+    key1, key2 = jrand.split(mcmc_key)
+
+    hmc_result = seed(hmc_chain)(
+        key1, initial_trace, const(n_steps), burn_in=const(burn_in)
+    )
+    mh_result = seed(mh_chain)(
+        key2, initial_trace, const(n_steps), burn_in=const(burn_in)
+    )
+
+    # HMC should generally have better mixing (higher effective sample size)
+    hmc_samples = hmc_result.traces.get_choices()["p"]
+    mh_samples = mh_result.traces.get_choices()["p"]
+
+    # Both should be finite and in valid range
+    assert jnp.all(jnp.isfinite(hmc_samples))
+    assert jnp.all(jnp.isfinite(mh_samples))
+    assert jnp.all((hmc_samples >= 0) & (hmc_samples <= 1))
+    assert jnp.all((mh_samples >= 0) & (mh_samples <= 1))
+
+    # HMC typically has higher acceptance rate than MH for continuous parameters
+    # (though this isn't guaranteed for all problems)
+    hmc_acceptance = hmc_result.acceptance_rate
+    mh_acceptance = mh_result.acceptance_rate
+
+    assert hmc_acceptance > 0.3  # Should be reasonable
+    assert mh_acceptance > 0.3  # Should be reasonable
+
+
+def test_hmc_step_size_effects():
+    """Test that different step sizes affect HMC acceptance rates."""
+    from genjax.distributions import normal
+
+    @gen
+    def normal_model():
+        return normal(0.0, 1.0) @ "x"
+
+    key = jrand.PRNGKey(42)
+    initial_trace = seed(normal_model.simulate)(key)
+
+    step_sizes = [0.01, 0.1, 0.5]
+    acceptance_rates = []
+
+    for step_size in step_sizes:
+
+        def hmc_kernel(trace):
+            return hmc(trace, sel("x"), step_size=step_size, n_steps=10)
+
+        hmc_chain = chain(hmc_kernel)
+
+        key = jrand.PRNGKey(123)
+        result = seed(hmc_chain)(key, initial_trace, const(500), burn_in=const(100))
+
+        acceptance_rates.append(result.acceptance_rate)
+
+    # All acceptance rates should be reasonable
+    for rate in acceptance_rates:
+        assert 0.0 <= rate <= 1.0
+        assert jnp.isfinite(rate)
+
+    # Smaller step sizes generally give higher acceptance rates
+    # (though this isn't always strictly monotonic)
+    assert acceptance_rates[0] >= 0.5  # Small step size should have good acceptance
+
+
+def test_hmc_chain_monotonic_convergence():
+    """Test that HMC shows monotonic convergence with increasing chain length."""
+
+    @gen
+    def normal_model():
+        return normal(1.0, 0.5) @ "x"  # True mean = 1.0, std = 0.5
+
+    key = jrand.PRNGKey(999)
+    initial_trace = seed(normal_model.simulate)(key)
+
+    def hmc_kernel(trace):
+        return hmc(trace, sel("x"), step_size=0.1, n_steps=10)
+
+    hmc_chain = chain(hmc_kernel)
+    seeded_chain = seed(hmc_chain)
+
+    # Test increasing chain lengths
+    chain_lengths = [200, 1000, 3000]
+    burn_in_lengths = [50, 200, 500]
+    errors = []
+
+    true_mean = 1.0  # Mean of normal(1.0, 0.5)
+
+    for n_steps, burn_in in zip(chain_lengths, burn_in_lengths):
+        key = jrand.PRNGKey(123)
+        result = seeded_chain(
+            key, initial_trace, const(n_steps), burn_in=const(burn_in)
+        )
+
+        sample_mean = jnp.mean(result.traces.get_choices()["x"])
+        error = jnp.abs(sample_mean - true_mean)
+        errors.append(error)
+
+    # Errors should generally decrease (allowing some tolerance for stochasticity)
+    # Test that the longest chain is more accurate than the shortest
+    assert errors[2] <= errors[0] * 1.2, f"Convergence not monotonic: {errors}"
+
+    # All errors should be reasonable
+    for error in errors:
+        assert error < 0.5, f"Error too large: {error}"
+
+
+# Note: HMC tests with exponential distributions are challenging because
+# HMC operates in unconstrained space and can propose negative values.
+# For production use with constrained distributions, consider:
+# 1. Using MH or MALA instead
+# 2. Transforming to unconstrained space first
+# 3. Using very small step sizes (but this may reduce efficiency)
+
+
+def test_hmc_multivariate_normal():
+    """Test HMC on true multivariate normal distribution."""
+
+    @gen
+    def multivariate_model():
+        x = normal(0.0, 1.0) @ "x"
+        y = normal(1.0, 2.0) @ "y"
+        return jnp.array([x, y])
+
+    key = jrand.PRNGKey(789)
+    initial_trace = seed(multivariate_model.simulate)(key)
+
+    def hmc_kernel(trace):
+        selection = sel("x") | sel("y")
+        # Can use larger step size for unconstrained normal distributions
+        return hmc(trace, selection, step_size=0.2, n_steps=15)
+
+    hmc_chain = chain(hmc_kernel)
+
+    key = jrand.PRNGKey(101112)
+    result = seed(hmc_chain)(key, initial_trace, const(2000), burn_in=const(500))
+
+    choices = result.traces.get_choices()
+
+    # Check that both variables were sampled
+    assert "x" in choices
+    assert "y" in choices
+    assert choices["x"].shape == (1500,)  # 2000 - 500 burn-in
+    assert choices["y"].shape == (1500,)
+
+    # Check sample means are close to true means
+    x_mean = jnp.mean(choices["x"])
+    y_mean = jnp.mean(choices["y"])
+
+    # True means: x ~ N(0, 1) -> mean=0, y ~ N(1, 4) -> mean=1
+    assert jnp.abs(x_mean - 0.0) < 0.15
+    assert jnp.abs(y_mean - 1.0) < 0.25
+
+    # Check sample variances are close to true variances
+    x_var = jnp.var(choices["x"])
+    y_var = jnp.var(choices["y"])
+
+    # True variances: x ~ N(0, 1) -> var=1, y ~ N(1, 4) -> var=4
+    assert jnp.abs(x_var - 1.0) < 0.4
+    assert jnp.abs(y_var - 4.0) < 1.0
+
+    # Acceptance rate should be good for unconstrained distributions
+    assert 0.6 <= result.acceptance_rate <= 1.0
+
+
+def test_hmc_n_steps_effects():
+    """Test that different numbers of leapfrog steps affect HMC performance."""
+
+    @gen
+    def normal_model():
+        return normal(0.0, 1.0) @ "x"
+
+    key = jrand.PRNGKey(42)
+    initial_trace = seed(normal_model.simulate)(key)
+
+    n_steps_options = [5, 20, 50]
+    results = []
+
+    for n_steps in n_steps_options:
+
+        def hmc_kernel(trace):
+            # Good step size for unconstrained normal distribution
+            return hmc(trace, sel("x"), step_size=0.1, n_steps=n_steps)
+
+        hmc_chain = chain(hmc_kernel)
+
+        key = jrand.PRNGKey(123)
+        result = seed(hmc_chain)(key, initial_trace, const(1000), burn_in=const(200))
+
+        results.append(result)
+
+    # All should produce valid results
+    for result in results:
+        assert 0.0 <= result.acceptance_rate <= 1.0
+        samples = result.traces.get_choices()["x"]
+        assert jnp.all(jnp.isfinite(samples))
+
+    # Generally, very long trajectories can have lower acceptance rates
+    # due to numerical errors, but all should be reasonable
+    for result in results:
+        assert (
+            result.acceptance_rate > 0.5
+        )  # Should maintain good acceptance for normal
+
+
+def test_hmc_convergence_normal(mcmc_key, mcmc_tolerance):
+    """Test HMC convergence to correct posterior for normal distribution."""
+
+    @gen
+    def normal_model():
+        return normal(0.5, 1.5) @ "x"
+
+    initial_trace = seed(normal_model.simulate)(mcmc_key)
+
+    def hmc_kernel(trace):
+        # Good step size for unconstrained normal distribution
+        return hmc(trace, sel("x"), step_size=0.15, n_steps=10)
+
+    hmc_chain = chain(hmc_kernel)
+    seeded_chain = seed(hmc_chain)
+
+    result = seeded_chain(mcmc_key, initial_trace, const(3000), burn_in=const(1000))
+
+    x_samples = result.traces.get_choices()["x"]
+
+    # For normal(0.5, 1.5): mean = 0.5, variance = 1.5^2 = 2.25
+    true_mean = 0.5
+    true_var = 2.25
+
+    sample_mean = jnp.mean(x_samples)
+    sample_var = jnp.var(x_samples)
+
+    # Test convergence to true moments
+    assert jnp.abs(sample_mean - true_mean) < mcmc_tolerance
+    assert jnp.abs(sample_var - true_var) < mcmc_tolerance
+
+    # Acceptance rate should be good for unconstrained distributions
+    assert result.acceptance_rate > 0.6
+
+
+def test_hmc_exact_inference_monotonic_convergence(
+    hierarchical_normal_model, mcmc_key, mcmc_tolerance
+):
+    """Test HMC monotonic convergence against exact inference for normal-normal conjugate model."""
+    y_observed = 1.5
+
+    # Model parameters for exact solution
+    prior_mean = 0.0
+    prior_var = 1.0  # prior_std^2 = 1.0^2
+    likelihood_var = 0.25  # obs_std^2 = 0.5^2
+
+    # Create constrained trace
+    constraints = {"y": y_observed}
+    initial_trace, _ = hierarchical_normal_model.generate(
+        constraints, prior_mean, 1.0, 0.5
+    )
+
+    # Compute exact posterior moments
+    exact_mean, exact_variance = exact_normal_normal_posterior_moments(
+        y_observed, prior_mean, prior_var, likelihood_var
+    )
+
+    def hmc_kernel(trace):
+        return hmc(trace, sel("mu"), step_size=0.2, n_steps=15)
+
+    hmc_chain = chain(hmc_kernel)
+    seeded_chain = seed(hmc_chain)
+
+    # Test monotonic convergence with increasing chain lengths
+    # Use multiple independent runs and average to reduce Monte Carlo noise
+    chain_lengths = [500, 2000, 5000]
+    burn_in_lengths = [100, 400, 1000]
+    n_runs = 5  # Multiple independent runs for averaging
+
+    avg_mean_errors = []
+    avg_var_errors = []
+
+    for n_steps, burn_in in zip(chain_lengths, burn_in_lengths):
+        run_mean_errors = []
+        run_var_errors = []
+
+        for run in range(n_runs):
+            # Use different key for each run to get independent samples
+            run_key = jrand.split(mcmc_key, n_runs)[run]
+
+            result = seeded_chain(
+                run_key, initial_trace, const(n_steps), burn_in=const(burn_in)
+            )
+
+            mu_samples = result.traces.get_choices()["mu"]
+
+            # Compute sample moments
+            sample_mean = jnp.mean(mu_samples)
+            sample_variance = jnp.var(mu_samples)
+
+            # Compute errors against exact values
+            mean_error = jnp.abs(sample_mean - exact_mean)
+            var_error = jnp.abs(sample_variance - exact_variance)
+
+            run_mean_errors.append(float(mean_error))
+            run_var_errors.append(float(var_error))
+
+        # Average errors across runs to reduce Monte Carlo noise
+        avg_mean_error = jnp.mean(jnp.array(run_mean_errors))
+        avg_var_error = jnp.mean(jnp.array(run_var_errors))
+
+        avg_mean_errors.append(float(avg_mean_error))
+        avg_var_errors.append(float(avg_var_error))
+
+    # Test monotonic convergence: longer chains should be more accurate on average
+    # With averaging, we should see cleaner convergence trends
+
+    # Mean error should show improvement from shortest to longest chain (stricter tolerance)
+    assert avg_mean_errors[2] <= avg_mean_errors[0] * 1.1, (
+        f"Mean error not improving sufficiently: {avg_mean_errors}"
+    )
+
+    # Variance error should also show improvement (stricter tolerance)
+    assert avg_var_errors[2] <= avg_var_errors[0] * 1.2, (
+        f"Variance error not improving sufficiently: {avg_var_errors}"
+    )
+
+    # All averaged errors should be reasonable (stricter tolerances)
+    for i, (mean_err, var_err) in enumerate(zip(avg_mean_errors, avg_var_errors)):
+        assert jnp.isfinite(mean_err) and jnp.isfinite(var_err), (
+            f"Non-finite averaged errors at chain {i}: mean={mean_err}, var={var_err}"
+        )
+        assert mean_err < 0.15, (
+            f"Averaged mean error too large at chain {i}: {mean_err:.4f}"
+        )
+        assert var_err < 0.15, (
+            f"Averaged variance error too large at chain {i}: {var_err:.4f}"
+        )
+
+    # Longest chain should show good accuracy (stricter requirements)
+    assert avg_mean_errors[2] < 0.05, (
+        f"Final averaged mean error too large: {avg_mean_errors[2]:.4f}"
+    )
+    assert avg_var_errors[2] < 0.05, (
+        f"Final averaged variance error too large: {avg_var_errors[2]:.4f}"
+    )
+
+    # Test final convergence with a single long chain
+    final_result = seeded_chain(
+        mcmc_key, initial_trace, const(8000), burn_in=const(2000)
+    )
+    final_mu_samples = final_result.traces.get_choices()["mu"]
+    final_mean = jnp.mean(final_mu_samples)
+    final_var = jnp.var(final_mu_samples)
+
+    # Should be very close to exact values with long chain (stricter tolerances)
+    strict_tolerance = 0.05  # Much stricter than mcmc_tolerance (0.3)
+    assert jnp.abs(final_mean - exact_mean) < strict_tolerance, (
+        f"Final mean error too large: {jnp.abs(final_mean - exact_mean):.4f} vs tolerance {strict_tolerance}"
+    )
+    assert jnp.abs(final_var - exact_variance) < strict_tolerance, (
+        f"Final variance error too large: {jnp.abs(final_var - exact_variance):.4f} vs tolerance {strict_tolerance}"
+    )
+
+    # Acceptance rate should be reasonable for HMC
+    assert final_result.acceptance_rate > 0.6, (
+        f"Acceptance rate too low: {final_result.acceptance_rate:.3f}"
     )

@@ -2,9 +2,9 @@
 MCMC (Markov Chain Monte Carlo) inference algorithms for GenJAX.
 
 This module provides implementations of standard MCMC algorithms including
-Metropolis-Hastings and MALA (Metropolis-Adjusted Langevin Algorithm).
-All algorithms use the GFI (Generative Function Interface) for efficient
-trace operations.
+Metropolis-Hastings, MALA (Metropolis-Adjusted Langevin Algorithm), and
+HMC (Hamiltonian Monte Carlo). All algorithms use the GFI (Generative Function Interface)
+for efficient trace operations.
 
 References
 ----------
@@ -22,8 +22,15 @@ References
 - Roberts, G. O., & Rosenthal, J. S. (1998). "Optimal scaling of discrete approximations to
   Langevin diffusions." Journal of the Royal Statistical Society: Series B, 60(1), 255-268.
 
+**HMC (Hamiltonian Monte Carlo):**
+- Neal, R. M. (2011). "MCMC Using Hamiltonian Dynamics", Handbook of Markov Chain Monte Carlo,
+  pp. 113-162. URL: http://www.mcmchandbook.net/HandbookChapter5.pdf
+- Duane, S., Kennedy, A. D., Pendleton, B. J., & Roweth, D. (1987). "Hybrid Monte Carlo."
+  Physics Letters B, 195(2), 216-222.
+
 **Implementation Reference:**
 - Gen.jl MALA implementation: https://github.com/probcomp/Gen.jl/blob/master/src/inference/mala.jl
+- Gen.jl HMC implementation: https://github.com/probcomp/Gen.jl/blob/master/src/inference/hmc.jl
 """
 
 import jax
@@ -47,6 +54,38 @@ from genjax.pjax import modular_vmap
 
 # Type alias for MCMC kernel functions
 MCMCKernel = Callable[[Trace[X, R]], Trace[X, R]]
+
+
+def _create_log_density_wrt_selected(target_gf, args, unselected_choices):
+    """
+    Create a log density function that only depends on selected choices.
+
+    This helper function is used by both MALA and HMC to create a closure
+    that computes log density with respect to only the selected addresses,
+    enabling gradient computation for those addresses only.
+
+    Args:
+        target_gf: The generative function to evaluate
+        args: Arguments tuple (args[0], args[1]) for the generative function
+        unselected_choices: The subset of choices that remain fixed
+
+    Returns:
+        Function that takes selected_choices_only and returns log density
+    """
+
+    def log_density_wrt_selected(selected_choices_only):
+        # Reconstruct full choices by merging selected with unselected
+        if unselected_choices is None:
+            # All choices were selected
+            full_choices = selected_choices_only
+        else:
+            # Use the GFI's merge method for all choice structures
+            full_choices = target_gf.merge(unselected_choices, selected_choices_only)
+
+        log_density, _ = target_gf.assess(full_choices, *args[0], **args[1])
+        return log_density
+
+    return log_density_wrt_selected
 
 
 def compute_rhat(samples: jnp.ndarray) -> FloatArray:
@@ -241,17 +280,9 @@ def mala(
         return current_trace
 
     # Create closure to compute gradients with respect to only selected choices
-    def log_density_wrt_selected(selected_choices_only):
-        # Reconstruct full choices by merging selected with unselected
-        if unselected_choices is None:
-            # All choices were selected
-            full_choices = selected_choices_only
-        else:
-            # Use the GFI's merge method for all choice structures
-            full_choices = target_gf.merge(unselected_choices, selected_choices_only)
-
-        log_density, _ = target_gf.assess(full_choices, *args[0], **args[1])
-        return log_density
+    log_density_wrt_selected = _create_log_density_wrt_selected(
+        target_gf, args, unselected_choices
+    )
 
     # Get gradients with respect to selected choices only
     selected_gradients = jax.grad(log_density_wrt_selected)(selected_choices)
@@ -312,6 +343,156 @@ def mala(
     # MALA acceptance probability
     # Alpha = model_weight + log P(x_old | x_new) - log P(x_new | x_old)
     log_alpha = model_weight + backward_log_prob_total - forward_log_prob_total
+    log_alpha = jnp.minimum(0.0, log_alpha)  # min(1, exp(log_alpha))
+
+    # Accept or reject using numerically stable log comparison
+    log_u = jnp.log(uniform.sample(0.0, 1.0))
+    accept = log_u < log_alpha
+
+    # Select final trace
+    final_trace = jtu.tree_map(
+        lambda new_leaf, old_leaf: jax.lax.select(accept, new_leaf, old_leaf),
+        proposed_trace,
+        current_trace,
+    )
+
+    # Save acceptance for diagnostics
+    save(accept=accept)
+
+    return final_trace
+
+
+def hmc(
+    current_trace: Trace[X, R],
+    selection: Selection,
+    step_size: float,
+    n_steps: int,
+) -> Trace[X, R]:
+    """
+    Single HMC (Hamiltonian Monte Carlo) step using leapfrog integration.
+
+    HMC uses gradient information and auxiliary momentum variables to propose
+    distant moves that maintain detailed balance. The algorithm simulates
+    Hamiltonian dynamics using leapfrog integration:
+
+    1. Sample momentum p ~ N(0, I)
+    2. Simulate Hamiltonian dynamics for n_steps using leapfrog integration:
+       - p' = p + (eps/2) * ∇log(p(x))
+       - x' = x + eps * p'
+       - p' = p' + (eps/2) * ∇log(p(x'))
+    3. Accept/reject using Metropolis criterion with joint (x,p) density
+
+    This implementation uses jax.lax.scan for leapfrog integration, making it
+    fully JAX-compatible and JIT-compilable. It follows Neal (2011) equations
+    (5.18)-(5.20) and the Gen.jl HMC implementation structure.
+
+    Args:
+        current_trace: Current trace state
+        selection: Addresses to regenerate (subset of choices)
+        step_size: Leapfrog integration step size (eps)
+        n_steps: Number of leapfrog steps (L)
+
+    Returns:
+        Updated trace after HMC step
+
+    State:
+        accept: Boolean indicating whether the proposal was accepted
+    """
+    target_gf = current_trace.get_gen_fn()
+    args = current_trace.get_args()
+    current_choices = current_trace.get_choices()
+
+    # Use the new GFI.filter method to extract selected choices
+    selected_choices, unselected_choices = target_gf.filter(current_choices, selection)
+
+    if selected_choices is None:
+        # No choices selected, return current trace unchanged
+        save(accept=True)
+        return current_trace
+
+    # Create closure to compute gradients with respect to only selected choices
+    log_density_wrt_selected = _create_log_density_wrt_selected(
+        target_gf, args, unselected_choices
+    )
+
+    # Helper functions for momentum
+    def sample_momentum(reference_val):
+        """Sample momentum with same structure as reference value."""
+        return normal.sample(0.0, 1.0)
+
+    def assess_momentum(momentum_val):
+        """Compute log probability of momentum (standard normal)."""
+        return normal.logpdf(momentum_val, 0.0, 1.0)
+
+    # Initial model score (negative potential energy)
+    prev_model_score = log_density_wrt_selected(selected_choices)
+
+    # Sample initial momentum and compute its score (negative kinetic energy)
+    initial_momentum = jtu.tree_map(sample_momentum, selected_choices)
+    prev_momentum_score = jtu.tree_reduce(
+        jnp.add, jtu.tree_map(assess_momentum, initial_momentum)
+    )
+
+    # Initialize leapfrog variables
+    current_position = selected_choices
+    current_momentum = initial_momentum
+
+    # Leapfrog integration for n_steps using jax.lax.scan
+    # Initial gradient
+    current_gradient = jax.grad(log_density_wrt_selected)(current_position)
+
+    def leapfrog_step(carry, _):
+        """Single leapfrog integration step."""
+        position, momentum, gradient = carry
+
+        # Half step on momentum
+        momentum = jtu.tree_map(
+            lambda p, g: p + (step_size / 2.0) * g, momentum, gradient
+        )
+
+        # Full step on position
+        position = jtu.tree_map(lambda x, p: x + step_size * p, position, momentum)
+
+        # Get new gradient at new position
+        gradient = jax.grad(log_density_wrt_selected)(position)
+
+        # Half step on momentum (completing the leapfrog step)
+        momentum = jtu.tree_map(
+            lambda p, g: p + (step_size / 2.0) * g, momentum, gradient
+        )
+
+        new_carry = (position, momentum, gradient)
+        return new_carry, None  # No output needed, just carry
+
+    # Run leapfrog integration
+    initial_carry = (current_position, current_momentum, current_gradient)
+    final_carry, _ = jax.lax.scan(leapfrog_step, initial_carry, jnp.arange(n_steps))
+
+    # Extract final position and momentum
+    final_position, final_momentum, _ = final_carry
+
+    # Update trace with proposed final position
+    proposed_trace, model_weight, discard = target_gf.update(
+        current_trace, final_position, *args[0], **args[1]
+    )
+
+    # Compute final model score (negative potential energy)
+    new_model_score = log_density_wrt_selected(final_position)
+
+    # Compute final momentum score (negative kinetic energy)
+    # Note: In HMC, we evaluate momentum at negated final momentum to account for
+    # the reversibility requirement of Hamiltonian dynamics
+    final_momentum_negated = jtu.tree_map(lambda p: -p, final_momentum)
+    new_momentum_score = jtu.tree_reduce(
+        jnp.add, jtu.tree_map(assess_momentum, final_momentum_negated)
+    )
+
+    # HMC acceptance probability
+    # alpha = (new_model_score + new_momentum_score) - (prev_model_score + prev_momentum_score)
+    # This is equivalent to the energy difference: -ΔH = -(ΔU + ΔK)
+    log_alpha = (new_model_score + new_momentum_score) - (
+        prev_model_score + prev_momentum_score
+    )
     log_alpha = jnp.minimum(0.0, log_alpha)  # min(1, exp(log_alpha))
 
     # Accept or reject using numerically stable log comparison

@@ -19,6 +19,18 @@ src/genjax/inference/
 
 ## MCMC Algorithms (`mcmc.py`)
 
+### Helper Functions
+
+#### Log Density for Selected Choices
+**Function**: `_create_log_density_wrt_selected(target_gf, args, unselected_choices) -> Callable`
+**Location**: `mcmc.py:59-88`
+**Purpose**: Create log density function that only depends on selected addresses
+
+**Usage**: Internal helper shared by MALA and HMC for gradient computation. Creates a closure that:
+- Reconstructs full choice map by merging selected with unselected choices
+- Computes log density via `target_gf.assess`
+- Enables `jax.grad` to compute gradients w.r.t. selected addresses only
+
 ### Core Components
 
 #### Metropolis-Hastings (`mh`)
@@ -42,6 +54,19 @@ def mala_kernel(trace):
     selection = sel("continuous_param")
     step_size = 0.01  # Tune based on acceptance rate
     return mala(trace, selection, step_size)
+```
+
+#### HMC - Hamiltonian Monte Carlo (`hmc`)
+Hamiltonian dynamics for efficient exploration of continuous parameter spaces:
+
+```python
+from genjax.inference import hmc
+
+def hmc_kernel(trace):
+    selection = sel("continuous_param")
+    step_size = 0.1    # Leapfrog step size (eps)
+    n_steps = 10       # Number of leapfrog steps (L)
+    return hmc(trace, selection, step_size, n_steps)
 ```
 
 #### Chain Function (`chain`)
@@ -111,6 +136,41 @@ for step_size in step_sizes:
     if abs(acceptance_rate - target_acceptance) < 0.1:
         optimal_step_size = step_size
         break
+```
+
+#### Parameter Tuning for HMC
+```python
+# HMC requires tuning both step size and number of steps
+# Target acceptance rate: 0.6-0.9 (higher than MALA due to volume preservation)
+def tune_hmc_parameters(initial_trace, selection):
+    step_sizes = [0.01, 0.05, 0.1, 0.2]
+    n_steps_options = [5, 10, 20, 50]
+
+    best_params = None
+    best_ess_per_step = 0
+
+    for step_size in step_sizes:
+        for n_steps in n_steps_options:
+            def hmc_kernel(trace):
+                return hmc(trace, selection, step_size, n_steps)
+
+            result = run_hmc_chain(hmc_kernel, initial_trace)
+            acceptance_rate = result.acceptance_rate
+
+            # Good HMC should have acceptance rate 0.6-0.9
+            if 0.6 <= acceptance_rate <= 0.9:
+                # Compute effective sample size per leapfrog step
+                ess_per_step = compute_ess(result) / n_steps
+                if ess_per_step > best_ess_per_step:
+                    best_ess_per_step = ess_per_step
+                    best_params = (step_size, n_steps)
+
+    return best_params
+
+# HMC step size guidelines:
+# - Simple models (normal distributions): 0.1 - 0.5
+# - Complex models (banana, hierarchical): 0.001 - 0.05
+# - High-dimensional models: start with 0.01 and adjust
 ```
 
 #### Multi-Chain Diagnostics
@@ -409,6 +469,11 @@ all_particles = rejuvenation_smc(
   - Model has complex dependencies
   - Computational time is not critical
 - **Avoid when**: Real-time inference required
+
+**MCMC Method Selection**:
+- **MH**: General purpose, works with discrete and continuous parameters
+- **MALA**: Continuous parameters, uses gradients for better proposals
+- **HMC**: Continuous parameters, excellent for high-dimensional problems and models with complex posterior geometry
 
 #### SMC
 - **Best for**: Sequential/temporal models, particle filtering
