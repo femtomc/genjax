@@ -15,12 +15,6 @@
         "mcp-server-fetch"
       ]
     },
-    "git": {
-      "command": "uvx",
-      "args": [
-        "mcp-server-git"
-      ]
-    },
     "sequential-thinking": {
       "command": "npx",
       "args": [
