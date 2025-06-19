@@ -193,23 +193,23 @@ default = { solve-group = "default" }
 format = { features = ["format"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 examples = { features = ["examples"], solve-group = "default" }
-cuda = { features = ["cuda"], solve-group = "default" }
+cuda = { features = ["cuda"], solve-group = "cuda" }
 faircoin = { features = ["faircoin"], solve-group = "default" }
-faircoin-cuda = { features = ["faircoin", "cuda"], solve-group = "default" }
+faircoin-cuda = { features = ["faircoin", "cuda"], solve-group = "cuda" }
 curvefit = { features = ["curvefit"], solve-group = "default" }
-curvefit-cuda = { features = ["curvefit", "cuda"], solve-group = "default" }
+curvefit-cuda = { features = ["curvefit", "cuda"], solve-group = "cuda" }
 gol = { features = ["gol"], solve-group = "default" }
-gol-cuda = { features = ["gol", "cuda"], solve-group = "default" }
+gol-cuda = { features = ["gol", "cuda"], solve-group = "cuda" }
 localization = { features = ["localization"], solve-group = "default" }
-localization-cuda = { features = ["localization", "cuda"], solve-group = "default" }
+localization-cuda = { features = ["localization", "cuda"], solve-group = "cuda" }
 state-space = { features = ["state_space"], solve-group = "default" }
-state-space-cuda = { features = ["state_space", "cuda"], solve-group = "default" }
+state-space-cuda = { features = ["state_space", "cuda"], solve-group = "cuda" }
 gen2d = { features = ["gen2d"], solve-group = "default" }
-gen2d-cuda = { features = ["gen2d", "cuda"], solve-group = "default" }
+gen2d-cuda = { features = ["gen2d", "cuda"], solve-group = "cuda" }
 intuitive-psych = { features = ["intuitive_physics"], solve-group = "default" }
-intuitive-psych-cuda = { features = ["intuitive_physics", "cuda"], solve-group = "default" }
+intuitive-psych-cuda = { features = ["intuitive_physics", "cuda"], solve-group = "cuda" }
 programmable-mcts = { features = ["programmable_mcts"], solve-group = "default" }
-programmable-mcts-cuda = { features = ["programmable_mcts", "cuda"], solve-group = "default" }
+programmable-mcts-cuda = { features = ["programmable_mcts", "cuda"], solve-group = "cuda" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"
