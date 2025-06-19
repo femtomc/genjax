@@ -61,8 +61,7 @@ This guide covers the core GenJAX concepts implemented in:
 **Mathematical Properties**:
 
 - **Importance weights** enable unbiased Monte Carlo estimation
-- **Incremental importance weights** from update/regenerate enable MCMC acceptance probabilities
-- **Edit moves** (update, regenerate) provide efficient inference transitions
+- **Incremental importance weights** from update/regenerate enable MCMC acceptance probabilities and SMC weight updates
 - **Selection interface** enables fine-grained control over which choices to modify
 
 **Trace Interface**:
