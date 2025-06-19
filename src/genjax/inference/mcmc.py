@@ -416,7 +416,7 @@ def hmc(
     )
 
     # Helper functions for momentum
-    def sample_momentum(reference_val):
+    def sample_momentum(_):
         """Sample momentum with same structure as reference value."""
         return normal.sample(0.0, 1.0)
 

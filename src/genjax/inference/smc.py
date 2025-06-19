@@ -167,6 +167,24 @@ class ParticleCollection(Pytree):
             return jnp.sum(weights_normalized[:, None] * values, axis=0)
 
 
+def _create_particle_collection(
+    traces: Trace[X, R],
+    log_weights: jnp.ndarray,
+    n_samples: Const[int],
+    log_marginal_estimate: jnp.ndarray = None,
+) -> ParticleCollection:
+    """Helper to create ParticleCollection."""
+    if log_marginal_estimate is None:
+        log_marginal_estimate = jnp.array(0.0)
+
+    return ParticleCollection(
+        traces=traces,
+        log_weights=log_weights,
+        n_samples=n_samples,
+        log_marginal_estimate=log_marginal_estimate,
+    )
+
+
 def init(
     target_gf: GFI[X, R],
     target_args: tuple,
@@ -261,7 +279,7 @@ def init(
             target_gf, proposal_gf, target_args, constraints
         )
 
-    return ParticleCollection(
+    return _create_particle_collection(
         traces=traces,  # vectorized
         log_weights=log_weights,
         n_samples=const(n_samples.value),
@@ -335,7 +353,7 @@ def change(
         particles.traces, particles.log_weights
     )
 
-    return ParticleCollection(
+    return _create_particle_collection(
         traces=new_traces,
         log_weights=new_log_weights,
         n_samples=particles.n_samples,
@@ -348,7 +366,7 @@ def extend(
     extended_target_gf: GFI[X, R],
     extended_target_args: Any,  # Can be tuple or vectorized args
     constraints: X,
-    extension_proposal: GFI[X, Any] = None,
+    extension_proposal: GFI[X, Any] | None = None,
 ) -> ParticleCollection:
     """
     Extension move for particle collection.
@@ -415,7 +433,7 @@ def extend(
         particles.traces, particles.log_weights, extended_target_args
     )
 
-    return ParticleCollection(
+    return _create_particle_collection(
         traces=new_traces,
         log_weights=new_log_weights,
         n_samples=particles.n_samples,
@@ -484,7 +502,7 @@ def rejuvenate(
         particles.traces, particles.log_weights
     )
 
-    return ParticleCollection(
+    return _create_particle_collection(
         traces=new_traces,
         log_weights=new_log_weights,
         n_samples=particles.n_samples,
@@ -529,7 +547,7 @@ def resample(
     # Reset weights to uniform (zero in log space)
     uniform_log_weights = jnp.zeros(particles.n_samples.value)
 
-    return ParticleCollection(
+    return _create_particle_collection(
         traces=resampled_traces,
         log_weights=uniform_log_weights,
         n_samples=particles.n_samples,
@@ -539,10 +557,10 @@ def resample(
 
 def rejuvenation_smc(
     model: GFI[X, R],
-    transition_proposal: GFI[X, Any],
-    mcmc_kernel: Const[Callable[[Trace[X, R]], Trace[X, R]]],
-    observations: X,
-    initial_model_args: tuple,
+    transition_proposal: GFI[X, Any] | None = None,
+    mcmc_kernel: Const[Callable[[Trace[X, R]], Trace[X, R]]] | None = None,
+    observations: X | None = None,
+    initial_model_args: tuple | None = None,
     n_particles: Const[int] = const(1000),
     return_all_particles: Const[bool] = const(False),
     n_rejuvenation_moves: Const[int] = const(1),
@@ -554,6 +572,7 @@ def rejuvenation_smc(
     and MCMC rejuvenation. Uses a single model with feedback loop where
     the return value becomes the next timestep's arguments, creating
     sequential dependencies.
+
 
     Note on Return Value:
         This function returns only the FINAL ParticleCollection after processing
@@ -571,11 +590,13 @@ def rejuvenation_smc(
 
     Args:
         model: Single generative function where return value feeds into next timestep
-        transition_proposal: Proposal for extending particles at each timestep
-        mcmc_kernel: MCMC kernel for particle rejuvenation (wrapped in Const)
+        transition_proposal: Optional proposal for extending particles at each timestep.
+                           If None, uses the model's internal proposal. (default: None)
+        mcmc_kernel: Optional MCMC kernel for particle rejuvenation (wrapped in Const).
+                    If None, no rejuvenation moves are performed. (default: None)
         observations: Sequence of observations (can be Pytree structure)
         initial_model_args: Arguments for the first timestep
-        n_particles: Number of particles to maintain
+        n_particles: Number of particles to maintain (default: const(1000))
         return_all_particles: If True, returns all particles across time (default: const(False))
         n_rejuvenation_moves: Number of MCMC rejuvenation moves per timestep (default: const(1))
 
@@ -589,6 +610,27 @@ def rejuvenation_smc(
     # Initialize with first observation using the single model
     particles = init(model, initial_model_args, n_particles, first_obs)
 
+    # Resample initial particles if needed
+    ess = particles.effective_sample_size()
+    particles = jax.lax.cond(
+        ess < n_particles.value // 2,
+        lambda p: resample(p),
+        lambda p: p,
+        particles,
+    )
+
+    # Apply initial rejuvenation moves (only if mcmc_kernel is provided)
+    if mcmc_kernel is not None:
+
+        def rejuvenation_step(particles, _):
+            """Single rejuvenation move."""
+            return rejuvenate(particles, mcmc_kernel.value), None
+
+        # Apply n_rejuvenation_moves steps
+        particles, _ = jax.lax.scan(
+            rejuvenation_step, particles, jnp.arange(n_rejuvenation_moves.value)
+        )
+
     def smc_step(particles, obs):
         # Extract return values from current particles to use as next model args
         # Get vectorized return values from all particles
@@ -601,7 +643,7 @@ def rejuvenation_smc(
             model,
             current_retvals,  # Feed return values as next model args
             obs,
-            extension_proposal=transition_proposal,
+            extension_proposal=transition_proposal,  # None is allowed - uses model's internal proposal
         )
 
         # Resample if needed
@@ -613,15 +655,17 @@ def rejuvenation_smc(
             particles,
         )
 
-        # Multiple rejuvenation moves
-        def rejuvenation_step(particles, _):
-            """Single rejuvenation move."""
-            return rejuvenate(particles, mcmc_kernel.value), None
+        # Multiple rejuvenation moves (only if mcmc_kernel is provided)
+        if mcmc_kernel is not None:
 
-        # Apply n_rejuvenation_moves steps
-        particles, _ = jax.lax.scan(
-            rejuvenation_step, particles, jnp.arange(n_rejuvenation_moves.value)
-        )
+            def rejuvenation_step(particles, _):
+                """Single rejuvenation move."""
+                return rejuvenate(particles, mcmc_kernel.value), None
+
+            # Apply n_rejuvenation_moves steps
+            particles, _ = jax.lax.scan(
+                rejuvenation_step, particles, jnp.arange(n_rejuvenation_moves.value)
+            )
 
         return particles, particles  # (carry, output)
 

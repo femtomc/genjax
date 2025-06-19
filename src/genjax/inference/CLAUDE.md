@@ -211,6 +211,7 @@ posterior_variance = particles.estimate(lambda choices: choices["param"]**2) - p
 custom_expectation = particles.estimate(lambda choices: jnp.sin(choices["x"]) + choices["y"])
 ```
 
+
 ### Core Components
 
 #### Particle Initialization (`init`)
@@ -314,14 +315,15 @@ particles = resample(particles, method="systematic")
 ### Complete SMC Algorithm
 
 #### Rejuvenation SMC
-**Function**: `rejuvenation_smc(model, transition_proposal, mcmc_kernel, observations, initial_model_args, n_particles, return_all_particles, n_rejuvenation_moves) -> ParticleCollection`
+**Function**: `rejuvenation_smc(model, transition_proposal=None, mcmc_kernel=None, observations, initial_model_args, n_particles, return_all_particles, n_rejuvenation_moves) -> ParticleCollection`
 **Location**: `smc.py:540-643`
 **Purpose**: Full SMC algorithm with automatic resampling and rejuvenation
 
 **API Contract**:
 - Model signature: `(*args) -> return_value` where return feeds next timestep
 - Uses feedback loop: return value from t becomes args for t+1
-- `mcmc_kernel` must be wrapped in `Const[]`
+- `transition_proposal` is optional (default: None) - uses model's internal proposal if not provided
+- `mcmc_kernel` is optional (default: None) - no rejuvenation if not provided, must be wrapped in `Const[]` if used
 - Observations can be any Pytree structure
 - `return_all_particles` must be wrapped in `Const[bool]` (default: `const(False)`)
 - `n_rejuvenation_moves` must be wrapped in `Const[int]` (default: `const(1)`)
@@ -336,32 +338,41 @@ particles = resample(particles, method="systematic")
 - Uses nested `jax.lax.scan` for efficient implementation
 - Each move applies the same `mcmc_kernel` to all particles
 
+
 ### Getting All Timesteps from SMC
 
 **Built-in Support**: Use `return_all_particles=const(True)` parameter:
 ```python
-# Get all timesteps with default single rejuvenation move
+# Get all timesteps with model's internal proposal (no custom proposal)
 all_particles = rejuvenation_smc(
     model=model,
-    transition_proposal=transition_proposal,
-    mcmc_kernel=const(mcmc_kernel),
+    # transition_proposal=None,  # Optional - uses model's internal proposal
+    # mcmc_kernel=None,         # Optional - no rejuvenation moves
     observations=observations,
     initial_model_args=initial_args,
     n_particles=const(1000),
     return_all_particles=const(True)  # Returns all timesteps
 )
-# all_particles has shape (T, n_particles, ...) for all fields
 
-# With multiple rejuvenation moves for better mixing
+# With custom proposal and rejuvenation
 all_particles = rejuvenation_smc(
     model=model,
-    transition_proposal=transition_proposal,
-    mcmc_kernel=const(mcmc_kernel),
+    transition_proposal=transition_proposal,  # Optional custom proposal
+    mcmc_kernel=const(mcmc_kernel),          # Optional rejuvenation
     observations=observations,
     initial_model_args=initial_args,
     n_particles=const(1000),
     return_all_particles=const(True),
     n_rejuvenation_moves=const(5)  # 5 MCMC moves per timestep
+)
+
+# Model-only SMC (no custom proposal, no rejuvenation)
+final_particles = rejuvenation_smc(
+    model=model,
+    observations=observations,
+    initial_model_args=initial_args,
+    n_particles=const(1000)
+    # All other parameters use defaults
 )
 ```
 

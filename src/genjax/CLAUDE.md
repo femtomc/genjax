@@ -28,35 +28,53 @@ This guide covers the core GenJAX concepts implemented in:
 **Core GFI Methods** (all densities in log space):
 
 #### simulate
-**Method**: `simulate(*args) -> Trace`
-**Location**: `core.py:GFI.simulate`
+**Method**: `simulate(*args, **kwargs) -> Trace[X, R]`
+**Location**: `core.py:1032-1060`
 **Purpose**: Forward sampling from the generative function
 - Samples `(choices, retval) ~ P(·; args)`
 - Returns trace with `score = log(1/P(choices; args))`
 
 #### assess
-**Method**: `assess(choices, *args) -> (float, R)`
-**Location**: `core.py:GFI.assess`
+**Method**: `assess(x: X, *args, **kwargs) -> tuple[Density, R]`
+**Location**: `core.py:1098-1127`
 **Purpose**: Evaluate density at given choices
 - Returns `(log P(choices; args), retval)`
 
 #### generate
-**Method**: `generate(constraints, *args) -> (Trace, float)`
-**Location**: `core.py:GFI.generate`
+**Method**: `generate(x: X | None, *args, **kwargs) -> tuple[Trace[X, R], Weight]`
+**Location**: `core.py:1062-1096`
 **Purpose**: Constrained generation via importance sampling
 - Returns trace and weight: `log[P(all_choices) / Q(unconstrained | constrained)]`
 
 #### update
-**Method**: `update(trace, constraints, *new_args) -> (Trace, float, X)`
-**Location**: `core.py:GFI.update`
+**Method**: `update(tr: Trace[X, R], x_: X | None, *args, **kwargs) -> tuple[Tr[X, R], Weight, X | None]`
+**Location**: `core.py:1129-1166`
 **Purpose**: Edit move for MCMC/SMC
 - Returns new trace, incremental weight, discarded choices
 
 #### regenerate
-**Method**: `regenerate(trace, selection, *args, **kwargs) -> (Trace, float, X)`
-**Location**: `core.py:GFI.regenerate`
+**Method**: `regenerate(tr: Trace[X, R], sel: Selection, *args, **kwargs) -> tuple[Tr[X, R], Weight, X | None]`
+**Location**: `core.py:1168-1208`
 **Purpose**: Selective regeneration of addresses
 - Weight: `log P(new_selected | non_selected) - log P(old_selected | non_selected)`
+
+#### merge
+**Method**: `merge(x: X, x_: X) -> X`
+**Location**: `core.py:1210-1225`
+**Purpose**: Merge two choice maps, with the second taking precedence
+- Used internally for compositional generative functions
+
+#### filter
+**Method**: `filter(x: X, selection: Selection) -> tuple[X | None, X | None]`
+**Location**: `core.py:1227-1252`
+**Purpose**: Filter choice map into selected and unselected parts
+- Returns `(selected_choices, unselected_choices)`
+
+#### log_density
+**Method**: `log_density(x: X, *args, **kwargs) -> Score`
+**Location**: `core.py:1278-1285`
+**Purpose**: Convenience method for assess that sums log densities
+- Returns total log density as scalar
 
 **Mathematical Properties**:
 
@@ -67,20 +85,21 @@ This guide covers the core GenJAX concepts implemented in:
 **Trace Interface**:
 
 **Type**: `Trace[X, R]`
-**Location**: `core.py:185-220`
+**Location**: `core.py:537-630`
 **Methods**:
 - `get_retval() -> R`: Return value
 - `get_choices() -> X`: Random choices
-- `get_score() -> float`: Negative log probability
-- `get_args() -> tuple`: Function arguments
+- `get_score() -> Score`: Negative log probability
+- `get_args() -> Any`: Function arguments
 - `get_gen_fn() -> GFI[X, R]`: Source generative function
+- `get_fixed_choices() -> X`: Choices preserving Fixed wrappers
 
 ### Selection Interface
 
 **Selections** specify which addresses to target for regeneration and choice filter operations.
 
-**Function**: `sel(addr: str = None) -> Selection`
-**Location**: `core.py:sel function`
+**Function**: `sel(*v: tuple[()] | str | dict[str, Any] | None) -> Selection`
+**Location**: `core.py:930-975`
 **Purpose**: Create selection objects for targeting specific addresses
 
 **Selection Combinators**:
@@ -116,7 +135,8 @@ This guide covers the core GenJAX concepts implemented in:
 ### `@gen` Functions
 
 **Decorator**: `@gen`
-**Location**: `core.py:Fn class`
+**Function**: `gen(fn: Callable[..., R]) -> Fn[R]`
+**Location**: `core.py:2212-2248`
 **Purpose**: Transform Python functions into generative functions
 
 **Key Features**:
@@ -134,23 +154,23 @@ This guide covers the core GenJAX concepts implemented in:
 Higher-order generative functions for composition:
 
 #### Scan
-**Class**: `Scan(gf, length)`
-**Location**: `core.py:Scan`
+**Class**: `Scan[X, R](callee: GFI[X, R], length: Const[int])`
+**Location**: `core.py:2284-2492`
 **Purpose**: Sequential iteration like `jax.lax.scan`
 - `length` must be static (use `Const[int]`)
 - Addresses indexed automatically: `x_0`, `x_1`, ...
 - Returns `(final_carry, stacked_outputs)`
 
 #### Vmap
-**Method**: `gf.vmap(in_axes)`
-**Location**: `core.py:GFI.vmap`
+**Method**: `vmap(in_axes: int | tuple[int | None, ...] | Sequence[Any] | None = 0, axis_size=None, axis_name: str | None = None, spmd_axis_name: str | None = None) -> Vmap[X, R]`
+**Location**: `core.py:1254-1267`
 **Purpose**: Vectorization over generative functions
 - Works like `jax.vmap` but for probabilistic programs
 - `repeat(n)` method for independent sampling
 
 #### Cond
-**Class**: `Cond(true_gf, false_gf)`
-**Location**: `core.py:Cond`
+**Class**: `Cond[X, R](callee: GFI[X, R], callee_: GFI[X, R])`
+**Location**: `core.py:2545-2688`
 **Purpose**: Conditional execution
 - First argument to resulting GF must be boolean condition
 - Both branches must have same return type
@@ -278,9 +298,9 @@ Higher-order generative functions for composition:
 
 ### The `Const[...]` Pattern
 
-**Type**: `Const[T]`
-**Function**: `const(value) -> Const[T]`
-**Location**: `core.py:Const`
+**Type**: `Const[A]`
+**Function**: `const(a: A) -> Const[A]`
+**Location**: `core.py:194-437`
 **Purpose**: Preserve static values across JAX transformations
 
 **When to Use**:

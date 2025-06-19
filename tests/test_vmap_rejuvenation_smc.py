@@ -40,7 +40,7 @@ def model_with_vmap(prev_state):
     )
 
     # Apply vectorized sensor - this fails during rejuvenation_smc
-    observations = vectorized_sensor(true_distances, ray_indices) @ "sensors"
+    vectorized_sensor(true_distances, ray_indices) @ "sensors"
 
     return new_state
 
@@ -108,9 +108,9 @@ def model_without_vmap(prev_state):
     new_state = normal(prev_state + 0.1, 0.2) @ "state"
 
     # Manual sensor observations (no Vmap)
-    obs_0 = normal(1.0, 0.1) @ "sensor_0"
-    obs_1 = normal(2.0, 0.1) @ "sensor_1"
-    obs_2 = normal(3.0, 0.1) @ "sensor_2"
+    normal(1.0, 0.1) @ "sensor_0"
+    normal(2.0, 0.1) @ "sensor_1"
+    normal(3.0, 0.1) @ "sensor_2"
 
     return new_state
 
@@ -183,7 +183,7 @@ def model_with_debug_vmap(prev_state):
         spmd_axis_name=Const(None),
     )
 
-    observations = vectorized_sensor(true_distances, ray_indices) @ "sensors"
+    vectorized_sensor(true_distances, ray_indices) @ "sensors"
     return new_state
 
 
@@ -262,7 +262,7 @@ def localization_like_model(prev_pose, world_size):
     )
 
     # This fails during rejuvenation_smc
-    lidar_obs = vectorized_lidar(true_distances, ray_indices) @ "lidar"
+    vectorized_lidar(true_distances, ray_indices) @ "lidar"
 
     return current_pose, world_size
 

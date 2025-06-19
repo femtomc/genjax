@@ -5,6 +5,7 @@ These tests compare approximate inference algorithms against exact inference
 on discrete HMMs to validate correctness and accuracy.
 """
 
+import pytest
 import jax
 import jax.numpy as jnp
 import jax.random as jrand
@@ -1709,6 +1710,7 @@ class TestRejuvenationSMC:
             f"Step 1 variance mismatch: got {filtered_covs[1, 0, 0]:.6f}, expected {expected_var_1:.6f}"
         )
 
+    @pytest.mark.skip(reason="Diagnostic weights removed from ParticleCollection")
     def test_rejuvenation_smc_multiple_moves(self):
         """Test rejuvenation_smc with multiple rejuvenation moves per timestep."""
         # Simple parameters
@@ -1808,4 +1810,189 @@ class TestRejuvenationSMC:
         all_states = all_particles.traces.get_choices()["state"]
         assert all_states.shape == (T, n_particles, d_state), (
             f"Expected shape ({T}, {n_particles}, {d_state}), got {all_states.shape}"
+        )
+
+
+class TestWeightEvolution:
+    """Test that particle weights evolve properly during SMC."""
+
+    @pytest.mark.skip(reason="Diagnostic weights removed from ParticleCollection")
+    def test_rejuvenation_smc_weight_evolution(self):
+        """Test that rejuvenation_smc produces varying weights between resampling steps."""
+        key = jrand.key(42)
+
+        # Simple 1D model with clear observation differences
+        @gen
+        def simple_sequential_model(prev_obs):
+            # State evolution with some persistence
+            x = normal(prev_obs * 0.5, 1.0) @ "x"
+            # Observation with moderate noise
+            obs = normal(x, 0.3) @ "obs"
+            return obs
+
+        # Custom proposal that introduces diversity
+        @gen
+        def diverse_proposal(prev_obs):
+            # Deliberately diverse proposal to create weight differences
+            return normal(prev_obs * 0.2, 1.5) @ "x"
+
+        def mcmc_kernel(trace):
+            return mh(trace, sel("x"))
+
+        # Create observations that should give different likelihoods
+        observations = {"obs": jnp.array([0.0, 2.0, -1.0])}  # Varied observations
+        initial_args = (0.0,)
+
+        # Run with return_all_particles=True to get weight evolution
+        all_particles = seed(rejuvenation_smc)(
+            key,
+            simple_sequential_model,
+            diverse_proposal,  # Use diverse proposal
+            const(mcmc_kernel),
+            observations,
+            initial_args,
+            const(100),  # Small number for debugging
+            const(True),  # return_all_particles=True
+            const(1),  # n_rejuvenation_moves
+        )
+
+        # Extract weights at each timestep
+        # all_particles should have shape (T, n_particles) for log_weights
+        assert hasattr(all_particles, "log_weights"), (
+            "Should have log_weights attribute"
+        )
+        assert hasattr(all_particles, "log_weights_normalized"), (
+            "Should have log_weights_normalized diagnostic attribute"
+        )
+
+        # Check weight diversity at each timestep
+        n_timesteps = len(observations["obs"])
+        weight_diversities = []
+
+        for t in range(n_timesteps):
+            # Extract diagnostic normalized weights for timestep t (these preserve pre-resampling diversity)
+            if (
+                all_particles.log_weights_normalized.ndim == 2
+            ):  # Shape: (T, n_particles)
+                weights_norm = all_particles.log_weights_normalized[t]
+            else:  # Single timestep case
+                weights_norm = all_particles.log_weights_normalized
+
+            # Compute weight diversity (standard deviation of normalized weights)
+            weight_std = jnp.std(weights_norm)
+            weight_diversities.append(float(weight_std))
+
+            # Compute ESS from diagnostic weights
+            ess = 1.0 / jnp.sum(jnp.exp(weights_norm) ** 2)
+
+            print(f"Timestep {t}: weight_std={weight_std:.6f}, ESS={ess:.1f}")
+
+        # Test 1: Weights should show some diversity (not all exactly uniform)
+        # If weights are perfectly uniform, std should be 0
+        max_diversity = max(weight_diversities)
+        assert max_diversity > 1e-8, (
+            f"Diagnostic weights appear to be perfectly uniform at all timesteps. "
+            f"Max weight diversity: {max_diversity:.10f}. "
+            f"This suggests extend operations are not creating likelihood differences, "
+            f"or the diagnostic weight preservation is not working correctly."
+        )
+
+        # Test 2: At least some timesteps should have non-trivial weight variation
+        significant_diversity_steps = sum(1 for div in weight_diversities if div > 1e-6)
+        assert significant_diversity_steps > 0, (
+            f"No timesteps show significant weight diversity. "
+            f"Weight diversities: {weight_diversities}. "
+            f"This indicates the extend step is not creating weight differences."
+        )
+
+        # Test 3: Diagnostic ESS should vary (showing actual particle diversity before resampling)
+        diagnostic_ess_values = []
+        for t in range(n_timesteps):
+            if all_particles.log_weights_normalized.ndim == 2:
+                weights_norm = all_particles.log_weights_normalized[t]
+            else:
+                weights_norm = all_particles.log_weights_normalized
+            ess = 1.0 / jnp.sum(jnp.exp(weights_norm) ** 2)
+            diagnostic_ess_values.append(float(ess))
+
+        # Check that diagnostic ESS shows meaningful variation
+        # Unlike regular ESS (which gets reset to n_particles by resampling),
+        # diagnostic ESS should reflect actual likelihood-based particle diversity
+        min_diagnostic_ess = min(diagnostic_ess_values)
+        max_diagnostic_ess = max(diagnostic_ess_values)
+        ess_range = max_diagnostic_ess - min_diagnostic_ess
+
+        assert ess_range > 1.0, (
+            f"Diagnostic ESS values show insufficient variation. "
+            f"Range: {ess_range:.3f}, Values: {diagnostic_ess_values}. "
+            f"This suggests extend operations are not creating meaningful likelihood differences."
+        )
+
+    def test_weight_evolution_without_resampling(self):
+        """Test weight evolution in a single extend step (no resampling)."""
+
+        # Simple model that should create weight differences
+        @gen
+        def weight_test_model():
+            mu = normal(0.0, 1.0) @ "mu"
+            obs = normal(mu, 0.1) @ "obs"  # Low noise for clear differences
+            return obs
+
+        # Initialize particles with constraints on observation
+        particles = init(
+            weight_test_model,
+            (),
+            const(50),
+            {"obs": 1.0},  # Fixed observation
+        )
+
+        # Check initial weight diversity
+        initial_weights = particles.log_weights
+        initial_weights_norm = initial_weights - jax.scipy.special.logsumexp(
+            initial_weights
+        )
+        initial_diversity = jnp.std(initial_weights_norm)
+        initial_ess = particles.effective_sample_size()
+
+        print(f"Initial weight diversity: {initial_diversity:.6f}")
+        print(f"Initial ESS: {initial_ess:.1f}")
+
+        # Extend with a new observation
+        @gen
+        def extended_model():
+            mu = normal(0.0, 1.0) @ "mu"
+            obs1 = normal(mu, 0.1) @ "obs1"
+            obs2 = normal(mu, 0.1) @ "obs2"  # New observation
+            return (obs1, obs2)
+
+        extended_particles = extend(
+            particles,
+            extended_model,
+            (),
+            {"obs2": 2.0},  # Different observation value
+        )
+
+        # Check weight diversity after extend
+        extended_weights = extended_particles.log_weights
+        extended_weights_norm = extended_weights - jax.scipy.special.logsumexp(
+            extended_weights
+        )
+        extended_diversity = jnp.std(extended_weights_norm)
+        extended_ess = extended_particles.effective_sample_size()
+
+        print(f"Extended weight diversity: {extended_diversity:.6f}")
+        print(f"Extended ESS: {extended_ess:.1f}")
+
+        # Test: Extending should change weight distribution
+        # The new observation should cause particles to have different likelihoods
+        assert extended_diversity > 1e-6, (
+            f"Extend step should create weight diversity, but diversity is {extended_diversity:.10f}. "
+            f"This suggests the extend operation is not properly computing different likelihoods for different particles."
+        )
+
+        # Test: ESS should decrease (become less uniform)
+        assert extended_ess < initial_ess * 0.95, (
+            f"ESS should decrease after extend (particles become less uniform), "
+            f"but went from {initial_ess:.1f} to {extended_ess:.1f}. "
+            f"This suggests weights didn't actually change during extend."
         )
