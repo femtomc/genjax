@@ -122,6 +122,7 @@ interpreter to maintain correct hierarchical structure even under complex
 JAX transformations.
 """
 
+from dataclasses import dataclass, field
 from functools import wraps
 
 import jax.extend as jex
@@ -130,11 +131,8 @@ from jax.extend.core import Jaxpr
 from jax.util import safe_map, split_list
 from jax.lax import scan_p, scan
 
-from genjax.core import (
-    Callable,
-    Any,
-    Pytree,
-)
+import beartype.typing as btyping
+
 from genjax.pjax import (
     PPPrimitive,
     Environment,
@@ -143,6 +141,10 @@ from genjax.pjax import (
     TerminalStyle,
     initial_style_bind,
 )
+
+# Type aliases for convenience
+Any = btyping.Any
+Callable = btyping.Callable
 
 
 # State primitive for tagging values to be collected
@@ -187,8 +189,8 @@ def _nested_dict_get(d, path):
     return current
 
 
-@Pytree.dataclass
-class State(Pytree):
+@dataclass
+class State:
     """JAX interpreter that collects tagged state values.
 
     This interpreter processes JAX computations and collects values that
@@ -197,7 +199,7 @@ class State(Pytree):
     """
 
     collected_state: dict[str, Any]
-    namespace_stack: list[str] = Pytree.field(default_factory=list)
+    namespace_stack: list[str] = field(default_factory=list)
 
     def eval_jaxpr_state(
         self,
