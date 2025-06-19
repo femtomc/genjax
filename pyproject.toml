@@ -35,8 +35,10 @@ seaborn = "*"
 numpyro = "*"
 
 [tool.pixi.feature.faircoin.tasks]
+cmd = "faircoin"
 # Beta-Bernoulli framework comparison (GenJAX vs NumPyro vs handcoded JAX)
 setup = "mkdir -p examples/faircoin/figs"  # Create output directory
+faircoin = "pixi run python -m examples.faircoin.main --combined"  # Main command (combined timing + posterior)
 faircoin-timing = "pixi run python -m examples.faircoin.main"  # Timing comparison only
 faircoin-combined = "pixi run python -m examples.faircoin.main --combined"  # Combined timing + posterior figure (recommended)
 
@@ -50,6 +52,7 @@ numpyro = "*"
 pyro-ppl = "*"
 
 [tool.pixi.feature.curvefit.tasks]
+cmd = "curvefit"
 # Curve fitting with multiple frameworks
 setup = "mkdir -p examples/curvefit/figs"  # Create output directory
 curvefit = "pixi run python examples/curvefit/main.py"  # Run main curvefit example
@@ -84,6 +87,7 @@ examples-setup = "mkdir -p examples/faircoin/figs examples/curvefit/figs example
 matplotlib = "*"
 
 [tool.pixi.feature.gol.tasks]
+cmd = "gol"
 # Game of Life inference
 gol = "pixi run python -m examples.gol.main"  # Generate all figures
 gol-blinker = "pixi run python -m examples.gol.main --mode blinker"  # Blinker reconstruction
@@ -96,6 +100,7 @@ matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.localization.tasks]
+cmd = "localization"
 # Particle filter localization
 localization = "pixi run python -m examples.localization.main"  # Run localization example
 
@@ -104,6 +109,7 @@ matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.state_space.tasks]
+cmd = "state-space"
 # State space models
 state-space = "pixi run python -m examples.state_space.main"  # Basic state space example
 state-space-all = "pixi run python -m examples.state_space.main --all"  # All analyses
@@ -120,6 +126,7 @@ matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.gen2d.tasks]
+cmd = "gen2d"
 # 2D generative models
 gen2d = "pixi run python -m examples.gen2d.main"  # Basic gen2d example
 gen2d-all = "pixi run python -m examples.gen2d.main --all"  # All analyses
@@ -130,6 +137,7 @@ matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.intuitive_physics.tasks]
+cmd = "intuitive-physics"
 # Physics simulation inference
 setup = "mkdir -p examples/intuitive_physics/figs"  # Create output directory
 intuitive-physics = "pixi run python -m examples.intuitive_physics.main"  # Basic run
@@ -146,6 +154,7 @@ matplotlib = "*"
 seaborn = "*"
 
 [tool.pixi.feature.programmable_mcts.tasks]
+cmd = "programmable-mcts"
 # Monte Carlo Tree Search
 setup = "mkdir -p examples/programmable_mcts/figs"  # Create output directory
 programmable-mcts = "pixi run python -m examples.programmable_mcts.main"  # Basic run
