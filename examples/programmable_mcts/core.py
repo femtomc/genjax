@@ -12,6 +12,7 @@ import jax.numpy as jnp
 import jax.random as jrand
 from typing import Any, List, Optional, Dict
 import math
+from genjax.distributions import normal
 
 from genjax.core import gen
 
@@ -268,8 +269,6 @@ class MCTS:
 # =============================================================================
 # EXAMPLE: SIMPLE PROBABILISTIC TIC-TAC-TOE MODEL
 # =============================================================================
-
-from genjax.distributions import normal
 
 
 @gen

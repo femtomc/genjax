@@ -8,7 +8,7 @@ Focuses on the probabilistic aspects without complex physics.
 import jax
 import jax.numpy as jnp
 import jax.random as jrand
-from genjax import gen, normal, Pytree, modular_vmap as vmap, seed, Vmap, Const
+from genjax import gen, normal, Pytree, seed, Vmap, Const
 
 
 # Data structures
@@ -412,7 +412,7 @@ def localization_model(prev_pose, time_index, world, n_rays=Const(128)):
     )
 
     # Apply vectorized sensor model
-    observed_distances = vectorized_sensor(true_distances, ray_indices) @ "measurements"
+    vectorized_sensor(true_distances, ray_indices) @ "measurements"
 
     return current_pose, time_index + 1, world, n_rays
 
@@ -505,66 +505,11 @@ def resample_particles(particles, weights, key):
     return resampled_particles
 
 
-def particle_filter_step(particles, weights, observation, world, key):
-    """Single step of particle filter using step model with control inference.
-
-    Now the step model infers controls internally, so we don't need to provide them.
-    """
-
-    # Predict: apply step model to each particle using vectorization
-    seeded_step = seed(step_model.simulate)
-    particle_keys = jrand.split(key, len(particles))
-
-    # Vectorized particle prediction using vmap
-    def predict_single_particle(particle_key, particle):
-        trace = seeded_step(particle_key, particle, world)  # Pass as separate arguments
-        return trace.get_retval()
-
-    # Use vmap to vectorize over particles
-    vectorized_predict = vmap(predict_single_particle, in_axes=(0, 0))
-
-    # Convert particles list to arrays for vmap
-    particle_xs = jnp.array([p.x for p in particles])
-    particle_ys = jnp.array([p.y for p in particles])
-    particle_thetas = jnp.array([p.theta for p in particles])
-    particle_array = Pose(x=particle_xs, y=particle_ys, theta=particle_thetas)
-
-    # Apply vectorized prediction
-    predicted_pose_array = vectorized_predict(particle_keys, particle_array)
-
-    # Convert back to list of individual Pose objects
-    predicted_poses = [
-        Pose(
-            predicted_pose_array.x[i],
-            predicted_pose_array.y[i],
-            predicted_pose_array.theta[i],
-        )
-        for i in range(len(particles))
-    ]
-
-    # Update: weight particles by observation likelihood (LIDAR vector)
-    def compute_weight(pose):
-        # For vectorized LIDAR observations using Vmap
-        # The Vmap combinator expects choices in the structure: {"measurements": {"distance": [array of distances]}}
-        choices = {"measurements": {"distance": observation}}
-        try:
-            log_weight, _ = sensor_model.assess(choices, pose, world)
-            # log_weight should now be a scalar (joint log density from Vmap.assess)
-            weight = jnp.exp(log_weight)
-            # Avoid numerical issues using JAX conditionals
-            is_valid = jnp.logical_and(jnp.isfinite(weight), weight > 0)
-            return jnp.where(is_valid, jnp.maximum(weight, 1e-10), 1e-10)
-        except Exception as e:
-            print(f"Error computing weight: {e}")
-            return 1e-10
-
-    # Compute weights for all particles
-    new_weights = jnp.array([compute_weight(pose) for pose in predicted_poses])
-    print(f"    Weight range: [{jnp.min(new_weights):.2e}, {jnp.max(new_weights):.2e}]")
-    print(f"    Weight variance: {jnp.var(new_weights):.2e}")
-    print(f"    Non-uniform weights: {jnp.sum(new_weights > 1e-9)}/{len(new_weights)}")
-
-    return predicted_poses, new_weights
+# Legacy particle filter function - not used with rejuvenation_smc API
+# def particle_filter_step(particles, weights, observation, world, key):
+#     """Single step of particle filter using step model with control inference."""
+#     # This function is deprecated in favor of rejuvenation_smc API
+#     pass
 
 
 def run_particle_filter(

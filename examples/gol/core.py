@@ -7,7 +7,7 @@ from jax import jit
 from jax.lax import dynamic_slice, scan
 from jax.nn import softmax
 from matplotlib import animation
-from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+from matplotlib.gridspec import GridSpec
 
 from genjax import Pytree, Trace, flip, gen, get_choices, seed, trace
 from genjax import modular_vmap as vmap
@@ -93,7 +93,9 @@ def generate_state_pair(n_y: int, n_x: int, p_flip):
         n_x: The number of columns in the state. (Const)
         p_flip: The probability of flipping a cell value.
     """
-    init = flip.vmap().vmap()(0.5 * jnp.ones((n_y, n_x))) @ "init"
+    init = (
+        flip.vmap(in_axes=(0,)).vmap(in_axes=(0,))(0.5 * jnp.ones((n_y, n_x))) @ "init"
+    )
     step = generate_next_state(init, p_flip) @ "step"
     return (init, step)
 
@@ -119,17 +121,16 @@ def get_gibbs_probs_fast(i, j, current_state, future_state, p_flip):
     def get_score_for_val(val_at_ij):
         def _next_y(next_y):
             def _next_x(next_x):
-                return get_cell_from_window.log_density(
-                    (
-                        window_for_next_cell_at_offset(
-                            next_y,
-                            next_x,
-                            val_at_ij,
-                        ),
-                        p_flip,
-                    ),
+                density, _ = get_cell_from_window.assess(
                     {"bit": future_state[next_y, next_x]},
+                    window_for_next_cell_at_offset(
+                        next_y,
+                        next_x,
+                        val_at_ij,
+                    ),
+                    p_flip,
                 )
+                return density
 
             return vmap(_next_x)(relevant_next_xs)
 
@@ -215,7 +216,8 @@ class GibbsSamplerState(Pytree):
         )
 
     def p_flip(self):
-        return self.inferred_trace.get_args()[2]
+        args = self.inferred_trace.get_args()
+        return args[2] if len(args) > 2 else 0.03  # fallback to default
 
     def inferred_prev_board(self):
         return get_choices(self.inferred_trace)["init"]
@@ -244,8 +246,8 @@ class GibbsSampler(Pytree):
             init_q_trace = proposal.simulate()
             p_trace, _ = generate_state_pair.generate(
                 {**init_q_trace.get_choices(), **step},
-                n_x,
                 n_y,
+                n_x,
                 p_flip,
             )
             return GibbsSamplerState(p_trace)
@@ -261,7 +263,8 @@ class GibbsSampler(Pytree):
         self,
         current_state: GibbsSamplerState,
     ) -> GibbsSamplerState:
-        p_flip = current_state.inferred_trace.get_args()[2]
+        args = current_state.inferred_trace.get_args()
+        p_flip = args[2] if len(args) > 2 else self.p_flip
         choices = get_choices(current_state.inferred_trace)
         init_img = choices["init"]
         future_img = choices["step"]["cells"]["bit"]
@@ -270,7 +273,7 @@ class GibbsSampler(Pytree):
             future_img,
             p_flip,
         )
-        new_trace, _, _ = current_state.inferred_trace.update(
+        new_trace, _, _ = generate_state_pair.update(
             current_state.inferred_trace,
             {"init": new_state},
             self.target_image.shape[0],
@@ -360,6 +363,196 @@ def run_sampler_and_get_summary(
 ### Animation ###
 
 
+def _setup_samples_grid(ax, frame_data, rollout_data, title_suffix=""):
+    """Setup 4x4 grid of different inferred samples"""
+    ax.clear()
+
+    # Select 16 samples from the available data (spread across timeline)
+    n_available = len(frame_data)
+    if n_available >= 16:
+        # Take samples evenly spaced across the timeline
+        indices = jnp.linspace(0, n_available - 1, 16, dtype=int)
+    else:
+        # Repeat samples if we don't have enough
+        indices = jnp.tile(jnp.arange(n_available), (16 // n_available + 1))[:16]
+
+    # Create 4x4 grid where each cell shows a different inferred sample
+    for grid_i in range(4):
+        for grid_j in range(4):
+            sample_idx = grid_i * 4 + grid_j
+            data_idx = indices[sample_idx]
+
+            # Get the Life grid for this sample
+            if title_suffix == "rollout":
+                sample_grid = rollout_data[data_idx]
+            else:
+                sample_grid = frame_data[data_idx]
+
+            # Calculate position for this sample grid
+            base_x = grid_j
+            base_y = 3 - grid_i  # Flip Y to match matrix indexing
+
+            # Draw the actual Life grid (scaled to fit in the cell)
+            grid_size = 0.9  # Size of the Life grid within the cell
+            offset = (1 - grid_size) / 2  # Center the grid
+
+            # Determine cell size based on the Life grid dimensions
+            life_rows, life_cols = sample_grid.shape
+            cell_height = grid_size / life_rows
+            cell_width = grid_size / life_cols
+
+            # Draw each cell of the Life grid
+            for life_i in range(life_rows):
+                for life_j in range(life_cols):
+                    cell_x = base_x + offset + life_j * cell_width
+                    cell_y = (
+                        base_y + offset + (life_rows - 1 - life_i) * cell_height
+                    )  # Flip Y
+
+                    # Color based on the Life cell value
+                    cell_value = int(sample_grid[life_i, life_j])
+                    color = "black" if cell_value == 1 else "white"
+                    alpha = 0.9 if cell_value == 1 else 0.1
+
+                    ax.add_patch(
+                        plt.Rectangle(
+                            (cell_x, cell_y),
+                            cell_width,
+                            cell_height,
+                            facecolor=color,
+                            alpha=alpha,
+                            edgecolor="gray",
+                            linewidth=0.3,
+                        )
+                    )
+
+            # Draw border around this sample
+            ax.add_patch(
+                plt.Rectangle(
+                    (base_x + offset, base_y + offset),
+                    grid_size,
+                    grid_size,
+                    facecolor="none",
+                    edgecolor="black",
+                    linewidth=1.0,
+                )
+            )
+
+            # Add Gibbs chain index as small text
+            gibbs_index = int(indices[sample_idx])
+            ax.text(
+                base_x + 0.05,
+                base_y + 0.95,
+                str(gibbs_index),
+                ha="left",
+                va="top",
+                fontsize=8,
+                fontweight="bold",
+                color="red",
+            )
+
+    ax.set_xlim(0, 4)
+    ax.set_ylim(0, 4)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def get_gol_sampler_separate_figures(
+    target_image,
+    run_summary: GibbsRunSummary,
+    n_steps_per_frame: int,
+):
+    """Create separate monitoring and samples figures"""
+
+    # Create monitoring figure - squeezed horizontally to match faircoin aesthetics
+    monitoring_fig = plt.figure(figsize=(10, 3.5), constrained_layout=True)
+    gs_mon = GridSpec(
+        1, 3, figure=monitoring_fig, width_ratios=[1.2, 1.2, 0.8], wspace=0.3
+    )
+    ax1 = monitoring_fig.add_subplot(gs_mon[0, 0])  # Score plot
+    ax2 = monitoring_fig.add_subplot(gs_mon[0, 1])  # Softness plot
+    ax3 = monitoring_fig.add_subplot(gs_mon[0, 2])  # Target state
+
+    # Create samples figure (Previous states, Rollouts)
+    samples_fig = plt.figure(figsize=(10, 5), constrained_layout=True)
+    gs_samp = GridSpec(1, 2, figure=samples_fig, width_ratios=[1, 1])
+    ax4 = samples_fig.add_subplot(gs_samp[0, 0])  # 16 Previous states
+    ax5 = samples_fig.add_subplot(gs_samp[0, 1])  # 16 Rollout states
+
+    # Setup monitoring plots with faircoin-style font sizes
+    ax1.set_title("Predictive Posterior Score", fontsize=20, fontweight="bold")
+    ax2.set_title("Softness Parameter", fontsize=20, fontweight="bold")
+    ax3.set_title("Target State", fontsize=20, fontweight="bold")
+
+    # Setup samples plots
+    ax4.set_title("16 Inferred Previous States", fontsize=14)
+    ax5.set_title("16 One-Step Rollouts", fontsize=14)
+
+    # Configure score plot with faircoin-style aesthetics
+    n_frames = len(run_summary.predictive_posterior_scores)
+    original_n_frames = n_frames * n_steps_per_frame
+    ax1.plot(
+        jnp.arange(
+            0, n_steps_per_frame * len(run_summary.trace_scores), n_steps_per_frame
+        ),
+        run_summary.predictive_posterior_scores,
+        lw=3,
+        color="black",
+    )
+    ax1.set_xlim(0, original_n_frames - 1)
+    ax1.set_ylim(
+        min(run_summary.predictive_posterior_scores),
+        max(run_summary.predictive_posterior_scores),
+    )
+    ax1.set_ylabel("Log P(Target|Inf)", fontsize=18)
+    ax1.tick_params(axis="x", which="major", labelbottom=False)  # Remove x-axis labels
+    ax1.tick_params(axis="y", which="major", labelsize=16)
+
+    # Configure softness plot with faircoin-style aesthetics
+    ax2.plot(
+        jnp.arange(0, n_steps_per_frame * len(run_summary.p_flips), n_steps_per_frame),
+        run_summary.p_flips,
+        lw=3,
+        color="black",
+    )
+    ax2.set_xlim(0, original_n_frames - 1)
+    ax2.set_ylim(min(run_summary.p_flips), max(run_summary.p_flips))
+    ax2.set_ylabel("Softness", fontsize=18)
+    ax2.tick_params(axis="x", which="major", labelbottom=False)  # Remove x-axis labels
+    ax2.tick_params(axis="y", which="major", labelsize=16)
+
+    # Configure target state
+    ax3.imshow(target_image, cmap="gray", vmin=0, vmax=1)
+    ax3.axis("off")
+    ax3.set_aspect("equal")
+
+    # Make the plots approximately the same height as the target state
+    ax1.set_aspect("auto")
+    ax2.set_aspect("auto")
+
+    # Setup sample grids (use final frame)
+    final_frame = n_frames - 1
+
+    # Setup previous states grid
+    _setup_samples_grid(
+        ax4,
+        run_summary.inferred_prev_boards[: final_frame + 1],
+        run_summary.inferred_reconstructed_targets[: final_frame + 1],
+        "previous",
+    )
+
+    # Setup rollouts grid
+    _setup_samples_grid(
+        ax5,
+        run_summary.inferred_prev_boards[: final_frame + 1],
+        run_summary.inferred_reconstructed_targets[: final_frame + 1],
+        "rollout",
+    )
+
+    return monitoring_fig, samples_fig
+
+
 def get_gol_figure_and_updater(
     target_image,
     run_summary: GibbsRunSummary,
@@ -368,36 +561,32 @@ def get_gol_figure_and_updater(
     include_time_line=True,
     grid_layout=True,
 ):
-    n_frames = len(run_summary.predictive_posterior_scores)
+    """Create combined figure (backwards compatibility)"""
+    # For backwards compatibility with animation, create the combined figure
+    fig = plt.figure(figsize=(14, 8), constrained_layout=True)
+    gs_main = GridSpec(
+        2,
+        12,
+        figure=fig,
+        height_ratios=[0.3, 1],
+        width_ratios=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    )
+    # Keep previous layout code for animations...
+    ax4 = fig.add_subplot(gs_main[1, 4:7])  # 16 Previous states (3 cols)
+    ax5 = fig.add_subplot(gs_main[1, 7:10])  # 16 Rollout states (3 cols)
+    ax1 = fig.add_subplot(gs_main[0, 4:5])  # Score plot
+    ax2 = fig.add_subplot(gs_main[0, 6:7])  # Softness plot (with gap)
+    ax3 = fig.add_subplot(gs_main[0, 8:9])  # Target state (with gap)
 
-    if grid_layout:
-        fig = plt.figure(figsize=(10, 8), constrained_layout=True)
-        gs_main = GridSpec(2, 2, figure=fig, height_ratios=[1, 1])
-        gs_sub = GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_main[0, 0], hspace=0.8)
-        ax1 = fig.add_subplot(gs_sub[0, 0])
-        ax2 = fig.add_subplot(gs_sub[1, 0])
-        ax3 = fig.add_subplot(gs_main[0, 1])
-        ax4 = fig.add_subplot(gs_main[1, 0])
-        ax5 = fig.add_subplot(gs_main[1, 1])
-    else:
-        fig = plt.figure(figsize=(12, 4), constrained_layout=True)
-        gs_main = GridSpec(1, 4, figure=fig)
-        gs_sub = GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_main[0, 0], hspace=0.8)
-        ax1 = fig.add_subplot(gs_sub[0, 0])
-        ax2 = fig.add_subplot(gs_sub[1, 0])
-        ax4 = fig.add_subplot(gs_main[0, 1])
-        ax5 = fig.add_subplot(gs_main[0, 2])
-        ax3 = fig.add_subplot(gs_main[0, 3])
+    # Set square aspect ratio for target state
+    ax3.set_aspect("equal")
 
     # Titles for each subplot
-    ax1.set_title("Predictive Posterior Score")
-    ax2.set_title("Softness Parameter")
-    ax3.set_title("Target State to Reconstruct")
-    ax4.set_title("Inferred Previous State")
-    if grid_layout:
-        ax5.set_title("One-Step Rollout from Inferred Previous State")
-    else:
-        ax5.set_title("One-Step Rollout from\nInferred Previous State")
+    ax1.set_title("Predictive Posterior Score", fontsize=12)
+    ax2.set_title("Softness Parameter", fontsize=12)
+    ax3.set_title("Target State", fontsize=12)
+    ax4.set_title("16 Inferred Previous States", fontsize=12)
+    ax5.set_title("16 One-Step Rollouts", fontsize=12)
 
     # Score and p_flip plots (animated)
     (score_line,) = ax1.plot([], [], lw=2, color="black")
@@ -410,17 +599,117 @@ def get_gol_figure_and_updater(
     ax3.imshow(target_image, cmap="gray", vmin=0, vmax=1)
     ax3.axis("off")
 
-    # Inferred previous board state (animated)
-    prev_board_img = ax4.imshow(
-        run_summary.inferred_prev_boards[0], cmap="gray", vmin=0, vmax=1
-    )
-    ax4.axis("off")
+    # Create 4x4 grid of different inferred samples visualization
+    def setup_samples_grid_display(ax, frame_data, rollout_data, title_suffix=""):
+        ax.clear()
 
-    # Inferred reconstructed target (animated)
-    reconstructed_img = ax5.imshow(
-        run_summary.inferred_reconstructed_targets[0], cmap="gray", vmin=0, vmax=1
+        # Select 16 samples from the available data (spread across timeline)
+        n_available = len(frame_data)
+        if n_available >= 16:
+            # Take samples evenly spaced across the timeline
+            indices = jnp.linspace(0, n_available - 1, 16, dtype=int)
+        else:
+            # Repeat samples if we don't have enough
+            indices = jnp.tile(jnp.arange(n_available), (16 // n_available + 1))[:16]
+
+        # Create 4x4 grid where each cell shows a different inferred sample
+        for grid_i in range(4):
+            for grid_j in range(4):
+                sample_idx = grid_i * 4 + grid_j
+                data_idx = indices[sample_idx]
+
+                # Get the Life grid for this sample
+                if title_suffix == "rollout":
+                    sample_grid = rollout_data[data_idx]
+                else:
+                    sample_grid = frame_data[data_idx]
+
+                # Calculate position for this sample grid
+                base_x = grid_j
+                base_y = 3 - grid_i  # Flip Y to match matrix indexing
+
+                # Draw the actual Life grid (scaled to fit in the cell)
+                grid_size = 0.9  # Size of the Life grid within the cell
+                offset = (1 - grid_size) / 2  # Center the grid
+
+                # Determine cell size based on the Life grid dimensions
+                life_rows, life_cols = sample_grid.shape
+                cell_height = grid_size / life_rows
+                cell_width = grid_size / life_cols
+
+                # Draw each cell of the Life grid
+                for life_i in range(life_rows):
+                    for life_j in range(life_cols):
+                        cell_x = base_x + offset + life_j * cell_width
+                        cell_y = (
+                            base_y + offset + (life_rows - 1 - life_i) * cell_height
+                        )  # Flip Y
+
+                        # Color based on the Life cell value
+                        cell_value = int(sample_grid[life_i, life_j])
+                        color = "black" if cell_value == 1 else "white"
+                        alpha = 0.9 if cell_value == 1 else 0.1
+
+                        ax.add_patch(
+                            plt.Rectangle(
+                                (cell_x, cell_y),
+                                cell_width,
+                                cell_height,
+                                facecolor=color,
+                                alpha=alpha,
+                                edgecolor="gray",
+                                linewidth=0.3,
+                            )
+                        )
+
+                # Draw border around this sample
+                ax.add_patch(
+                    plt.Rectangle(
+                        (base_x + offset, base_y + offset),
+                        grid_size,
+                        grid_size,
+                        facecolor="none",
+                        edgecolor="black",
+                        linewidth=1.0,
+                    )
+                )
+
+                # Add Gibbs chain index as small text
+                gibbs_index = int(indices[sample_idx])
+                ax.text(
+                    base_x + 0.05,
+                    base_y + 0.95,
+                    str(gibbs_index),
+                    ha="left",
+                    va="top",
+                    fontsize=8,
+                    fontweight="bold",
+                    color="red",
+                )
+
+        ax.set_xlim(0, 4)
+        ax.set_ylim(0, 4)
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        return []
+
+    # Initialize with frame 0 data
+    setup_samples_grid_display(
+        ax4,
+        run_summary.inferred_prev_boards,
+        run_summary.inferred_reconstructed_targets,
+        "previous",
     )
-    ax5.axis("off")
+
+    # Initialize rollout display
+    setup_samples_grid_display(
+        ax5,
+        run_summary.inferred_prev_boards,
+        run_summary.inferred_reconstructed_targets,
+        "rollout",
+    )
 
     # Set limits for the score plot, adjusting for n_steps_per_frame
     original_n_frames = len(run_summary.predictive_posterior_scores) * n_steps_per_frame
@@ -429,16 +718,21 @@ def get_gol_figure_and_updater(
         min(run_summary.predictive_posterior_scores),
         max(run_summary.predictive_posterior_scores),
     )
-    ax1.set_xlabel("# Gibbs Sweeps Performed")
-    ax1.set_ylabel("Log P(Target | Inferred)")
+    ax1.set_xlabel("# Gibbs Sweeps", fontsize=10)
+    ax1.set_ylabel("Log P(Target|Inf)", fontsize=10)
+    ax1.tick_params(axis="both", which="major", labelsize=8)
 
     # Set limits for the p_flip plot, adjusting for n_steps_per_frame
     ax2.set_xlim(0, original_n_frames - 1)
     ax2.set_ylim(min(run_summary.p_flips), max(run_summary.p_flips))
-    ax2.set_xlabel("# Gibbs Sweeps Performed")
-    ax2.set_ylabel("Softness")
+    ax2.set_xlabel("# Gibbs Sweeps", fontsize=10)
+    ax2.set_ylabel("Softness", fontsize=10)
+    ax2.tick_params(axis="both", which="major", labelsize=8)
 
-    plt.tight_layout()
+    # Skip tight_layout since we're using constrained_layout=True
+    
+    # Define number of frames for animation
+    n_frames = len(run_summary.predictive_posterior_scores)
 
     def update(frame):
         """Animation function to update the frames."""
@@ -461,8 +755,20 @@ def get_gol_figure_and_updater(
             ),
             run_summary.p_flips,
         )
-        prev_board_img.set_array(run_summary.inferred_prev_boards[frame])
-        reconstructed_img.set_array(run_summary.inferred_reconstructed_targets[frame])
+        # Update samples grid displays for current frame
+        # For animation, we could show samples up to current frame
+        current_frame_data = run_summary.inferred_prev_boards[: frame + 1]
+        current_rollout_data = run_summary.inferred_reconstructed_targets[: frame + 1]
+
+        # Update previous board samples grid
+        setup_samples_grid_display(
+            ax4, current_frame_data, current_rollout_data, "previous"
+        )
+
+        # Update reconstructed target samples grid
+        setup_samples_grid_display(
+            ax5, current_frame_data, current_rollout_data, "rollout"
+        )
         if include_time_line:
             score_bar.set_xdata([original_frame])
             p_flip_bar.set_xdata([original_frame])
@@ -471,13 +777,11 @@ def get_gol_figure_and_updater(
             return (
                 score_line,
                 p_flip_line,
-                prev_board_img,
-                reconstructed_img,
                 score_bar,
                 p_flip_bar,
             )
         else:
-            return score_line, p_flip_line, prev_board_img, reconstructed_img
+            return score_line, p_flip_line
 
     return fig, update, n_frames
 
@@ -511,7 +815,7 @@ def get_gol_sampler_lastframe_figure(
         target_image,
         run_summary,
         n_steps_per_frame,
-        grid_layout=False,
+        grid_layout=True,
         include_time_line=False,
         **anim_kwargs,
     )
