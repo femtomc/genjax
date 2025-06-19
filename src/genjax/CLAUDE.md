@@ -23,7 +23,7 @@ This guide covers the core GenJAX concepts implemented in:
 
 - Measure kernel $P(dx; args)$ over measurable space $X$ (the model distribution)
 - Return value function $f(x, args) \rightarrow R$ (deterministic computation from choices)
-- Internal proposal family $Q(dx; args, context)$ (for efficient inference)
+- Internal proposal family $Q(dx'; args, x)$
 
 **Core GFI Methods** (all densities in log space):
 
