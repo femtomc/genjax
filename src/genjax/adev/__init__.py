@@ -57,14 +57,8 @@ import jax._src.core
 import jax.dtypes
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from beartype.typing import Annotated, Any, Callable
 from beartype.vale import Is
-from genjax.core import (
-    Pytree,
-    Const,
-    const,
-    distribution,
-)
+from genjax.core import Pytree, Const, const, distribution, Any, Callable, Annotated
 from genjax.pjax import (
     PPPrimitive,
     Environment,

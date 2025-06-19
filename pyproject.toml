@@ -64,9 +64,16 @@ vulture = "vulture"
 precommit-install = "pre-commit install"
 precommit-run = "pre-commit run --all-files"
 
+[tool.pixi.feature.docs.dependencies]
+quarto = "*"
+jupyter-cache = "*"
+matplotlib = "*"
+ipykernel = "*"
+
 [tool.pixi.feature.docs.tasks]
-deploy = "quarto publish gh-pages ./quarto"
-preview = "quarto preview ./quarto"
+docs-build = "quarto render ./docs"
+docs-preview = "quarto preview ./docs"
+docs-deploy = "quarto publish gh-pages ./docs"
 
 [tool.pixi.feature.test.tasks]
 test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"
@@ -89,6 +96,16 @@ seaborn = "*"
 [tool.pixi.feature.localization.tasks]
 localization = "pixi run python -m examples.localization.main"
 
+[tool.pixi.feature.rejuvenation_smc.dependencies]
+matplotlib = "*"
+seaborn = "*"
+
+[tool.pixi.feature.rejuvenation_smc.tasks]
+rejuv-smc = "pixi run python -m examples.rejuvenation_smc.main --benchmark"
+rejuv-smc-all = "pixi run python -m examples.rejuvenation_smc.main --all --quick"
+rejuv-smc-accuracy = "pixi run python -m examples.rejuvenation_smc.main --accuracy --quick"
+rejuv-smc-efficiency = "pixi run python -m examples.rejuvenation_smc.main --efficiency --quick"
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
 format = { features = ["format"], solve-group = "default" }
@@ -98,6 +115,7 @@ faircoin = { features = ["faircoin"], solve-group = "default" }
 curvefit = { features = ["curvefit"], solve-group = "default" }
 gol = { features = ["gol"], solve-group = "default" }
 localization = { features = ["localization"], solve-group = "default" }
+rejuv-smc = { features = ["rejuvenation_smc"], solve-group = "default" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"
