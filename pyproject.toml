@@ -11,14 +11,17 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [tool.pixi.workspace]
-channels = ["conda-forge"]
+channels = ["conda-forge", "nvidia"]
 platforms = ["osx-arm64", "linux-64"]
 
-[tool.pixi.pypi-dependencies]
-genjax = { path = ".", editable = true }
+[tool.pixi.system-requirements]
+cuda = "12"
 
 [tool.pixi.dependencies]
 jax = ">=0.6.0,<0.7"
+
+[tool.pixi.pypi-dependencies]
+genjax = { path = ".", editable = true }
 
 [tool.vulture]
 make_whitelist = true
@@ -166,19 +169,47 @@ programmable-mcts-demo = "pixi run python -m examples.programmable_mcts.main --m
 programmable-mcts-visualizations = "pixi run python -m examples.programmable_mcts.main --mode visualizations"  # Visualizations
 programmable-mcts-all = "pixi run python -m examples.programmable_mcts.main --mode all"  # All modes
 
+[tool.pixi.feature.cuda.target.linux-64.dependencies]
+# CUDA-enabled JAX for GPU acceleration on linux-64
+jaxlib = { version = ">=0.6.0,<0.7", build = "*cuda12*" }
+
+[tool.pixi.feature.cuda.tasks]
+# CUDA GPU acceleration tasks
+cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); print(f\"JAX devices: {jax.devices()}\"); print(f\"Default backend: {jax.default_backend()}\")'"  # Check CUDA availability
+cuda-test = "pixi run test -k 'not slow'"  # Run tests with CUDA backend
+# CUDA-accelerated case studies
+cuda-faircoin = "pixi run -e faircoin-cuda faircoin"  # Run faircoin with CUDA
+cuda-curvefit = "pixi run -e curvefit-cuda curvefit"  # Run curvefit with CUDA
+cuda-gol = "pixi run -e gol-cuda gol"  # Run Game of Life with CUDA
+cuda-localization = "pixi run -e localization-cuda localization"  # Run localization with CUDA
+cuda-state-space = "pixi run -e state-space-cuda state-space"  # Run state space with CUDA
+cuda-gen2d = "pixi run -e gen2d-cuda gen2d"  # Run gen2d with CUDA
+cuda-intuitive-psych = "pixi run -e intuitive-psych-cuda intuitive-psych"  # Run intuitive physics with CUDA
+cuda-programmable-mcts = "pixi run -e programmable-mcts-cuda programmable-mcts"  # Run MCTS with CUDA
+cuda-examples-all = "pixi run -e faircoin-cuda faircoin && pixi run -e curvefit-cuda curvefit && pixi run -e gol-cuda gol && pixi run -e localization-cuda localization && pixi run -e state-space-cuda state-space && pixi run -e gen2d-cuda gen2d && pixi run -e intuitive-psych-cuda intuitive-psych && pixi run -e programmable-mcts-cuda programmable-mcts"  # Run all examples with CUDA
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
 format = { features = ["format"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 examples = { features = ["examples"], solve-group = "default" }
+cuda = { features = ["cuda"], solve-group = "default" }
 faircoin = { features = ["faircoin"], solve-group = "default" }
+faircoin-cuda = { features = ["faircoin", "cuda"], solve-group = "default" }
 curvefit = { features = ["curvefit"], solve-group = "default" }
+curvefit-cuda = { features = ["curvefit", "cuda"], solve-group = "default" }
 gol = { features = ["gol"], solve-group = "default" }
+gol-cuda = { features = ["gol", "cuda"], solve-group = "default" }
 localization = { features = ["localization"], solve-group = "default" }
+localization-cuda = { features = ["localization", "cuda"], solve-group = "default" }
 state-space = { features = ["state_space"], solve-group = "default" }
+state-space-cuda = { features = ["state_space", "cuda"], solve-group = "default" }
 gen2d = { features = ["gen2d"], solve-group = "default" }
+gen2d-cuda = { features = ["gen2d", "cuda"], solve-group = "default" }
 intuitive-psych = { features = ["intuitive_physics"], solve-group = "default" }
+intuitive-psych-cuda = { features = ["intuitive_physics", "cuda"], solve-group = "default" }
 programmable-mcts = { features = ["programmable_mcts"], solve-group = "default" }
+programmable-mcts-cuda = { features = ["programmable_mcts", "cuda"], solve-group = "default" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"
