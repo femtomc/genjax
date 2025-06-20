@@ -1369,9 +1369,13 @@ class Vmap(Generic[X, R], GFI[X, R]):
         *args,
         **kwargs,
     ) -> tuple[Tr[X, R], Weight]:
+        if self.in_axes.value is None:
+            in_axes = (0,) + (None,) * len(args)
+        else:
+            in_axes = (0,) + self.in_axes.value
         tr, w = modular_vmap(
             self.gen_fn.generate,
-            in_axes=(0,) + self.in_axes.value,
+            in_axes=in_axes,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
@@ -1384,9 +1388,13 @@ class Vmap(Generic[X, R], GFI[X, R]):
         *args,
         **kwargs,
     ) -> tuple[Density, R]:
+        if self.in_axes.value is None:
+            in_axes = (0,) + (None,) * len(args)
+        else:
+            in_axes = (0,) + self.in_axes.value
         density, retval = modular_vmap(
             self.gen_fn.assess,
-            in_axes=(0,) + self.in_axes.value,
+            in_axes=in_axes,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
@@ -1400,9 +1408,13 @@ class Vmap(Generic[X, R], GFI[X, R]):
         *args,
         **kwargs,
     ) -> tuple[Tr[X, R], Weight, X | None]:
+        if self.in_axes.value is None:
+            in_axes = (0, 0) + (None,) * len(args)
+        else:
+            in_axes = (0, 0) + self.in_axes.value
         new_tr, w, discard = modular_vmap(
             self.gen_fn.update,
-            in_axes=(0, 0) + self.in_axes.value,
+            in_axes=in_axes,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
@@ -1416,9 +1428,13 @@ class Vmap(Generic[X, R], GFI[X, R]):
         *args,
         **kwargs,
     ) -> tuple[Tr[X, R], Weight, X | None]:
+        if self.in_axes.value is None:
+            in_axes = (0, None) + (None,) * len(args)
+        else:
+            in_axes = (0, None) + self.in_axes.value
         new_tr, w, discard = modular_vmap(
             self.gen_fn.regenerate,
-            in_axes=(0, None) + self.in_axes.value,
+            in_axes=in_axes,
             axis_size=self.axis_size.value,
             axis_name=self.axis_name.value,
             spmd_axis_name=self.spmd_axis_name.value,
