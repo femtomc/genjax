@@ -451,9 +451,9 @@ def combined_comparison_fig(
     ax_timing.set_yticks([])  # Remove y-axis ticks
     ax_timing.set_xlabel("Relative Performance (% of Handcoded JAX time)", fontsize=22)
 
-    # Add clarification in center of plot
+    # Add clarification on right side of plot
     ax_timing.text(
-        0.50,
+        0.85,
         0.85,
         "Smaller bar is better",
         transform=ax_timing.transAxes,

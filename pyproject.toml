@@ -178,7 +178,7 @@ jaxlib = { version = ">=0.6.0,<0.7", build = "*cuda12*" }
 cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); print(f\"JAX devices: {jax.devices()}\"); print(f\"Default backend: {jax.default_backend()}\")'"  # Check CUDA availability
 cuda-test = "pixi run test -k 'not slow'"  # Run tests with CUDA backend
 # CUDA-accelerated case studies
-cuda-faircoin = "pixi run -e faircoin-cuda faircoin"  # Run faircoin with CUDA
+cuda-faircoin = "pixi run -e faircoin-cuda setup && pixi run -e faircoin-cuda faircoin"  # Run faircoin with CUDA (setup figs dir first)
 cuda-curvefit = "pixi run -e curvefit-cuda curvefit"  # Run curvefit with CUDA
 cuda-gol = "pixi run -e gol-cuda gol"  # Run Game of Life with CUDA
 cuda-localization = "pixi run -e localization-cuda localization"  # Run localization with CUDA
