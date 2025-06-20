@@ -47,19 +47,15 @@ matplotlib = "*"
 numpy = "*"
 
 [tool.pixi.feature.curvefit.pypi-dependencies]
-torch = "*"
 numpyro = "*"
-pyro-ppl = "*"
 
 [tool.pixi.feature.curvefit.tasks]
 cmd = "curvefit"
-# Curve fitting with multiple frameworks
+# Curve fitting with GenJAX and NumPyro
 setup = "mkdir -p examples/curvefit/figs"  # Create output directory
-curvefit = "pixi run python examples/curvefit/main.py"  # Run main curvefit example
+curvefit = "pixi run python examples/curvefit/main.py --mode genjax-fast"  # Run fast GenJAX mode (default)
+curvefit-full = "pixi run python examples/curvefit/main.py --mode all"  # Run full analysis (slow)
 curvefit-data = "pixi run python examples/curvefit/data.py"  # Generate/process data
-curvefit-core = "pixi run python examples/curvefit/core.py"  # Run core analysis
-curvefit-figs = "pixi run python examples/curvefit/figs.py"  # Generate figures
-curvefit-all = "pixi run curvefit-core && pixi run curvefit-figs"  # Run core + generate figures
 
 [tool.pixi.feature.format.tasks]
 # Code formatting and linting
@@ -179,14 +175,15 @@ cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); 
 cuda-test = "pixi run test -k 'not slow'"  # Run tests with CUDA backend
 # CUDA-accelerated case studies
 cuda-faircoin = "pixi run -e faircoin-cuda setup && pixi run -e faircoin-cuda faircoin"  # Run faircoin with CUDA (setup figs dir first)
-cuda-curvefit = "pixi run -e curvefit-cuda curvefit"  # Run curvefit with CUDA
+cuda-curvefit = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit"  # Run curvefit with CUDA (fast mode)
+cuda-curvefit-full = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit-full"  # Run full curvefit with CUDA (slow)
 cuda-gol = "pixi run -e gol-cuda gol"  # Run Game of Life with CUDA
 cuda-localization = "pixi run -e localization-cuda localization"  # Run localization with CUDA
 cuda-state-space = "pixi run -e state-space-cuda state-space"  # Run state space with CUDA
 cuda-gen2d = "pixi run -e gen2d-cuda gen2d"  # Run gen2d with CUDA
 cuda-intuitive-psych = "pixi run -e intuitive-psych-cuda intuitive-psych"  # Run intuitive physics with CUDA
 cuda-programmable-mcts = "pixi run -e programmable-mcts-cuda programmable-mcts"  # Run MCTS with CUDA
-cuda-examples-all = "pixi run -e faircoin-cuda faircoin && pixi run -e curvefit-cuda curvefit && pixi run -e gol-cuda gol && pixi run -e localization-cuda localization && pixi run -e state-space-cuda state-space && pixi run -e gen2d-cuda gen2d && pixi run -e intuitive-psych-cuda intuitive-psych && pixi run -e programmable-mcts-cuda programmable-mcts"  # Run all examples with CUDA
+cuda-examples-all = "pixi run cuda-faircoin && pixi run cuda-curvefit && pixi run cuda-gol && pixi run cuda-localization"  # Run core examples with CUDA (fast modes)
 
 [tool.pixi.environments]
 default = { solve-group = "default" }

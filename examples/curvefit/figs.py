@@ -36,7 +36,7 @@ def save_onepoint_trace_viz():
     print("Making and saving onepoint trace visualization.")
     trace = onepoint_curve.simulate(0.0)
     fig = visualize_onepoint_trace(trace)
-    fig.savefig("figs/010_onepoint_trace.pdf")
+    fig.savefig("examples/curvefit/figs/010_onepoint_trace.pdf")
 
 
 ## Multipoint trace visualization ##
@@ -82,7 +82,7 @@ def save_multipoint_trace_viz():
     xs = jnp.linspace(-1, 11, 10)  # 10 points covering the full visualization range
     trace = npoint_curve.simulate(xs)
     fig = visualize_multipoint_trace(trace, yrange=(-1.5, 1.5))
-    fig.savefig("figs/020_multipoint_trace.pdf")
+    fig.savefig("examples/curvefit/figs/020_multipoint_trace.pdf")
 
 
 ## 4 Multipoint trace visualization ##
@@ -110,7 +110,9 @@ def save_four_multipoint_trace_vizs():
         fig = visualize_multipoint_trace(
             trace, figsize=(1, 0.5), yrange=(-3, 3), show_ticks=False
         )
-        fig.savefig(f"figs/03{i}_batched_multipoint_trace.pdf", pad_inches=0)
+        fig.savefig(
+            f"examples/curvefit/figs/03{i}_batched_multipoint_trace.pdf", pad_inches=0
+        )
 
     print("Making and saving visualizations of trace densities.")
     densities = vmap(
@@ -120,7 +122,9 @@ def save_four_multipoint_trace_vizs():
     for i in range(4):
         density_val = jnp.asarray(densities[i]).item()
         fig = make_fig_with_centered_number(density_val)
-        fig.savefig(f"figs/04{i}_batched_multipoint_trace_density.pdf")
+        fig.savefig(
+            f"examples/curvefit/figs/04{i}_batched_multipoint_trace_density.pdf"
+        )
 
 
 ## Inference-related figures ##
@@ -153,7 +157,7 @@ def save_inference_viz(n_curves_to_plot=100):
     plt.gca().spines["top"].set_visible(False)
     plt.gca().spines["right"].set_visible(False)
     plt.tight_layout(pad=0.2)
-    fig.savefig("figs/050_inference_viz.pdf")
+    fig.savefig("examples/curvefit/figs/050_inference_viz.pdf")
 
 
 ## Inference time & quality scaling plots ##
@@ -223,7 +227,7 @@ def save_inference_scaling_viz():
     plt.gca().spines["top"].set_visible(False)
     plt.gca().spines["right"].set_visible(False)
     plt.tight_layout(pad=0.2)
-    fig.savefig("figs/060_inference_time_scaling.pdf")
+    fig.savefig("examples/curvefit/figs/060_inference_time_scaling.pdf")
 
     ## Plot 2: Inference quality scaling ##
     print("Making and saving inference quality scaling visualization.")
@@ -236,7 +240,7 @@ def save_inference_scaling_viz():
     plt.gca().spines["right"].set_visible(False)
     plt.legend()
     plt.tight_layout(pad=0.2)
-    fig.savefig("figs/061_inference_quality_scaling.pdf")
+    fig.savefig("examples/curvefit/figs/061_inference_quality_scaling.pdf")
 
 
 def save_comprehensive_benchmark_figure(
@@ -335,7 +339,7 @@ def save_comprehensive_benchmark_figure(
             freq = freq_samples[idx]
             offset = offset_samples[idx]
 
-            # Handle different data types (JAX, NumPy, PyTorch)
+            # Handle different data types (JAX, NumPy)
             if hasattr(freq, "item"):
                 freq = freq.item()
             if hasattr(offset, "item"):
@@ -413,7 +417,9 @@ def save_comprehensive_benchmark_figure(
     fig.text(0.02, 0.02, param_text, fontsize=14, alpha=0.7)
 
     # Save figure
-    filename = f"figs/benchmark_comparison_n{n_points}_s{n_samples}.pdf"
+    filename = (
+        f"examples/curvefit/figs/benchmark_comparison_n{n_points}_s{n_samples}.pdf"
+    )
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()
 
@@ -551,9 +557,11 @@ def plot_inference_diagnostics(curve, xs, ys, samples, log_weights):
     ax4.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig("figs/genjax_diagnostics.pdf", dpi=150, bbox_inches="tight")
+    plt.savefig(
+        "examples/curvefit/figs/genjax_diagnostics.pdf", dpi=150, bbox_inches="tight"
+    )
     plt.close()
-    print("Saved diagnostic plot as 'figs/genjax_diagnostics.pdf'")
+    print("Saved diagnostic plot as 'examples/curvefit/figs/genjax_diagnostics.pdf'")
 
 
 def save_genjax_scaling_benchmark(
@@ -977,7 +985,7 @@ True Parameters:
     ax10.tick_params(labelsize=20)
 
     # Save figure
-    filename = f"figs/genjax_scaling_benchmark_n{n_points}.pdf"
+    filename = f"examples/curvefit/figs/genjax_scaling_benchmark_n{n_points}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()
 
@@ -1573,7 +1581,7 @@ def save_genjax_posterior_comparison(
     )
 
     # Save figure
-    filename = f"figs/genjax_posterior_comparison_n{n_points}.pdf"
+    filename = f"examples/curvefit/figs/genjax_posterior_comparison_n{n_points}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()
 

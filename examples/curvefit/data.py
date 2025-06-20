@@ -2,14 +2,13 @@
 Common data generation for curvefit case study.
 
 This module provides standardized test datasets for benchmarking across
-GenJAX, Pyro, and NumPyro implementations. All frameworks use the same
+GenJAX and NumPyro implementations. All frameworks use the same
 underlying data to ensure fair comparisons.
 """
 
 import jax.numpy as jnp
 import jax.random as jrand
 import numpy as np
-import torch
 
 
 def sinfn(x, freq, offset):
@@ -78,28 +77,6 @@ def generate_test_dataset(
     }
 
     return result
-
-
-def convert_to_torch(data_dict):
-    """
-    Convert JAX arrays to PyTorch tensors for Pyro implementation.
-
-    Args:
-        data_dict: Dictionary from generate_test_dataset
-
-    Returns:
-        Dictionary with PyTorch tensors
-    """
-    torch_dict = {}
-    for key, value in data_dict.items():
-        if isinstance(value, jnp.ndarray):
-            torch_dict[key] = torch.from_numpy(np.array(value)).float()
-        elif isinstance(value, dict):
-            torch_dict[key] = convert_to_torch(value)
-        else:
-            torch_dict[key] = value
-
-    return torch_dict
 
 
 def convert_to_numpy(data_dict):
@@ -186,14 +163,10 @@ if __name__ == "__main__":
     print_dataset_summary(data, "Default Test Dataset")
 
     # Show framework-specific conversions
-    torch_data = convert_to_torch(data)
     numpy_data = convert_to_numpy(data)
 
     print("\nFramework conversions:")
     print(f"  JAX xs shape: {data['xs'].shape}, dtype: {data['xs'].dtype}")
-    print(
-        f"  PyTorch xs shape: {torch_data['xs'].shape}, dtype: {torch_data['xs'].dtype}"
-    )
     print(
         f"  NumPy xs shape: {numpy_data['xs'].shape}, dtype: {numpy_data['xs'].dtype}"
     )

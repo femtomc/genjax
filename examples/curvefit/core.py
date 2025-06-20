@@ -17,8 +17,6 @@ from numpyro.handlers import replay, seed as numpyro_seed
 from numpyro.infer.util import log_density
 from numpyro.infer import MCMC, HMC
 
-# Pyro imports (disabled - implementation not included in this version)
-PYRO_AVAILABLE = False
 
 pi = jnp.pi
 tfd = tfp.distributions
@@ -397,176 +395,6 @@ numpyro_run_hmc_inference_jit = jax.jit(
 )
 
 
-# # Pyro Implementation (disabled)
-# # if PYRO_AVAILABLE:
-# #     def pyro_sinfn(x, freq, offset):
-#     """Sine function with frequency and offset parameters."""
-#     return torch.sin(2.0 * math.pi * freq * x + offset)
-#
-# def pyro_point_model(x, freq, offset, idx, obs=None):
-#     """Pyro model for a single data point with Gaussian noise."""
-#     y_det = pyro_sinfn(x, freq, offset)
-#     y_observed = pyro.sample(f"obs_{idx}", pyro_dist.Normal(y_det, 0.3), obs=obs)
-#     return y_observed
-#
-# def pyro_npoint_model(xs, obs_dict=None):
-#     """Pyro model for multiple data points with shared sine wave parameters."""
-#     freq = pyro.sample("freq", pyro_dist.Exponential(10.0))
-#     offset = pyro.sample("offset", pyro_dist.Uniform(0.0, 2.0 * math.pi))
-#
-#     ys = []
-#     for i, x in enumerate(xs):
-#         with pyro.plate(f"data_{i}", 1):
-#             obs_val = None
-#             if obs_dict is not None and "obs" in obs_dict:
-#                 obs_val = obs_dict["obs"][i] if i < len(obs_dict["obs"]) else None
-#             y = pyro_point_model(x, freq, offset, i, obs=obs_val)
-#             ys.append(y)
-#
-#     return torch.stack(ys)
-#
-# def pyro_guide_npoint(xs, obs_dict=None):
-#     """Guide for importance sampling that samples from the prior."""
-#     pyro.sample("freq", pyro_dist.Exponential(10.0))
-#     pyro.sample("offset", pyro_dist.Uniform(0.0, 2.0 * math.pi))
-#
-# def pyro_run_importance_sampling(xs, ys, num_samples=1000):
-#     """Run importance sampling inference using Pyro."""
-#     # Convert JAX arrays to numpy first, then to torch tensors
-#     if hasattr(xs, "__array__"):  # JAX array
-#         xs = np.array(xs)
-#     if hasattr(ys, "__array__"):  # JAX array
-#         ys = np.array(ys)
-#     if isinstance(xs, (list, np.ndarray)):
-#         xs = torch.tensor(xs, dtype=torch.float32)
-#     if isinstance(ys, (list, np.ndarray)):
-#         ys = torch.tensor(ys, dtype=torch.float32)
-#
-#     pyro.clear_param_store()
-#
-#     samples = []
-#     log_weights = []
-#
-#     for _ in range(num_samples):
-#         guide_trace = pyro.poutine.trace(pyro_guide_npoint).get_trace(xs)
-#         guide_log_prob = guide_trace.log_prob_sum()
-#
-#         conditions = {}
-#         for i, y in enumerate(ys):
-#             conditions[f"obs_{i}"] = y
-#
-#         conditioned_model = pyro.poutine.condition(
-#             pyro_npoint_model, data=conditions
-#         )
-#         replayed_model = pyro.poutine.replay(conditioned_model, trace=guide_trace)
-#         model_trace = pyro.poutine.trace(replayed_model).get_trace(xs)
-#
-#         model_log_prob = model_trace.log_prob_sum()
-#         log_weight = model_log_prob - guide_log_prob
-#
-#         sample = {
-#             "freq": guide_trace.nodes["freq"]["value"].item(),
-#             "offset": guide_trace.nodes["offset"]["value"].item(),
-#         }
-#
-#         samples.append(sample)
-#         log_weights.append(log_weight.item())
-#
-#     return {
-#         "samples": samples,
-#         "log_weights": torch.tensor(log_weights),
-#         "num_samples": num_samples,
-#     }
-#
-# def pyro_variational_guide(xs, obs_dict=None):
-#     """Variational guide for SVI."""
-#     freq_loc = pyro.param("freq_loc", torch.tensor(-1.0))
-#     freq_scale = pyro.param(
-#         "freq_scale", torch.tensor(0.5), constraint=pyro_dist.constraints.positive
-#     )
-#
-#     offset_alpha = pyro.param(
-#         "offset_alpha", torch.tensor(2.0), constraint=pyro_dist.constraints.positive
-#     )
-#     offset_beta = pyro.param(
-#         "offset_beta", torch.tensor(2.0), constraint=pyro_dist.constraints.positive
-#     )
-#
-#     pyro.sample("freq", pyro_dist.LogNormal(freq_loc, freq_scale))
-#
-#     beta_sample = pyro.sample(
-#         "beta_sample", pyro_dist.Beta(offset_alpha, offset_beta)
-#     )
-#     offset = beta_sample * (2.0 * math.pi)
-#     pyro.sample("offset", pyro_dist.Delta(offset))
-#
-# def pyro_run_variational_inference(xs, ys, num_iterations=1000, learning_rate=0.01):
-#     """Run stochastic variational inference using Pyro."""
-#     # Convert JAX arrays to numpy first, then to torch tensors
-#     if hasattr(xs, "__array__"):  # JAX array
-#         xs = np.array(xs)
-#     if hasattr(ys, "__array__"):  # JAX array
-#         ys = np.array(ys)
-#     if isinstance(xs, (list, np.ndarray)):
-#         xs = torch.tensor(xs, dtype=torch.float32)
-#     if isinstance(ys, (list, np.ndarray)):
-#         ys = torch.tensor(ys, dtype=torch.float32)
-#
-#     pyro.clear_param_store()
-#
-#     conditions = {}
-#     for i, y in enumerate(ys):
-#         conditions[f"obs_{i}"] = y
-#     conditioned_model = pyro.poutine.condition(pyro_npoint_model, data=conditions)
-#
-#     optimizer = Adam({"lr": learning_rate})
-#     svi = SVI(
-#         conditioned_model, pyro_variational_guide, optimizer, loss=Trace_ELBO()
-#     )
-#
-#     elbo_trace = []
-#     for step in range(num_iterations):
-#         loss = svi.step(xs)
-#         elbo_trace.append(-loss)
-#
-#         if step % 100 == 0:
-#             print(f"  Step {step}, ELBO: {-loss:.3f}")
-#
-#     final_params = {}
-#     for name, param in pyro.get_param_store().items():
-#         final_params[name] = param.detach().clone()
-#
-#     return {
-#         "final_params": final_params,
-#         "elbo_trace": torch.tensor(elbo_trace),
-#         "num_iterations": num_iterations,
-#     }
-#
-# def pyro_sample_from_variational_posterior(xs, num_samples=1000):
-#     """Sample from the fitted variational posterior."""
-#     samples = []
-#
-#     for _ in range(num_samples):
-#         trace = pyro.poutine.trace(pyro_variational_guide).get_trace(xs)
-#
-#         sample = {
-#             "freq": trace.nodes["freq"]["value"].item(),
-#             "offset": trace.nodes["offset"]["value"].item(),
-#         }
-#         samples.append(sample)
-#
-#     return {"samples": samples, "num_samples": num_samples}
-#
-# def pyro_log_marginal_likelihood(log_weights):
-#     """Estimate log marginal likelihood from importance weights."""
-#     return torch.logsumexp(log_weights, dim=0) - math.log(len(log_weights))
-#
-# def pyro_effective_sample_size(log_weights):
-#     """Compute effective sample size from log importance weights."""
-#     log_weights_normalized = log_weights - torch.logsumexp(log_weights, dim=0)
-#     weights_normalized = torch.exp(log_weights_normalized)
-#     return 1.0 / torch.sum(weights_normalized**2)
-#
 #
 def run_comprehensive_benchmark(
     n_points=20, n_samples=1000, n_warmup=500, seed=42, timing_repeats=50
@@ -574,7 +402,7 @@ def run_comprehensive_benchmark(
     """
         Run comprehensive benchmarking across all frameworks and methods.
 
-    Tests both importance sampling and HMC across GenJAX, NumPyro, and Pyro.
+    Tests both importance sampling and HMC across GenJAX and NumPyro.
 
     Args:
         n_points: Number of data points for inference
@@ -699,9 +527,6 @@ def run_comprehensive_benchmark(
         "timing_stats": numpyro_hmc_stats,
     }
 
-    # Pyro methods (disabled for now)
-    print("Pyro benchmarks disabled - focusing on GenJAX and NumPyro")
-
     return results
 
 
@@ -759,8 +584,6 @@ def extract_posterior_samples(benchmark_results):
                 samples = result["samples"]
                 freq_samples = samples["freq"]
                 offset_samples = samples["offset"]
-
-        # Pyro handling disabled for now
 
         posterior_samples[method_name] = {
             "framework": framework,
@@ -834,6 +657,3 @@ if __name__ == "__main__":
     )
     print(f"  Number of divergences: {summary['num_divergences']}")
     print(f"  Mean acceptance probability: {summary['mean_accept_prob']:.3f}")
-
-    # Pyro comparison (disabled - implementation not included in this version)
-    print("\n=== Pyro: Not Available (implementation not included in this version) ===")

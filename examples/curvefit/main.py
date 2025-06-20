@@ -26,6 +26,8 @@ def main():
             "inference",
             "scaling",
             "benchmark",
+            "genjax-only",
+            "genjax-fast",
             "genjax-scaling",
             "posterior-comparison",
         ],
@@ -103,7 +105,7 @@ def main():
 
         except ImportError as e:
             print(f"Warning: Some frameworks not available - {e}")
-            print("Install numpyro and/or pyro-ppl for full framework comparison")
+            print("Install numpyro for full framework comparison")
         except Exception as e:
             print(f"Benchmark failed: {e}")
             print("Continuing with other figures...")
@@ -133,6 +135,53 @@ def main():
         except Exception as e:
             print(f"GenJAX posterior comparison failed: {e}")
             print("Continuing with other figures...")
+
+    if args.mode == "genjax-only":
+        print("\n=== GenJAX-Only Mode ===")
+        print("Running all GenJAX demonstrations without framework comparisons...")
+
+        print("\nGenerating trace visualizations...")
+        save_onepoint_trace_viz()
+        save_multipoint_trace_viz()
+        save_four_multipoint_trace_vizs()
+
+        print("\nGenerating inference visualizations...")
+        save_inference_viz()
+
+        print("\nGenerating light scaling analysis...")
+        print(
+            "Skipping heavy scaling analysis (save_inference_scaling_viz) - use 'scaling' mode for full analysis"
+        )
+
+        print("\nRunning light GenJAX scaling analysis...")
+        try:
+            save_genjax_scaling_benchmark(
+                n_points=min(10, args.n_points),  # Reduce data points
+                timing_repeats=max(
+                    1, args.timing_repeats // 5
+                ),  # Reduce repeats significantly
+                seed=args.seed,
+            )
+            print("GenJAX scaling analysis completed successfully!")
+        except Exception as e:
+            print(f"GenJAX scaling analysis failed: {e}")
+            print("Continuing...")
+
+    if args.mode == "genjax-fast":
+        print("\n=== GenJAX-Fast Mode ===")
+        print("Running fast GenJAX demonstrations (no heavy scaling analysis)...")
+
+        print("\nGenerating trace visualizations...")
+        save_onepoint_trace_viz()
+        save_multipoint_trace_viz()
+        save_four_multipoint_trace_vizs()
+
+        print("\nGenerating inference visualizations...")
+        save_inference_viz()
+
+        print(
+            "Skipping scaling analyses for speed - use 'genjax-only' for light scaling or 'scaling'/'genjax-scaling' for full analysis"
+        )
 
     print("\n=== Curvefit case study complete! ===")
 
