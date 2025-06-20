@@ -8,7 +8,7 @@ Focuses on the probabilistic aspects without complex physics.
 import jax
 import jax.numpy as jnp
 import jax.random as jrand
-from genjax import gen, normal, Pytree, seed, Vmap, Const
+from genjax import gen, normal, Pytree, seed, Vmap, Const, const
 
 
 # Data structures
@@ -167,22 +167,6 @@ def point_to_walls_distance_vectorized(
     return jnp.sqrt(dist_x * dist_x + dist_y * dist_y)
 
 
-def point_to_line_distance(px: float, py: float, wall: Wall) -> float:
-    """Compute distance from point to line segment - kept for compatibility."""
-    # This function is kept for any remaining non-vectorized uses
-    wall_dx = wall.x2 - wall.x1
-    wall_dy = wall.y2 - wall.y1
-    wall_length_sq = jnp.maximum(wall_dx * wall_dx + wall_dy * wall_dy, 1e-10)
-    point_dx = px - wall.x1
-    point_dy = py - wall.y1
-    t = jnp.clip((point_dx * wall_dx + point_dy * wall_dy) / wall_length_sq, 0.0, 1.0)
-    closest_x = wall.x1 + t * wall_dx
-    closest_y = wall.y1 + t * wall_dy
-    dist_x = px - closest_x
-    dist_y = py - closest_y
-    return jnp.sqrt(dist_x * dist_x + dist_y * dist_y)
-
-
 def check_wall_collision_vectorized(pose: Pose, new_pose: Pose, world: World) -> tuple:
     """Check if movement from pose to new_pose collides with any wall using vectorization.
 
@@ -324,19 +308,9 @@ def distance_to_wall_lidar(
     return distances
 
 
-def distance_to_wall(pose: Pose, world: World) -> float:
-    """Compute minimum distance to any wall (backward compatibility).
-
-    This function is kept for compatibility with existing code that expects
-    a single distance value.
-    """
-    lidar_distances = distance_to_wall_lidar(pose, world, n_angles=128)
-    return jnp.min(lidar_distances)
-
-
 # Generative functions for rejuvenation_smc API
 @gen
-def localization_model(prev_pose, time_index, world, n_rays=Const(128)):
+def localization_model(prev_pose, time_index, world, n_rays=Const(8)):
     """Localization model for rejuvenation_smc API with proper initialization.
 
     This handles both initialization (t=0) and transitions (t>0) properly.
@@ -422,8 +396,8 @@ def sensor_model_single_ray(true_distance: float, ray_idx: int):
     """Generative model for a single LIDAR ray observation."""
     # Each ray has independent Gaussian noise - increased for more challenging measurements
     obs_dist = (
-        normal(true_distance, 0.5) @ "distance"
-    )  # Increased from 0.3 to 0.5 for noisier LIDAR measurements
+        normal(true_distance, 1.0) @ "distance"
+    )  # Increased from 0.5 to 1.0 for much noisier LIDAR measurements
     # Constrain to non-negative values
     obs_dist = jnp.maximum(0.0, obs_dist)
     return obs_dist
@@ -453,21 +427,6 @@ def sensor_model(pose: Pose, world: World, n_angles: int = 128):
     observed_distances = vectorized_sensor(true_distances, ray_indices) @ "measurements"
 
     return observed_distances
-
-
-@gen
-def sensor_model_single(pose: Pose, world: World):
-    """Generative model for single distance sensor (backward compatibility)."""
-    # True distance to wall (minimum)
-    true_distance = distance_to_wall(pose, world)
-
-    # Sample observed distance as a random variable
-    observed_distance = normal(true_distance, 0.2) @ "observed_distance"
-
-    # Constrain to non-negative values
-    observed_distance = jnp.maximum(0.0, observed_distance)
-
-    return observed_distance
 
 
 @gen
@@ -505,15 +464,8 @@ def resample_particles(particles, weights, key):
     return resampled_particles
 
 
-# Legacy particle filter function - not used with rejuvenation_smc API
-# def particle_filter_step(particles, weights, observation, world, key):
-#     """Single step of particle filter using step model with control inference."""
-#     # This function is deprecated in favor of rejuvenation_smc API
-#     pass
-
-
 def run_particle_filter(
-    n_particles, observations, world, key, n_rays=128, collect_diagnostics=False
+    n_particles, observations, world, key, n_rays=8, collect_diagnostics=False
 ):
     """Run particle filter using rejuvenation_smc API.
 
@@ -523,12 +475,12 @@ def run_particle_filter(
         world: World object
         key: Random key
         n_rays: Number of LIDAR rays
-        collect_diagnostics: Whether to collect diagnostic weights (ignored, kept for compatibility)
+        collect_diagnostics: Whether to collect diagnostic weights from SMC
 
     Returns:
         particle_history: List of particle states over time
         weight_history: List of particle weights over time
-        diagnostic_weights: Always None (diagnostic weights removed)
+        diagnostic_weights: Log normalized diagnostic weights [T, n_particles] if collect_diagnostics=True, else None
     """
     # Import rejuvenation_smc
     from genjax.inference import rejuvenation_smc
@@ -601,7 +553,378 @@ def run_particle_filter(
         timestep_weights = timestep_weights / jnp.sum(timestep_weights)
         weight_history.append(timestep_weights)
 
-    return particle_history, weight_history, None
+    # Extract diagnostic weights if requested
+    diagnostic_weights_history = None
+    if collect_diagnostics:
+        diagnostic_weights_history = (
+            particles_smc.diagnostic_weights
+        )  # Shape: [T, n_particles]
+
+    return particle_history, weight_history, diagnostic_weights_history
+
+
+def run_smc_basic(n_particles, observations, world, key, n_rays=8):
+    """Run basic SMC without rejuvenation (just resampling)."""
+    from genjax.inference import rejuvenation_smc
+    from genjax.core import const
+
+    # Prepare observations
+    obs_array = jnp.array(observations)
+    obs_sequence = {"measurements": {"distance": obs_array}}
+
+    dummy_pose = Pose(x=0.0, y=0.0, theta=0.0)
+    initial_args = (dummy_pose, jnp.array(0), world, const(n_rays))
+
+    # Run basic SMC (no rejuvenation)
+    particles_smc = seed(rejuvenation_smc)(
+        key,
+        localization_model,
+        observations=obs_sequence,
+        initial_model_args=initial_args,
+        n_particles=const(n_particles),
+        return_all_particles=const(True),
+    )
+
+    # Extract particle history and weights from SMC result
+    all_traces = particles_smc.traces
+    all_weights = particles_smc.log_weights
+
+    choices = all_traces.get_choices()
+    n_timesteps = choices["x"].shape[0]
+
+    particle_history = []
+    weight_history = []
+
+    for t in range(n_timesteps):
+        timestep_particles = []
+        for i in range(n_particles):
+            pose = Pose(
+                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
+            )
+            timestep_particles.append(pose)
+
+        particle_history.append(timestep_particles)
+
+        timestep_weights = jnp.exp(all_weights[t])
+        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
+        weight_history.append(timestep_weights)
+
+    diagnostic_weights = particles_smc.diagnostic_weights
+    return particle_history, weight_history, diagnostic_weights
+
+
+def run_smc_with_mh(
+    n_particles, observations, world, key, n_rays=8, K: Const[int] = const(10)
+):
+    """Run SMC with Metropolis-Hastings rejuvenation."""
+    from genjax.inference import rejuvenation_smc, mh
+    from genjax.core import const, sel
+
+    # Prepare observations
+    obs_array = jnp.array(observations)
+    obs_sequence = {"measurements": {"distance": obs_array}}
+
+    dummy_pose = Pose(x=0.0, y=0.0, theta=0.0)
+    initial_args = (dummy_pose, jnp.array(0), world, const(n_rays))
+
+    # Define MH kernel function that takes a trace and returns a trace
+    def mh_kernel(trace):
+        # Select all latent variables for MH updates
+        selection = sel("x") | sel("y") | sel("theta")
+        return mh(trace, selection)
+
+    # Run SMC with MH rejuvenation
+    particles_smc = seed(rejuvenation_smc)(
+        key,
+        localization_model,
+        mcmc_kernel=const(mh_kernel),
+        observations=obs_sequence,
+        initial_model_args=initial_args,
+        n_particles=const(n_particles),
+        return_all_particles=const(True),
+        n_rejuvenation_moves=K,
+    )
+
+    # Extract particle history and weights from SMC result
+    all_traces = particles_smc.traces
+    all_weights = particles_smc.log_weights
+
+    choices = all_traces.get_choices()
+    n_timesteps = choices["x"].shape[0]
+
+    particle_history = []
+    weight_history = []
+
+    for t in range(n_timesteps):
+        timestep_particles = []
+        for i in range(n_particles):
+            pose = Pose(
+                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
+            )
+            timestep_particles.append(pose)
+
+        particle_history.append(timestep_particles)
+
+        timestep_weights = jnp.exp(all_weights[t])
+        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
+        weight_history.append(timestep_weights)
+
+    diagnostic_weights = particles_smc.diagnostic_weights
+    return particle_history, weight_history, diagnostic_weights
+
+
+def run_smc_with_hmc(
+    n_particles, observations, world, key, n_rays=8, K: Const[int] = const(10)
+):
+    """Run SMC with Hamiltonian Monte Carlo rejuvenation."""
+    from genjax.inference import rejuvenation_smc, hmc
+    from genjax.core import const, sel
+
+    # Prepare observations
+    obs_array = jnp.array(observations)
+    obs_sequence = {"measurements": {"distance": obs_array}}
+
+    dummy_pose = Pose(x=0.0, y=0.0, theta=0.0)
+    initial_args = (dummy_pose, jnp.array(0), world, const(n_rays))
+
+    # Define HMC kernel function that takes a trace and returns a trace
+    def hmc_kernel(trace):
+        # Select all continuous latent variables for HMC updates
+        selection = sel("x") | sel("y") | sel("theta")
+        return hmc(trace, selection, step_size=0.01, n_steps=10)
+
+    # Run SMC with HMC rejuvenation
+    particles_smc = seed(rejuvenation_smc)(
+        key,
+        localization_model,
+        mcmc_kernel=const(hmc_kernel),
+        observations=obs_sequence,
+        initial_model_args=initial_args,
+        n_particles=const(n_particles),
+        return_all_particles=const(True),
+        n_rejuvenation_moves=K,
+    )
+
+    # Extract particle history and weights from SMC result
+    all_traces = particles_smc.traces
+    all_weights = particles_smc.log_weights
+
+    choices = all_traces.get_choices()
+    n_timesteps = choices["x"].shape[0]
+
+    particle_history = []
+    weight_history = []
+
+    for t in range(n_timesteps):
+        timestep_particles = []
+        for i in range(n_particles):
+            pose = Pose(
+                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
+            )
+            timestep_particles.append(pose)
+
+        particle_history.append(timestep_particles)
+
+        timestep_weights = jnp.exp(all_weights[t])
+        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
+        weight_history.append(timestep_weights)
+
+    diagnostic_weights = particles_smc.diagnostic_weights
+    return particle_history, weight_history, diagnostic_weights
+
+
+def create_locally_optimal_proposal(world, grid_size=15, noise_std=0.15):
+    """Create a locally optimal proposal using grid evaluation and max selection.
+
+    Args:
+        world: World object for bounds and constraints
+        grid_size: Number of grid points per dimension
+        noise_std: Standard deviation for Gaussian noise around selected grid points
+
+    Returns:
+        Generative function for locally optimal proposal
+    """
+    # Create coordinate grids for x, y, theta
+    x_grid = jnp.linspace(0.5, world.width - 0.5, grid_size)
+    y_grid = jnp.linspace(0.5, world.height - 0.5, grid_size)
+    theta_grid = jnp.linspace(-jnp.pi, jnp.pi, grid_size)
+
+    # Create meshgrid for all combinations
+    X, Y, THETA = jnp.meshgrid(x_grid, y_grid, theta_grid, indexing="ij")
+    grid_points = jnp.stack(
+        [X.flatten(), Y.flatten(), THETA.flatten()], axis=1
+    )  # Shape: (grid_size^3, 3)
+
+    @gen
+    def locally_optimal_proposal(obs, prev_choices, *args):
+        """Locally optimal proposal that evaluates grid and selects the maximum.
+
+        Args:
+            obs: Current observation constraints (what we're conditioning on)
+            prev_choices: Previous particle's choices
+            *args: Model arguments for this timestep
+        """
+
+        # Use vectorized assessment over all grid points
+        def assess_single_point(grid_point):
+            """Assess the model at a single grid point."""
+            x_prop, y_prop, theta_prop = grid_point
+
+            # Create proposed choices by updating prev_choices with new pose
+            proposed_choices = dict(prev_choices)
+            proposed_choices["x"] = x_prop
+            proposed_choices["y"] = y_prop
+            proposed_choices["theta"] = theta_prop
+
+            # Assess the model at this proposed choice
+            try:
+                # Get constraints with observations merged in
+                full_constraints = dict(obs) if isinstance(obs, dict) else obs
+                if isinstance(full_constraints, dict):
+                    full_constraints.update(proposed_choices)
+                    assess_result = localization_model.assess(full_constraints, *args)
+                else:
+                    # If obs is not a dict, we can't easily merge - use just proposed choices
+                    assess_result = localization_model.assess(proposed_choices, *args)
+
+                return assess_result.get_score()
+            except Exception:
+                # If assessment fails, return very low probability
+                return -1e6
+
+        # Vectorize over all grid points
+        vectorized_assess = jax.vmap(assess_single_point, in_axes=0)
+        log_probs = vectorized_assess(grid_points)
+
+        # Find the maximum probability grid point
+        max_idx = jnp.argmax(log_probs)
+        selected_point = grid_points[max_idx]
+
+        # Sample with Gaussian noise around the selected point
+        x_prop = normal(selected_point[0], noise_std) @ "x"
+        y_prop = normal(selected_point[1], noise_std) @ "y"
+        theta_prop = (
+            normal(selected_point[2], noise_std * 0.5) @ "theta"
+        )  # Smaller noise for angle
+
+        return x_prop, y_prop, theta_prop
+
+    return locally_optimal_proposal
+
+
+def run_smc_with_locally_optimal(
+    n_particles, observations, world, key, n_rays=8, K: Const[int] = const(10)
+):
+    """Run SMC with locally optimal proposal rejuvenation."""
+    from genjax.inference import rejuvenation_smc
+    from genjax.core import const
+
+    # Prepare observations
+    obs_array = jnp.array(observations)
+    obs_sequence = {"measurements": {"distance": obs_array}}
+
+    dummy_pose = Pose(x=0.0, y=0.0, theta=0.0)
+    initial_args = (dummy_pose, jnp.array(0), world, const(n_rays))
+
+    # Create locally optimal proposal
+    locally_optimal_proposal = create_locally_optimal_proposal(
+        world, grid_size=15, noise_std=0.15
+    )
+
+    # Run SMC with locally optimal proposal (no mcmc_kernel needed)
+    particles_smc = seed(rejuvenation_smc)(
+        key,
+        localization_model,
+        transition_proposal=locally_optimal_proposal,
+        observations=obs_sequence,
+        initial_model_args=initial_args,
+        n_particles=const(n_particles),
+        return_all_particles=const(True),
+        n_rejuvenation_moves=K,
+    )
+
+    # Extract particle history and weights from SMC result
+    all_traces = particles_smc.traces
+    all_weights = particles_smc.log_weights
+
+    choices = all_traces.get_choices()
+    n_timesteps = choices["x"].shape[0]
+
+    particle_history = []
+    weight_history = []
+
+    for t in range(n_timesteps):
+        timestep_particles = []
+        for i in range(n_particles):
+            pose = Pose(
+                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
+            )
+            timestep_particles.append(pose)
+
+        particle_history.append(timestep_particles)
+
+        timestep_weights = jnp.exp(all_weights[t])
+        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
+        weight_history.append(timestep_weights)
+
+    diagnostic_weights = particles_smc.diagnostic_weights
+    return particle_history, weight_history, diagnostic_weights
+
+
+def benchmark_smc_methods(
+    n_particles, observations, world, key, n_rays=8, repeats=5, K=10
+):
+    """Benchmark different SMC methods and return timing results."""
+    import jax
+    from examples.utils import benchmark_with_warmup
+    from genjax.core import const
+
+    methods = {
+        "smc_basic": run_smc_basic,
+        "smc_mh": run_smc_with_mh,
+        "smc_hmc": run_smc_with_hmc,
+        "smc_locally_optimal": run_smc_with_locally_optimal,
+    }
+
+    results = {}
+
+    for method_name, method_func in methods.items():
+        print(f"Benchmarking {method_name}...")
+
+        # JIT compile the method for fair timing comparison
+        # Note: With Const[...] pattern, we don't need K in static_argnames
+        jitted_method = jax.jit(method_func, static_argnames=("n_particles", "n_rays"))
+
+        # Prepare function for timing (pass const(K) for MCMC methods)
+        def run_method():
+            if method_name in ["smc_mh", "smc_hmc", "smc_locally_optimal"]:
+                return jitted_method(
+                    n_particles, observations, world, key, n_rays, const(K)
+                )
+            else:
+                return jitted_method(n_particles, observations, world, key, n_rays)
+
+        # Warm up and time the method
+        times, (mean_time, std_time) = benchmark_with_warmup(
+            run_method,
+            repeats=repeats,
+            warmup_runs=3,  # More warmup for JIT
+            inner_repeats=3,
+        )
+
+        # Get results for quality comparison
+        particle_history, weight_history, diagnostic_weights = run_method()
+
+        results[method_name] = {
+            "timing_stats": (mean_time, std_time),
+            "particle_history": particle_history,
+            "weight_history": weight_history,
+            "diagnostic_weights": diagnostic_weights,
+        }
+
+        print(f"  {method_name}: {mean_time:.3f} ± {std_time:.3f} seconds")
+
+    return results
 
 
 # Utility functions
@@ -709,31 +1032,6 @@ def create_multi_room_world(world_type="basic"):
         return create_complex_multi_room_world()
     else:
         raise ValueError(f"Unknown world_type: {world_type}. Use 'basic' or 'complex'")
-
-
-def create_simple_world():
-    """Create a simple rectangular world with a single internal wall."""
-    # Single internal wall in the middle of the world
-    wall_coords = [
-        [5.0, 2.0, 5.0, 8.0]  # Vertical wall in center with gaps at top/bottom
-    ]
-
-    # Convert to JAX arrays
-    wall_array = jnp.array(wall_coords)
-    walls_x1 = wall_array[:, 0]
-    walls_y1 = wall_array[:, 1]
-    walls_x2 = wall_array[:, 2]
-    walls_y2 = wall_array[:, 3]
-
-    return World(
-        width=10.0,
-        height=10.0,
-        walls_x1=walls_x1,
-        walls_y1=walls_y1,
-        walls_x2=walls_x2,
-        walls_y2=walls_y2,
-        num_walls=1,
-    )
 
 
 # Data generation functions moved to data.py

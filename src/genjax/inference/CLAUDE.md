@@ -398,6 +398,65 @@ final_particles = rejuvenation_smc(
 - Must be bijective on address space
 - See `change` docstring in `smc.py:290-310` for detailed specs
 
+### Locally Optimal Proposals
+
+**Concept**: A locally optimal proposal uses the model's `assess` method to evaluate multiple candidate proposals and selects the most promising one, providing more informed transitions than simple prior sampling.
+
+**Mathematical Foundation**:
+For a transition proposal at timestep t, instead of sampling directly from the prior:
+1. **Grid Evaluation**: Create a grid of candidate values for latent variables
+2. **Model Assessment**: Use `model.assess(candidates, observations, *args)` to evaluate log probability at each grid point
+3. **Optimal Selection**: Choose the candidate with maximum log probability: `argmax_i log p(candidate_i | observations)`
+4. **Noise Injection**: Add Gaussian noise around the selected point for smooth proposals
+
+**API Contract**:
+```python
+@gen
+def locally_optimal_proposal(obs, prev_choices, *args):
+    """Locally optimal proposal using grid evaluation.
+    
+    Args:
+        obs: Current observation constraints
+        prev_choices: Previous particle's choices
+        *args: Model arguments for this timestep
+    """
+    # Create grid of candidate values
+    candidates = create_grid(variable_bounds)
+    
+    # Vectorized assessment over all candidates
+    def assess_single_candidate(candidate):
+        proposed_choices = update_choices(prev_choices, candidate)
+        return model.assess(merge(obs, proposed_choices), *args).get_score()
+    
+    vectorized_assess = jax.vmap(assess_single_candidate)
+    log_probs = vectorized_assess(candidates)
+    
+    # Select optimal candidate
+    best_idx = jnp.argmax(log_probs)
+    best_candidate = candidates[best_idx]
+    
+    # Add noise for smooth proposals
+    x_prop = normal(best_candidate[0], noise_std) @ "x"
+    y_prop = normal(best_candidate[1], noise_std) @ "y"
+    
+    return x_prop, y_prop
+```
+
+**Performance Characteristics**:
+- **Computational Cost**: O(grid_size^d × model_complexity) where d is dimension
+- **Accuracy**: Higher than prior sampling, especially with informative observations
+- **JAX Compatibility**: Fully vectorized using `jax.vmap` for efficiency
+- **Grid Size Trade-off**: Larger grids provide better proposals but increase computation
+
+**Use Cases**:
+- **High-dimensional spaces** where prior sampling is inefficient
+- **Informative observations** that significantly constrain the posterior
+- **Complex models** where likelihood evaluation is cheap relative to MCMC steps
+- **Real-time applications** requiring efficient particle transitions
+
+**Implementation Example**:
+See `examples/localization/core.py` for a complete implementation using 15×15×15 grid evaluation over (x, y, θ) space for robot localization.
+
 ## Variational Inference (`vi.py`)
 
 ### Core Components

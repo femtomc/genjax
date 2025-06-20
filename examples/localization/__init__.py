@@ -9,7 +9,6 @@ from .core import (
     Pose,
     Control,
     World,
-    create_simple_world,
     run_particle_filter,
 )
 
@@ -33,7 +32,6 @@ __all__ = [
     "Pose",
     "Control",
     "World",
-    "create_simple_world",
     "generate_ground_truth_data",
     "generate_multiple_trajectories",
     "run_particle_filter",

@@ -48,6 +48,10 @@ examples/{case_study_name}/
 ├── core.py             # Model definitions and core logic (REQUIRED)
 ├── data.py             # Data generation and loading utilities (REQUIRED)
 ├── figs.py             # Visualization and figure generation (REQUIRED)
+├── export.py           # Data export/import utilities (OPTIONAL)
+├── data/               # Experimental data storage (OPTIONAL)
+│   ├── README.md       # Data format documentation
+│   └── experiment_*/   # Timestamped experiment directories
 └── figs/               # Generated figure outputs (REQUIRED)
     └── *.pdf           # Research-quality PDF outputs
 ```
@@ -91,6 +95,22 @@ examples/{case_study_name}/
 - **Parametrized filenames**: Include experimental parameters in output names
 - **Multiple figure types**: Support timing, accuracy, and combined visualizations
 - **Consistent styling**: Use established color schemes and formatting
+
+### `export.py` (OPTIONAL)
+
+- **Purpose**: Data export/import utilities for reproducible research
+- **CSV format**: Export experimental results to CSV files with metadata
+- **Timestamped directories**: Organize experiments with unique timestamps
+- **Plot-from-data**: Enable visualization without recomputation
+- **Example functions**: `save_benchmark_results()`, `load_benchmark_results()`
+
+### `data/` directory (OPTIONAL)
+
+- **Purpose**: Storage for experimental data to enable experiment/plotting separation
+- **Structure**: Timestamped experiment directories with standardized CSV format
+- **Benefit**: Run expensive experiments once, iterate on plots separately
+- **Documentation**: Include `README.md` explaining data format and usage
+- **Reproducibility**: Complete experimental record with configuration metadata
 
 ### `figs/` directory (REQUIRED)
 
@@ -169,6 +189,10 @@ python -m examples.{name}.main --posterior  # if applicable
 
 # Parameter customization
 python -m examples.{name}.main --num-obs 100 --num-samples 5000
+
+# Data export/import (RECOMMENDED for complex experiments)
+python -m examples.{name}.main --experiment --export-data  # Run and save
+python -m examples.{name}.main --plot-from-data path/to/data  # Plot only
 ```
 
 ## Pixi Task Integration
@@ -184,6 +208,57 @@ Each case study should integrate with the top-level `pyproject.toml`:
 {name}-all = "python -m examples.{name}.main --all"
 ```
 
+## Experiment/Plotting Separation (RECOMMENDED)
+
+**Best Practice**: Separate expensive experiments from iterative plotting for efficient development.
+
+### Benefits
+
+- **Efficiency**: Run costly experiments once, iterate on visualizations quickly
+- **Reproducibility**: Complete experimental record with metadata and configuration
+- **Collaboration**: Share experimental data without requiring full computational environment
+- **Flexibility**: Generate different visualizations from same experimental data
+- **Development**: Rapid iteration on plot aesthetics without recomputation
+
+### Implementation Pattern
+
+1. **Export Data**: Add `--export-data` flag to save experimental results
+2. **Import Data**: Add `--plot-from-data` flag to load saved results
+3. **CSV Format**: Use structured CSV files with metadata for portability
+4. **Timestamped Directories**: Organize experiments with unique timestamps
+5. **Documentation**: Include `data/README.md` explaining format and usage
+
+### Example Workflow
+
+```bash
+# Step 1: Run expensive experiment once and save data
+python -m examples.localization.main --experiment --export-data \
+    --n-particles 200 --timing-repeats 50
+
+# Step 2: Iterate on plotting without recomputation
+python -m examples.localization.main \
+    --plot-from-data data/experiment_20250620_123456
+
+# Step 3: Modify visualization code in figs.py
+# Step 4: Re-run plotting quickly
+python -m examples.localization.main \
+    --plot-from-data data/experiment_20250620_123456
+```
+
+### Data Export Structure
+
+```
+data/experiment_YYYYMMDD_HHMMSS/
+├── experiment_metadata.json     # Configuration and parameters
+├── benchmark_summary.csv        # Method comparison overview
+├── ground_truth_*.csv          # True trajectory and observations
+└── method_name/                # Results for each method
+    ├── timing.csv              # Performance statistics
+    ├── diagnostic_weights.csv  # Method-specific diagnostics
+    └── particles/              # Particle trajectories
+        └── timestep_*.csv      # Per-timestep particle states
+```
+
 ## Development Workflow
 
 When creating or modifying case studies:
@@ -197,6 +272,7 @@ When creating or modifying case studies:
 
 - Create all required files (`main.py`, `core.py`, `data.py`, `figs.py`)
 - Create `figs/` directory for outputs
+- Consider adding `export.py` and `data/` for complex experiments
 - Write comprehensive `CLAUDE.md` with case study guidance
 
 ### 3. **Implement consistent patterns**
@@ -204,17 +280,19 @@ When creating or modifying case studies:
 - Use established naming conventions
 - Follow timing benchmark standards
 - Generate research-quality figures
-- Support standard CLI arguments
+- Support standard CLI arguments including `--export-data` and `--plot-from-data`
 
 ### 4. **Test thoroughly**
 
 - Run all figure generation modes
+- Test data export/import functionality if implemented
 - Verify framework comparison fairness
 - Check research paper quality of outputs
 
 ### 5. **Document properly**
 
 - Update case study `CLAUDE.md` with implementation details
+- Document data export format in `data/README.md` if applicable
 - Document any special requirements or dependencies
 
 ## Common Patterns

@@ -6,60 +6,12 @@ Contains trajectory creation and ground truth data generation functions.
 
 import jax.numpy as jnp
 import jax.random as jrand
-from genjax import seed
 
 from .core import (
     Pose,
     Control,
-    sensor_model,
     distance_to_wall_lidar,
-    apply_control,
 )
-from genjax import gen, normal
-
-
-def create_wall_to_wall_trajectory():
-    """Create a trajectory that moves aggressively toward walls to trigger bouncing."""
-    # More aggressive movement that should definitely hit walls and bounce
-
-    controls = [
-        # Move fast right toward wall
-        Control(velocity=2.0, angular_velocity=0.0),  # Step 1: fast right
-        Control(velocity=2.0, angular_velocity=0.0),  # Step 2: fast right
-        Control(velocity=2.0, angular_velocity=0.0),  # Step 3: fast right
-        Control(
-            velocity=2.0, angular_velocity=0.0
-        ),  # Step 4: fast right (should hit wall)
-        Control(velocity=2.0, angular_velocity=0.0),  # Step 5: continue (should bounce)
-        # Move down toward bottom wall
-        Control(velocity=0.5, angular_velocity=-jnp.pi / 2),  # Step 6: turn down
-        Control(velocity=2.0, angular_velocity=0.0),  # Step 7: fast down
-        Control(
-            velocity=2.0, angular_velocity=0.0
-        ),  # Step 8: fast down (should hit bottom)
-        Control(velocity=2.0, angular_velocity=0.0),  # Step 9: continue (should bounce)
-        # Move up toward top wall
-        Control(velocity=0.5, angular_velocity=jnp.pi),  # Step 10: turn around
-        Control(velocity=2.0, angular_velocity=0.0),  # Step 11: fast up
-        Control(
-            velocity=2.0, angular_velocity=0.0
-        ),  # Step 12: fast up (should hit top)
-    ]
-
-    return controls
-
-
-def create_bouncing_test_trajectory():
-    """Create a simple bouncing test with just a few aggressive moves."""
-    return [
-        # Start at (2,2) and move fast right - should hit right wall and bounce
-        Control(velocity=3.0, angular_velocity=0.0),  # Step 1: very fast right
-        Control(
-            velocity=3.0, angular_velocity=0.0
-        ),  # Step 2: very fast right (hit wall)
-        Control(velocity=3.0, angular_velocity=0.0),  # Step 3: should bounce back left
-        Control(velocity=3.0, angular_velocity=0.0),  # Step 4: continue bouncing
-    ]
 
 
 def create_room_navigation_trajectory():
@@ -105,26 +57,6 @@ def create_room_navigation_trajectory():
             velocity=1.5, angular_velocity=0.0
         ),  # Step 13: Reach upper-right corner
     ]
-
-
-def create_exploration_trajectory():
-    """Create a trajectory that explores Room 1 systematically."""
-    return [
-        # Systematic exploration pattern within Room 1
-        Control(velocity=1.2, angular_velocity=0.0),  # Move forward
-        Control(velocity=1.0, angular_velocity=jnp.pi / 2),  # Turn right
-        Control(velocity=1.2, angular_velocity=0.0),  # Move forward
-        Control(velocity=1.0, angular_velocity=jnp.pi / 2),  # Turn right
-        Control(velocity=1.2, angular_velocity=0.0),  # Move forward
-        Control(velocity=1.0, angular_velocity=jnp.pi / 2),  # Turn right
-        Control(velocity=1.2, angular_velocity=0.0),  # Move forward
-        Control(velocity=1.0, angular_velocity=jnp.pi / 2),  # Complete square
-    ]
-
-
-def create_test_trajectory():
-    """Create a test trajectory - defaults to room navigation."""
-    return create_room_navigation_trajectory()
 
 
 def create_waypoint_trajectory_room1_to_room3():
@@ -190,7 +122,7 @@ def create_waypoint_trajectory_exploration_room1():
 
 
 def generate_synthetic_data_from_waypoints(
-    waypoints, world, key, noise_std=0.15, n_rays=128
+    waypoints, world, key, noise_std=0.15, n_rays=8
 ):
     """Generate synthetic trajectory data from waypoints using LIDAR sensor model.
 
@@ -234,7 +166,7 @@ def generate_synthetic_data_from_waypoints(
 
 
 def generate_ground_truth_data(
-    world, key, trajectory_type="room_navigation", n_steps=16, n_rays=128
+    world, key, trajectory_type="room_navigation", n_steps=16, n_rays=8
 ):
     """Generate ground truth trajectory and observations.
 
@@ -242,7 +174,7 @@ def generate_ground_truth_data(
         world: World object defining the environment
         key: JAX random key for reproducible generation
         trajectory_type: Type of trajectory to generate
-                        ("room_navigation", "wall_bouncing", "exploration", "simple_bounce")
+                        ("room_navigation", "exploration")
         n_steps: Number of trajectory steps to generate
         n_rays: Number of LIDAR rays for distance measurements
 
@@ -278,62 +210,10 @@ def generate_ground_truth_data(
         ]
         return all_poses, controls, observations
 
-    # For other trajectory types, use the original control-based approach
-    elif trajectory_type == "wall_bouncing":
-        controls = create_wall_to_wall_trajectory()
-    elif trajectory_type == "simple_bounce":
-        controls = create_bouncing_test_trajectory()
     else:
-        raise ValueError(f"Unknown trajectory_type: {trajectory_type}")
-
-    # Default initial pose for control-based trajectories - offset from walls
-    initial_pose = Pose(x=1.8, y=1.8, theta=0.0)
-
-    # Sequential generation using individual models (original approach)
-    # For control-based trajectories, we need to create a compatible step model
-    # that takes controls as arguments (for backward compatibility)
-
-    @gen
-    def step_model_with_controls(pose, control, world):
-        """Temporary step model that accepts control arguments for compatibility."""
-        # Apply deterministic motion with bouncing
-        ideal_next_pose = apply_control(pose, control, world)
-
-        # Add motion noise
-        next_x = normal(ideal_next_pose.x, 0.1) @ "x"
-        next_y = normal(ideal_next_pose.y, 0.1) @ "y"
-        next_theta = normal(ideal_next_pose.theta, 0.05) @ "theta"
-
-        # Keep within world boundaries
-        bounce_threshold = 0.3
-        next_x = jnp.clip(next_x, bounce_threshold, world.width - bounce_threshold)
-        next_y = jnp.clip(next_y, bounce_threshold, world.height - bounce_threshold)
-
-        return Pose(next_x, next_y, next_theta)
-
-    seeded_step = seed(step_model_with_controls.simulate)
-    seeded_sensor = seed(sensor_model.simulate)
-
-    poses = [initial_pose]
-    observations = []
-    current_pose = initial_pose
-
-    for i, control in enumerate(controls):
-        # Generate next pose
-        step_key, key = jrand.split(key)
-        step_trace = seeded_step(step_key, current_pose, control, world)
-        current_pose = step_trace.get_retval()
-
-        # Generate observation at new pose
-        obs_key, key = jrand.split(key)
-        obs_trace = seeded_sensor(obs_key, current_pose, world)
-        observation = obs_trace.get_retval()
-
-        poses.append(current_pose)
-        observations.append(observation)
-
-    # Return all poses (including initial) for consistency
-    return poses, controls, observations
+        raise ValueError(
+            f"Unknown trajectory_type: {trajectory_type}. Supported types: 'room_navigation', 'exploration'"
+        )
 
 
 def generate_multiple_trajectories(world, key, n_trajectories=5, trajectory_types=None):
@@ -349,7 +229,7 @@ def generate_multiple_trajectories(world, key, n_trajectories=5, trajectory_type
         list: List of (initial_pose, controls, poses, observations) tuples
     """
     if trajectory_types is None:
-        trajectory_types = ["room_navigation", "exploration", "wall_bouncing"]
+        trajectory_types = ["room_navigation", "exploration"]
 
     trajectories = []
     keys = jrand.split(key, n_trajectories)

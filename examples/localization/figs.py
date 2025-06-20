@@ -3,14 +3,12 @@ Visualization functions for the localization case study.
 """
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 import jax.numpy as jnp
 import numpy as np
 from .core import Pose, World
 
 # Set up plotting style
 plt.style.use("default")
-sns.set_palette("husl")
 
 
 def plot_world(world: World, ax=None, room_label_fontsize=14):
@@ -140,6 +138,12 @@ def plot_lidar_rays(
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 8))
+        # Remove axis frame and grid for clean LIDAR visualization
+        ax.grid(False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
 
     # Import distance computation function
     from .core import distance_to_wall_lidar
@@ -272,13 +276,21 @@ def plot_particle_filter_step(
     save_path=None,
     show_lidar_rays=True,
     observations=None,
-    n_rays=128,
+    n_rays=8,
 ):
     """Plot a single step of particle filter with true pose and particles."""
     fig, ax = plt.subplots(figsize=(12, 10))
 
     # Plot world
     plot_world(world, ax)
+
+    # Remove grid and axis frame for clean LIDAR visualization
+    if show_lidar_rays:
+        ax.grid(False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
 
     # Plot particles
     plot_particles(particles, world, weights, ax, alpha=0.7)
@@ -363,46 +375,30 @@ def plot_particle_filter_evolution(
     save_dir=None,
     show_lidar_rays=True,
     observations_history=None,
-    n_rays=128,
+    n_rays=8,
 ):
     """Plot evolution of particle filter over time with enhanced grid layout."""
     n_steps = len(particle_history)
 
-    # Show more steps with a larger grid layout
-    if n_steps <= 8:
-        # For smaller numbers of steps, use 4 columns
-        n_cols = 4
-        n_rows = (n_steps + n_cols - 1) // n_cols
-    elif n_steps <= 16:
-        # For medium numbers, use optimal square-ish layout
-        n_cols = 4
-        n_rows = 4
-        n_steps_to_show = min(16, n_steps)  # Show up to 16 steps
-    else:
-        # For large numbers, use 5x4 layout
-        n_cols = 5
-        n_rows = 4
-        n_steps_to_show = min(20, n_steps)  # Show up to 20 steps
+    # Fixed layout: 1 row, 4 columns showing specific timesteps
+    n_rows = 1
+    n_cols = 4
 
-    # If we have more steps than we can show, select them strategically
-    if n_steps > n_cols * n_rows:
-        n_steps_to_show = n_cols * n_rows
-        # Select steps evenly distributed across the trajectory
-        step_indices = jnp.linspace(0, n_steps - 1, n_steps_to_show, dtype=int)
-    else:
-        n_steps_to_show = n_steps
-        step_indices = list(range(n_steps))
+    # Show specific timesteps: 1, 6, 11, and 16 (0-indexed: 0, 5, 10, 15)
+    step_indices = [0, 5, 10, 15]  # These correspond to steps 1, 6, 11, 16
 
-    # Create larger figure with more space
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 3 * n_rows))
+    # Filter out indices that don't exist
+    step_indices = [idx for idx in step_indices if idx < n_steps]
+    n_steps_to_show = len(step_indices)
 
-    # Handle different subplot array structures
-    if n_rows == 1 and n_cols == 1:
+    # Create figure with horizontal layout
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
+
+    # Handle different subplot array structures for (1, 4) layout
+    if n_cols == 1:
         axes = [axes]
-    elif n_rows == 1 or n_cols == 1:
-        axes = axes.flatten()
     else:
-        axes = axes.flatten()
+        axes = axes.flatten() if hasattr(axes, "flatten") else axes
 
     for i, step_idx in enumerate(step_indices):
         ax = axes[i]
@@ -458,10 +454,23 @@ def plot_particle_filter_evolution(
         if step_idx < len(true_poses):
             plot_pose(true_poses[step_idx], ax, color="red", arrow_length=0.25)
 
-        ax.set_title(f"Step {step_idx + 1}", fontsize=10)
-        ax.legend().set_visible(False)  # Hide legend for cleaner look
+        # Remove default title and legend for cleaner look
+        ax.set_title("")
+        ax.legend().set_visible(False)
 
-        # Remove axis frame and labels for cleaner appearance
+        # Add bolded step number in upper left corner of the room
+        ax.text(
+            0.5,
+            world.height - 0.5,
+            f"{step_idx + 1}",
+            fontsize=20,
+            fontweight="bold",
+            ha="left",
+            va="top",
+        )
+
+        # Remove axis frame, grid, and labels for cleaner appearance
+        ax.grid(False)
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_xlabel("")
@@ -476,7 +485,7 @@ def plot_particle_filter_evolution(
     plt.tight_layout(pad=1.0)
 
     if save_dir:
-        plt.savefig(f"{save_dir}/particle_evolution.png", dpi=150, bbox_inches="tight")
+        plt.savefig(f"{save_dir}/particle_evolution.pdf", dpi=150, bbox_inches="tight")
 
     return fig, axes
 
@@ -797,12 +806,21 @@ def plot_ground_truth_trajectory(
     return fig, axes
 
 
-def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=128):
+def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=8):
     """Demo plot showing LIDAR measurements from a robot pose."""
     fig, ax = plt.subplots(figsize=(12, 10))
 
     # Plot world
     plot_world(world, ax)
+
+    # Remove axis frames and grid for clean room-only visualization
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel("")
+    ax.set_ylabel("")
 
     # Plot robot pose
     plot_pose(pose, ax, color="red", label="Robot", arrow_length=0.5)
@@ -880,9 +898,6 @@ def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=128):
     ax.set_title(
         f"LIDAR Sensor Demonstration\n{n_rays}-Ray Distance Measurements with Noise"
     )
-
-    # Remove background grid lines for cleaner appearance
-    ax.grid(False)
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
@@ -1027,12 +1042,12 @@ def plot_weight_evolution(weight_history, save_path=None):
 
 
 def plot_weight_flow(weight_data, save_path=None):
-    """Plot particle weight distribution evolution as horizontal box-plot-style visualization.
+    """Plot particle weight distribution evolution as horizontal raincloud plots.
 
     Shows weight distribution characteristics over time with:
-    - X-axis: Weight magnitude (log scale)
+    - X-axis: Weight magnitude
     - Y-axis: Timestep
-    - Box plots showing quartiles, median, and outliers for each timestep
+    - Raincloud plots (violin + box + scatter) for each timestep
 
     Args:
         weight_data: Either:
@@ -1042,8 +1057,11 @@ def plot_weight_flow(weight_data, save_path=None):
         save_path: Optional path to save figure
 
     Returns:
-        fig, (ax1, ax2): Figure and axis objects
+        fig, ax: Figure and axis objects
     """
+    # Import our custom raincloud plot
+    from genjax.viz.raincloud import horizontal_raincloud
+
     if weight_data is None:
         # Handle case where no diagnostic weights available
         print(
@@ -1055,6 +1073,20 @@ def plot_weight_flow(weight_data, save_path=None):
         weight_history = [
             jnp.ones(n_particles) / n_particles for _ in range(n_timesteps)
         ]
+    elif hasattr(weight_data, "shape") and len(weight_data.shape) == 2:
+        # We have a 2D array (timesteps, particles) - this is diagnostic weights
+        T, N = weight_data.shape
+        print(f"Processing diagnostic weights: {T} timesteps, {N} particles")
+
+        # These are log normalized weights, convert to linear
+        weight_history = []
+        for t in range(T):
+            # Convert log weights to linear weights
+            log_weights_t = weight_data[t]
+            linear_weights_t = jnp.exp(log_weights_t)
+            # Normalize to sum to 1
+            linear_weights_t = linear_weights_t / jnp.sum(linear_weights_t)
+            weight_history.append(linear_weights_t)
     elif isinstance(weight_data, list) and len(weight_data) > 0:
         # Check if we have log weights (from diagnostics) or linear weights
         first_weights = weight_data[0]
@@ -1071,11 +1103,14 @@ def plot_weight_flow(weight_data, save_path=None):
 
     n_timesteps = len(weight_history)
 
-    # Compute statistics for each timestep
-    weight_stats = []
+    # Prepare labels for timesteps
+    labels = [f"t={t}" for t in range(n_timesteps)]
+
+    # Create colors with ESS-based coloring
+    colors = []
     ess_values = []
 
-    for t, weights in enumerate(weight_history):
+    for weights in weight_history:
         # Normalize weights if not already normalized
         if jnp.abs(jnp.sum(weights) - 1.0) > 1e-6:
             weights_norm = weights / jnp.sum(weights)
@@ -1086,198 +1121,65 @@ def plot_weight_flow(weight_data, save_path=None):
         ess = 1.0 / jnp.sum(weights_norm**2)
         ess_values.append(ess)
 
-        # Compute weight statistics
-        # Sort weights for percentile computation
-        sorted_weights = jnp.sort(weights_norm)
+        # Color based on ESS quality
+        n_particles = len(weights)
+        if ess < n_particles * 0.1:
+            colors.append("lightcoral")  # Poor ESS
+        elif ess < n_particles * 0.5:
+            colors.append("orange")  # Fair ESS
+        else:
+            colors.append("lightgreen")  # Good ESS
 
-        stats = {
-            "min": jnp.min(sorted_weights),
-            "q25": jnp.percentile(sorted_weights, 25),
-            "median": jnp.percentile(sorted_weights, 50),
-            "q75": jnp.percentile(sorted_weights, 75),
-            "max": jnp.max(sorted_weights),
-            "mean": jnp.mean(sorted_weights),
-            "std": jnp.std(sorted_weights),
-            "ess": ess,
-        }
-        weight_stats.append(stats)
+    # Create the raincloud plot (squeezed vertically)
+    fig, ax = plt.subplots(figsize=(14, 5))
 
-    # Create the plot
-    fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(16, 10), gridspec_kw={"width_ratios": [4, 1]}
+    horizontal_raincloud(
+        data=weight_history,
+        labels=labels,
+        ax=ax,
+        colors=colors,
+        width_violin=0.3,
+        width_box=0.1,
+        jitter=0.05,
+        point_size=8,
+        alpha=0.7,
+        orient="v",  # Changed to vertical to make time flow horizontally
     )
 
-    # Main box-plot-style visualization
-    timesteps = jnp.arange(n_timesteps)
-
-    # Plot box plot elements for each timestep
-    box_height = 0.6  # Height of each box
-
-    for t, stats in enumerate(weight_stats):
-        y_center = t
-        y_bottom = y_center - box_height / 2
-        y_top = y_center + box_height / 2
-
-        # Color based on ESS quality
-        ess = stats["ess"]
-        n_particles = len(weight_history[0])
-        if ess < n_particles * 0.1:
-            color = "red"
-            alpha = 0.8
-        elif ess < n_particles * 0.5:
-            color = "orange"
-            alpha = 0.8
-        else:
-            color = "green"
-            alpha = 0.8
-
-        # Draw the box (Q1 to Q3)
-        box_width = stats["q75"] - stats["q25"]
-        if box_width > 0:  # Only draw if there's actual spread
-            rect = plt.Rectangle(
-                (stats["q25"], y_bottom),
-                box_width,
-                box_height,
-                facecolor=color,
-                alpha=alpha * 0.3,
-                edgecolor=color,
-                linewidth=1.5,
-            )
-            ax1.add_patch(rect)
-
-        # Draw median line
-        ax1.plot(
-            [stats["median"], stats["median"]],
-            [y_bottom, y_top],
-            color=color,
-            linewidth=3,
-            alpha=alpha,
-        )
-
-        # Draw whiskers (min to Q1, Q3 to max)
-        # Left whisker
-        ax1.plot(
-            [stats["min"], stats["q25"]],
-            [y_center, y_center],
-            color=color,
-            linewidth=1.5,
-            alpha=alpha,
-        )
-        ax1.plot(
-            [stats["min"], stats["min"]],
-            [y_center - 0.1, y_center + 0.1],
-            color=color,
-            linewidth=1.5,
-            alpha=alpha,
-        )
-
-        # Right whisker
-        ax1.plot(
-            [stats["q75"], stats["max"]],
-            [y_center, y_center],
-            color=color,
-            linewidth=1.5,
-            alpha=alpha,
-        )
-        ax1.plot(
-            [stats["max"], stats["max"]],
-            [y_center - 0.1, y_center + 0.1],
-            color=color,
-            linewidth=1.5,
-            alpha=alpha,
-        )
-
-        # Mark mean with a diamond
-        ax1.scatter(
-            [stats["mean"]],
-            [y_center],
-            marker="D",
-            s=40,
-            color=color,
-            edgecolor="black",
-            linewidth=1,
-            alpha=alpha,
-            zorder=5,
-        )
-
-        # Add ESS annotation - handle uniform weights case
-        if stats["max"] > 0:
-            text_x = stats["max"] * 2
-        else:
-            text_x = 1e-3  # Fallback for uniform weights
-        ax1.text(
-            text_x,
-            y_center,
+    # Add ESS annotations (adjusted for horizontal time flow)
+    for t, ess in enumerate(ess_values):
+        weight_max = jnp.max(weight_history[t])
+        ax.text(
+            t,
+            weight_max * 1.1,
             f"ESS: {ess:.1f}",
-            verticalalignment="center",
-            color=color,
-            fontweight="bold",
-            fontsize=9,
+            fontsize=10,
+            va="bottom",
+            ha="center",
             bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8),
         )
 
-    # Customize the main plot
-    ax1.set_xscale("log")
-    ax1.set_xlabel("Normalized Weight (log scale)", fontsize=12)
-    ax1.set_ylabel("Timestep", fontsize=12)
-    ax1.set_title(
-        "Particle Weight Distribution Over Time\n(Box plots: Q1-Q3 boxes, median lines, min-max whiskers, mean diamonds)",
-        fontsize=14,
-    )
-    ax1.grid(True, alpha=0.3)
-    ax1.set_ylim(-0.5, n_timesteps - 0.5)
-    ax1.invert_yaxis()  # Show timestep 0 at top
+    # Customize the plot for horizontal time flow
+    ax.set_ylabel("Particle Weight (normalized)", fontsize=12)
+    ax.set_xlabel("Time Step", fontsize=12)
+    ax.grid(True, alpha=0.3)
 
-    # Add legend
+    # Add ESS quality legend
     from matplotlib.patches import Patch
 
     legend_elements = [
-        Patch(facecolor="red", alpha=0.3, edgecolor="red", label="Poor ESS (<10%)"),
-        Patch(
-            facecolor="orange", alpha=0.3, edgecolor="orange", label="Fair ESS (10-50%)"
-        ),
-        Patch(facecolor="green", alpha=0.3, edgecolor="green", label="Good ESS (>50%)"),
+        Patch(facecolor="lightcoral", alpha=0.7, label="Poor ESS (<10%)"),
+        Patch(facecolor="orange", alpha=0.7, label="Fair ESS (10-50%)"),
+        Patch(facecolor="lightgreen", alpha=0.7, label="Good ESS (>50%)"),
     ]
-    ax1.legend(handles=legend_elements, loc="upper left", fontsize=10)
-
-    # Side plot: ESS evolution
-    ax2.plot(ess_values, timesteps, "o-", linewidth=2, markersize=6, color="blue")
-    ax2.axvline(
-        len(weight_history[0]) * 0.5,
-        color="green",
-        linestyle="--",
-        alpha=0.7,
-        label="Good (50%)",
-    )
-    ax2.axvline(
-        len(weight_history[0]) * 0.1,
-        color="orange",
-        linestyle="--",
-        alpha=0.7,
-        label="Poor (10%)",
-    )
-    ax2.set_xlabel("Effective Sample Size", fontsize=12)
-    ax2.set_ylabel("Timestep", fontsize=12)
-    ax2.set_title("ESS Evolution", fontsize=14)
-    ax2.grid(True, alpha=0.3)
-    ax2.invert_yaxis()
-    ax2.legend(fontsize=10)
-
-    # Color code the ESS plot background
-    for t, ess in enumerate(ess_values):
-        if ess < len(weight_history[0]) * 0.1:
-            ax2.axhspan(t - 0.4, t + 0.4, color="red", alpha=0.1)
-        elif ess < len(weight_history[0]) * 0.5:
-            ax2.axhspan(t - 0.4, t + 0.4, color="orange", alpha=0.1)
-        else:
-            ax2.axhspan(t - 0.4, t + 0.4, color="green", alpha=0.1)
+    ax.legend(handles=legend_elements, loc="upper right", fontsize=10)
 
     plt.tight_layout()
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
-    return fig, (ax1, ax2)
+    return fig, ax
 
 
 def plot_multiple_trajectories(trajectory_data_list, world, save_path=None):
@@ -1286,6 +1188,15 @@ def plot_multiple_trajectories(trajectory_data_list, world, save_path=None):
 
     # Plot world
     plot_world(world, ax)
+
+    # Remove axis frames and grid for clean room-only visualization
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel("")
+    ax.set_ylabel("")
 
     colors = ["blue", "red", "green", "orange", "purple"]
 
@@ -1335,3 +1246,394 @@ def plot_multiple_trajectories(trajectory_data_list, world, save_path=None):
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
     return fig, ax
+
+
+def plot_smc_timing_comparison(
+    benchmark_results, save_path=None, n_particles=200, K=10
+):
+    """Create horizontal bar chart comparing SMC method timing."""
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    # Color scheme for different SMC methods
+    colors = {
+        "smc_basic": "#1f77b4",  # Blue - Bootstrap filter
+        "smc_mh": "#ff7f0e",  # Orange - MH rejuvenation
+        "smc_hmc": "#2ca02c",  # Green - HMC rejuvenation
+        "smc_locally_optimal": "#d62728",  # Red - Locally optimal proposal
+    }
+
+    method_labels = {
+        "smc_basic": f"Bootstrap filter (N={n_particles})",
+        "smc_mh": f"SMC (N={n_particles}) + MH (K={K})",
+        "smc_hmc": f"SMC (N={n_particles}) + HMC (K={K})",
+        "smc_locally_optimal": f"SMC (N={n_particles}) + Locally Optimal (K={K})",
+    }
+
+    # Extract timing data
+    method_names = []
+    timing_means = []
+    timing_stds = []
+    method_colors = []
+
+    for method_name, result in benchmark_results.items():
+        if method_name in colors:
+            method_names.append(method_labels[method_name])
+            timing_mean = (
+                float(result["timing_stats"][0]) * 1000
+            )  # Convert to milliseconds
+            timing_std = (
+                float(result["timing_stats"][1]) * 1000
+            )  # Convert to milliseconds
+            timing_means.append(timing_mean)
+            timing_stds.append(timing_std)
+            method_colors.append(colors[method_name])
+
+    # Create horizontal bar chart
+    y_pos = jnp.arange(len(method_names))
+    bars = ax.barh(
+        y_pos, timing_means, xerr=timing_stds, color=method_colors, alpha=0.7, capsize=5
+    )
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(method_names, fontsize=18)
+    ax.set_xlabel("Time (milliseconds)", fontsize=16)
+    ax.set_title("SMC Method Timing Comparison", fontsize=20, fontweight="bold", pad=20)
+    ax.tick_params(labelsize=16)
+    ax.grid(True, axis="x", alpha=0.3)
+
+    # Add timing values as text on bars
+    for i, (bar, mean, std) in enumerate(zip(bars, timing_means, timing_stds)):
+        width = bar.get_width()
+        mean_val = float(mean)
+        std_val = float(std)
+        ax.text(
+            width + std_val + max(timing_means) * 0.01,  # Position after error bar
+            bar.get_y() + bar.get_height() / 2,  # Center vertically
+            f"{mean_val:.1f}±{std_val:.1f}ms",  # Format as mean±std in milliseconds
+            ha="left",
+            va="center",
+            fontsize=16,
+        )
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    return fig, ax
+
+
+def plot_smc_method_comparison(
+    benchmark_results,
+    true_poses,
+    world,
+    save_path=None,
+    n_rays=8,
+    n_particles=200,
+    K=10,
+):
+    """Create comprehensive comparison plot for different SMC methods."""
+    n_methods = len(benchmark_results)
+
+    # Create 4-row layout: first timestep, final particles, rainclouds, timing
+    fig = plt.figure(figsize=(6 * n_methods, 20))
+    # Create main gridspec with 4 rows
+    gs_main = fig.add_gridspec(4, 1, height_ratios=[1, 1, 1, 0.8], hspace=0.4)
+    # First row for initial particle distributions
+    gs_first = gs_main[0].subgridspec(1, n_methods, hspace=0.05)
+    # Second row for final particle distributions
+    gs_second = gs_main[1].subgridspec(1, n_methods, hspace=0.05)
+    # Third row for raincloud plots
+    gs_third = gs_main[2].subgridspec(1, n_methods, hspace=0.05)
+    # Bottom section for timing
+    gs_bottom = gs_main[3]
+
+    method_labels = {
+        "smc_basic": f"Bootstrap filter (N={n_particles})",
+        "smc_mh": f"SMC (N={n_particles}) + MH (K={K})",
+        "smc_hmc": f"SMC (N={n_particles}) + HMC (K={K})",
+        "smc_locally_optimal": f"SMC (N={n_particles}) + Locally Optimal (K={K})",
+    }
+
+    colors = {
+        "smc_basic": "#1f77b4",
+        "smc_mh": "#ff7f0e",
+        "smc_hmc": "#2ca02c",
+        "smc_locally_optimal": "#d62728",
+    }
+
+    # Grayscale colors for raincloud plots
+    grayscale_colors = {
+        "smc_basic": "#404040",
+        "smc_mh": "#606060",
+        "smc_hmc": "#808080",
+        "smc_locally_optimal": "#a0a0a0",
+    }
+
+    for i, (method_name, result) in enumerate(benchmark_results.items()):
+        particle_history = result["particle_history"]
+        weight_history = result["weight_history"]
+        diagnostic_weights = result["diagnostic_weights"]
+
+        # First row: Initial particle distribution (timestep 1)
+        ax_first = fig.add_subplot(gs_first[i])
+        plot_world(world, ax_first)
+
+        # Remove axis frames for clean visualization
+        ax_first.grid(False)
+        for spine in ax_first.spines.values():
+            spine.set_visible(False)
+        ax_first.set_xticks([])
+        ax_first.set_yticks([])
+        ax_first.set_xlabel("")
+        ax_first.set_ylabel("")
+
+        # Plot first timestep particle distribution
+        first_particles = particle_history[0]
+        first_weights = weight_history[0]
+        plot_particles(first_particles, world, first_weights, ax_first, alpha=0.8)
+
+        # Plot true first pose
+        plot_pose(
+            true_poses[0], ax_first, color="red", label="True Pose", arrow_length=0.4
+        )
+
+        ax_first.set_title("", fontsize=20, fontweight="bold")
+        ax_first.legend().set_visible(False)
+
+        # Color-code the method with frame
+        for spine in ax_first.spines.values():
+            spine.set_color(colors[method_name])
+            spine.set_linewidth(3)
+            spine.set_visible(True)
+
+        # Add "Start" label on the leftmost plot only
+        if i == 0:
+            ax_first.text(
+                -0.1,
+                0.5,
+                "Start",
+                transform=ax_first.transAxes,
+                fontsize=20,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                rotation=90,
+            )
+
+        # Second row: Final particle distribution
+        ax_particles = fig.add_subplot(gs_second[i])
+        plot_world(world, ax_particles)
+
+        # Remove axis frames for clean visualization
+        ax_particles.grid(False)
+        for spine in ax_particles.spines.values():
+            spine.set_visible(False)
+        ax_particles.set_xticks([])
+        ax_particles.set_yticks([])
+        ax_particles.set_xlabel("")
+        ax_particles.set_ylabel("")
+
+        # Plot final particle distribution
+        final_particles = particle_history[-1]
+        final_weights = weight_history[-1]
+        plot_particles(final_particles, world, final_weights, ax_particles, alpha=0.8)
+
+        # Plot true final pose
+        plot_pose(
+            true_poses[-1],
+            ax_particles,
+            color="red",
+            label="True Pose",
+            arrow_length=0.4,
+        )
+
+        ax_particles.set_title("", fontsize=20, fontweight="bold")  # Remove title
+        ax_particles.legend().set_visible(False)
+
+        # Color-code the method with frame
+        for spine in ax_particles.spines.values():
+            spine.set_color(colors[method_name])
+            spine.set_linewidth(3)
+            spine.set_visible(True)
+
+        # Add "End" label on the leftmost plot only
+        if i == 0:
+            ax_particles.text(
+                -0.1,
+                0.5,
+                "End",
+                transform=ax_particles.transAxes,
+                fontsize=20,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                rotation=90,
+            )
+
+        # Third row: Raincloud plot with ESS (grayscale)
+        ax_weights = fig.add_subplot(gs_third[i])
+
+        # Remove frames except bottom x-axis
+        ax_weights.grid(False)
+        for spine_name, spine in ax_weights.spines.items():
+            if spine_name == "bottom":
+                spine.set_visible(True)
+                spine.set_color("black")
+                spine.set_linewidth(1)
+            else:
+                spine.set_visible(False)
+
+        if diagnostic_weights is not None and hasattr(diagnostic_weights, "shape"):
+            from genjax.viz.raincloud import diagnostic_raincloud
+
+            T, N = diagnostic_weights.shape
+            ess_values = []
+            ess_colors = []
+
+            # Show selected timesteps with raincloud visualization
+            selected_timesteps = [1, 6, 11, 16]
+            for plot_pos, t in enumerate([t for t in selected_timesteps if t < T]):
+                linear_weights = jnp.exp(diagnostic_weights[t])
+                linear_weights = linear_weights / jnp.sum(linear_weights)
+
+                # Use the modular raincloud function with particle count for ESS coloring
+                ess, ess_color = diagnostic_raincloud(
+                    ax_weights,
+                    linear_weights,
+                    position=plot_pos,  # Use plot position instead of timestep
+                    color=grayscale_colors[method_name],
+                    width=0.3,
+                    n_particles=N,  # Pass particle count for ESS quality assessment
+                )
+                ess_values.append(ess)
+                ess_colors.append(ess_color)
+
+            # Add ESS values as color-coded text annotations on the right side
+            # Also add timestep labels on the left
+            selected_timesteps = [1, 6, 11, 16]
+            valid_timesteps = [t for t in selected_timesteps if t < T]
+
+            for plot_pos, (timestep, ess, ess_color) in enumerate(
+                zip(valid_timesteps, ess_values, ess_colors)
+            ):
+                # ESS annotation on the right
+                ax_weights.text(
+                    0.98,
+                    plot_pos,
+                    f"ESS: {ess:.0f}",
+                    fontsize=16,
+                    va="center",
+                    ha="right",
+                    fontweight="bold",
+                    color=ess_color,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9),
+                    transform=ax_weights.get_yaxis_transform(),
+                )
+
+            # Update y-axis to show the selected timesteps
+            ax_weights.set_ylim(-0.5, len(valid_timesteps) - 0.5)
+            ax_weights.set_yticks(range(len(valid_timesteps)))
+            if i == 0:
+                # Only show y-axis labels on the leftmost plot
+                ax_weights.set_yticklabels(
+                    [f"{t}" for t in valid_timesteps], fontsize=12
+                )
+            else:
+                # Hide y-axis labels for columns 2 and 3
+                ax_weights.set_yticklabels([])
+                ax_weights.tick_params(left=False)  # Hide tick marks too
+
+            # Only show x-axis label on the leftmost plot
+            if i == 0:
+                ax_weights.set_xlabel("Particle Weight", fontsize=18, fontweight="bold")
+                ax_weights.set_ylabel("Timestep", fontsize=18, fontweight="bold")
+            else:
+                ax_weights.set_xlabel("")
+                ax_weights.set_ylabel("")
+
+            # Set x-axis limits and ticks
+            ax_weights.set_xlim(0, 1)
+            ax_weights.set_xticks([0, 1])
+            ax_weights.set_xticklabels(["0", "1"], fontsize=14)
+            ax_weights.tick_params(labelsize=14)
+        ax_weights.set_title("")  # Remove title to save space
+
+    # Bottom row: Timing comparison (spans all columns)
+    ax_timing = fig.add_subplot(gs_bottom)
+
+    # Extract timing data
+    method_names = []
+    timing_means = []
+    timing_stds = []
+    method_colors = []
+
+    for method_name, result in benchmark_results.items():
+        if method_name in colors:
+            method_names.append(method_labels[method_name])
+            timing_mean = (
+                float(result["timing_stats"][0]) * 1000
+            )  # Convert to milliseconds
+            timing_std = (
+                float(result["timing_stats"][1]) * 1000
+            )  # Convert to milliseconds
+            timing_means.append(timing_mean)
+            timing_stds.append(timing_std)
+            method_colors.append(colors[method_name])
+
+    # Create horizontal bar chart
+    y_pos = jnp.arange(len(method_names))
+    bars = ax_timing.barh(
+        y_pos, timing_means, xerr=timing_stds, color=method_colors, alpha=0.7, capsize=5
+    )
+
+    ax_timing.set_yticks(y_pos)
+    ax_timing.set_yticklabels([])
+    ax_timing.set_xlabel("Time (milliseconds)", fontsize=20, fontweight="bold")
+    ax_timing.set_title("", fontsize=22, fontweight="bold", pad=20)  # Remove title
+    ax_timing.tick_params(labelsize=16)
+    ax_timing.grid(True, axis="x", alpha=0.3)
+
+    # Add timing values as text on bars
+    for i, (bar, mean, std) in enumerate(zip(bars, timing_means, timing_stds)):
+        width = bar.get_width()
+        mean_val = float(mean)
+        std_val = float(std)
+        ax_timing.text(
+            width + std_val + max(timing_means) * 0.01,  # Position after error bar
+            bar.get_y() + bar.get_height() / 2,  # Center vertically
+            f"{mean_val:.1f}±{std_val:.1f}ms",  # Format as mean±std in milliseconds
+            ha="left",
+            va="center",
+            fontsize=16,
+            fontweight="bold",
+        )
+
+    # Add legend for SMC methods at the bottom
+    from matplotlib.patches import Patch
+
+    legend_elements = [
+        Patch(facecolor=colors[method], label=method_labels[method])
+        for method in benchmark_results.keys()
+        if method in colors
+    ]
+    legend = fig.legend(
+        legend_elements,
+        [
+            method_labels[method]
+            for method in benchmark_results.keys()
+            if method in colors
+        ],
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=len(legend_elements),
+        fontsize=18,
+    )
+    # Make legend text bold
+    for text in legend.get_texts():
+        text.set_fontweight("bold")
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    return fig

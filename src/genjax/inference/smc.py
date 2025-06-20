@@ -104,6 +104,7 @@ class ParticleCollection(Pytree):
 
     traces: Trace[X, R]  # Vectorized trace containing all samples
     log_weights: jnp.ndarray
+    diagnostic_weights: jnp.ndarray  # Log normalized weights for diagnostics
     n_samples: Const[int]
     log_marginal_estimate: jnp.ndarray = Pytree.field(
         default_factory=lambda: jnp.array(0.0)
@@ -172,14 +173,20 @@ def _create_particle_collection(
     log_weights: jnp.ndarray,
     n_samples: Const[int],
     log_marginal_estimate: jnp.ndarray = None,
+    diagnostic_weights: jnp.ndarray = None,
 ) -> ParticleCollection:
     """Helper to create ParticleCollection."""
     if log_marginal_estimate is None:
         log_marginal_estimate = jnp.array(0.0)
 
+    if diagnostic_weights is None:
+        # Initialize diagnostic weights as log normalized weights
+        diagnostic_weights = log_weights - jax.scipy.special.logsumexp(log_weights)
+
     return ParticleCollection(
         traces=traces,
         log_weights=log_weights,
+        diagnostic_weights=diagnostic_weights,
         n_samples=n_samples,
         log_marginal_estimate=log_marginal_estimate,
     )
@@ -358,6 +365,7 @@ def change(
         log_weights=new_log_weights,
         n_samples=particles.n_samples,
         log_marginal_estimate=particles.log_marginal_estimate,
+        # diagnostic_weights will be computed from new_log_weights in _create_particle_collection
     )
 
 
@@ -406,8 +414,11 @@ def extend(
             new_log_weight = old_log_weight + log_weight
         else:
             # Use custom extension proposal
-            # Sample extension from proposal
-            extension_trace = extension_proposal.simulate(*args)
+            # Proposal gets: (obs, prev_particle_choices, *model_args)
+            old_choices = old_trace.get_choices()
+            extension_trace = extension_proposal.simulate(
+                constraints, old_choices, *args
+            )
             extension_choices = extension_trace.get_choices()
             proposal_score = extension_trace.get_score()
 
@@ -438,6 +449,7 @@ def extend(
         log_weights=new_log_weights,
         n_samples=particles.n_samples,
         log_marginal_estimate=particles.log_marginal_estimate,
+        # diagnostic_weights will be computed from new_log_weights in _create_particle_collection
     )
 
 
@@ -449,8 +461,8 @@ def rejuvenate(
     Rejuvenate move for particle collection.
 
     Applies an MCMC kernel to each particle independently to improve
-    particle diversity and reduce degeneracy. The importance weights remain
-    unchanged due to detailed balance.
+    particle diversity and reduce degeneracy. The importance weights and
+    diagnostic weights remain unchanged due to detailed balance.
 
     Mathematical Foundation:
         For an MCMC kernel satisfying detailed balance, the log incremental weight is 0:
@@ -507,6 +519,7 @@ def rejuvenate(
         log_weights=new_log_weights,
         n_samples=particles.n_samples,
         log_marginal_estimate=particles.log_marginal_estimate,
+        diagnostic_weights=particles.diagnostic_weights,  # Propagate diagnostic weights unchanged
     )
 
 
@@ -517,6 +530,7 @@ def resample(
     """
     Resample particle collection to combat degeneracy.
 
+    Computes log normalized weights for diagnostics before resampling.
     After resampling, weights are reset to uniform (zero in log space)
     and the marginal likelihood estimate is updated to include the
     average weight before resampling.
@@ -528,6 +542,11 @@ def resample(
     Returns:
         New ParticleCollection with resampled particles and updated marginal estimate
     """
+    # Compute log normalized weights before resampling for diagnostics
+    log_normalized_weights = particles.log_weights - jax.scipy.special.logsumexp(
+        particles.log_weights
+    )
+
     # Compute current marginal contribution before resampling
     current_marginal = jax.scipy.special.logsumexp(particles.log_weights) - jnp.log(
         particles.n_samples.value
@@ -552,6 +571,7 @@ def resample(
         log_weights=uniform_log_weights,
         n_samples=particles.n_samples,
         log_marginal_estimate=new_log_marginal_estimate,
+        diagnostic_weights=log_normalized_weights,  # Store pre-resampling normalized weights
     )
 
 

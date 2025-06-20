@@ -96,9 +96,7 @@ def benchmark_with_warmup(
     """
     # Warm-up runs to trigger JIT compilation
     for _ in range(warmup_runs):
-        result = fn()
-        if auto_sync:
-            jax.block_until_ready(result)
+        _ = fn()
 
     # Actual timing
     return timing(fn, repeats=repeats, inner_repeats=inner_repeats, auto_sync=auto_sync)

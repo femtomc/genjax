@@ -16,6 +16,7 @@ tests/
 ├── test_smc.py          # Tests for src/genjax/smc.py (Sequential Monte Carlo)
 ├── test_vi.py           # Tests for src/genjax/vi.py (Variational inference)
 ├── test_adev.py         # Tests for src/genjax/adev.py (Automatic differentiation)
+├── test_gp.py           # Tests for src/genjax/gp/ (Gaussian Processes)
 ├── discrete_hmm.py      # Discrete HMM test utilities
 └── conftest.py          # Test configuration and shared fixtures
 ```
@@ -114,6 +115,32 @@ For computationally intensive algorithms:
 - Use smaller problem sizes in tests
 - Focus on correctness over performance
 - Add performance benchmarks separately if needed
+
+### Gaussian Process Testing
+
+The GP module tests (`test_gp.py`) cover:
+
+1. **Kernel Functionality** (`test_gp_kernels`):
+   - RBF, Matern52, and other kernel implementations
+   - Kernel evaluation on test inputs
+   - Proper variance values on diagonal
+
+2. **Mean Functions** (`test_gp_mean_functions`):
+   - Zero, Constant, and Linear mean functions
+   - Correct output shapes and values
+
+3. **GP as Generative Function**:
+   - `test_gp_simulate`: Forward sampling from GP prior/posterior
+   - `test_gp_conditioning`: GP conditioning on observations
+   - `test_gp_assess`: Density evaluation
+   - `test_gp_generate_with_constraints`: Constrained generation
+   - `test_gp_in_gen_function`: Integration with `@gen` functions
+
+4. **Special Considerations**:
+   - GP uses exact inference as internal proposal (weight = 0)
+   - GPTrace inherits from Trace for proper unwrapping
+   - Integration with PJAX via `seed()` transformation
+   - Proper handling of Fixed wrappers not needed for GP
 
 ## Inference Algorithm Testing Strategies
 

@@ -97,6 +97,10 @@ from .state import (  # noqa: E402
     tag_state,
     namespace,
 )
+from .viz import (  # noqa: E402
+    horizontal_raincloud,
+    raincloud,
+)
 
 # Import extras module for additional functionality
 from . import extras  # noqa: E402
@@ -201,6 +205,9 @@ __all__ = [
     "save",
     "tag_state",
     "namespace",
+    # Visualization functionality
+    "horizontal_raincloud",
+    "raincloud",
     # Extras
     "extras",
     # Discrete HMM

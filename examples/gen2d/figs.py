@@ -359,7 +359,7 @@ def plot_diagnostics(
                 )  # Approximate for non-final
                 ess_values.append(float(ess))
                 log_weights_variance.append(0.1)  # Placeholder
-            except:
+            except Exception:
                 # Fallback values
                 ess_values.append(float(particles.n_samples.value) * 0.7)
                 log_weights_variance.append(0.1)

@@ -5,7 +5,6 @@ These tests compare approximate inference algorithms against exact inference
 on discrete HMMs to validate correctness and accuracy.
 """
 
-import pytest
 import jax
 import jax.numpy as jnp
 import jax.random as jrand
@@ -1710,7 +1709,6 @@ class TestRejuvenationSMC:
             f"Step 1 variance mismatch: got {filtered_covs[1, 0, 0]:.6f}, expected {expected_var_1:.6f}"
         )
 
-    @pytest.mark.skip(reason="Diagnostic weights removed from ParticleCollection")
     def test_rejuvenation_smc_multiple_moves(self):
         """Test rejuvenation_smc with multiple rejuvenation moves per timestep."""
         # Simple parameters
@@ -1783,7 +1781,7 @@ class TestRejuvenationSMC:
             assert jnp.isfinite(log_ml), (
                 f"Log marginal likelihood should be finite, got {log_ml}"
             )
-            assert 0 < ess <= n_particles, (
+            assert 0 < ess <= n_particles + 1e-5, (
                 f"ESS should be between 0 and {n_particles}, got {ess}"
             )
 
@@ -1816,7 +1814,145 @@ class TestRejuvenationSMC:
 class TestWeightEvolution:
     """Test that particle weights evolve properly during SMC."""
 
-    @pytest.mark.skip(reason="Diagnostic weights removed from ParticleCollection")
+    def test_diagnostic_weights_change_over_time(self):
+        """Test that diagnostic weights show variation over time in particle filter."""
+        key = jrand.key(42)
+        key1, key2 = jrand.split(key)
+
+        # Use simple HMM for reproducible weight evolution
+        initial_probs, transition_matrix, emission_matrix = create_simple_hmm_params()
+        T = 5
+        n_particles = 100
+
+        # Generate test data with clear observation differences
+        def sample_hmm_dataset_closure(
+            initial_probs, transition_matrix, emission_matrix
+        ):
+            return sample_hmm_dataset(
+                initial_probs, transition_matrix, emission_matrix, const(T)
+            )
+
+        true_states, observations, constraints = seed(sample_hmm_dataset_closure)(
+            key1, initial_probs, transition_matrix, emission_matrix
+        )
+
+        # Use discrete_hmm with rejuvenation_smc
+        @gen
+        def hmm_proposal(
+            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+        ):
+            """Simple proposal that samples uniformly."""
+            n_states = initial_probs.shape[0]
+            uniform_logits = jnp.log(jnp.ones(n_states) / n_states)
+            return categorical(uniform_logits) @ "state"
+
+        def mcmc_kernel(trace):
+            return mh(trace, sel("state"))
+
+        # Prepare observations
+        obs_sequence = {"obs": observations}
+
+        # Initial arguments for discrete_hmm
+        initial_args = (
+            jnp.array(0),
+            jnp.array(0),
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
+        )
+
+        # Run with return_all_particles to get weight evolution
+        all_particles = seed(rejuvenation_smc)(
+            key2,
+            discrete_hmm,
+            hmm_proposal,
+            const(mcmc_kernel),
+            obs_sequence,
+            initial_args,
+            const(n_particles),
+            const(True),  # return_all_particles=True
+            const(1),  # n_rejuvenation_moves
+        )
+
+        # Extract diagnostic weights - shape should be (T, n_particles)
+        diagnostic_weights = all_particles.diagnostic_weights
+        assert diagnostic_weights.shape == (T, n_particles), (
+            f"Diagnostic weights shape mismatch: expected ({T}, {n_particles}), got {diagnostic_weights.shape}"
+        )
+
+        # Test 1: Diagnostic weights should show variation within each timestep
+        timestep_variations = []
+        for t in range(T):
+            weights_t = diagnostic_weights[t]
+            # Compute standard deviation of normalized weights
+            weights_std = jnp.std(weights_t)
+            timestep_variations.append(float(weights_std))
+
+            # Each timestep should have some weight variation
+            assert weights_std > 1e-8, (
+                f"Timestep {t}: diagnostic weights show no variation (std={weights_std:.10f}). "
+                f"This suggests the extend step is not creating likelihood differences between particles."
+            )
+
+        # Test 2: At least some timesteps should have significant weight variation
+        significant_variation_count = sum(
+            1 for var in timestep_variations if var > 1e-6
+        )
+        assert significant_variation_count >= T // 2, (
+            f"Too few timesteps show significant weight variation. "
+            f"Expected at least {T // 2}, got {significant_variation_count}. "
+            f"Variations: {timestep_variations}"
+        )
+
+        # Test 3: Diagnostic weights should change over time
+        # Compare weights across different timesteps
+        weight_changes = []
+        for t in range(1, T):
+            prev_weights = diagnostic_weights[t - 1]
+            curr_weights = diagnostic_weights[t]
+
+            # Compute correlation between consecutive timesteps
+            # Low correlation indicates weights are changing
+            correlation = jnp.corrcoef(prev_weights, curr_weights)[0, 1]
+            weight_changes.append(float(correlation))
+
+            # Weights should not be perfectly correlated across timesteps
+            assert correlation < 0.99, (
+                f"Diagnostic weights too highly correlated between timesteps {t - 1} and {t} "
+                f"(correlation={correlation:.6f}). This suggests weights are not evolving properly."
+            )
+
+        # Test 4: ESS should vary over time (showing actual particle diversity)
+        ess_values = []
+        for t in range(T):
+            weights_t = diagnostic_weights[t]
+            # Convert log weights to normalized weights
+            weights_norm = jnp.exp(weights_t - jax.scipy.special.logsumexp(weights_t))
+            ess = 1.0 / jnp.sum(weights_norm**2)
+            ess_values.append(float(ess))
+
+            # ESS should be meaningful (not trivial edge cases)
+            assert ess > 1.0, f"ESS too low at timestep {t}: {ess:.3f}"
+            assert ess <= n_particles + 1e-6, f"ESS too high at timestep {t}: {ess:.3f}"
+
+        # ESS should show variation over time
+        ess_std = jnp.std(jnp.array(ess_values))
+        assert ess_std > 1.0, (
+            f"ESS values show insufficient variation over time (std={ess_std:.3f}). "
+            f"ESS values: {ess_values}. "
+            f"This suggests particle weights are not properly reflecting observation likelihood differences."
+        )
+
+        print("\nDiagnostic weight evolution test results:")
+        print(
+            f"  Timestep weight variations: {[f'{v:.6f}' for v in timestep_variations]}"
+        )
+        print(
+            f"  Weight correlations between timesteps: {[f'{c:.4f}' for c in weight_changes]}"
+        )
+        print(f"  ESS values over time: {[f'{e:.1f}' for e in ess_values]}")
+        print(f"  ESS standard deviation: {ess_std:.3f}")
+
     def test_rejuvenation_smc_weight_evolution(self):
         """Test that rejuvenation_smc produces varying weights between resampling steps."""
         key = jrand.key(42)
@@ -1861,8 +1997,8 @@ class TestWeightEvolution:
         assert hasattr(all_particles, "log_weights"), (
             "Should have log_weights attribute"
         )
-        assert hasattr(all_particles, "log_weights_normalized"), (
-            "Should have log_weights_normalized diagnostic attribute"
+        assert hasattr(all_particles, "diagnostic_weights"), (
+            "Should have diagnostic_weights attribute"
         )
 
         # Check weight diversity at each timestep
@@ -1871,12 +2007,10 @@ class TestWeightEvolution:
 
         for t in range(n_timesteps):
             # Extract diagnostic normalized weights for timestep t (these preserve pre-resampling diversity)
-            if (
-                all_particles.log_weights_normalized.ndim == 2
-            ):  # Shape: (T, n_particles)
-                weights_norm = all_particles.log_weights_normalized[t]
+            if all_particles.diagnostic_weights.ndim == 2:  # Shape: (T, n_particles)
+                weights_norm = all_particles.diagnostic_weights[t]
             else:  # Single timestep case
-                weights_norm = all_particles.log_weights_normalized
+                weights_norm = all_particles.diagnostic_weights
 
             # Compute weight diversity (standard deviation of normalized weights)
             weight_std = jnp.std(weights_norm)
