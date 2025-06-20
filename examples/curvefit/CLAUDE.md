@@ -358,18 +358,20 @@ result = seed(default_importance_sampling)(key, model, (), n_samples, constraint
 ### Model Validation
 
 ```python
-# Test factory pattern
-model = npoint_curve_factory(10)
-trace = model.simulate()  # No args needed for this model
-assert trace.get_retval()[1][0].shape == (10,)  # xs shape
-assert trace.get_retval()[1][1].shape == (10,)  # ys shape
+# Test model with specific inputs
+xs = jnp.linspace(0, 5, 20)
+trace = npoint_curve.simulate(xs)
+curve, (xs_ret, ys_ret) = trace.get_retval()
+assert xs_ret.shape == (20,)
+assert ys_ret.shape == (20,)
 ```
 
 ### Inference Validation
 
 ```python
-# Test inference convergence
-samples, weights = infer_latents(key, ys, 1000)
+# Test inference with proper seeding
+xs, ys = get_points_for_inference(n_points=20)
+samples, weights = seed(infer_latents)(key, xs, ys, Const(1000))
 assert samples.get_choices()['curve']['freq'].shape == (1000,)
 assert weights.shape == (1000,)
 ```

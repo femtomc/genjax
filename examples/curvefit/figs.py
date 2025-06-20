@@ -7,14 +7,13 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import timing
-from core import (
+from examples.utils import timing
+from examples.curvefit.core import (
     onepoint_curve,
     npoint_curve,
     infer_latents,
     get_points_for_inference,
 )
-from jax import vmap
 
 
 ## Onepoint trace visualization ##
@@ -77,8 +76,6 @@ def visualize_multipoint_trace(
 
 def save_multipoint_trace_viz():
     print("Making and saving multipoint trace visualization.")
-    import jax.numpy as jnp
-
     xs = jnp.linspace(-1, 11, 10)  # 10 points covering the full visualization range
     trace = npoint_curve.simulate(xs)
     fig = visualize_multipoint_trace(trace, yrange=(-1.5, 1.5))
@@ -98,7 +95,6 @@ def save_four_multipoint_trace_vizs():
     print(
         "Making and saving visualizations of traces generated from modular_vmap(simulate)."
     )
-    import jax.numpy as jnp
     from genjax.pjax import modular_vmap
 
     xs = jnp.linspace(-1, 11, 10)  # 10 points covering the full visualization range
@@ -115,7 +111,7 @@ def save_four_multipoint_trace_vizs():
         )
 
     print("Making and saving visualizations of trace densities.")
-    densities = vmap(
+    densities = jax.vmap(
         lambda chm: npoint_curve.log_density(chm, xs),
         in_axes=0,
     )(traces.get_choices())
@@ -447,121 +443,6 @@ def save_comprehensive_benchmark_figure(
             print(f"{label:<20} {time_ms:<15.1f} {ess:<10} {log_ml:<10}")
 
     return benchmark_results, posterior_samples
-
-
-def plot_inference_diagnostics(curve, xs, ys, samples, log_weights):
-    """
-    Create diagnostic plots for GenJAX inference results.
-
-    Args:
-        curve: Curve object with parameters
-        xs: Input locations
-        ys: Observed data
-        samples: Trace samples from inference
-        log_weights: Log importance weights
-    """
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    # No overall title for research quality figure - individual panel titles provide context
-
-    # Convert to numpy for plotting
-    xs_np = np.array(xs)
-    ys_np = np.array(ys)
-    log_weights_np = np.array(log_weights)
-
-    # Plot 1: Data and posterior predictive samples
-    ax1 = axes[0, 0]
-    ax1.scatter(xs_np, ys_np, c="red", s=50, alpha=0.7, label="Observed data", zorder=3)
-
-    # Plot true curve for reference
-    x_fine = np.linspace(xs_np.min(), xs_np.max(), 100)
-    true_freq = 0.3
-    true_offset = 1.5
-    y_true = np.sin(2 * np.pi * true_freq * x_fine + true_offset)
-    ax1.plot(x_fine, y_true, "g-", linewidth=3, alpha=0.8, label="True curve", zorder=2)
-
-    # Importance resample to get proper posterior samples using GenJAX categorical
-    n_resample = min(500, len(samples.get_choices()["curve"]["freq"]))
-
-    # Use GenJAX categorical with log weights directly
-    # Generate a key for resampling
-    resample_key = jrand.key(123)  # Use a fixed seed for reproducibility
-
-    # Sample from categorical distribution with log weights as logits
-    resampled_indices = jrand.categorical(
-        resample_key, jnp.array(log_weights), shape=(n_resample,)
-    )
-
-    # Sample posterior curves using properly resampled indices
-    for idx in resampled_indices:
-        freq = float(samples.get_choices()["curve"]["freq"][idx])
-        offset = float(samples.get_choices()["curve"]["off"][idx])
-        y_curve = np.sin(2 * np.pi * freq * x_fine + offset)
-        ax1.plot(
-            x_fine, y_curve, "b-", alpha=0.05, linewidth=0.3
-        )  # Lower alpha, thinner lines
-
-    ax1.set_xlabel("x")
-    ax1.set_ylabel("y")
-    ax1.set_title("Data + Posterior Curves")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-
-    # Plot 2: Parameter posterior distributions
-    ax2 = axes[0, 1]
-    freqs = np.array(samples.get_choices()["curve"]["freq"])
-    offsets = np.array(samples.get_choices()["curve"]["off"])
-
-    # Use resampled indices for proper posterior representation
-    resampled_freqs = freqs[resampled_indices]
-    resampled_offsets = offsets[resampled_indices]
-
-    ax2.scatter(
-        resampled_freqs, resampled_offsets, alpha=0.3, s=10, label="Resampled posterior"
-    )
-    ax2.scatter(
-        true_freq,
-        true_offset,
-        c="green",
-        s=100,
-        marker="*",
-        label="True parameters",
-        zorder=3,
-    )
-    ax2.set_xlabel("Frequency")
-    ax2.set_ylabel("Offset")
-    ax2.set_title("Parameter Posterior")
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-
-    # Plot 3: Parameter traces
-    ax3 = axes[1, 0]
-    ax3.plot(freqs, alpha=0.7, label="Frequency")
-    ax3.set_xlabel("Sample")
-    ax3.set_ylabel("Value")
-    ax3.set_title("Parameter Trace (Frequency)")
-    ax3.grid(True, alpha=0.3)
-
-    # Plot 4: Log weights distribution
-    ax4 = axes[1, 1]
-    ax4.hist(log_weights_np, bins=30, alpha=0.7, density=True, color="blue")
-    ax4.axvline(
-        log_weights_np.mean(),
-        color="red",
-        linestyle="--",
-        label=f"Mean: {log_weights_np.mean():.2f}",
-    )
-    ax4.set_xlabel("Log Weight")
-    ax4.set_ylabel("Density")
-    ax4.set_title("Importance Weights Distribution")
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(
-        "examples/curvefit/figs/genjax_diagnostics.pdf", dpi=150, bbox_inches="tight"
-    )
-    plt.close()
-    print("Saved diagnostic plot as 'examples/curvefit/figs/genjax_diagnostics.pdf'")
 
 
 def save_genjax_scaling_benchmark(
@@ -1587,3 +1468,539 @@ def save_genjax_posterior_comparison(
 
     print(f"\nSaved posterior comparison figure: {filename}")
     print("=== GenJAX Posterior Comparison Complete ===")
+
+
+def save_genjax_posterior_comparison_from_data(
+    data_dict, output_dir="figs", n_curves_to_plot=100, figsize=(16, 12)
+):
+    """
+    Generate posterior comparison plot from saved experimental data.
+
+    This function loads previously computed inference results and generates
+    the same visualization without recomputing the expensive inference.
+
+    Args:
+        data_dict: Dictionary from load_benchmark_results containing:
+            - dataset: xs, ys, true_freq, true_offset
+            - methods: Dictionary of method results
+        output_dir: Output directory for figures
+        n_curves_to_plot: Number of posterior curves to visualize
+        figsize: Figure size tuple
+    """
+    print("\n=== GenJAX Posterior Comparison from Saved Data ===")
+
+    # Extract dataset
+    dataset = data_dict["dataset"]
+    xs = dataset["xs"]
+    ys = dataset["ys"]
+    true_freq = dataset["true_freq"]
+    true_offset = dataset["true_offset"]
+    n_points = len(xs)
+
+    # Extract method results
+    methods = data_dict["methods"]
+
+    # Check which methods are available
+    has_is = "genjax_is" in methods
+    has_hmc = "genjax_hmc" in methods
+    has_numpyro = "numpyro_hmc" in methods
+
+    if not (has_is and has_hmc):
+        print("Warning: Missing GenJAX IS or HMC results. Cannot create comparison.")
+        return
+
+    print(f"Data points: {n_points}")
+    print(f"Available methods: {list(methods.keys())}")
+    print(f"True parameters: freq={true_freq:.3f}, offset={true_offset:.3f}")
+
+    # Extract samples
+    is_result = methods["genjax_is"]
+    hmc_result = methods["genjax_hmc"]
+
+    is_freq = is_result["samples"]["curve"]["freq"]
+    is_off = is_result["samples"]["curve"]["off"]
+    is_weights = is_result.get("weights", jnp.ones(len(is_freq)))
+
+    hmc_freq = hmc_result["samples"]["curve"]["freq"]
+    hmc_off = hmc_result["samples"]["curve"]["off"]
+
+    # Compute statistics
+    is_stats = {
+        "freq_mean": float(jnp.mean(is_freq)),
+        "freq_std": float(jnp.std(is_freq)),
+        "offset_mean": float(jnp.mean(is_off)),
+        "offset_std": float(jnp.std(is_off)),
+    }
+
+    hmc_stats = {
+        "freq_mean": float(jnp.mean(hmc_freq)),
+        "freq_std": float(jnp.std(hmc_freq)),
+        "offset_mean": float(jnp.mean(hmc_off)),
+        "offset_std": float(jnp.std(hmc_off)),
+        "acceptance_rate": hmc_result.get("additional_stats", {}).get(
+            "acceptance_rate", 0.0
+        ),
+    }
+
+    # Handle NumPyro results if available
+    if has_numpyro:
+        numpyro_result = methods["numpyro_hmc"]
+        numpyro_freq = numpyro_result["samples"]["freq"]
+        numpyro_off = numpyro_result["samples"]["off"]
+
+        numpyro_stats = {
+            "freq_mean": float(jnp.mean(numpyro_freq)),
+            "freq_std": float(jnp.std(numpyro_freq)),
+            "offset_mean": float(jnp.mean(numpyro_off)),
+            "offset_std": float(jnp.std(numpyro_off)),
+            "acceptance_rate": numpyro_result.get("additional_stats", {}).get(
+                "acceptance_rate", 0.0
+            ),
+        }
+    else:
+        numpyro_freq = jnp.array([])
+        numpyro_off = jnp.array([])
+        numpyro_stats = {
+            "freq_mean": 0,
+            "freq_std": 0,
+            "offset_mean": 0,
+            "offset_std": 0,
+            "acceptance_rate": 0,
+        }
+
+    # Print statistics
+    print(
+        f"\nIS Posterior: freq={is_stats['freq_mean']:.3f}±{is_stats['freq_std']:.3f}, "
+        f"offset={is_stats['offset_mean']:.3f}±{is_stats['offset_std']:.3f}"
+    )
+    if is_result.get("timing_stats"):
+        print(
+            f"IS Timing: {is_result['timing_stats'][0] * 1000:.1f}±{is_result['timing_stats'][1] * 1000:.1f}ms"
+        )
+
+    print(
+        f"HMC Posterior: freq={hmc_stats['freq_mean']:.3f}±{hmc_stats['freq_std']:.3f}, "
+        f"offset={hmc_stats['offset_mean']:.3f}±{hmc_stats['offset_std']:.3f}"
+    )
+    if hmc_result.get("timing_stats"):
+        print(
+            f"HMC Timing: {hmc_result['timing_stats'][0] * 1000:.1f}±{hmc_result['timing_stats'][1] * 1000:.1f}ms"
+        )
+    print(f"HMC Acceptance Rate: {hmc_stats['acceptance_rate']:.3f}")
+
+    if has_numpyro:
+        print(
+            f"NumPyro HMC Posterior: freq={numpyro_stats['freq_mean']:.3f}±{numpyro_stats['freq_std']:.3f}, "
+            f"offset={numpyro_stats['offset_mean']:.3f}±{numpyro_stats['offset_std']:.3f}"
+        )
+        if numpyro_result.get("timing_stats"):
+            print(
+                f"NumPyro HMC Timing: {numpyro_result['timing_stats'][0] * 1000:.1f}±{numpyro_result['timing_stats'][1] * 1000:.1f}ms"
+            )
+
+    # Create visualization (reuse existing plotting code)
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from examples.curvefit.data import sinfn
+
+    fig = plt.figure(figsize=figsize)
+    gs = fig.add_gridspec(4, 4, height_ratios=[3, 3, 2, 1.5], hspace=0.4, wspace=0.3)
+
+    # Individual method plots
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax3 = fig.add_subplot(gs[0, 2])
+    ax5 = fig.add_subplot(gs[0, 3])  # Parameter scatter plot
+
+    # Combined overlay
+    ax4 = fig.add_subplot(gs[1, :])
+
+    # Performance comparison
+    ax6 = fig.add_subplot(gs[2, :])
+
+    # Legend
+    ax7 = fig.add_subplot(gs[3, :])
+    ax7.axis("off")
+
+    # Style configuration
+    title_fontsize = 20
+    label_fontsize = 18
+    tick_fontsize = 16
+    legend_fontsize = 20
+
+    # Color scheme
+    is_color = "#1f77b4"  # Blue
+    hmc_color = "#2ca02c"  # Green
+    numpyro_color = "#d62728"  # Red
+    true_color = "#ff7f0e"  # Orange
+    data_color = "#17becf"  # Cyan
+
+    # Plot IS posterior curves (Row 1, Col 1)
+    ax1.set_title(
+        "GenJAX IS Posterior", fontsize=title_fontsize, fontweight="bold", pad=10
+    )
+    x_fine = np.linspace(-1, max(xs) + 1, 300)
+
+    # Sample subset for plotting
+    n_plot = min(n_curves_to_plot, len(is_freq))
+    if n_plot < len(is_freq):
+        indices = np.random.choice(len(is_freq), n_plot, replace=False)
+    else:
+        indices = np.arange(len(is_freq))
+
+    for i in indices:
+        curve = sinfn(x_fine, is_freq[i], is_off[i])
+        ax1.plot(x_fine, curve, alpha=0.15, color=is_color, linewidth=1)
+
+    ax1.scatter(
+        xs,
+        ys,
+        color=data_color,
+        s=80,
+        alpha=0.9,
+        zorder=10,
+        edgecolor="darkblue",
+        linewidth=1,
+    )
+    ax1.set_xlabel("x", fontsize=label_fontsize)
+    ax1.set_ylabel("y", fontsize=label_fontsize)
+    ax1.tick_params(labelsize=tick_fontsize)
+    ax1.set_ylim(-2.5, 2.5)
+
+    # Plot HMC posterior curves (Row 1, Col 2)
+    ax2.set_title(
+        "GenJAX HMC Posterior", fontsize=title_fontsize, fontweight="bold", pad=10
+    )
+
+    n_plot = min(n_curves_to_plot, len(hmc_freq))
+    step = max(1, len(hmc_freq) // n_plot)
+    for i in range(0, len(hmc_freq), step):
+        if i >= n_plot:
+            break
+        curve = sinfn(x_fine, hmc_freq[i], hmc_off[i])
+        ax2.plot(x_fine, curve, alpha=0.15, color=hmc_color, linewidth=1)
+
+    ax2.scatter(
+        xs,
+        ys,
+        color=data_color,
+        s=80,
+        alpha=0.9,
+        zorder=10,
+        edgecolor="darkblue",
+        linewidth=1,
+    )
+    ax2.set_xlabel("x", fontsize=label_fontsize)
+    ax2.set_ylabel("y", fontsize=label_fontsize)
+    ax2.tick_params(labelsize=tick_fontsize)
+    ax2.set_ylim(-2.5, 2.5)
+
+    # Plot NumPyro HMC posterior curves (Row 1, Col 3)
+    if has_numpyro:
+        ax3.set_title(
+            "NumPyro HMC Posterior", fontsize=title_fontsize, fontweight="bold", pad=10
+        )
+
+        n_plot = min(n_curves_to_plot, len(numpyro_freq))
+        step = max(1, len(numpyro_freq) // n_plot)
+        for i in range(0, len(numpyro_freq), step):
+            if i >= n_plot:
+                break
+            curve = sinfn(x_fine, numpyro_freq[i], numpyro_off[i])
+            ax3.plot(x_fine, curve, alpha=0.15, color=numpyro_color, linewidth=1)
+
+        ax3.scatter(
+            xs,
+            ys,
+            color=data_color,
+            s=80,
+            alpha=0.9,
+            zorder=10,
+            edgecolor="darkblue",
+            linewidth=1,
+        )
+    else:
+        ax3.text(
+            0.5,
+            0.5,
+            "NumPyro not available",
+            ha="center",
+            va="center",
+            transform=ax3.transAxes,
+            fontsize=16,
+        )
+        ax3.set_title(
+            "NumPyro HMC Posterior", fontsize=title_fontsize, fontweight="bold", pad=10
+        )
+
+    ax3.set_xlabel("x", fontsize=label_fontsize)
+    ax3.set_ylabel("y", fontsize=label_fontsize)
+    ax3.tick_params(labelsize=tick_fontsize)
+    ax3.set_ylim(-2.5, 2.5)
+
+    # Parameter space scatter plot (Row 1, Col 4)
+    ax5.set_title(
+        "Parameter Estimates", fontsize=title_fontsize, fontweight="bold", pad=10
+    )
+
+    # Plot samples with transparency
+    ax5.scatter(is_freq, is_off, alpha=0.1, color=is_color, s=20, label="IS")
+    ax5.scatter(hmc_freq, hmc_off, alpha=0.1, color=hmc_color, s=20, label="HMC")
+    if has_numpyro:
+        ax5.scatter(
+            numpyro_freq,
+            numpyro_off,
+            alpha=0.1,
+            color=numpyro_color,
+            s=20,
+            label="NumPyro",
+        )
+
+    # Plot means
+    ax5.scatter(
+        is_stats["freq_mean"],
+        is_stats["offset_mean"],
+        color=is_color,
+        s=200,
+        marker="*",
+        edgecolor="black",
+        linewidth=1,
+    )
+    ax5.scatter(
+        hmc_stats["freq_mean"],
+        hmc_stats["offset_mean"],
+        color=hmc_color,
+        s=200,
+        marker="*",
+        edgecolor="black",
+        linewidth=1,
+    )
+    if has_numpyro:
+        ax5.scatter(
+            numpyro_stats["freq_mean"],
+            numpyro_stats["offset_mean"],
+            color=numpyro_color,
+            s=200,
+            marker="*",
+            edgecolor="black",
+            linewidth=1,
+        )
+
+    # True parameters
+    ax5.scatter(
+        true_freq,
+        true_offset,
+        color=true_color,
+        s=300,
+        marker="X",
+        edgecolor="black",
+        linewidth=2,
+        label="True",
+        zorder=100,
+    )
+
+    ax5.set_xlabel("Frequency", fontsize=label_fontsize)
+    ax5.set_ylabel("Offset", fontsize=label_fontsize)
+    ax5.tick_params(labelsize=tick_fontsize)
+
+    # Combined overlay (Row 2, full width)
+    ax4.set_title(
+        "Combined Posterior Comparison",
+        fontsize=title_fontsize,
+        fontweight="bold",
+        pad=10,
+    )
+
+    # Plot subset of curves from each method
+    n_overlay = 30
+
+    # IS curves
+    n_plot = min(n_overlay, len(is_freq))
+    if n_plot < len(is_freq):
+        indices = np.random.choice(len(is_freq), n_plot, replace=False)
+    else:
+        indices = np.arange(len(is_freq))
+    for i in indices:
+        curve = sinfn(x_fine, is_freq[i], is_off[i])
+        ax4.plot(x_fine, curve, alpha=0.1, color=is_color, linewidth=1)
+
+    # HMC curves
+    n_plot = min(n_overlay, len(hmc_freq))
+    step = max(1, len(hmc_freq) // n_plot)
+    for i in range(0, len(hmc_freq), step * 2):
+        if i >= n_plot * 2:
+            break
+        curve = sinfn(x_fine, hmc_freq[i], hmc_off[i])
+        ax4.plot(x_fine, curve, alpha=0.1, color=hmc_color, linewidth=1)
+
+    # NumPyro curves
+    if has_numpyro:
+        n_plot = min(n_overlay, len(numpyro_freq))
+        step = max(1, len(numpyro_freq) // n_plot)
+        for i in range(0, len(numpyro_freq), step * 3):
+            if i >= n_plot * 3:
+                break
+            curve = sinfn(x_fine, numpyro_freq[i], numpyro_off[i])
+            ax4.plot(x_fine, curve, alpha=0.1, color=numpyro_color, linewidth=1)
+
+    # Plot mean curves
+    true_curve = sinfn(x_fine, true_freq, true_offset)
+    is_mean_curve = sinfn(x_fine, is_stats["freq_mean"], is_stats["offset_mean"])
+    hmc_mean_curve = sinfn(x_fine, hmc_stats["freq_mean"], hmc_stats["offset_mean"])
+
+    ax4.plot(
+        x_fine, is_mean_curve, color=is_color, linewidth=3, linestyle="--", zorder=12
+    )
+    ax4.plot(
+        x_fine, hmc_mean_curve, color=hmc_color, linewidth=3, linestyle="--", zorder=12
+    )
+    if has_numpyro:
+        numpyro_mean_curve = sinfn(
+            x_fine, numpyro_stats["freq_mean"], numpyro_stats["offset_mean"]
+        )
+        ax4.plot(
+            x_fine,
+            numpyro_mean_curve,
+            color=numpyro_color,
+            linewidth=3,
+            linestyle="--",
+            zorder=12,
+        )
+
+    ax4.plot(x_fine, true_curve, color=true_color, linewidth=4, zorder=15)
+    ax4.scatter(
+        xs,
+        ys,
+        color=data_color,
+        s=80,
+        alpha=0.9,
+        zorder=20,
+        edgecolor="darkred",
+        linewidth=1,
+    )
+
+    ax4.set_xlabel("x", fontsize=label_fontsize)
+    ax4.set_ylabel("y", fontsize=label_fontsize)
+    ax4.tick_params(labelsize=tick_fontsize)
+    ax4.set_ylim(-2.5, 2.5)
+
+    # Performance comparison (Row 3)
+    ax6.set_title(
+        "Performance Comparison", fontsize=title_fontsize, fontweight="bold", pad=10
+    )
+
+    methods_list = []
+    times_list = []
+    colors_list = []
+
+    if is_result.get("timing_stats"):
+        methods_list.append("GenJAX IS")
+        times_list.append(is_result["timing_stats"][0] * 1000)
+        colors_list.append(is_color)
+
+    if hmc_result.get("timing_stats"):
+        methods_list.append("GenJAX HMC")
+        times_list.append(hmc_result["timing_stats"][0] * 1000)
+        colors_list.append(hmc_color)
+
+    if has_numpyro and numpyro_result.get("timing_stats"):
+        methods_list.append("NumPyro HMC")
+        times_list.append(numpyro_result["timing_stats"][0] * 1000)
+        colors_list.append(numpyro_color)
+
+    if times_list:
+        y_pos = np.arange(len(methods_list))
+        bars = ax6.barh(y_pos, times_list, color=colors_list, alpha=0.8, height=0.6)
+
+        ax6.set_yticks(y_pos)
+        ax6.set_yticklabels([])  # Remove method names from y-axis
+        ax6.set_xlabel("Time (ms)", fontsize=label_fontsize)
+        ax6.tick_params(labelsize=tick_fontsize)
+        ax6.grid(axis="x", alpha=0.3)
+    else:
+        ax6.text(
+            0.5,
+            0.5,
+            "No timing data available",
+            ha="center",
+            va="center",
+            transform=ax6.transAxes,
+            fontsize=16,
+        )
+
+    # Create legend (Row 4)
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    legend_elements = [
+        Line2D([0], [0], color=true_color, linewidth=4, label="Ground Truth"),
+        Line2D(
+            [0],
+            [0],
+            color=data_color,
+            marker="o",
+            linewidth=0,
+            markersize=10,
+            markeredgecolor="darkred",
+            markeredgewidth=1,
+            label="Observed Data",
+        ),
+        Patch(facecolor=is_color, alpha=0.3, label="GenJAX IS Posterior"),
+        Patch(facecolor=hmc_color, alpha=0.3, label="GenJAX HMC Posterior"),
+    ]
+
+    if has_numpyro:
+        legend_elements.append(
+            Patch(facecolor=numpyro_color, alpha=0.3, label="NumPyro HMC Posterior")
+        )
+
+    legend_elements.extend(
+        [
+            Line2D(
+                [0],
+                [0],
+                color=is_color,
+                linewidth=3,
+                linestyle="--",
+                label="GenJAX IS Mean",
+            ),
+            Line2D(
+                [0],
+                [0],
+                color=hmc_color,
+                linewidth=3,
+                linestyle="--",
+                label="GenJAX HMC Mean",
+            ),
+        ]
+    )
+
+    if has_numpyro:
+        legend_elements.append(
+            Line2D(
+                [0],
+                [0],
+                color=numpyro_color,
+                linewidth=3,
+                linestyle="--",
+                label="NumPyro HMC Mean",
+            )
+        )
+
+    ax7.legend(
+        handles=legend_elements,
+        loc="center",
+        ncol=3,
+        fontsize=legend_fontsize,
+        frameon=False,
+        columnspacing=1.0,
+    )
+
+    # Save figure
+    os.makedirs(f"examples/curvefit/{output_dir}", exist_ok=True)
+    filename = f"examples/curvefit/{output_dir}/genjax_posterior_comparison_n{n_points}_from_data.pdf"
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+    plt.close()
+
+    print(f"\nSaved posterior comparison figure: {filename}")
+    print("=== Posterior Comparison from Data Complete ===")

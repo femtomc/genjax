@@ -5,6 +5,7 @@ Visualization functions for the localization case study.
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
 import numpy as np
+from typing import Dict, Any, List
 from .core import Pose, World
 
 # Set up plotting style
@@ -64,10 +65,6 @@ def plot_world(world: World, ax=None, room_label_fontsize=14):
             bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.3),
         )
 
-        # Mark doorways
-        ax.text(4, 4, "Door", fontsize=10, ha="center", rotation=90, alpha=0.6)
-        ax.text(8, 5, "Door", fontsize=10, ha="center", rotation=90, alpha=0.6)
-
     ax.set_xlim(-0.5, world.width + 0.5)
     ax.set_ylim(-0.5, world.height + 0.5)
     ax.set_aspect("equal")
@@ -78,29 +75,38 @@ def plot_world(world: World, ax=None, room_label_fontsize=14):
     return ax
 
 
-def plot_pose(pose: Pose, ax=None, color="red", label=None, arrow_length=0.5):
+def plot_pose(
+    pose: Pose,
+    ax=None,
+    color="red",
+    label=None,
+    arrow_length=0.5,
+    marker="o",
+    show_arrow=True,
+):
     """Plot a single robot pose with position and heading."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 8))
 
     # Plot position
-    ax.scatter(pose.x, pose.y, color=color, s=100, label=label, zorder=5)
+    ax.scatter(pose.x, pose.y, color=color, s=100, label=label, zorder=5, marker=marker)
 
-    # Plot heading arrow
-    dx = arrow_length * jnp.cos(pose.theta)
-    dy = arrow_length * jnp.sin(pose.theta)
-    ax.arrow(
-        pose.x,
-        pose.y,
-        dx,
-        dy,
-        head_width=0.1,
-        head_length=0.1,
-        fc=color,
-        ec=color,
-        alpha=0.7,
-        zorder=4,
-    )
+    # Plot heading arrow if requested
+    if show_arrow:
+        dx = arrow_length * jnp.cos(pose.theta)
+        dy = arrow_length * jnp.sin(pose.theta)
+        ax.arrow(
+            pose.x,
+            pose.y,
+            dx,
+            dy,
+            head_width=0.1,
+            head_length=0.1,
+            fc=color,
+            ec=color,
+            alpha=0.7,
+            zorder=4,
+        )
 
     return ax
 
@@ -233,7 +239,16 @@ def plot_trajectory(
 
 
 def plot_particles(
-    particles, world: World, weights=None, ax=None, alpha=0.6, size_scale=100
+    particles,
+    world: World,
+    weights=None,
+    ax=None,
+    alpha=0.6,
+    size_scale=100,
+    color=None,
+    label=None,
+    cmap="viridis",
+    show_colorbar=False,
 ):
     """Plot particle distribution with optional weights."""
     if ax is None:
@@ -253,16 +268,27 @@ def plot_particles(
         sizes = size_scale / 10  # Default small size
 
     # Plot particles
-    scatter = ax.scatter(
-        xs,
-        ys,
-        s=sizes,
-        alpha=alpha,
-        c=range(len(particles)),
-        cmap="viridis",
-        label=f"Particles (n={len(particles)})",
-        zorder=3,
-    )
+    if color is not None:
+        scatter = ax.scatter(
+            xs,
+            ys,
+            s=sizes,
+            alpha=alpha,
+            c=color,
+            label=label,
+            zorder=3,
+        )
+    else:
+        scatter = ax.scatter(
+            xs,
+            ys,
+            s=sizes,
+            alpha=alpha,
+            c=range(len(particles)),
+            cmap=cmap,
+            label=label if label else f"Particles (n={len(particles)})",
+            zorder=3,
+        )
 
     return ax, scatter
 
@@ -328,7 +354,15 @@ def plot_particle_filter_step(
             )
 
     # Plot true pose
-    plot_pose(true_pose, ax, color="red", label="True Pose", arrow_length=0.4)
+    plot_pose(
+        true_pose,
+        ax,
+        color="red",
+        label="True Pose",
+        arrow_length=0.4,
+        marker="x",
+        show_arrow=False,
+    )
 
     # Compute and display weighted mean
     if weights is not None:
@@ -376,23 +410,21 @@ def plot_particle_filter_evolution(
     show_lidar_rays=True,
     observations_history=None,
     n_rays=8,
+    method_name="Particle Filter",
 ):
     """Plot evolution of particle filter over time with enhanced grid layout."""
     n_steps = len(particle_history)
 
-    # Fixed layout: 1 row, 4 columns showing specific timesteps
-    n_rows = 1
+    # Fixed layout: 4x4 grid showing all 16 timesteps
+    n_rows = 4
     n_cols = 4
 
-    # Show specific timesteps: 1, 6, 11, and 16 (0-indexed: 0, 5, 10, 15)
-    step_indices = [0, 5, 10, 15]  # These correspond to steps 1, 6, 11, 16
-
-    # Filter out indices that don't exist
-    step_indices = [idx for idx in step_indices if idx < n_steps]
+    # Show all timesteps (up to 16)
+    step_indices = list(range(min(16, n_steps)))
     n_steps_to_show = len(step_indices)
 
-    # Create figure with horizontal layout
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
+    # Create figure with 4x4 grid layout
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 3 * n_rows))
 
     # Handle different subplot array structures for (1, 4) layout
     if n_cols == 1:
@@ -452,7 +484,14 @@ def plot_particle_filter_evolution(
         # step_idx corresponds to particle timestep after incorporating observations[step_idx]
         # So we want to show the pose where observations[step_idx] was taken: true_poses[step_idx]
         if step_idx < len(true_poses):
-            plot_pose(true_poses[step_idx], ax, color="red", arrow_length=0.25)
+            plot_pose(
+                true_poses[step_idx],
+                ax,
+                color="red",
+                arrow_length=0.25,
+                marker="x",
+                show_arrow=False,
+            )
 
         # Remove default title and legend for cleaner look
         ax.set_title("")
@@ -482,10 +521,19 @@ def plot_particle_filter_evolution(
     for i in range(len(step_indices), len(axes)):
         axes[i].set_visible(False)
 
+    # Add title with method name
+    fig.suptitle(f"{method_name} - Particle Evolution Over Time", fontsize=16, y=0.98)
+
     plt.tight_layout(pad=1.0)
 
     if save_dir:
-        plt.savefig(f"{save_dir}/particle_evolution.pdf", dpi=150, bbox_inches="tight")
+        # Include method name in filename
+        method_slug = method_name.lower().replace(" ", "_").replace("+", "_")
+        plt.savefig(
+            f"{save_dir}/particle_evolution_{method_slug}.pdf",
+            dpi=150,
+            bbox_inches="tight",
+        )
 
     return fig, axes
 
@@ -494,46 +542,46 @@ def plot_estimation_error(true_poses, estimated_poses, save_path=None):
     """Plot estimation error over time."""
     # Compute position errors
     position_errors = []
-    for true_pose, est_pose in zip(true_poses, estimated_poses):
-        error = jnp.sqrt(
-            (true_pose.x - est_pose.x) ** 2 + (true_pose.y - est_pose.y) ** 2
-        )
-        position_errors.append(error)
-
-    # Compute heading errors (angular difference)
     heading_errors = []
     for true_pose, est_pose in zip(true_poses, estimated_poses):
-        angle_diff = jnp.abs(true_pose.theta - est_pose.theta)
-        # Wrap to [-pi, pi]
-        angle_diff = jnp.where(angle_diff > jnp.pi, 2 * jnp.pi - angle_diff, angle_diff)
-        heading_errors.append(angle_diff)
+        # Position error
+        pos_error = jnp.sqrt(
+            (true_pose.x - est_pose.x) ** 2 + (true_pose.y - est_pose.y) ** 2
+        )
+        position_errors.append(float(pos_error))
+
+        # Heading error (wrapped to [-pi, pi])
+        heading_error = jnp.abs(
+            jnp.arctan2(
+                jnp.sin(true_pose.theta - est_pose.theta),
+                jnp.cos(true_pose.theta - est_pose.theta),
+            )
+        )
+        heading_errors.append(float(heading_error) * 180 / jnp.pi)  # Convert to degrees
 
     # Create plots
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
-    # Position error
-    ax1.plot(position_errors, "b-", linewidth=2, label="Position Error")
-    ax1.set_ylabel("Position Error (units)")
-    ax1.set_title("Localization Estimation Error")
+    # Plot position error
+    timesteps = list(range(len(position_errors)))
+    ax1.plot(timesteps, position_errors, "b-", marker="o", markersize=6, linewidth=2)
+    ax1.set_xlabel("Time Step", fontsize=12)
+    ax1.set_ylabel("Position Error (units)", fontsize=12)
+    ax1.set_title("Position Estimation Error", fontsize=14, fontweight="bold")
     ax1.grid(True, alpha=0.3)
-    ax1.legend()
 
-    # Heading error
-    ax2.plot(
-        np.array(heading_errors) * 180 / jnp.pi,
-        "r-",
-        linewidth=2,
-        label="Heading Error",
-    )
-    ax2.set_xlabel("Time Step")
-    ax2.set_ylabel("Heading Error (degrees)")
+    # Plot heading error
+    ax2.plot(timesteps, heading_errors, "r-", marker="o", markersize=6, linewidth=2)
+    ax2.set_xlabel("Time Step", fontsize=12)
+    ax2.set_ylabel("Heading Error (degrees)", fontsize=12)
+    ax2.set_title("Heading Estimation Error", fontsize=14, fontweight="bold")
     ax2.grid(True, alpha=0.3)
-    ax2.legend()
 
     plt.tight_layout()
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close()
 
     return fig, (ax1, ax2)
 
@@ -1333,7 +1381,17 @@ def plot_smc_method_comparison(
     K=10,
 ):
     """Create comprehensive comparison plot for different SMC methods."""
-    n_methods = len(benchmark_results)
+    # Define colors first
+    colors = {
+        "smc_basic": "#1f77b4",
+        "smc_mh": "#ff7f0e",
+        "smc_hmc": "#2ca02c",
+        "smc_locally_optimal": "#d62728",
+    }
+
+    # Only count methods we have colors for
+    valid_methods = [name for name in benchmark_results.keys() if name in colors]
+    n_methods = len(valid_methods)
 
     # Create 4-row layout: first timestep, final particles, rainclouds, timing
     fig = plt.figure(figsize=(6 * n_methods, 20))
@@ -1355,13 +1413,6 @@ def plot_smc_method_comparison(
         "smc_locally_optimal": f"SMC (N={n_particles}) + Locally Optimal (K={K})",
     }
 
-    colors = {
-        "smc_basic": "#1f77b4",
-        "smc_mh": "#ff7f0e",
-        "smc_hmc": "#2ca02c",
-        "smc_locally_optimal": "#d62728",
-    }
-
     # Grayscale colors for raincloud plots
     grayscale_colors = {
         "smc_basic": "#404040",
@@ -1370,7 +1421,12 @@ def plot_smc_method_comparison(
         "smc_locally_optimal": "#a0a0a0",
     }
 
-    for i, (method_name, result) in enumerate(benchmark_results.items()):
+    # Only process methods we have colors for
+    method_items = [
+        (name, result) for name, result in benchmark_results.items() if name in colors
+    ]
+
+    for i, (method_name, result) in enumerate(method_items):
         particle_history = result["particle_history"]
         weight_history = result["weight_history"]
         diagnostic_weights = result["diagnostic_weights"]
@@ -1391,11 +1447,19 @@ def plot_smc_method_comparison(
         # Plot first timestep particle distribution
         first_particles = particle_history[0]
         first_weights = weight_history[0]
-        plot_particles(first_particles, world, first_weights, ax_first, alpha=0.8)
+        plot_particles(
+            first_particles, world, first_weights, ax_first, alpha=0.8, size_scale=50
+        )
 
         # Plot true first pose
         plot_pose(
-            true_poses[0], ax_first, color="red", label="True Pose", arrow_length=0.4
+            true_poses[0],
+            ax_first,
+            color="red",
+            label="True Pose",
+            arrow_length=0.4,
+            marker="x",
+            show_arrow=False,
         )
 
         ax_first.set_title("", fontsize=20, fontweight="bold")
@@ -1421,7 +1485,7 @@ def plot_smc_method_comparison(
                 rotation=90,
             )
 
-        # Second row: Final particle distribution
+        # Second row: Blended particle evolution (showing trajectory)
         ax_particles = fig.add_subplot(gs_second[i])
         plot_world(world, ax_particles)
 
@@ -1434,19 +1498,104 @@ def plot_smc_method_comparison(
         ax_particles.set_xlabel("")
         ax_particles.set_ylabel("")
 
-        # Plot final particle distribution
-        final_particles = particle_history[-1]
-        final_weights = weight_history[-1]
-        plot_particles(final_particles, world, final_weights, ax_particles, alpha=0.8)
+        # Plot particles from multiple timesteps with alpha blending
+        # Show all timesteps with decreasing alpha (older = more transparent)
+        n_blend_steps = len(particle_history)  # Show all timesteps
+        start_idx = 0  # Start from the beginning
 
-        # Plot true final pose
-        plot_pose(
-            true_poses[-1],
-            ax_particles,
-            color="red",
-            label="True Pose",
-            arrow_length=0.4,
-        )
+        for blend_idx, t in enumerate(range(start_idx, len(particle_history))):
+            particles = particle_history[t]
+            weights = weight_history[t]
+
+            # Calculate alpha based on recency (more recent = more opaque)
+            # With many timesteps, make older ones very transparent
+            # Oldest gets 0.05, newest gets 0.8 for visibility
+            alpha = 0.05 + (0.75 * blend_idx / max(1, n_blend_steps - 1))
+
+            # Use fixed size for all particles (matching the Start row)
+            # Plot particles with weighted sizes
+            if weights is not None and jnp.sum(weights) > 0:
+                weights_norm = weights / jnp.sum(weights)
+                normalized_weights = weights_norm / jnp.max(weights_norm)
+                sizes = (
+                    50 * normalized_weights
+                )  # Fixed base size 50, scaled only by weight
+            else:
+                sizes = 5  # Default size
+
+            # Extract positions
+            xs = [p.x for p in particles]
+            ys = [p.y for p in particles]
+
+            # Plot particles with original viridis colormap
+            ax_particles.scatter(
+                xs,
+                ys,
+                s=sizes,
+                alpha=alpha,
+                c=range(len(particles)),
+                cmap="viridis",
+                edgecolors="none",
+                zorder=3 + blend_idx,  # Later timesteps on top
+            )
+
+        # Plot connecting line for true trajectory first
+        if len(true_poses) > start_idx:
+            true_xs = [
+                true_poses[t].x
+                for t in range(start_idx, min(len(true_poses), len(particle_history)))
+            ]
+            true_ys = [
+                true_poses[t].y
+                for t in range(start_idx, min(len(true_poses), len(particle_history)))
+            ]
+
+            # Plot trajectory line with gradient alpha
+            for j in range(len(true_xs) - 1):
+                blend_factor = j / max(1, len(true_xs) - 2)
+                alpha = 0.2 + (0.6 * blend_factor)
+                ax_particles.plot(
+                    [true_xs[j], true_xs[j + 1]],
+                    [true_ys[j], true_ys[j + 1]],
+                    color="red",
+                    linewidth=2,
+                    alpha=alpha,
+                    zorder=19,
+                )
+
+        # Plot ghostly trail of true poses matching the particle timesteps
+        for blend_idx, t in enumerate(range(start_idx, len(particle_history))):
+            if t < len(true_poses):
+                true_pose = true_poses[t]
+
+                # Alpha for ground truth - make it more visible than particles
+                # With many timesteps: 0.3 to 1.0
+                alpha = 0.3 + (0.7 * blend_idx / max(1, n_blend_steps - 1))
+                arrow_length = 0.15 + (0.35 * blend_idx / max(1, n_blend_steps - 1))
+
+                # Plot position with fading red - larger and more prominent
+                ax_particles.scatter(
+                    true_pose.x,
+                    true_pose.y,
+                    color="red",
+                    s=80 + 80 * blend_idx / (n_blend_steps - 1),  # Size from 80 to 160
+                    alpha=alpha,
+                    zorder=20 + blend_idx,  # True poses on top of particles
+                    linewidth=2.0,
+                    marker="x",
+                )
+
+        # Emphasize the final true pose
+        if len(true_poses) > 0:
+            plot_pose(
+                true_poses[-1],
+                ax_particles,
+                color="red",
+                label="True Pose",
+                arrow_length=0.5,
+                marker="x",
+                show_arrow=False,
+            )
 
         ax_particles.set_title("", fontsize=20, fontweight="bold")  # Remove title
         ax_particles.legend().set_visible(False)
@@ -1637,3 +1786,127 @@ def plot_smc_method_comparison(
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
     return fig
+
+
+def plot_multi_method_estimation_error(
+    benchmark_results: Dict[str, Any],
+    true_poses: List[Pose],
+    save_path: str = None,
+):
+    """Plot position and heading error for all SMC methods.
+
+    This helps diagnose convergence issues across different methods.
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+    method_names = {
+        "smc_basic": "Bootstrap Filter",
+        "smc_mh": "SMC + MH",
+        "smc_hmc": "SMC + HMC",
+        "smc_locally_optimal": "SMC + Locally Optimal",
+    }
+
+    colors = {
+        "smc_basic": "#E74C3C",
+        "smc_mh": "#3498DB",
+        "smc_hmc": "#2ECC71",
+        "smc_locally_optimal": "#9B59B6",
+    }
+
+    # For each method
+    for method_key, method_display_name in method_names.items():
+        if method_key not in benchmark_results:
+            continue
+
+        result = benchmark_results[method_key]
+        particle_history = result["particle_history"]
+        weight_history = result["weight_history"]
+
+        # Compute weighted mean estimates
+        position_errors = []
+        heading_errors = []
+
+        for t, (particles, weights, true_pose) in enumerate(
+            zip(particle_history, weight_history, true_poses)
+        ):
+            if len(particles) == 0 or jnp.sum(weights) == 0:
+                continue
+
+            # Normalize weights
+            weights_norm = weights / jnp.sum(weights)
+
+            # Compute weighted mean position
+            mean_x = jnp.sum(jnp.array([p.x for p in particles]) * weights_norm)
+            mean_y = jnp.sum(jnp.array([p.y for p in particles]) * weights_norm)
+
+            # Compute weighted circular mean for heading
+            sin_sum = jnp.sum(
+                jnp.sin(jnp.array([p.theta for p in particles])) * weights_norm
+            )
+            cos_sum = jnp.sum(
+                jnp.cos(jnp.array([p.theta for p in particles])) * weights_norm
+            )
+            mean_theta = jnp.arctan2(sin_sum, cos_sum)
+
+            # Compute errors
+            pos_error = jnp.sqrt(
+                (mean_x - true_pose.x) ** 2 + (mean_y - true_pose.y) ** 2
+            )
+
+            # Angular difference (wrapped to [-pi, pi])
+            heading_error = jnp.abs(
+                jnp.arctan2(
+                    jnp.sin(mean_theta - true_pose.theta),
+                    jnp.cos(mean_theta - true_pose.theta),
+                )
+            )
+
+            position_errors.append(float(pos_error))
+            heading_errors.append(
+                float(heading_error) * 180 / jnp.pi
+            )  # Convert to degrees
+
+        # Plot position error
+        timesteps = list(range(len(position_errors)))
+        ax1.plot(
+            timesteps,
+            position_errors,
+            label=method_display_name,
+            color=colors[method_key],
+            linewidth=2,
+            marker="o",
+            markersize=4,
+        )
+
+        # Plot heading error
+        ax2.plot(
+            timesteps,
+            heading_errors,
+            label=method_display_name,
+            color=colors[method_key],
+            linewidth=2,
+            marker="o",
+            markersize=4,
+        )
+
+    # Configure position error plot
+    ax1.set_xlabel("Time Step", fontsize=12)
+    ax1.set_ylabel("Position Error (units)", fontsize=12)
+    ax1.set_title("Position Estimation Error", fontsize=14, fontweight="bold")
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc="upper right")
+
+    # Configure heading error plot
+    ax2.set_xlabel("Time Step", fontsize=12)
+    ax2.set_ylabel("Heading Error (degrees)", fontsize=12)
+    ax2.set_title("Heading Estimation Error", fontsize=14, fontweight="bold")
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(loc="upper right")
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close()
+
+    return fig, (ax1, ax2)

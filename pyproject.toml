@@ -16,9 +16,14 @@ platforms = ["osx-arm64", "linux-64"]
 
 [tool.pixi.dependencies]
 jax = ">=0.6.0,<0.7"
+matplotlib = ">=3.10.3,<4"
 
 [tool.pixi.pypi-dependencies]
 genjax = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+# Clean all generated figures from examples
+clean-figs = "find examples -name '*.pdf' -o -name '*.png' -o -name '*.jpg' -o -name '*.svg' | grep '/figs/' | xargs rm -f"
 
 [tool.vulture]
 make_whitelist = true
@@ -95,10 +100,16 @@ gol-quick = "pixi run python -m examples.gol.main --chain-length 10 --grid-sizes
 matplotlib = "*"
 seaborn = "*"
 
+[tool.pixi.feature.localization.pypi-dependencies]
+ptitprince = "*"
+
 [tool.pixi.feature.localization.tasks]
 cmd = "localization"
-# Particle filter localization
-localization = "pixi run python -m examples.localization.main"  # Run localization example
+# Particle filter localization - New two-step workflow
+localization-generate-data = "pixi run python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison"  # Generate all experimental data
+localization-plot-figures = "pixi run python -m examples.localization.main plot-figures"  # Plot all figures from saved data
+# Legacy command for backward compatibility
+localization = "pixi run python -m examples.localization.main generate-data --include-basic-demo && pixi run python -m examples.localization.main plot-figures"  # Run full pipeline
 
 [tool.pixi.feature.state_space.dependencies]
 matplotlib = "*"
@@ -178,7 +189,9 @@ cuda-faircoin = "pixi run -e faircoin-cuda setup && pixi run -e faircoin-cuda fa
 cuda-curvefit = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit"  # Run curvefit with CUDA (fast mode)
 cuda-curvefit-full = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit-full"  # Run full curvefit with CUDA (slow)
 cuda-gol = "pixi run -e gol-cuda gol"  # Run Game of Life with CUDA
-cuda-localization = "pixi run -e localization-cuda localization"  # Run localization with CUDA
+cuda-localization-generate-data = "pixi run -e localization-cuda python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison"  # Generate localization data with CUDA
+cuda-localization-plot-figures = "pixi run -e localization-cuda python -m examples.localization.main plot-figures"  # Plot localization figures
+cuda-localization = "pixi run -e localization-cuda python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison && pixi run -e localization-cuda python -m examples.localization.main plot-figures"  # Full localization pipeline with CUDA
 cuda-state-space = "pixi run -e state-space-cuda state-space"  # Run state space with CUDA
 cuda-gen2d = "pixi run -e gen2d-cuda gen2d"  # Run gen2d with CUDA
 cuda-intuitive-psych = "pixi run -e intuitive-psych-cuda intuitive-psych"  # Run intuitive physics with CUDA

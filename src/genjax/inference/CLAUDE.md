@@ -414,7 +414,7 @@ For a transition proposal at timestep t, instead of sampling directly from the p
 @gen
 def locally_optimal_proposal(obs, prev_choices, *args):
     """Locally optimal proposal using grid evaluation.
-    
+
     Args:
         obs: Current observation constraints
         prev_choices: Previous particle's choices
@@ -422,23 +422,23 @@ def locally_optimal_proposal(obs, prev_choices, *args):
     """
     # Create grid of candidate values
     candidates = create_grid(variable_bounds)
-    
+
     # Vectorized assessment over all candidates
     def assess_single_candidate(candidate):
         proposed_choices = update_choices(prev_choices, candidate)
         return model.assess(merge(obs, proposed_choices), *args).get_score()
-    
+
     vectorized_assess = jax.vmap(assess_single_candidate)
     log_probs = vectorized_assess(candidates)
-    
+
     # Select optimal candidate
     best_idx = jnp.argmax(log_probs)
     best_candidate = candidates[best_idx]
-    
+
     # Add noise for smooth proposals
     x_prop = normal(best_candidate[0], noise_std) @ "x"
     y_prop = normal(best_candidate[1], noise_std) @ "y"
-    
+
     return x_prop, y_prop
 ```
 

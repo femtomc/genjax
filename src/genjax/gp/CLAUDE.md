@@ -125,14 +125,14 @@ def hierarchical_gp(x_train, y_train, x_test):
     # Sample hyperparameters
     lengthscale = exponential(1.0) @ "lengthscale"
     variance = gamma(2.0, 2.0) @ "variance"
-    
+
     # Create GP with sampled hyperparameters
     kernel = RBF(variance=variance, lengthscale=lengthscale)
     gp = GP(kernel, noise_variance=0.01)
-    
+
     # Sample function values
     f_test = gp(x_test, x_train=x_train, y_train=y_train) @ "f_test"
-    
+
     return f_test
 ```
 
@@ -144,11 +144,11 @@ def additive_model(x_train, y_train, x_test):
     # Long-term trend
     gp_trend = GP(RBF(variance=1.0, lengthscale=2.0))
     trend = gp_trend(x_test, x_train, y_train) @ "trend"
-    
+
     # Short-term variations
     gp_local = GP(Matern32(variance=0.5, lengthscale=0.1))
     local = gp_local(x_test) @ "local"
-    
+
     # Combine
     return trend + local
 ```

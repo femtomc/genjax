@@ -196,9 +196,9 @@ This approach ensures documentation stays in sync with the codebase and reduces 
 - **Code Quality**: `format`, `format-md`, `format-all`, `vulture`, `precommit-run` commands in `[tool.pixi.feature.format.tasks]`
 - **Examples**: Each example has its own feature section with specific commands:
   - `faircoin`: Beta-Bernoulli framework comparison
-  - `curvefit`: Curve fitting with multiple frameworks
+  - `curvefit`: Curve fitting with multiple frameworks (requires NumPyro)
   - `gol`: Game of Life inference
-  - `localization`: Particle filter localization
+  - `localization`: Particle filter localization (requires cuda environment for visualization)
   - `state-space`: State space models
   - `gen2d`: 2D generative models
   - `intuitive-physics`: Physics simulation inference
@@ -208,3 +208,15 @@ This approach ensures documentation stays in sync with the codebase and reduces 
 - General commands: `pixi run <command>`
 - Example-specific commands: `pixi run -e <example> <command>`
 - Many examples have `setup`, `<name>-quick`, `<name>-all` variants for different use cases
+
+**Environment Selection for Case Studies**:
+- **Case study-specific environments**: Some examples require specific environments
+  - `curvefit`: Requires the curvefit environment for NumPyro dependencies
+  - `localization`: Requires the cuda environment for visualization dependencies
+- **CPU environments**: Default for most examples, works everywhere
+- **CUDA environments**: Use for GPU acceleration when available
+  - Access via: `pixi run -e cuda <command>` or `pixi run cuda-<example>`
+  - Examples: `cuda-localization`, `cuda-faircoin`, `cuda-curvefit`
+- **Usage examples**:
+  - `pixi run -e curvefit python -m examples.curvefit.main` (curvefit with NumPyro)
+  - `pixi run -e cuda python -m examples.localization.main` (localization with GPU)

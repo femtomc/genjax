@@ -173,26 +173,49 @@ def comparison_fig(num_obs=50, num_samples=1000, **kwargs):
 
 ## CLI Standards
 
+### Environment Selection
+
+**IMPORTANT**: Case studies may require specific environments for dependencies:
+
+```bash
+# CPU environment (default for most examples)
+pixi run -e {name} python -m examples.{name}.main
+
+# CUDA environment (for GPU acceleration + visualization dependencies)
+pixi run -e cuda python -m examples.{name}.main
+
+# Using predefined tasks (automatically selects correct environment)
+pixi run {name}           # CPU version
+pixi run cuda-{name}      # CUDA version
+```
+
+**Environment Requirements by Case Study**:
+- **localization**: Requires `cuda` environment for matplotlib dependencies
+- **faircoin, curvefit, gol**: Work in both CPU and CUDA environments
+- **Other examples**: Generally use CPU environment unless GPU is needed
+
+### Command Line Interface
+
 Every `main.py` should support:
 
 ```bash
 # Default behavior (usually timing)
-python -m examples.{name}.main
+pixi run -e {environment} python -m examples.{name}.main
 
 # All figures
-python -m examples.{name}.main --all
+pixi run -e {environment} python -m examples.{name}.main --all
 
 # Specific figure types
-python -m examples.{name}.main --timing
-python -m examples.{name}.main --comparison
-python -m examples.{name}.main --posterior  # if applicable
+pixi run -e {environment} python -m examples.{name}.main --timing
+pixi run -e {environment} python -m examples.{name}.main --comparison
+pixi run -e {environment} python -m examples.{name}.main --posterior  # if applicable
 
 # Parameter customization
-python -m examples.{name}.main --num-obs 100 --num-samples 5000
+pixi run -e {environment} python -m examples.{name}.main --num-obs 100 --num-samples 5000
 
 # Data export/import (RECOMMENDED for complex experiments)
-python -m examples.{name}.main --experiment --export-data  # Run and save
-python -m examples.{name}.main --plot-from-data path/to/data  # Plot only
+pixi run -e {environment} python -m examples.{name}.main --experiment --export-data  # Run and save
+pixi run -e {environment} python -m examples.{name}.main --plot-from-data path/to/data  # Plot only
 ```
 
 ## Pixi Task Integration

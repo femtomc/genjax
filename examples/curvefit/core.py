@@ -7,16 +7,17 @@ import jax.random as jrand
 from tensorflow_probability.substrates import jax as tfp
 
 from genjax import tfp_distribution
-from genjax import Pytree
 import jax
 
 # NumPyro imports
 import numpyro
 import numpyro.distributions as numpyro_dist
 from numpyro.handlers import replay, seed as numpyro_seed
-from numpyro.infer.util import log_density
-from numpyro.infer import MCMC, HMC
+from numpyro.contrib.funsor import log_density
+from numpyro.infer import HMC, MCMC
 
+
+from genjax import Pytree
 
 pi = jnp.pi
 tfd = tfp.distributions
@@ -26,6 +27,8 @@ exponential = tfp_distribution(tfd.Exponential)
 
 @Pytree.dataclass
 class Lambda(Pytree):
+    """Lambda wrapper for curve functions with JAX compatibility."""
+
     f: Const[any]
     dynamic_vals: jnp.ndarray
     static_vals: Const[tuple] = Const(())
@@ -172,13 +175,6 @@ def numpyro_sinfn(x, freq, offset):
     return jnp.sin(2.0 * jnp.pi * freq * x + offset)
 
 
-def numpyro_point_model(x, freq, offset, obs=None):
-    """NumPyro model for a single data point with Gaussian noise."""
-    y_det = numpyro_sinfn(x, freq, offset)
-    y_observed = numpyro.sample("obs", numpyro_dist.Normal(y_det, 0.3), obs=obs)
-    return y_observed
-
-
 def numpyro_npoint_model(xs, obs_dict=None):
     """NumPyro model for multiple data points with shared sine wave parameters."""
     freq = numpyro.sample("freq", numpyro_dist.Exponential(10.0))
@@ -296,13 +292,6 @@ def numpyro_run_hmc_inference_jit_impl(key, xs, ys, num_samples=1000, num_warmup
     mcmc.run(key, xs, obs_dict)
 
     samples = mcmc.get_samples()
-    diagnostics = {
-        "divergences": mcmc.get_extra_fields().get("diverging", jnp.array([])),
-        "accept_probs": mcmc.get_extra_fields().get("accept_prob", jnp.array([])),
-        "step_size": mcmc.get_extra_fields().get("step_size", None),
-    }
-
-    samples = mcmc.get_samples()
     extra_fields = mcmc.get_extra_fields()
 
     # Basic HMC diagnostics (same as GenJAX HMC for comparison)
@@ -326,53 +315,6 @@ numpyro_run_hmc_inference_jit = jax.jit(
 )  # num_samples, num_warmup
 
 
-def numpyro_hmc_summary_statistics(hmc_result):
-    """Compute summary statistics for HMC results."""
-    freq_samples = hmc_result["samples"]["freq"]
-    offset_samples = hmc_result["samples"]["offset"]
-
-    def eff_sample_size(x):
-        n = len(x)
-        return n / (
-            1
-            + 2
-            * jnp.sum(
-                jnp.abs(
-                    jnp.correlate(x - jnp.mean(x), x - jnp.mean(x), mode="full")[
-                        n - 1 : n + 10
-                    ]
-                )
-            )
-        )
-
-    summary = {
-        "freq": {
-            "mean": jnp.mean(freq_samples),
-            "std": jnp.std(freq_samples),
-            "quantiles": jnp.percentile(
-                freq_samples, jnp.array([2.5, 25, 50, 75, 97.5])
-            ),
-            "ess": eff_sample_size(freq_samples),
-        },
-        "offset": {
-            "mean": jnp.mean(offset_samples),
-            "std": jnp.std(offset_samples),
-            "quantiles": jnp.percentile(
-                offset_samples, jnp.array([2.5, 25, 50, 75, 97.5])
-            ),
-            "ess": eff_sample_size(offset_samples),
-        },
-        "num_divergences": jnp.sum(hmc_result["diagnostics"]["divergences"])
-        if len(hmc_result["diagnostics"]["divergences"]) > 0
-        else 0,
-        "mean_accept_prob": jnp.mean(hmc_result["diagnostics"]["accept_probs"])
-        if len(hmc_result["diagnostics"]["accept_probs"]) > 0
-        else 0.0,
-    }
-
-    return summary
-
-
 # JIT compiled functions for performance benchmarks
 
 # GenJAX JIT-compiled functions - apply seed() before jit()
@@ -389,9 +331,6 @@ hmc_infer_latents_jit = jax.jit(
 # NumPyro JIT-compiled functions
 numpyro_run_importance_sampling_jit = jax.jit(
     numpyro_run_importance_sampling, static_argnums=(3,)
-)
-numpyro_run_hmc_inference_jit = jax.jit(
-    numpyro_run_hmc_inference, static_argnums=(3, 4)
 )
 
 
@@ -593,67 +532,3 @@ def extract_posterior_samples(benchmark_results):
         }
 
     return posterior_samples
-
-
-# Example usage and testing
-if __name__ == "__main__":
-    import jax.random as jrand
-    from data import generate_test_dataset, print_dataset_summary
-    from genjax.core import Const
-    from figs import plot_inference_diagnostics
-
-    # Generate common test data
-    data = generate_test_dataset(seed=42, n_points=20)
-    xs, ys = data["xs"], data["ys"]
-    print_dataset_summary(data, "Test Dataset")
-
-    print("\n=== GenJAX: Importance Sampling (SMC) ===")
-    # Run GenJAX inference
-    key = jrand.key(42)
-    samples, log_weights = infer_latents_jit(key, xs, ys, Const(5000))
-
-    print("GenJAX inference complete:")
-    print(f"  Number of samples: {len(log_weights)}")
-    print(f"  Log marginal likelihood: {log_marginal_likelihood(log_weights):.4f}")
-    print(f"  Effective sample size: {effective_sample_size(log_weights):.1f}")
-
-    # Extract parameter statistics
-    freqs = samples.get_choices()["curve"]["freq"]
-    offsets = samples.get_choices()["curve"]["off"]
-
-    print(f"  Frequency range: [{freqs.min():.3f}, {freqs.max():.3f}]")
-    print(f"  Offset range: [{offsets.min():.3f}, {offsets.max():.3f}]")
-
-    print("\n=== Generating GenJAX Diagnostic Plots ===")
-    plot_inference_diagnostics(None, xs, ys, samples, log_weights)
-
-    # NumPyro comparison
-    # NumPyro is available in curvefit environment
-    print("\n=== NumPyro: Importance Sampling ===")
-    key1, key2 = jrand.split(key, 2)
-    numpyro_result = numpyro_run_importance_sampling_jit(key1, xs, ys, num_samples=5000)
-
-    print("NumPyro inference complete:")
-    print(f"  Number of samples: {numpyro_result['num_samples']}")
-    print(
-        f"  Log marginal likelihood: {log_marginal_likelihood(numpyro_result['log_weights']):.4f}"
-    )
-    print(
-        f"  Effective sample size: {effective_sample_size(numpyro_result['log_weights']):.1f}"
-    )
-
-    print("\n=== NumPyro: Hamiltonian Monte Carlo ===")
-    hmc_result = numpyro_run_hmc_inference_jit(
-        key2, xs, ys, num_samples=2000, num_warmup=1000
-    )
-    summary = numpyro_hmc_summary_statistics(hmc_result)
-
-    print("NumPyro HMC inference complete:")
-    print(
-        f"  Frequency posterior: μ={summary['freq']['mean']:.3f}, σ={summary['freq']['std']:.3f}"
-    )
-    print(
-        f"  Offset posterior: μ={summary['offset']['mean']:.3f}, σ={summary['offset']['std']:.3f}"
-    )
-    print(f"  Number of divergences: {summary['num_divergences']}")
-    print(f"  Mean acceptance probability: {summary['mean_accept_prob']:.3f}")
