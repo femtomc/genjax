@@ -16,10 +16,10 @@ This directory contains specialized command personas for different aspects of Ge
 **Style**: Direct, precise, metrics-driven
 **Version**: v2 (optimized for Claude 4)
 
-### 📝 `/improver` - Prompt Enhancement Specialist
-**Purpose**: Transform basic prompts into comprehensive, structured instructions
-**Use when**: Creating new commands, improving documentation, or optimizing Claude interactions
-**Style**: Systematic, template-driven, meta-analytical
+### 🏥 `/doctor` - CLAUDE.md Documentation Specialist
+**Purpose**: Diagnose and optimize CLAUDE.md files for maximum effectiveness
+**Use when**: Creating or improving CLAUDE.md documentation, ensuring directory consistency
+**Style**: Medical/diagnostic metaphor, systematic examination, prescriptive solutions
 **Version**: v2 (optimized for Claude 4)
 
 ## Command Design Principles
@@ -35,7 +35,7 @@ All commands follow Claude 4 best practices:
 
 ## Creating New Commands
 
-Use `/improver` to enhance your initial command idea, ensuring:
+When creating new command personas, ensure:
 - Clear role definition with specific expertise
 - Structured workflow with phases
 - Explicit constraints and guidelines
@@ -58,9 +58,10 @@ Use `/improver` to enhance your initial command idea, ensuring:
 ## Usage Tips
 
 1. Commands can be combined - start with `/chikhai-bardo` for orientation, then switch to `/george` for implementation
-2. Each command maintains its persona throughout the conversation
-3. Commands include specific references to GenJAX's CLAUDE.md documentation
-4. All commands emphasize GenJAX-specific best practices (JAX control flow, pixi commands, etc.)
+2. Use `/doctor` to ensure CLAUDE.md files are comprehensive and well-structured
+3. Each command maintains its persona throughout the conversation
+4. Commands include specific references to GenJAX's CLAUDE.md documentation
+5. All commands emphasize GenJAX-specific best practices (JAX control flow, pixi commands, etc.)
 
 ## Maintenance
 
