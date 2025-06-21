@@ -75,7 +75,7 @@ jobs:
 
           # Always include root CLAUDE.md
           if [ -f "CLAUDE.md" ]; then
-            claude_content="# Root CLAUDE.md\n\n$(cat CLAUDE.md)\n\n"
+            claude_content=$(printf "# Root CLAUDE.md\n\n%s\n\n" "$(cat CLAUDE.md)")
           fi
 
           # Include CLAUDE.md files from changed directories
@@ -84,7 +84,7 @@ jobs:
           for dir in $changed_dirs; do
             claude_file="$dir/CLAUDE.md"
             if [ -f "$claude_file" ]; then
-              claude_content="${claude_content}# $claude_file\n\n$(cat $claude_file)\n\n"
+              claude_content=$(printf "%s# %s\n\n%s\n\n" "$claude_content" "$claude_file" "$(cat $claude_file)")
             fi
           done
 
