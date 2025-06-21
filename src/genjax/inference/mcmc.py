@@ -80,7 +80,7 @@ def _create_log_density_wrt_selected(target_gf, args, unselected_choices):
             full_choices = selected_choices_only
         else:
             # Use the GFI's merge method for all choice structures
-            full_choices = target_gf.merge(unselected_choices, selected_choices_only)
+            full_choices, _ = target_gf.merge(unselected_choices, selected_choices_only)
 
         log_density, _ = target_gf.assess(full_choices, *args[0], **args[1])
         return log_density

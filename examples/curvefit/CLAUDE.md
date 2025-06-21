@@ -419,6 +419,37 @@ f"Value: {jax_array:.2f}"
 f"Value: {float(jax_array):.2f}"
 ```
 
+### Cond Combinator for Mixture Models
+
+The `Cond` combinator now fully supports mixture models with same addresses in both branches:
+
+```python
+# ✅ Mixture model with outliers - natural expression!
+@gen
+def point_with_outliers(x, curve, outlier_rate=0.1, outlier_std=1.0):
+    y_det = curve(x)
+    is_outlier = flip(outlier_rate) @ "is_outlier"
+
+    @gen
+    def inlier_branch():
+        return normal(y_det, 0.2) @ "obs"  # Same address works!
+
+    @gen
+    def outlier_branch():
+        return normal(y_det, outlier_std) @ "obs"  # Same address works!
+
+    # Natural mixture model expression
+    cond_model = Cond(outlier_branch, inlier_branch)
+    y_observed = cond_model(is_outlier) @ "y"
+    return y_observed
+```
+
+**Key Features**:
+- **Natural syntax**: Express mixture models as you would mathematically
+- **Full inference support**: Works with all GenJAX inference algorithms
+- **JAX optimized**: Uses efficient `jnp.where` for conditional selection
+- **Type safe**: Branches must have compatible return types
+
 ### Import Dependencies
 
 - **Matplotlib required**: For figure generation in `figs.py`

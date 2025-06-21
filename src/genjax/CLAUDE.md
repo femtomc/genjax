@@ -59,10 +59,13 @@ This guide covers the core GenJAX concepts implemented in:
 - Weight: `log P(new_selected | non_selected) - log P(old_selected | non_selected)`
 
 #### merge
-**Method**: `merge(x: X, x_: X) -> X`
-**Location**: `core.py:1210-1225`
-**Purpose**: Merge two choice maps, with the second taking precedence
-- Used internally for compositional generative functions
+**Method**: `merge(x: X, x_: X, check: jnp.ndarray | None = None) -> tuple[X, X | None]`
+**Location**: `core.py:1210-1227`
+**Purpose**: Merge two choice maps, with optional conditional selection
+- Returns `(merged_choices, discarded_values)`
+- If `check` is provided, uses `jnp.where(check, x, x_)` for conditional selection at leaf level
+- Used internally for compositional generative functions and Cond combinator
+- **Enhanced API (June 2025)**: Added `check` parameter and tuple return for conditional merge support
 
 #### filter
 **Method**: `filter(x: X, selection: Selection) -> tuple[X | None, X | None]`
@@ -171,9 +174,14 @@ Higher-order generative functions for composition:
 #### Cond
 **Class**: `Cond[X, R](callee: GFI[X, R], callee_: GFI[X, R])`
 **Location**: `core.py:2545-2688`
-**Purpose**: Conditional execution
+**Purpose**: Conditional execution with full support for same-address branches
 - First argument to resulting GF must be boolean condition
 - Both branches must have same return type
+- **Enhanced (June 2025)**: Now supports branches with same addresses via conditional merge API
+- Uses `merge(x, x_, check=condition)` for efficient conditional selection
+- `CondTr.get_choices()` automatically applies conditional selection using enhanced merge
+- Enables natural mixture models without address conflicts
+- No NaN masking needed when structures match - direct `jnp.where` selection instead
 
 ## Critical API Patterns
 
@@ -266,6 +274,33 @@ Higher-order generative functions for composition:
 - Single namespace: `namespace(fn, "section")`
 - Nested: `namespace(namespace(fn, "inner"), "outer")`
 - See `state.py` for implementation details
+
+### Enhanced Cond Combinator (June 2025)
+
+**Mixture Model Pattern with Same Addresses**:
+```python
+@gen
+def mixture_observation(condition, value):
+    """Example: Mixture model with same observation address in both branches."""
+    @gen
+    def normal_branch():
+        return normal(value, 0.1) @ "obs"  # Same address!
+
+    @gen
+    def heavy_tail_branch():
+        return normal(value, 1.0) @ "obs"  # Same address!
+
+    # This now works correctly thanks to enhanced merge API
+    cond_model = Cond(heavy_tail_branch, normal_branch)
+    observation = cond_model(condition) @ "mixture"
+    return observation
+```
+
+**How It Works**:
+- `CondTr` stores choices from both branches
+- When `get_choices()` is called, uses `merge(branch1_choices, branch2_choices, check=condition)`
+- Distribution.merge implements `jnp.where(condition, branch1_val, branch2_val)` at leaves
+- Result: Efficient conditional selection without address conflicts
 
 #### MCMC Integration
 

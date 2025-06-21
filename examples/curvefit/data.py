@@ -95,7 +95,7 @@ def generate_test_dataset(
 
 
 def generate_easy_inference_dataset(
-    seed=42, n_points=5, noise_std=0.15, param_scale=0.3, key=None
+    seed=42, n_points=5, noise_std=0.2, param_scale=0.3, key=None
 ):
     """
     Generate an easier dataset for importance sampling.
@@ -108,7 +108,7 @@ def generate_easy_inference_dataset(
     Args:
         seed: Random seed for reproducibility
         n_points: Number of data points (default: 5, fewer than standard)
-        noise_std: Observation noise std (default: 0.15, 3x standard)
+        noise_std: Observation noise std (default: 0.2, matches updated model)
         param_scale: Scale factor for parameters (default: 0.3, keeps them near 0)
         key: Optional JAX PRNG key
 
@@ -155,6 +155,92 @@ def generate_easy_inference_dataset(
     return result
 
 
+def generate_dataset_with_outliers(
+    key=None,
+    n_points=20,
+    outlier_fraction=0.15,
+    outlier_scale=3.0,
+    noise_std=0.2,
+    seed=42,
+    true_a=None,
+    true_b=None,
+    true_c=None,
+):
+    """
+    Generate a dataset with outliers for testing robust regression.
+
+    Args:
+        key: JAX random key (if None, uses seed)
+        n_points: Number of data points
+        outlier_fraction: Fraction of points to make outliers (default 0.15)
+        outlier_scale: How many standard deviations away outliers can be (default 3.0)
+        noise_std: Base noise level for inliers (default 0.2)
+        seed: Random seed (used if key is None)
+        true_a, true_b, true_c: True polynomial coefficients (sampled if None)
+
+    Returns:
+        Dictionary with:
+            - xs: Input locations
+            - ys: Observed values (with outliers)
+            - true_params: True parameters including outlier info
+            - clean_ys: Noise-free deterministic values
+            - is_outlier: Boolean array indicating which points are outliers
+    """
+    if key is None:
+        key = jrand.key(seed)
+
+    # Generate input locations
+    xs = jnp.linspace(0, 1, n_points, dtype=jnp.float32)
+
+    # Generate or use provided coefficients
+    if true_a is None:
+        key, subkey = jrand.split(key)
+        true_a = jrand.normal(subkey, shape=()) * 0.5
+    if true_b is None:
+        key, subkey = jrand.split(key)
+        true_b = jrand.normal(subkey, shape=()) * 0.5
+    if true_c is None:
+        key, subkey = jrand.split(key)
+        true_c = jrand.normal(subkey, shape=()) * 0.5
+
+    # Generate clean polynomial values
+    clean_ys = polyfn(xs, true_a, true_b, true_c)
+
+    # Determine which points are outliers
+    key, subkey = jrand.split(key)
+    is_outlier = jrand.uniform(subkey, shape=(n_points,)) < outlier_fraction
+
+    # Generate noise
+    key, subkey = jrand.split(key)
+    inlier_noise = noise_std * jrand.normal(subkey, shape=(n_points,))
+
+    key, subkey = jrand.split(key)
+    outlier_noise = noise_std * outlier_scale * jrand.normal(subkey, shape=(n_points,))
+
+    # Combine inlier and outlier noise
+    noise = jnp.where(is_outlier, outlier_noise, inlier_noise)
+    ys = clean_ys + noise
+
+    # Package results
+    result = {
+        "xs": xs,
+        "ys": ys,
+        "true_params": {
+            "a": float(true_a),
+            "b": float(true_b),
+            "c": float(true_c),
+            "noise_std": noise_std,
+            "outlier_fraction": outlier_fraction,
+            "outlier_scale": outlier_scale,
+        },
+        "clean_ys": clean_ys,
+        "is_outlier": is_outlier,
+        "n_outliers": int(jnp.sum(is_outlier)),
+    }
+
+    return result
+
+
 def print_dataset_summary(data_dict, name="Dataset"):
     """
     Print a summary of the dataset characteristics.
@@ -170,4 +256,13 @@ def print_dataset_summary(data_dict, name="Dataset"):
     print(f"    b (x):     {data_dict['true_params']['b']:.3f}")
     print(f"    c (x²):    {data_dict['true_params']['c']:.3f}")
     print(f"  Noise std: {data_dict['true_params']['noise_std']:.3f}")
+
+    if "is_outlier" in data_dict:
+        print(
+            f"  Number of outliers: {data_dict['n_outliers']} ({data_dict['true_params']['outlier_fraction'] * 100:.0f}%)"
+        )
+        print(
+            f"  Outlier scale: {data_dict['true_params']['outlier_scale']:.1f}x noise"
+        )
+
     print(f"  Y range: [{data_dict['ys'].min():.3f}, {data_dict['ys'].max():.3f}]")

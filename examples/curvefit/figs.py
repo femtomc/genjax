@@ -47,6 +47,9 @@ def get_reference_dataset(seed=42, n_points=10, use_easy=False):
     """
     Generate a dataset for use across visualizations.
 
+    This function generates the exact same "Reference Dataset" as shown in
+    the four_multipoint_traces visualization (first subplot).
+
     Args:
         seed: Random seed for reproducibility
         n_points: Number of data points
@@ -55,24 +58,49 @@ def get_reference_dataset(seed=42, n_points=10, use_easy=False):
     Returns:
         dict with xs, ys, true_params, trace
     """
-    from examples.curvefit.data import (
-        generate_easy_inference_dataset,
-        generate_test_dataset,
-    )
+    from examples.curvefit.core import npoint_curve
+    from genjax.pjax import seed as genjax_seed
 
-    if use_easy:
-        # Use easier dataset that works better with importance sampling
-        return generate_easy_inference_dataset(seed=seed, n_points=5)
-    else:
-        # Use standard dataset generation
-        return generate_test_dataset(seed=seed, n_points=n_points)
+    # Match the exact setup from save_four_multipoint_trace_vizs
+    xs = jnp.linspace(0, 1, 10)  # Always use 10 points like the reference
+
+    # Use seeded simulation for reproducibility
+    seeded_simulate = genjax_seed(npoint_curve.simulate)
+
+    # Generate the same key sequence as in four_multipoint_traces
+    key = jrand.key(seed)
+    keys = jrand.split(key, 4)
+
+    # Use the first key (index 0) which is the "Reference Dataset"
+    trace = seeded_simulate(keys[0], xs)
+
+    # Extract the data
+    curve, (xs_ret, ys) = trace.get_retval()
+    choices = trace.get_choices()
+
+    # Extract true parameters
+    true_a = float(choices["curve"]["a"])
+    true_b = float(choices["curve"]["b"])
+    true_c = float(choices["curve"]["c"])
+
+    return {
+        "xs": xs,
+        "ys": ys,
+        "true_params": {
+            "a": true_a,
+            "b": true_b,
+            "c": true_c,
+            "noise_std": 0.2,  # Current model noise level
+        },
+        "trace": trace,
+    }
 
 
 def save_framework_comparison_figure(
     n_points=10,
-    n_samples_is=1000,
+    n_samples_is=5000,
     n_samples_hmc=1000,
-    n_warmup=2,
+    n_warmup=500,
     seed=42,
     timing_repeats=10,
     figsize=(12, 8),
@@ -81,7 +109,7 @@ def save_framework_comparison_figure(
     Create a clean framework comparison figure.
 
     Compares:
-    - GenJAX IS with 1000 particles
+    - GenJAX IS with 5000 particles
     - GenJAX HMC
     - NumPyro HMC
 
@@ -96,12 +124,12 @@ def save_framework_comparison_figure(
     - Bottom: Timing comparison
     """
     from examples.curvefit.core import (
-        infer_latents_easy,
+        infer_latents_jit,
         hmc_infer_latents_jit,
+        numpyro_run_importance_sampling_jit,
         numpyro_run_hmc_inference_jit,
     )
     from genjax.core import Const
-    from genjax.pjax import seed as genjax_seed
     import jax
 
     print("=== Framework Comparison ===")
@@ -110,30 +138,27 @@ def save_framework_comparison_figure(
     print(f"HMC samples: {n_samples_hmc}")
     print(f"HMC warmup: {n_warmup} (critical for convergence)")
 
-    # Use easier dataset for better importance sampling performance
-    data = get_reference_dataset(n_points=5, use_easy=True)
+    # Use the exact reference dataset from four_multipoint_traces
+    data = get_reference_dataset(seed=seed)
     xs, ys = data["xs"], data["ys"]
     true_a = data["true_params"]["a"]
     true_b = data["true_params"]["b"]
     true_c = data["true_params"]["c"]
     noise_std = data["true_params"]["noise_std"]
 
-    print(f"True parameters: a={true_a:.3f}, b={true_b:.3f}, c={true_c:.3f}")
-    print(f"Using easier inference with noise_std={noise_std:.3f}")
+    print(
+        f"Reference Dataset - True parameters: a={true_a:.3f}, b={true_b:.3f}, c={true_c:.3f}"
+    )
+    print(f"Observation noise std: {noise_std:.3f}")
+    print(f"Number of data points: {len(xs)}")
 
     results = {}
 
-    # 1. GenJAX Importance Sampling (1000 particles) - using easier model
-    print("\n1. GenJAX IS (1000 particles) with easier model...")
-
-    # Create seeded and jitted version of easy inference
-    seeded_infer_easy = genjax_seed(infer_latents_easy)
-    infer_latents_easy_jit = jax.jit(seeded_infer_easy)
+    # 1. GenJAX Importance Sampling
+    print(f"\n1. GenJAX IS ({n_samples_is} particles)...")
 
     def is_task():
-        return infer_latents_easy_jit(
-            jrand.key(seed), xs, ys, Const(n_samples_is), Const(noise_std)
-        )
+        return infer_latents_jit(jrand.key(seed), xs, ys, Const(n_samples_is))
 
     is_times, is_timing_stats = benchmark_with_warmup(
         is_task, warmup_runs=2, repeats=timing_repeats, inner_repeats=10
@@ -152,20 +177,38 @@ def save_framework_comparison_figure(
     is_b_plot = is_b[is_indices]
     is_c_plot = is_c[is_indices]
 
+    # Calculate weighted mean for IS (important!)
+    normalized_weights = jnp.exp(is_weights - jax.scipy.special.logsumexp(is_weights))
+    is_a_mean = jnp.sum(is_a * normalized_weights)
+    is_b_mean = jnp.sum(is_b * normalized_weights)
+    is_c_mean = jnp.sum(is_c * normalized_weights)
+
     results["genjax_is"] = {
         "a": is_a_plot,
         "b": is_b_plot,
         "c": is_c_plot,
         "timing": is_timing_stats,
-        "method": "GenJAX IS (1000)",
+        "method": f"GenJAX IS (N={n_samples_is})",
+        "weighted_mean_a": is_a_mean,
+        "weighted_mean_b": is_b_mean,
+        "weighted_mean_c": is_c_mean,
     }
 
     print(
         f"  Time: {is_timing_stats[0] * 1000:.1f} ± {is_timing_stats[1] * 1000:.1f} ms"
     )
-    print(f"  IS a mean: {is_a_plot.mean():.3f}, std: {is_a_plot.std():.3f}")
-    print(f"  IS b mean: {is_b_plot.mean():.3f}, std: {is_b_plot.std():.3f}")
-    print(f"  IS c mean: {is_c_plot.mean():.3f}, std: {is_c_plot.std():.3f}")
+    print(
+        f"  IS a mean (resampled): {is_a_plot.mean():.3f}, std: {is_a_plot.std():.3f}"
+    )
+    print(
+        f"  IS b mean (resampled): {is_b_plot.mean():.3f}, std: {is_b_plot.std():.3f}"
+    )
+    print(
+        f"  IS c mean (resampled): {is_c_plot.mean():.3f}, std: {is_c_plot.std():.3f}"
+    )
+    print(
+        f"  IS weighted mean: a={is_a_mean:.3f}, b={is_b_mean:.3f}, c={is_c_mean:.3f}"
+    )
 
     # 2. GenJAX HMC
     print("\n2. GenJAX HMC...")
@@ -216,12 +259,70 @@ def save_framework_comparison_figure(
     print(f"  HMC a mean: {hmc_a_plot.mean():.3f}, std: {hmc_a_plot.std():.3f}")
     print(f"  HMC b mean: {hmc_b_plot.mean():.3f}, std: {hmc_b_plot.std():.3f}")
     print(f"  HMC c mean: {hmc_c_plot.mean():.3f}, std: {hmc_c_plot.std():.3f}")
+    print(f"  GenJAX HMC: {len(hmc_a)} total samples")
+
+    # 3. NumPyro IS
+    print(f"\n3. NumPyro IS ({n_samples_is} particles)...")
+
+    def numpyro_is_task():
+        return numpyro_run_importance_sampling_jit(
+            jrand.key(seed), xs, ys, n_samples_is
+        )
+
+    numpyro_is_times, numpyro_is_timing_stats = benchmark_with_warmup(
+        numpyro_is_task, warmup_runs=2, repeats=timing_repeats, inner_repeats=10
+    )
+    numpyro_is_result = numpyro_is_task()
+
+    # Extract samples
+    numpyro_is_samples = numpyro_is_result["samples"]
+    numpyro_is_weights = numpyro_is_result["log_weights"]
+
+    # Resample for visualization
+    numpyro_is_indices = jrand.categorical(
+        jrand.key(124), numpyro_is_weights, shape=(n_resample,)
+    )
+    numpyro_is_a_plot = numpyro_is_samples["a"][numpyro_is_indices]
+    numpyro_is_b_plot = numpyro_is_samples["b"][numpyro_is_indices]
+    numpyro_is_c_plot = numpyro_is_samples["c"][numpyro_is_indices]
+
+    # Calculate weighted mean for NumPyro IS
+    normalized_weights_np = jnp.exp(
+        numpyro_is_weights - jax.scipy.special.logsumexp(numpyro_is_weights)
+    )
+    numpyro_is_a_mean = jnp.sum(numpyro_is_samples["a"] * normalized_weights_np)
+    numpyro_is_b_mean = jnp.sum(numpyro_is_samples["b"] * normalized_weights_np)
+    numpyro_is_c_mean = jnp.sum(numpyro_is_samples["c"] * normalized_weights_np)
+
+    results["numpyro_is"] = {
+        "a": numpyro_is_a_plot,
+        "b": numpyro_is_b_plot,
+        "c": numpyro_is_c_plot,
+        "timing": numpyro_is_timing_stats,
+        "method": f"NumPyro IS (N={n_samples_is})",
+        "weighted_mean_a": numpyro_is_a_mean,
+        "weighted_mean_b": numpyro_is_b_mean,
+        "weighted_mean_c": numpyro_is_c_mean,
+    }
+
     print(
-        f"  GenJAX HMC: {len(hmc_a)} total samples, thinned by {thin_factor} for plotting"
+        f"  Time: {numpyro_is_timing_stats[0] * 1000:.1f} ± {numpyro_is_timing_stats[1] * 1000:.1f} ms"
+    )
+    print(
+        f"  NumPyro IS a mean (resampled): {numpyro_is_a_plot.mean():.3f}, std: {numpyro_is_a_plot.std():.3f}"
+    )
+    print(
+        f"  NumPyro IS b mean (resampled): {numpyro_is_b_plot.mean():.3f}, std: {numpyro_is_b_plot.std():.3f}"
+    )
+    print(
+        f"  NumPyro IS c mean (resampled): {numpyro_is_c_plot.mean():.3f}, std: {numpyro_is_c_plot.std():.3f}"
+    )
+    print(
+        f"  NumPyro IS weighted mean: a={numpyro_is_a_mean:.3f}, b={numpyro_is_b_mean:.3f}, c={numpyro_is_c_mean:.3f}"
     )
 
-    # 3. NumPyro HMC
-    print("\n3. NumPyro HMC...")
+    # 4. NumPyro HMC
+    print("\n4. NumPyro HMC...")
 
     def numpyro_task():
         # Use same key as GenJAX HMC for fair comparison
@@ -267,9 +368,7 @@ def save_framework_comparison_figure(
     print(f"  NumPyro a mean: {numpyro_a.mean():.3f}, std: {numpyro_a.std():.3f}")
     print(f"  NumPyro b mean: {numpyro_b.mean():.3f}, std: {numpyro_b.std():.3f}")
     print(f"  NumPyro c mean: {numpyro_c.mean():.3f}, std: {numpyro_c.std():.3f}")
-    print(
-        f"  NumPyro HMC: {len(numpyro_a)} total samples, thinned by {thin_factor} for plotting"
-    )
+    print(f"  NumPyro HMC: {len(numpyro_a)} total samples")
 
     # Create figure
     fig = plt.figure(figsize=figsize)
@@ -279,6 +378,7 @@ def save_framework_comparison_figure(
     colors = {
         "genjax_is": "#0173B2",  # Blue
         "genjax_hmc": "#DE8F05",  # Orange
+        "numpyro_is": "#CC3311",  # Red
         "numpyro_hmc": "#029E73",  # Green
     }
 
@@ -310,27 +410,41 @@ def save_framework_comparison_figure(
         c_samples = result["c"]
         color = colors[method_key]
 
-        # Plot subset of curves - increase to 500 for better visualization
-        n_plot = min(500, len(a_samples))
-        print(f"  Plotting {n_plot} curves for {result['method']}")
-
-        for i in range(n_plot):
-            curve = a_samples[i] + b_samples[i] * x_fine + c_samples[i] * x_fine**2
-            ax1.plot(x_fine, curve, color=color, alpha=0.01, linewidth=0.6)
+        # Skip plotting individual posterior curves - only plot mean curves
 
         # Calculate and plot mean curve
-        mean_a = np.mean(a_samples)
-        mean_b = np.mean(b_samples)
-        mean_c = np.mean(c_samples)
+        # For IS, use the weighted mean instead of simple mean
+        if method_key == "genjax_is" and "weighted_mean_a" in result:
+            mean_a = float(result["weighted_mean_a"])
+            mean_b = float(result["weighted_mean_b"])
+            mean_c = float(result["weighted_mean_c"])
+        else:
+            mean_a = np.mean(a_samples)
+            mean_b = np.mean(b_samples)
+            mean_c = np.mean(c_samples)
+
         mean_curve = mean_a + mean_b * x_fine + mean_c * x_fine**2
+
+        # Debug print for all mean curves
+        print(
+            f"  {result['method']} mean curve: a={mean_a:.3f}, b={mean_b:.3f}, c={mean_c:.3f}"
+        )
+        print(
+            f"  {result['method']} mean curve range: [{np.min(mean_curve):.3f}, {np.max(mean_curve):.3f}]"
+        )
+
+        # Use consistent styling for all mean curves
+        linewidth = 3.0
+        zorder = 25  # High z-order for all mean curves
+
         ax1.plot(
             x_fine,
             mean_curve,
             color=color,
-            linewidth=2.5,
+            linewidth=linewidth,
             alpha=1.0,
             linestyle="-",
-            zorder=20,
+            zorder=zorder,
         )  # Solid line, high z-order
 
         # Add a single legend entry for this method with higher alpha
@@ -344,7 +458,7 @@ def save_framework_comparison_figure(
     ax1.set_title("Posterior Comparison", fontweight="normal")
     set_minimal_ticks(ax1, x_ticks=4, y_ticks=3)
 
-    # Simple legend for true curve and data only
+    # Create legend with only true curve and data
     from matplotlib.lines import Line2D
 
     # Legend elements - just true curve and data
@@ -362,7 +476,7 @@ def save_framework_comparison_figure(
         ),
     ]
 
-    ax1.legend(handles=legend_elements, loc="upper right", frameon=False, fontsize=14)
+    ax1.legend(handles=legend_elements, loc="upper left", frameon=False, fontsize=12)
 
     # Bottom panel: Timing comparison
     ax2 = fig.add_subplot(gs[1])
@@ -518,10 +632,14 @@ def save_four_multipoint_trace_vizs():
     # Use seeded simulation for reproducibility
     seeded_simulate = genjax_seed(npoint_curve.simulate)
 
-    for i, ax in enumerate(axes):
-        # Generate trace with seed based on index
-        # First trace (i=0) uses seed=42, which is our reference dataset
-        trace = seeded_simulate(jrand.key(42 + i), xs)
+    # Initialize key and split for multiple samples
+    key = jrand.key(42)
+    keys = jrand.split(key, 4)  # Split into 4 keys for 4 subplots
+
+    for i, (ax, subkey) in enumerate(zip(axes, keys)):
+        # Generate trace with properly split key
+        # First trace (i=0) uses first split from seed=42, which is our reference dataset
+        trace = seeded_simulate(subkey, xs)
 
         # Get the log density of the trace (score is negative log probability)
         log_density = -float(trace.get_score())

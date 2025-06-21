@@ -336,7 +336,7 @@ def init(
             proposal_score = proposal_trace.get_score()
 
             # Merge proposal choices with constraints
-            merged_choices = target_gf.merge(proposal_choices, constraints)
+            merged_choices, _ = target_gf.merge(proposal_choices, constraints)
 
             # Generate from target using merged choices
             target_trace, target_weight = target_gf.generate(
@@ -500,7 +500,7 @@ def extend(
             proposal_score = extension_trace.get_score()
 
             # Merge old choices, extension choices, and constraints
-            merged_choices = extended_target_gf.merge(constraints, extension_choices)
+            merged_choices, _ = extended_target_gf.merge(constraints, extension_choices)
 
             # Generate with extended target
             new_trace, log_weight = extended_target_gf.generate(merged_choices, *args)
