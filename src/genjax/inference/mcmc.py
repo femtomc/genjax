@@ -90,16 +90,47 @@ def _create_log_density_wrt_selected(target_gf, args, unselected_choices):
 
 def compute_rhat(samples: jnp.ndarray) -> FloatArray:
     """
-    Compute potential scale reduction factor (R-hat) for MCMC convergence.
+    Compute potential scale reduction factor (R-hat) for MCMC convergence diagnostics.
 
-    R-hat compares between-chain and within-chain variance to assess convergence.
-    Values close to 1.0 indicate good convergence.
+    Implements the split-R-hat diagnostic from Vehtari et al. (2021), which improves
+    upon the original formulation of Gelman & Rubin (1992) by accounting for
+    non-stationarity within chains.
+
+    Mathematical Formulation:
+        Given M chains each of length N, compute:
+
+        B = N/(M-1) * Σᵢ (θ̄ᵢ - θ̄)²  (between-chain variance)
+        W = 1/M * Σᵢ sᵢ²             (within-chain variance)
+
+        where θ̄ᵢ is the mean of chain i, θ̄ is the grand mean, and sᵢ² is
+        the sample variance of chain i.
+
+        The potential scale reduction factor is:
+        R̂ = √[(N-1)/N * W + 1/N * B] / W
+
+    Convergence Criterion:
+        R̂ < 1.01 indicates good convergence (Vehtari et al., 2021)
+        R̂ < 1.1 was the classical threshold (Gelman & Rubin, 1992)
 
     Args:
         samples: Array of shape (n_chains, n_samples) containing MCMC samples
+                 from M chains each of length N
 
     Returns:
-        R-hat statistic. Values < 1.01 typically indicate convergence.
+        R-hat statistic. Values close to 1.0 indicate convergence.
+        Returns NaN if n_chains < 2.
+
+    References:
+        .. [1] Gelman, A., & Rubin, D. B. (1992). "Inference from iterative
+               simulation using multiple sequences". Statistical Science, 7(4), 457-472.
+        .. [2] Vehtari, A., Gelman, A., Simpson, D., Carpenter, B., & Bürkner, P. C.
+               (2021). "Rank-normalization, folding, and localization: An improved R̂
+               for assessing convergence of MCMC". Bayesian Analysis, 16(2), 667-718.
+
+    Notes:
+        - This implementation uses the basic R-hat without rank-normalization
+        - For rank-normalized R-hat (more robust), see [2]
+        - Requires at least 2 chains for meaningful computation
     """
     n_chains, n_samples = samples.shape
 
@@ -129,14 +160,58 @@ def compute_rhat(samples: jnp.ndarray) -> FloatArray:
 
 def compute_ess(samples: jnp.ndarray, kind: str = "bulk") -> FloatArray:
     """
-    Compute effective sample size for MCMC chains.
+    Compute effective sample size (ESS) for MCMC chains.
+
+    Estimates the number of independent samples accounting for autocorrelation
+    in Markov chains. Implements simplified versions of bulk and tail ESS from
+    Vehtari et al. (2021).
+
+    Mathematical Formulation:
+        The effective sample size is defined as:
+
+        ESS = M × N / τ
+
+        where M is the number of chains, N is the chain length, and τ is the
+        integrated autocorrelation time:
+
+        τ = 1 + 2 × Σₖ ρₖ
+
+        where ρₖ is the autocorrelation at lag k, summed over positive correlations.
+
+    Algorithm:
+        - Bulk ESS: Uses all samples to estimate central tendency efficiency
+        - Tail ESS: Uses quantile differences (0.05 and 0.95) to assess tail behavior
+
+        This implementation uses a simplified approximation based on lag-1
+        autocorrelation: ESS ≈ N / (1 + 2ρ₁)
+
+    Time Complexity: O(M × N)
+    Space Complexity: O(1)
 
     Args:
         samples: Array of shape (n_chains, n_samples) containing MCMC samples
-        kind: Type of ESS to compute ("bulk" or "tail")
+        kind: Type of ESS to compute:
+              - "bulk": Efficiency for estimating posterior mean/median
+              - "tail": Efficiency for estimating posterior quantiles
 
     Returns:
-        Effective sample size estimate
+        Effective sample size estimate. Range: [1, M × N]
+        Lower values indicate higher autocorrelation.
+
+    References:
+        .. [1] Geyer, C. J. (1992). "Practical Markov chain Monte Carlo".
+               Statistical Science, 7(4), 473-483.
+        .. [2] Vehtari, A., Gelman, A., Simpson, D., Carpenter, B., & Bürkner, P. C.
+               (2021). "Rank-normalization, folding, and localization: An improved R̂
+               for assessing convergence of MCMC". Bayesian Analysis, 16(2), 667-718.
+        .. [3] Stan Development Team (2023). "Stan Reference Manual: Effective
+               Sample Size". Version 2.33. Section 15.4.
+
+    Notes:
+        - This is a simplified implementation using lag-1 autocorrelation
+        - Full implementation would compute autocorrelation function to first negative
+        - Tail ESS focuses on extreme quantiles, useful for credible intervals
+        - Bulk ESS focuses on center, useful for posterior expectations
     """
     n_chains, n_samples = samples.shape
 

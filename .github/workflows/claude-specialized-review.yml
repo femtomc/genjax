@@ -1,0 +1,194 @@
+name: Claude Specialized Review
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  specialized-review:
+    # Only run on PR comments that contain Claude commands
+    if: |
+      github.event.issue.pull_request &&
+      (contains(github.event.comment.body, '/claude doctor') ||
+       contains(github.event.comment.body, '/claude renoir') ||
+       contains(github.event.comment.body, '/claude shifu'))
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Command
+        id: command
+        run: |
+          comment="${{ github.event.comment.body }}"
+          if [[ "$comment" == *"/claude doctor"* ]]; then
+            echo "command=doctor" >> $GITHUB_OUTPUT
+            echo "prompt_file=.claude/commands/doctor.md" >> $GITHUB_OUTPUT
+          elif [[ "$comment" == *"/claude renoir"* ]]; then
+            echo "command=renoir" >> $GITHUB_OUTPUT
+            echo "prompt_file=.claude/commands/renoir.md" >> $GITHUB_OUTPUT
+          elif [[ "$comment" == *"/claude shifu"* ]]; then
+            echo "command=shifu" >> $GITHUB_OUTPUT
+            echo "prompt_file=.claude/commands/shifu.md" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get PR Details
+        id: pr-details
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const { data: diff } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              mediaType: {
+                format: 'diff'
+              }
+            });
+
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            return {
+              title: pr.title,
+              body: pr.body || '',
+              diff: diff,
+              files: files
+            };
+
+      - name: Prepare Specialized Prompt
+        id: prepare-prompt
+        run: |
+          # Read the command persona
+          persona=$(cat ${{ steps.command.outputs.prompt_file }})
+
+          # Create the specialized prompt
+          cat > specialized_prompt.txt << 'EOF'
+          $persona
+
+          You are reviewing a pull request. Please respond in character.
+
+          EOF
+
+          # Add specific instructions based on command
+          case "${{ steps.command.outputs.command }}" in
+            doctor)
+              cat >> specialized_prompt.txt << 'EOF'
+          Focus on:
+          1. CLAUDE.md files that need updating based on the changes
+          2. Missing documentation for new features
+          3. Outdated references that need correction
+          4. Documentation health score for affected modules
+
+          EOF
+              ;;
+            renoir)
+              cat >> specialized_prompt.txt << 'EOF'
+          Focus on:
+          1. Redundant code that could be eliminated
+          2. Overly complex functions that need simplification
+          3. Unused imports or dead code
+          4. Opportunities for elegant refactoring
+          5. Code that doesn't "breathe" properly
+
+          Note: The tests define what is necessary. Do not suggest removing tested functionality.
+
+          EOF
+              ;;
+            shifu)
+              cat >> specialized_prompt.txt << 'EOF'
+          Focus on:
+          1. Commit message quality and poetry
+          2. Git workflow best practices
+          3. Branch naming conventions
+          4. PR description completeness
+          5. Whether the PR follows the sacred path
+
+          Provide guidance with appropriate koans or haiku.
+
+          EOF
+              ;;
+          esac
+
+          # Add PR details
+          cat >> specialized_prompt.txt << 'EOF'
+          PR Title: ${{ fromJson(steps.pr-details.outputs.result).title }}
+          PR Description: ${{ fromJson(steps.pr-details.outputs.result).body }}
+
+          Changed files:
+          EOF
+
+          # List changed files
+          echo '${{ steps.pr-details.outputs.result }}' | jq -r '.files[] | "- \(.filename) (+\(.additions) -\(.deletions))"' >> specialized_prompt.txt
+
+          cat >> specialized_prompt.txt << 'EOF'
+
+          Diff:
+          ```diff
+          ${{ fromJson(steps.pr-details.outputs.result).diff }}
+          ```
+          EOF
+
+      - name: Call Claude API
+        id: claude-specialized
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          response=$(curl -X POST https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d @- << EOF
+          {
+            "model": "claude-3-5-sonnet-20241022",
+            "max_tokens": 4000,
+            "messages": [
+              {
+                "role": "user",
+                "content": $(jq -Rs . < specialized_prompt.txt)
+              }
+            ]
+          }
+          EOF
+          )
+
+          echo "$response" | jq -r '.content[0].text' > specialized_review.md
+
+      - name: Post Specialized Review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('specialized_review.md', 'utf8');
+            const command = '${{ steps.command.outputs.command }}';
+
+            const emoji = {
+              doctor: '🩺',
+              renoir: '🎨',
+              shifu: '🥋'
+            };
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ${emoji[command]} Claude ${command.charAt(0).toUpperCase() + command.slice(1)} Review\n\n${review}\n\n---\n*This specialized review was triggered by \`/claude ${command}\`*`
+            });
