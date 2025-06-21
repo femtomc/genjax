@@ -53,14 +53,15 @@ numpy = "*"
 
 [tool.pixi.feature.curvefit.pypi-dependencies]
 numpyro = "*"
+funsor = "*"
 
 [tool.pixi.feature.curvefit.tasks]
 cmd = "curvefit"
 # Curve fitting with GenJAX and NumPyro
 setup = "mkdir -p examples/curvefit/figs"  # Create output directory
-curvefit = "pixi run python examples/curvefit/main.py --mode genjax-fast"  # Run fast GenJAX mode (default)
-curvefit-full = "pixi run python examples/curvefit/main.py --mode all"  # Run full analysis (slow)
-curvefit-data = "pixi run python examples/curvefit/data.py"  # Generate/process data
+curvefit = "pixi run python -m examples.curvefit.main quick"  # Quick demonstration
+curvefit-full = "pixi run python -m examples.curvefit.main full"  # Complete analysis
+curvefit-benchmark = "pixi run python -m examples.curvefit.main benchmark"  # Framework comparison
 
 [tool.pixi.feature.format.tasks]
 # Code formatting and linting
@@ -188,8 +189,9 @@ cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); 
 cuda-test = "pixi run test -k 'not slow'"  # Run tests with CUDA backend
 # CUDA-accelerated case studies
 cuda-faircoin = "pixi run -e faircoin-cuda setup && pixi run -e faircoin-cuda faircoin"  # Run faircoin with CUDA (setup figs dir first)
-cuda-curvefit = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit"  # Run curvefit with CUDA (fast mode)
-cuda-curvefit-full = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit-full"  # Run full curvefit with CUDA (slow)
+cuda-curvefit = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit"  # Quick curvefit with CUDA
+cuda-curvefit-full = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit-full"  # Full curvefit with CUDA
+cuda-curvefit-benchmark = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit-benchmark"  # Benchmark with CUDA
 cuda-gol = "pixi run -e gol-cuda gol"  # Run Game of Life with CUDA
 cuda-localization-generate-data = "pixi run -e localization-cuda python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison"  # Generate localization data with CUDA
 cuda-localization-plot-figures = "pixi run -e localization-cuda python -m examples.localization.main plot-figures"  # Plot localization figures

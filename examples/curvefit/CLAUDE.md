@@ -1,10 +1,10 @@
 # CLAUDE.md - Curve Fitting Case Study
 
-This file provides guidance to Claude Code when working with the curve fitting case study that demonstrates Bayesian inference for sine wave parameter estimation.
+This file provides guidance to Claude Code when working with the curve fitting case study that demonstrates Bayesian inference for polynomial regression.
 
 ## Overview
 
-The curvefit case study showcases Bayesian curve fitting using GenJAX, demonstrating outlier-robust inference for sine wave parameters with hierarchical modeling and importance sampling.
+The curvefit case study showcases Bayesian curve fitting using GenJAX, demonstrating polynomial regression (degree 2) with hierarchical modeling and both importance sampling and HMC inference. The case study has been simplified to focus on essential comparisons: IS with 1000 particles vs HMC methods.
 
 ## Directory Structure
 
@@ -26,12 +26,11 @@ examples/curvefit/
 
 **GenJAX Models:**
 
-- **`point(x, curve)`**: Single data point model with outlier handling
-- **`sine()`**: Sine wave parameter prior model
+- **`point(x, curve)`**: Single data point model with Gaussian noise (σ=0.05)
+- **`polynomial()`**: Polynomial coefficient prior model (degree 2)
 - **`onepoint_curve(x)`**: Single point curve fitting model
-- **`npoint_curve_factory(n)`**: Factory for multi-point curve models with static n
-- **`_infer_latents()`**: SMC-based parameter inference using proper factory/closure patterns
-- **`infer_latents()`**: JIT-compiled inference function
+- **`npoint_curve(xs)`**: Multi-point curve model taking xs as input
+- **`infer_latents()`**: SMC-based parameter inference using importance sampling
 - **`get_points_for_inference()`**: Test data generation utility
 
 **NumPyro Implementations (if numpyro available):**
@@ -52,19 +51,17 @@ examples/curvefit/
 
 **Cross-Framework Data Generation**:
 
-- **`sinfn()`**: Core sine function with frequency and offset parameters
+- **`polyfn()`**: Core polynomial function evaluating degree 2 polynomials
 - **`generate_test_dataset()`**: Creates standardized datasets with configurable parameters
-- **`convert_to_torch()`**: Convert JAX datasets to PyTorch format for Pyro compatibility
-- **`convert_to_numpy()`**: Convert JAX datasets to NumPy format for general use
 - **`get_standard_datasets()`**: Generate pre-configured datasets for common benchmarks
 - **`print_dataset_summary()`**: Display dataset statistics and true parameters
 
 **Key Features**:
 
-- **Consistent Parameters**: Default true_freq=0.3, true_offset=1.5 across all frameworks
+- **Consistent Parameters**: Standard polynomial coefficients across all frameworks
 - **Reproducible Seeds**: Fixed random seeds ensure identical datasets for fair comparisons
-- **Framework Compatibility**: Automatic conversion between JAX, NumPy, and PyTorch formats
-- **Noise Modeling**: Standardized Gaussian noise (σ=0.3) for realistic observations
+- **Framework Compatibility**: JAX-based data generation compatible with NumPyro
+- **Noise Modeling**: Standardized Gaussian noise (σ=0.05) for realistic observations
 - **Benchmark Suites**: Pre-configured datasets for performance and accuracy comparisons
 
 ### `figs.py` - Visualization
@@ -74,114 +71,85 @@ examples/curvefit/
 - **Scaling studies**: Performance and quality analysis across sample sizes
 - **Density visualizations**: Log-density comparisons
 
-### `figs.py` - Comprehensive Visualization Suite
+### `figs.py` - Clean Visualization Suite
 
-**Standard Visualizations:**
-- **Trace visualizations**: Single and multi-point curve traces
-- **Inference visualizations**: Posterior curve overlays with uncertainty
-- **Scaling studies**: Performance and quality analysis across sample sizes
-- **Density visualizations**: Log-density comparisons
-- **Comprehensive benchmark**: Cross-framework comparison with timing analysis
+**Core Visualizations:**
+- **`save_onepoint_trace_viz()`**: Single point curve trace
+- **`save_multipoint_trace_viz()`**: Multi-point curve trace
+- **`save_inference_viz()`**: Posterior curve overlay with uncertainty
 
-**Advanced Analysis Functions:**
+**Framework Comparison:**
+- **`save_framework_comparison_figure()`**: Clean comparison of IS (1000) vs HMC methods
+  - **Methods compared**: GenJAX IS (1000 particles), GenJAX HMC, NumPyro HMC
+  - **Two-panel layout**: Posterior curves (top), timing comparison (bottom)
+  - **JIT-compiled performance**: Fair comparison with proper warm-up
+  - **Professional styling**: Publication-ready with clear legends
+  - **Focused metrics**: Essential timing and acceptance rate information
 
-**`save_genjax_scaling_benchmark()` - GenJAX Performance Analysis:**
-- **Importance sampling scaling**: Performance and posterior quality vs N_samples
-- **HMC scaling**: Performance and posterior quality vs chain length
-- **Comprehensive metrics**: Timing, bias, variance, ESS, acceptance rates
-- **JIT-compiled functions**: Uses optimized GenJAX functions for accurate benchmarks
-- **Research-quality output**: 12-panel figure showing complete scaling analysis
-- **Standard interface**: Integrated with main.py CLI system
+### `main.py` - Simplified Entry Point
 
-**`save_genjax_posterior_comparison()` - Comprehensive Method Comparison:**
-- **Three-method comparison**: GenJAX IS, GenJAX HMC, and NumPyro HMC with JIT compilation
-- **Visual posterior comparison**: Side-by-side posterior curve visualizations for each method
-- **Parameter space visualization**: Joint posterior distributions showing parameter estimates
-- **Comprehensive overlay**: Combined view showing all three methods with observed data
-- **Performance benchmarking**: JIT-compiled timing comparisons across all methods
-- **Statistical diagnostics**: Posterior means, uncertainties, bias, and HMC acceptance rates
-- **Professional visualization**: 4-row layout with publication-ready formatting
-  - **Row 1**: Individual method posterior plots + parameter estimates scatter plot
-  - **Row 2**: Combined overlay comparison spanning full width
-  - **Row 3**: Performance comparison bar chart (unlabeled bars, color-coded)
-  - **Row 4**: Comprehensive shared legend (3-column, 3-row layout, 20pt font)
-- **JIT-compiled inference**: Uses optimized functions for fair performance comparison
-- **Parameter alignment**: Ensures identical HMC parameters between GenJAX and NumPyro (step_size=0.01, num_steps=20)
-- **Font standardization**: Matches faircoin publication standards (18-22pt fonts, bold titles)
-- **Legend organization**: Groups elements logically (ground truth, posteriors, means)
-- **Standard interface**: Integrated with main.py CLI system
-
-### `main.py` - Figure Generation
-
-- **Orchestrates all visualizations**: Calls figure generation functions in sequence
-- **Produces complete paper-ready figures**: For research and documentation
-- **Multiple modes**: Support for traces, inference, scaling, benchmark, genjax-scaling, and posterior-comparison
+- **Three clean modes**: quick (fast demo), full (complete analysis), benchmark (framework comparison)
+- **Focused on essentials**: IS with 1000 particles vs HMC methods
+- **Standard parameters**: Consistent defaults for reproducibility
 
 ## Key Implementation Details
 
 ### Model Specification
 
-**Hierarchical Sine Wave Model**:
+**Hierarchical Polynomial Model**:
 
 ```python
 @gen
-def sine():
-    freq = exponential(10.0) @ "freq"      # Frequency parameter
-    offset = uniform(0.0, 2.0 * pi) @ "off"  # Phase offset
-    return Lambda(sinfn, jnp.array([freq, offset]))
+def polynomial():
+    # Degree 2 polynomial: y = a + b*x + c*x^2
+    a = normal(0.0, 1.0) @ "a"  # Constant term
+    b = normal(0.0, 0.5) @ "b"  # Linear coefficient
+    c = normal(0.0, 0.2) @ "c"  # Quadratic coefficient
+    return Lambda(Const(polyfn), jnp.array([a, b, c]))
 
 @gen
 def point(x, curve):
-    y_det = curve(x)                       # Deterministic curve value
-    is_outlier = flip(0.08) @ "is_out"     # 8% outlier probability
-    y_out = uniform(-3.0, 3.0) @ "y_out"   # Outlier value
-    y = jnp.where(is_outlier, y_out, y_det)  # Mixture model
-    y_observed = normal(y, 0.2) @ "obs"    # Observation noise
+    y_det = curve(x)                      # Deterministic curve value
+    y_observed = normal(y_det, 0.05) @ "obs"  # Observation noise
     return y_observed
 ```
 
-### Factory Pattern for Static Dependencies
+### Direct Model Implementation
 
-**Critical Pattern**: The `npoint_curve_factory` demonstrates proper handling of static parameters:
+**Current Pattern**: The `npoint_curve` model takes `xs` as input directly:
 
 ```python
-def npoint_curve_factory(n: int):
-    """Factory function to create npoint_curve with static n parameter."""
-
-    @gen
-    def npoint_curve():
-        curve = sine() @ "curve"
-        xs = jnp.arange(0, n)  # n is now static from factory closure
-        ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
-        return curve, (xs, ys)
-
-    return npoint_curve
+@gen
+def npoint_curve(xs):
+    """N-point curve model with xs as input."""
+    curve = polynomial() @ "curve"
+    ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
+    return curve, (xs, ys)
 ```
 
-**Why Factory Pattern is Necessary**:
+**Key Design**:
 
-- `jnp.arange(0, n)` requires concrete value for `n`
-- Direct usage in `@gen` functions causes tracing issues with SMC
-- Factory pattern captures `n` as static in closure, preventing tracer propagation
+- `xs` passed as input avoids static parameter issues
+- Direct model definition without factory pattern
+- Vectorized observations using `vmap` for efficiency
 
-### SMC Integration with Closure Pattern
+### SMC Integration
 
-**Proper SMC Usage**:
+**Current SMC Usage**:
 
 ```python
-def _infer_latents(key, ys, n_samples):
-    # Create model with static n using factory pattern
-    npoint_curve_model = npoint_curve_factory(len(ys))
+def infer_latents(xs, ys, n_samples: Const[int]):
+    """Infer latent curve parameters using GenJAX SMC importance sampling."""
+    from genjax.inference import init
 
-    # Create closure for default_importance_sampling that captures static arguments
-    def default_importance_sampling_closure(target_gf, target_args, constraints):
-        return default_importance_sampling(
-            target_gf, target_args, n_samples, constraints
-        )
+    constraints = {"ys": {"obs": ys}}
 
-    # Apply seed to the closure - follows test_smc.py pattern
-    result = seed(default_importance_sampling_closure)(
-        key, npoint_curve_model, (), constraints
+    # Use SMC init for importance sampling
+    result = init(
+        npoint_curve,  # target generative function
+        (xs,),  # target args with xs as input
+        n_samples,  # already wrapped in Const
+        constraints,  # constraints
     )
 
     return result.traces, result.log_weights
@@ -189,18 +157,18 @@ def _infer_latents(key, ys, n_samples):
 
 **Key Patterns**:
 
-1. **Factory for static dependencies**: Handles `jnp.arange` concrete value requirement
-2. **Closure for static arguments**: Captures `n_samples` for `seed` transformation
-3. **Empty target args**: `()` because `n` is captured in factory, not passed as argument
+1. **Direct model usage**: No factory pattern needed with xs as input
+2. **Const wrapper**: Use `Const[int]` for static n_samples parameter
+3. **Input arguments**: Pass `(xs,)` as target args to the model
 
-### Outlier-Robust Modeling
+### Noise Modeling
 
-**Mixture Model Approach**:
+**Simple Gaussian Noise**:
 
-- **Primary model**: Sine wave with Gaussian noise
-- **Outlier model**: Uniform distribution over reasonable range
-- **Mixture probability**: 8% outlier rate (tunable parameter)
-- **Robust inference**: Automatically identifies and down-weights outliers
+- **Observation model**: Polynomial evaluation with Gaussian noise
+- **Noise level**: σ=0.05 for low observation noise
+- **No outlier handling**: Clean data assumption
+- **Parameter priors**: Hierarchical with decreasing variance for higher-order terms
 
 ### Lambda Utility for Dynamic Functions
 
@@ -242,7 +210,7 @@ class Lambda(Pytree):
 ```python
 key = jrand.key(42)
 curve, (xs, ys) = get_points_for_inference()
-samples, weights = infer_latents(key, ys, 1000)
+samples, weights = seed(infer_latents)(key, xs, ys, Const(1000))
 ```
 
 **NumPyro (if available):**
@@ -270,50 +238,53 @@ samples = pyro_sample_from_variational_posterior(xs, num_samples=1000)
 ### Custom Model Creation
 
 ```python
-# Create model for specific number of points
-model = npoint_curve_factory(15)
-trace = model.simulate()  # No args needed for this model
+# Create model trace with specific input points
+xs = jnp.linspace(0, 10, 15)
+trace = npoint_curve.simulate(xs)
+curve, (xs_ret, ys_ret) = trace.get_retval()
 ```
 
 ### Running Examples
 
 ```bash
-# Generate all figures (complete case study)
-pixi run -e curvefit curvefit
+# Quick demonstration (default)
+pixi run curvefit
 # or equivalently:
-python -m examples.curvefit.main --mode all
+python -m examples.curvefit.main quick
 
-# Specific figure types
-python -m examples.curvefit.main --mode traces              # Basic trace visualizations
-python -m examples.curvefit.main --mode inference          # Inference visualization
-python -m examples.curvefit.main --mode scaling            # Original scaling analysis
-python -m examples.curvefit.main --mode benchmark          # Cross-framework benchmark
-python -m examples.curvefit.main --mode genjax-scaling     # GenJAX scaling analysis
-python -m examples.curvefit.main --mode posterior-comparison # Three-method comparison
+# Full analysis
+pixi run curvefit-full
+# or:
+python -m examples.curvefit.main full
+
+# Framework benchmark comparison
+pixi run curvefit-benchmark
+# or:
+python -m examples.curvefit.main benchmark
+
+# With CUDA acceleration
+pixi run cuda-curvefit          # Quick mode
+pixi run cuda-curvefit-full     # Full analysis
+pixi run cuda-curvefit-benchmark # Benchmark
 
 # Customize parameters
-python -m examples.curvefit.main --mode posterior-comparison --n-points 20 --timing-repeats 5
-python -m examples.curvefit.main --mode genjax-scaling --n-points 15 --timing-repeats 3
-
-# Legacy compatibility (still supported)
-pixi run -e curvefit curvefit-core
-pixi run -e curvefit curvefit-figs
-pixi run -e curvefit curvefit-all
+python -m examples.curvefit.main benchmark --n-points 30 --timing-repeats 20
+python -m examples.curvefit.main full --n-samples-is 2000 --n-samples-hmc 1500
 ```
 
 ## Development Guidelines
 
 ### When Adding New Models
 
-1. **Use factory pattern** for any static dependencies (array sizes, loop bounds)
-2. **Capture concrete values** before entering generative functions
-3. **Follow SMC closure pattern** for inference integration
+1. **Pass data as inputs** to avoid static dependency issues
+2. **Use Const wrapper** for parameters that must remain static
+3. **Follow established patterns** from core.py implementation
 
 ### When Modifying Inference
 
-1. **Maintain factory + closure pattern** for SMC compatibility
-2. **Test with different data sizes** to ensure static parameter handling works
-3. **Verify JIT compilation** with `static_argnums` specification
+1. **Use Const wrapper** for static parameters like n_samples
+2. **Test with different data sizes** to ensure model flexibility
+3. **Apply seed transformation** before JIT compilation
 
 ### When Adding Visualizations
 
@@ -323,34 +294,33 @@ pixi run -e curvefit curvefit-all
 
 ## Common Patterns
 
-### Factory Pattern Usage
+### Input Parameter Pattern
 
 ```python
-# ✅ CORRECT - Static parameter in factory
-def model_factory(n: int):
-    @gen
-    def model():
-        xs = jnp.arange(0, n)  # n is static
-        # ... rest of model
-    return model
-
-# ❌ WRONG - Dynamic parameter causes tracing issues
+# ✅ CORRECT - Pass data as input arguments
 @gen
-def model(n):
-    xs = jnp.arange(0, n)  # n becomes tracer, causes concrete value error
+def model(xs):
+    # xs is passed as input, avoiding static issues
+    ys = process(xs)
+    return ys
+
+# Alternative if static values needed - use Const wrapper
+@gen
+def model(n: Const[int]):
+    xs = jnp.arange(0, n.value)  # Access static value
+    return xs
 ```
 
-### SMC Closure Pattern
+### SMC with Const Pattern
 
 ```python
-# ✅ CORRECT - Closure captures static arguments
-def inference_closure(target_gf, target_args, constraints):
-    return default_importance_sampling(target_gf, target_args, n_samples, constraints)
+# ✅ CORRECT - Use Const wrapper for static parameters
+def infer(xs, ys, n_samples: Const[int]):
+    result = init(model, (xs,), n_samples, constraints)
+    return result
 
-result = seed(inference_closure)(key, model, (), constraints)
-
-# ❌ WRONG - Direct usage causes tracing issues
-result = seed(default_importance_sampling)(key, model, (), n_samples, constraints)
+# Call with Const wrapper
+infer(xs, ys, Const(1000))
 ```
 
 ## Testing Patterns
@@ -372,7 +342,9 @@ assert ys_ret.shape == (20,)
 # Test inference with proper seeding
 xs, ys = get_points_for_inference(n_points=20)
 samples, weights = seed(infer_latents)(key, xs, ys, Const(1000))
-assert samples.get_choices()['curve']['freq'].shape == (1000,)
+assert samples.get_choices()['curve']['a'].shape == (1000,)  # polynomial coefficients
+assert samples.get_choices()['curve']['b'].shape == (1000,)
+assert samples.get_choices()['curve']['c'].shape == (1000,)
 assert weights.shape == (1000,)
 ```
 
@@ -411,9 +383,9 @@ jit_fn = jax.jit(seeded_fn)  # No static_argnums needed with Const pattern
 
 This case study serves as:
 
-1. **Factory pattern example**: Shows how to handle static dependencies properly
-2. **SMC usage demonstration**: Illustrates correct closure patterns with seed
-3. **Outlier modeling showcase**: Demonstrates robust Bayesian inference
+1. **Input parameter pattern**: Shows how to pass data as model inputs
+2. **SMC usage demonstration**: Illustrates importance sampling with Const wrapper
+3. **Polynomial regression showcase**: Demonstrates hierarchical Bayesian curve fitting
 4. **Visualization reference**: Provides examples of research-quality figure generation
 
 ## Common Issues
@@ -421,14 +393,14 @@ This case study serves as:
 ### Concrete Value Errors
 
 - **Cause**: Using dynamic arguments in `jnp.arange`, `jnp.zeros`, etc.
-- **Solution**: Use factory pattern to capture static values
-- **Example**: `npoint_curve_factory(n)` instead of `npoint_curve(n)`
+- **Solution**: Pass data as input arguments or use Const wrapper
+- **Example**: `npoint_curve(xs)` with xs as input
 
-### SMC Tracing Issues
+### SMC Parameter Issues
 
-- **Cause**: Passing dynamic `n_samples` to `default_importance_sampling`
-- **Solution**: Use closure pattern to capture static arguments
-- **Pattern**: See `test_smc.py` lines 242-256 for reference
+- **Cause**: Passing unwrapped integers to inference functions
+- **Solution**: Use Const wrapper for static parameters
+- **Pattern**: `infer_latents(xs, ys, Const(1000))`
 
 ### NumPyro JAX Transformation Issues
 
@@ -447,61 +419,63 @@ f"Value: {jax_array:.2f}"
 f"Value: {float(jax_array):.2f}"
 ```
 
+### Cond Combinator for Mixture Models
+
+The `Cond` combinator now fully supports mixture models with same addresses in both branches:
+
+```python
+# ✅ Mixture model with outliers - natural expression!
+@gen
+def point_with_outliers(x, curve, outlier_rate=0.1, outlier_std=1.0):
+    y_det = curve(x)
+    is_outlier = flip(outlier_rate) @ "is_outlier"
+
+    @gen
+    def inlier_branch():
+        return normal(y_det, 0.2) @ "obs"  # Same address works!
+
+    @gen
+    def outlier_branch():
+        return normal(y_det, outlier_std) @ "obs"  # Same address works!
+
+    # Natural mixture model expression
+    cond_model = Cond(outlier_branch, inlier_branch)
+    y_observed = cond_model(is_outlier) @ "y"
+    return y_observed
+```
+
+**Key Features**:
+- **Natural syntax**: Express mixture models as you would mathematically
+- **Full inference support**: Works with all GenJAX inference algorithms
+- **JAX optimized**: Uses efficient `jnp.where` for conditional selection
+- **Type safe**: Branches must have compatible return types
+
 ### Import Dependencies
 
 - **Matplotlib required**: For figure generation in `figs.py`
 - **NumPy compatibility**: Used alongside JAX for some visualizations
 - **Environment**: Use `pixi run -e curvefit` for proper dependencies
 
-## Recent Developments
+## Recent Updates (2025)
 
-### Standard Case Study Integration (2025)
+### Simplified and Focused Structure
 
-The case study has been fully integrated into the standard GenJAX examples format:
+The case study has been streamlined to focus on essential comparisons:
 
-**Structural Improvements**:
-- **Unified `figs.py`**: All visualization functions consolidated into single file following examples standards
-- **Standard CLI interface**: Full integration with `main.py` supporting all standard modes and parameters
-- **Removed standalone scripts**: Eliminated `genjax_scaling_benchmark.py` and `genjax_posterior_comparison.py`
-- **Consistent API**: All functions follow `save_*()` naming convention with standardized parameters
+**Key Changes**:
+- **Clean `figs.py`**: Focused on core visualizations and framework comparison
+- **Simplified `main.py`**: Three clear modes (quick, full, benchmark)
+- **Essential benchmarks**: IS with 1000 particles vs HMC methods only
+- **Reduced complexity**: From 2000+ lines to ~350 lines in figs.py
 
-**Advanced Analysis Integration**:
-- **`save_genjax_scaling_benchmark()`**: 12-panel GenJAX performance analysis fully integrated
-- **`save_genjax_posterior_comparison()`**: 4-row three-method comparison fully integrated
-- **Parameter customization**: CLI arguments for sample sizes, timing repeats, and seeds
-- **Error handling**: Robust exception handling with graceful degradation
+**Framework Comparison Focus**:
+- **GenJAX IS**: 1000 particles (fixed) for consistent comparison
+- **GenJAX HMC**: Standard parameters matching NumPyro
+- **NumPyro HMC**: JIT-compiled for fair performance comparison
+- **Clean visualization**: Two-panel figure with posterior curves and timing
 
-### Comprehensive Framework Comparison (2025)
-
-The case study includes a complete three-way comparison between GenJAX and NumPyro:
-
-**Implementation Features**:
-- **JIT compilation**: All methods use optimized JIT compilation for fair performance comparison
-- **Parameter alignment**: GenJAX and NumPyro HMC use identical parameters (step_size=0.01, num_steps=20)
-- **Chain length optimization**: Increased to 5000 samples + 3000 warmup for better mixing
-- **Thinning for autocorrelation**: Every 5th sample used for visualization to reduce correlation
-- **Professional visualization**: 4-row layout with publication-ready formatting and comprehensive legend
-
-**Key Insights**:
-- **GenJAX performance**: Competitive with NumPyro on JIT-compiled implementations
-- **Method comparison**: Clear visual comparison between importance sampling and HMC approaches
-- **Publication quality**: Matches font standards and formatting of other GenJAX examples
-
-**Technical Achievements**:
-- **Font standardization**: All figures match faircoin publication standards (18-22pt fonts)
-- **Legend organization**: 3-column, 3-row layout grouping ground truth, posteriors, and means
-- **Bar chart design**: Clean unlabeled bars with color-coding for method identification
-- **Statistical rigor**: Proper timing benchmarks with warm-up and multiple repetitions
-- **Standard compliance**: Follows all GenJAX examples directory standards
-
-### Evolution Notes
-
-The implementation has evolved from manual SMC replication to a standard-compliant case study:
-
-- **Original**: Manual `modular_vmap` + `generate` pattern
-- **SMC Integration**: Factory pattern + closure pattern + `genjax.smc.default_importance_sampling`
-- **Framework Comparison**: Added NumPyro integration with JIT compilation and comprehensive visualization
-- **Standard Integration**: Unified into standard examples format with consolidated `figs.py` and standard CLI
-- **Benefits**: Better maintainability, consistency with GenJAX patterns, educational value, competitive benchmarking, and standard compliance
-
-This case study now serves as both a reference for proper GenJAX patterns and a demonstration of competitive performance against established probabilistic programming frameworks, while fully conforming to GenJAX examples directory standards.
+**Benefits**:
+- **Faster execution**: Reduced from minutes to seconds for benchmarks
+- **Clearer focus**: Essential comparisons without overwhelming details
+- **Better maintainability**: Simpler code structure following standards
+- **Educational value**: Clear demonstration of key concepts

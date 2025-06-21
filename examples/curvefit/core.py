@@ -1,4 +1,4 @@
-from genjax import gen, uniform, normal
+from genjax import gen, normal, Cond, flip
 from genjax.core import Const
 from genjax.pjax import seed
 import jax.numpy as jnp
@@ -13,7 +13,8 @@ import jax
 import numpyro
 import numpyro.distributions as numpyro_dist
 from numpyro.handlers import replay, seed as numpyro_seed
-from numpyro.contrib.funsor import log_density
+
+# from numpyro.contrib.funsor import log_density  # Moved to function for lazy loading
 from numpyro.infer import HMC, MCMC
 
 
@@ -41,24 +42,37 @@ class Lambda(Pytree):
 @gen
 def point(x, curve):
     y_det = curve(x)
-    y_observed = normal(y_det, 0.3) @ "obs"
+    y_observed = normal(y_det, 0.2) @ "obs"
     return y_observed
 
 
-def sinfn(x, a):
-    return jnp.sin(2.0 * pi * a[0] * x + a[1])
+@gen
+def point_with_noise(x, curve, noise_std):
+    """Point model with configurable noise level."""
+    y_det = curve(x)
+    y_observed = normal(y_det, noise_std) @ "obs"
+    return y_observed
+
+
+def polyfn(x, coeffs):
+    """Degree 2 polynomial: y = a + b*x + c*x^2"""
+    a, b, c = coeffs[0], coeffs[1], coeffs[2]
+    return a + b * x + c * x**2
 
 
 @gen
-def sine():
-    freq = exponential(10.0) @ "freq"
-    offset = uniform(0.0, 2.0 * pi) @ "off"
-    return Lambda(Const(sinfn), jnp.array([freq, offset]))
+def polynomial():
+    # Use normal distributions for polynomial coefficients
+    # Uniform priors with std=1.0 for all coefficients
+    a = normal(0.0, 1.0) @ "a"  # Constant term (std=1.0)
+    b = normal(0.0, 1.0) @ "b"  # Linear coefficient (std=1.0)
+    c = normal(0.0, 1.0) @ "c"  # Quadratic coefficient (std=1.0)
+    return Lambda(Const(polyfn), jnp.array([a, b, c]))
 
 
 @gen
 def onepoint_curve(x):
-    curve = sine() @ "curve"
+    curve = polynomial() @ "curve"
     y = point(x, curve) @ "y"
     return curve, (x, y)
 
@@ -66,8 +80,19 @@ def onepoint_curve(x):
 @gen
 def npoint_curve(xs):
     """N-point curve model with xs as input."""
-    curve = sine() @ "curve"
+    curve = polynomial() @ "curve"
     ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
+    return curve, (xs, ys)
+
+
+@gen
+def npoint_curve_easy(xs, noise_std=Const(0.2)):
+    """N-point curve model with configurable noise for easier inference."""
+    curve = polynomial() @ "curve"
+    ys = (
+        point_with_noise.vmap(in_axes=(0, None, None))(xs, curve, noise_std.value)
+        @ "ys"
+    )
     return curve, (xs, ys)
 
 
@@ -93,6 +118,33 @@ def infer_latents(xs, ys, n_samples: Const[int]):
     )
 
     # Extract samples (traces) and weights for compatibility
+    return result.traces, result.log_weights
+
+
+def infer_latents_easy(
+    xs, ys, n_samples: Const[int], noise_std: Const[float] = Const(0.2)
+):
+    """
+    Infer latent curve parameters using easier model with more noise.
+
+    Args:
+        xs: Input points where observations were made
+        ys: Observed values at xs
+        n_samples: Number of importance samples (wrapped in Const)
+        noise_std: Observation noise std (default: 0.15, 3x standard)
+    """
+    from genjax.inference import init
+
+    constraints = {"ys": {"obs": ys}}
+
+    # Use easier model with configurable noise
+    result = init(
+        npoint_curve_easy,  # easier model
+        (xs, noise_std),  # pass noise level
+        n_samples,
+        constraints,
+    )
+
     return result.traces, result.log_weights
 
 
@@ -145,10 +197,10 @@ def hmc_infer_latents(
     }
 
 
-def get_points_for_inference(n_points=20):
+def get_points_for_inference(n_points=10):
     """Generate test data for inference with xs as input."""
-    # Create grid of input points
-    xs = jnp.linspace(0, n_points / 4, n_points)
+    # Create grid of input points in [0, 1]
+    xs = jnp.linspace(0, 1, n_points)
     # Simulate model to get observations
     trace = npoint_curve.simulate(xs)
     curve, (xs_ret, ys) = trace.get_retval()
@@ -170,35 +222,47 @@ def effective_sample_size(log_weights):
 # NumPyro Implementation
 
 
-def numpyro_sinfn(x, freq, offset):
-    """Sine function with frequency and offset parameters."""
-    return jnp.sin(2.0 * jnp.pi * freq * x + offset)
+def numpyro_polyfn(x, a, b, c):
+    """Degree 2 polynomial function: y = a + b*x + c*x^2"""
+    return a + b * x + c * x**2
 
 
 def numpyro_npoint_model(xs, obs_dict=None):
-    """NumPyro model for multiple data points with shared sine wave parameters."""
-    freq = numpyro.sample("freq", numpyro_dist.Exponential(10.0))
-    offset = numpyro.sample("offset", numpyro_dist.Uniform(0.0, 2.0 * jnp.pi))
+    """NumPyro model for multiple data points with shared polynomial parameters."""
+    # Match GenJAX model with normal distributions
+    a = numpyro.sample("a", numpyro_dist.Normal(0.0, 1.0))  # Constant term (std=1.0)
+    b = numpyro.sample(
+        "b", numpyro_dist.Normal(0.0, 1.0)
+    )  # Linear coefficient (std=1.0)
+    c = numpyro.sample(
+        "c", numpyro_dist.Normal(0.0, 1.0)
+    )  # Quadratic coefficient (std=1.0)
 
     with numpyro.plate("data", len(xs)):
         obs_vals = None
         if obs_dict is not None and "obs" in obs_dict:
             obs_vals = obs_dict["obs"]
-        y_det = numpyro_sinfn(xs, freq, offset)
+        y_det = numpyro_polyfn(xs, a, b, c)
         y_observed = numpyro.sample(
-            "obs", numpyro_dist.Normal(y_det, 0.3), obs=obs_vals
+            "obs", numpyro_dist.Normal(y_det, 0.2), obs=obs_vals
         )
     return y_observed
 
 
 def numpyro_guide_npoint(xs, obs_dict=None):
     """Guide for importance sampling that samples from the prior."""
-    numpyro.sample("freq", numpyro_dist.Exponential(10.0))
-    numpyro.sample("offset", numpyro_dist.Uniform(0.0, 2.0 * jnp.pi))
+    numpyro.sample("a", numpyro_dist.Normal(0.0, 1.0))  # Constant term (std=1.0)
+    numpyro.sample("b", numpyro_dist.Normal(0.0, 1.0))  # Linear coefficient (std=1.0)
+    numpyro.sample(
+        "c", numpyro_dist.Normal(0.0, 1.0)
+    )  # Quadratic coefficient (std=1.0)
 
 
 def numpyro_single_importance_sample(key, xs, obs_dict):
     """Single importance sampling step for NumPyro."""
+    # Lazy import to avoid funsor dependency for non-NumPyro modes
+    from numpyro.contrib.funsor import log_density
+
     key1, key2 = jrand.split(key)
 
     seeded_guide = numpyro_seed(numpyro_guide_npoint, key1)
@@ -211,8 +275,9 @@ def numpyro_single_importance_sample(key, xs, obs_dict):
     log_weight = model_log_density - guide_log_density
 
     sample = {
-        "freq": model_trace["freq"]["value"],
-        "offset": model_trace["offset"]["value"],
+        "a": model_trace["a"]["value"],
+        "b": model_trace["b"]["value"],
+        "c": model_trace["c"]["value"],
     }
 
     return sample, log_weight
@@ -265,14 +330,16 @@ def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500):
     }
 
     return {
-        "samples": {"freq": samples["freq"], "offset": samples["offset"]},
+        "samples": {"a": samples["a"], "b": samples["b"], "c": samples["c"]},
         "diagnostics": diagnostics,
         "num_samples": num_samples,
         "num_warmup": num_warmup,
     }
 
 
-def numpyro_run_hmc_inference_jit_impl(key, xs, ys, num_samples=1000, num_warmup=500):
+def numpyro_run_hmc_inference_jit_impl(
+    key, xs, ys, num_samples=1000, num_warmup=500, step_size=0.01, num_steps=20
+):
     """Run HMC inference using NumPyro with JIT compilation (same parameters as GenJAX)."""
     obs_dict = {"obs": ys}
 
@@ -281,7 +348,7 @@ def numpyro_run_hmc_inference_jit_impl(key, xs, ys, num_samples=1000, num_warmup
 
     # Use basic HMC with same parameters as GenJAX for fair comparison
     # Note: Only specify num_steps to avoid trajectory_length conflict
-    hmc_kernel = HMC(conditioned_model, step_size=0.01, num_steps=20)
+    hmc_kernel = HMC(conditioned_model, step_size=step_size, num_steps=num_steps)
     mcmc = MCMC(
         hmc_kernel,
         num_warmup=num_warmup,
@@ -302,7 +369,7 @@ def numpyro_run_hmc_inference_jit_impl(key, xs, ys, num_samples=1000, num_warmup
     }
 
     return {
-        "samples": {"freq": samples["freq"], "offset": samples["offset"]},
+        "samples": {"a": samples["a"], "b": samples["b"], "c": samples["c"]},
         "diagnostics": diagnostics,
         "num_samples": num_samples,
         "num_warmup": num_warmup,
@@ -311,8 +378,149 @@ def numpyro_run_hmc_inference_jit_impl(key, xs, ys, num_samples=1000, num_warmup
 
 # JIT-compiled version for fair performance comparison
 numpyro_run_hmc_inference_jit = jax.jit(
-    numpyro_run_hmc_inference_jit_impl, static_argnums=(3, 4)
-)  # num_samples, num_warmup
+    numpyro_run_hmc_inference_jit_impl, static_argnums=(3, 4, 6)
+)  # num_samples, num_warmup, num_steps (step_size is not static)
+
+
+# Outlier models for GenJAX
+
+
+@gen
+def point_with_outliers(x, curve, outlier_rate=0.1, outlier_std=1.0):
+    """Point model that can be either inlier or outlier.
+
+    Args:
+        x: Input point
+        curve: Curve function
+        outlier_rate: Probability of being an outlier (default 0.1)
+        outlier_std: Standard deviation for outlier distribution (default 1.0)
+    """
+    y_det = curve(x)
+
+    # Sample whether this point is an outlier
+    is_outlier = flip(outlier_rate) @ "is_outlier"
+
+    # Define inlier and outlier branches with SAME address (now supported!)
+    @gen
+    def inlier_branch():
+        # Normal observation with small noise
+        return normal(y_det, 0.2) @ "obs"
+
+    @gen
+    def outlier_branch():
+        # Outlier: wide normal centered at y_det
+        return normal(y_det, outlier_std) @ "obs"
+
+    # Use Cond to select between branches
+    cond_model = Cond(outlier_branch, inlier_branch)
+    y_observed = cond_model(is_outlier) @ "y"
+
+    return y_observed
+
+
+@gen
+def npoint_curve_with_outliers(xs, outlier_rate=Const(0.1), outlier_std=Const(1.0)):
+    """N-point curve model with outlier detection.
+
+    Each point can be classified as inlier or outlier.
+    """
+    curve = polynomial() @ "curve"
+
+    # Vectorize the outlier model
+    ys = (
+        point_with_outliers.vmap(in_axes=(0, None, None, None))(
+            xs, curve, outlier_rate.value, outlier_std.value
+        )
+        @ "ys"
+    )
+
+    return curve, (xs, ys)
+
+
+def infer_latents_with_outliers(
+    xs,
+    ys,
+    n_samples: Const[int],
+    outlier_rate: Const[float] = Const(0.1),
+    outlier_std: Const[float] = Const(1.0),
+):
+    """
+    Infer latent curve parameters and outlier indicators using GenJAX SMC.
+
+    Args:
+        xs: Input points where observations were made
+        ys: Observed values at xs
+        n_samples: Number of importance samples (wrapped in Const)
+        outlier_rate: Prior probability of outlier (wrapped in Const)
+        outlier_std: Std dev for outlier distribution (wrapped in Const)
+    """
+    from genjax.inference import init
+
+    # With the fixed Cond, we can now properly constrain observations!
+    constraints = {"ys": {"y": {"obs": ys}}}
+
+    # Use SMC init for importance sampling
+    result = init(
+        npoint_curve_with_outliers,  # outlier-aware model
+        (xs, outlier_rate, outlier_std),  # model args
+        n_samples,
+        constraints,
+    )
+
+    return result.traces, result.log_weights
+
+
+def hmc_infer_latents_with_outliers(
+    xs,
+    ys,
+    n_samples: Const[int],
+    n_warmup: Const[int] = Const(500),
+    step_size: Const[float] = Const(0.05),
+    n_steps: Const[int] = Const(10),
+    outlier_rate: Const[float] = Const(0.1),
+    outlier_std: Const[float] = Const(1.0),
+):
+    """
+    Infer latent curve parameters using HMC, marginalizing over outlier indicators.
+
+    Note: HMC only updates continuous parameters (curve coefficients).
+    The discrete outlier indicators are handled through regeneration.
+    """
+    from genjax.inference import hmc, mh, chain
+    from genjax.core import sel
+
+    constraints = {"ys": {"y": {"obs": ys}}}
+
+    # Generate initial trace
+    initial_trace, _ = npoint_curve_with_outliers.generate(
+        constraints, xs, outlier_rate, outlier_std
+    )
+
+    # Define mixed kernel: HMC for continuous, MH for discrete
+    def mixed_kernel(trace):
+        # First update curve parameters with HMC
+        trace = hmc(
+            trace, sel("curve"), step_size=step_size.value, n_steps=n_steps.value
+        )
+
+        # Then update outlier indicators with MH
+        # Select all outlier indicators
+        trace = mh(trace, sel("ys") & sel("is_outlier"))
+
+        return trace
+
+    # Create MCMC chain
+    mcmc_chain = chain(mixed_kernel)
+
+    # Run MCMC with burn-in
+    total_steps = n_samples.value + n_warmup.value
+    result = mcmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
+
+    return result.traces, {
+        "acceptance_rate": result.acceptance_rate,
+        "n_samples": result.n_steps.value,
+        "n_chains": result.n_chains.value,
+    }
 
 
 # JIT compiled functions for performance benchmarks
@@ -320,6 +528,8 @@ numpyro_run_hmc_inference_jit = jax.jit(
 # GenJAX JIT-compiled functions - apply seed() before jit()
 infer_latents_seeded = seed(infer_latents)
 hmc_infer_latents_seeded = seed(hmc_infer_latents)
+infer_latents_with_outliers_seeded = seed(infer_latents_with_outliers)
+hmc_infer_latents_with_outliers_seeded = seed(hmc_infer_latents_with_outliers)
 
 infer_latents_jit = jax.jit(
     infer_latents_seeded
@@ -327,6 +537,8 @@ infer_latents_jit = jax.jit(
 hmc_infer_latents_jit = jax.jit(
     hmc_infer_latents_seeded
 )  # Use Const pattern instead of static_argnums
+infer_latents_with_outliers_jit = jax.jit(infer_latents_with_outliers_seeded)
+hmc_infer_latents_with_outliers_jit = jax.jit(hmc_infer_latents_with_outliers_seeded)
 
 # NumPyro JIT-compiled functions
 numpyro_run_importance_sampling_jit = jax.jit(
@@ -496,14 +708,16 @@ def extract_posterior_samples(benchmark_results):
                 key = jrand.key(123)
                 indices = jrand.categorical(key, weights, shape=(n_resample,))
 
-                freq_samples = traces.get_choices()["curve"]["freq"][indices]
-                offset_samples = traces.get_choices()["curve"]["off"][indices]
+                a_samples = traces.get_choices()["curve"]["a"][indices]
+                b_samples = traces.get_choices()["curve"]["b"][indices]
+                c_samples = traces.get_choices()["curve"]["c"][indices]
 
             elif method == "HMC":
                 # Extract MCMC samples directly
                 traces = result["samples"]
-                freq_samples = traces.get_choices()["curve"]["freq"]
-                offset_samples = traces.get_choices()["curve"]["off"]
+                a_samples = traces.get_choices()["curve"]["a"]
+                b_samples = traces.get_choices()["curve"]["b"]
+                c_samples = traces.get_choices()["curve"]["c"]
 
         elif framework == "NumPyro":
             if method == "Importance Sampling":
@@ -515,20 +729,23 @@ def extract_posterior_samples(benchmark_results):
                 key = jrand.key(123)
                 indices = jrand.categorical(key, weights, shape=(n_resample,))
 
-                freq_samples = samples["freq"][indices]
-                offset_samples = samples["offset"][indices]
+                a_samples = samples["a"][indices]
+                b_samples = samples["b"][indices]
+                c_samples = samples["c"][indices]
 
             elif method == "HMC":
                 # MCMC samples
                 samples = result["samples"]
-                freq_samples = samples["freq"]
-                offset_samples = samples["offset"]
+                a_samples = samples["a"]
+                b_samples = samples["b"]
+                c_samples = samples["c"]
 
         posterior_samples[method_name] = {
             "framework": framework,
             "method": method,
-            "freq": freq_samples,
-            "offset": offset_samples,
+            "a": a_samples,
+            "b": b_samples,
+            "c": c_samples,
         }
 
     return posterior_samples

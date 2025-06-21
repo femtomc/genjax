@@ -1208,7 +1208,9 @@ class GFI(Generic[X, R], Pytree):
         pass
 
     @abstractmethod
-    def merge(self, x: X, x_: X) -> X:
+    def merge(
+        self, x: X, x_: X, check: jnp.ndarray | None = None
+    ) -> tuple[X, X | None]:
         """Merge two choice maps, with the second taking precedence.
 
         Used internally for compositional generative functions where choice maps
@@ -1218,9 +1220,13 @@ class GFI(Generic[X, R], Pytree):
         Args:
             x: First choice map.
             x_: Second choice map (takes precedence in conflicts).
+            check: Optional boolean array for conditional selection.
+                   If provided, selects x where True, x_ where False.
 
         Returns:
-            Merged choice map with x_ values overriding x values at conflicting addresses.
+            Tuple of (merged choice map, discarded values).
+            - merged: Combined choices with x_ values overriding x values at conflicts
+            - discarded: Values from x that were overridden by x_ (None if no conflicts)
         """
         pass
 
@@ -1441,8 +1447,20 @@ class Vmap(Generic[X, R], GFI[X, R]):
         )(tr, s, *args, **kwargs)
         return new_tr, jnp.sum(w), discard
 
-    def merge(self, x: X, x_: X) -> X:
-        return modular_vmap(self.merge, in_axes=(0, 0))(x, x_)
+    def merge(
+        self, x: X, x_: X, check: jnp.ndarray | None = None
+    ) -> tuple[X, X | None]:
+        # For Vmap, we need to handle the check parameter appropriately
+        if check is None:
+            merged, discarded = modular_vmap(self.gen_fn.merge, in_axes=(0, 0, None))(
+                x, x_, None
+            )
+        else:
+            # Check should be broadcast across the batch dimension
+            merged, discarded = modular_vmap(self.gen_fn.merge, in_axes=(0, 0, 0))(
+                x, x_, check
+            )
+        return merged, discarded
 
     def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
         """Filter vectorized choices using the underlying generative function's filter.
@@ -1594,10 +1612,24 @@ class Distribution(Generic[X], GFI[X, X]):
                 None,
             )
 
-    def merge(self, x: X, x_: X) -> X:
-        raise Exception(
-            "Can't merge: the underlying sample space `X` for the type `Distribution` doesn't support merging."
-        )
+    def merge(
+        self, x: X, x_: X, check: jnp.ndarray | None = None
+    ) -> tuple[X, X | None]:
+        """Merge distribution choices with optional conditional selection.
+
+        For distributions, choices are raw values from the sample space.
+        When check is provided, we use jnp.where for conditional selection.
+        """
+        if check is not None:
+            # Conditional merge using jnp.where
+            merged = jtu.tree_map(lambda v1, v2: jnp.where(check, v1, v2), x, x_)
+            # No values are truly "discarded" in conditional selection
+            return merged, None
+        else:
+            # Without check, Distribution doesn't support merge
+            raise Exception(
+                "Can't merge: the underlying sample space `X` for the type `Distribution` doesn't support merging without a check parameter."
+            )
 
     def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
         """Filter choice into selected and unselected parts.
@@ -2146,9 +2178,11 @@ class Fn(
         self,
         x: dict[str, Any],
         x_: dict[str, Any],
-    ) -> dict[str, Any]:
+        check: jnp.ndarray | None = None,
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         # Handle recursive merge for nested dictionaries
         result = {}
+        discarded = {}
         all_keys = set(x.keys()) | set(x_.keys())
 
         for key in all_keys:
@@ -2159,14 +2193,22 @@ class Fn(
 
                 # If both values are dictionaries, recursively merge
                 if isinstance(val_x, dict) and isinstance(val_x_, dict):
-                    result[key] = self.merge(val_x, val_x_)
+                    merged_val, disc_val = self.merge(val_x, val_x_, check)
+                    result[key] = merged_val
+                    if disc_val is not None:
+                        discarded[key] = disc_val
                 else:
                     # Conflict: same key but values are not both dictionaries
-                    raise ValueError(
-                        f"Fn.merge detected conflicting values for key '{key}'. "
-                        f"Both proposal and constraints specify this key but values cannot be merged. "
-                        f"Proposal value type: {type(val_x)}, Constraint value type: {type(val_x_)}"
-                    )
+                    if check is not None:
+                        # Use conditional selection at the leaf
+                        result[key] = jtu.tree_map(
+                            lambda v1, v2: jnp.where(check, v1, v2), val_x, val_x_
+                        )
+                        # In conditional merge, nothing is truly discarded
+                    else:
+                        # Without check, x_ takes precedence and x is discarded
+                        result[key] = val_x_
+                        discarded[key] = val_x
             elif key in x:
                 # Only in proposal
                 result[key] = x[key]
@@ -2174,7 +2216,7 @@ class Fn(
                 # Only in constraints
                 result[key] = x_[key]
 
-        return result
+        return result, discarded if discarded else None
 
     def filter(
         self, x: dict[str, Any], selection: "Selection"
@@ -2340,8 +2382,11 @@ class Scan(Generic[X, R], GFI[X, R]):
     callee: GFI[X, R]
     length: Const[int]
 
-    def merge(self, x: X, x_: X):
-        return self.callee.merge(x, x_)
+    def merge(
+        self, x: X, x_: X, check: jnp.ndarray | None = None
+    ) -> tuple[X, X | None]:
+        # For Scan, delegate to the callee's merge with check parameter
+        return self.callee.merge(x, x_, check)
 
     def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
         """Filter scan choices using the underlying generative function's filter.
@@ -2522,31 +2567,19 @@ class CondTr(Generic[X, R], Trace[X, R]):
         return self.gen_fn
 
     def get_choices(self) -> X:
-        callee = self.gen_fn.callee
         chm, chm_ = map(get_choices, self.trs)
-        chm = jtu.tree_map(
-            lambda v: jnp.where(self.check, v, jnp.nan),
-            chm,
-        )
-        chm_ = jtu.tree_map(
-            lambda v: jnp.where(self.check, jnp.nan, v),
-            chm_,
-        )
-        return callee.merge(chm, chm_)
+
+        # Use merge with check parameter for conditional selection
+        merged, _ = self.gen_fn.merge(chm, chm_, self.check)
+        return merged
 
     def get_fixed_choices(self) -> X:
         """Get choices preserving Fixed wrappers."""
-        callee = self.gen_fn.callee
         chm, chm_ = map(lambda tr: tr.get_fixed_choices(), self.trs)
-        chm = jtu.tree_map(
-            lambda v: jnp.where(self.check, v, jnp.nan),
-            chm,
-        )
-        chm_ = jtu.tree_map(
-            lambda v: jnp.where(self.check, jnp.nan, v),
-            chm_,
-        )
-        return callee.merge(chm, chm_)
+
+        # Use merge with check parameter for conditional selection
+        merged, _ = self.gen_fn.merge(chm, chm_, self.check)
+        return merged
 
     def get_args(self) -> Any:
         return (self.check, *self.trs[0].get_args())
@@ -2604,8 +2637,11 @@ class Cond(Generic[X, R], GFI[X, R]):
     callee: GFI[X, R]
     callee_: GFI[X, R]
 
-    def merge(self, x: X, x_: X):
-        return self.callee.merge(x, x_)
+    def merge(
+        self, x: X, x_: X, check: jnp.ndarray | None = None
+    ) -> tuple[X, X | None]:
+        # For Cond, delegate to callee's merge with check parameter
+        return self.callee.merge(x, x_, check)
 
     def filter(self, x: X, selection: "Selection") -> tuple[X | None, X | None]:
         """Filter conditional choices using the underlying generative function's filter.
@@ -2672,10 +2708,12 @@ class Cond(Generic[X, R], GFI[X, R]):
         (check, *rest_args) = args
         new_tr, w, discard = self.callee.update(tr.trs[0], x, *rest_args, **kwargs)
         new_tr_, w_, discard_ = self.callee_.update(tr.trs[1], x, *rest_args, **kwargs)
+        # Merge discarded values
+        merged_discard, _ = self.callee.merge(discard, discard_)
         return (
             CondTr(self, check, [new_tr, new_tr_]),
             jnp.select(check, [w, w_]),
-            self.callee.merge(discard, discard_),
+            merged_discard,
         )
 
     def regenerate(
@@ -2690,15 +2728,14 @@ class Cond(Generic[X, R], GFI[X, R]):
         new_tr_, w_, discard_ = self.callee_.regenerate(
             tr.trs[1], s, *rest_args, **kwargs
         )
-        discard = (
-            discard
-            if discard_ is None
-            else discard_
-            if discard is None
-            else self.callee.merge(discard, discard_)
-        )
+        if discard is None:
+            merged_discard = discard_
+        elif discard_ is None:
+            merged_discard = discard
+        else:
+            merged_discard, _ = self.callee.merge(discard, discard_)
         return (
             CondTr(self, check, [new_tr, new_tr_]),
-            jnp.where(check, [w, w_]),
-            discard,
+            jnp.where(check, w, w_),
+            merged_discard,
         )
