@@ -9,7 +9,6 @@ When invoked, immediately execute these steps in parallel:
 <parallel_tasks>
 - Read all CLAUDE.md files: `src/genjax/CLAUDE.md`, `src/genjax/inference/CLAUDE.md`, `src/genjax/adev/CLAUDE.md`, `examples/CLAUDE.md`
 - Examine `pyproject.toml` for available commands and project structure
-- Scan test files in `tests/` for usage patterns
 </parallel_tasks>
 
 ## Core Knowledge Base

@@ -16,7 +16,7 @@ GenJAX is a probabilistic programming language embedded in Python centered on pr
 
 ## Recent Updates
 
-### Enhanced rejuvenation_smc API (June 2025)
+### Enhanced rejuvenation_smc API
 - **Optional Parameters**: `transition_proposal` and `mcmc_kernel` are now optional in `rejuvenation_smc`
 - **Simplified Usage**: Can use model's internal proposal without custom proposals
 - **Backwards Compatible**: All existing code continues to work unchanged

@@ -13,6 +13,7 @@ coverage.xml
 .coverage
 
 # Generated figures and outputs (keep logo assets)
+figs/
 examples/**/figs/*.pdf
 examples/**/figs/*.png
 # Keep specific asset directories

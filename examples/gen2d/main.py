@@ -5,9 +5,9 @@ import jax
 import jax.numpy as jnp
 from pathlib import Path
 
-from core import run_gen2d_inference
-from data import generate_tracking_data
-from figs import (
+from examples.gen2d.core import run_gen2d_inference
+from examples.gen2d.data import generate_tracking_data
+from examples.gen2d.figs import (
     plot_tracking_results,
     plot_trajectories,
     plot_diagnostics,

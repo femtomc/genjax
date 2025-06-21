@@ -23,13 +23,53 @@ import jax.tree_util as jtu
 
 def effective_sample_size(log_weights: jnp.ndarray) -> jnp.ndarray:
     """
-    Compute the effective sample size from log importance weights.
+    Compute the effective sample size (ESS) from log importance weights.
+
+    The ESS measures the efficiency of importance sampling by estimating the
+    number of independent samples that would provide equivalent statistical
+    information. It quantifies particle degeneracy in SMC algorithms.
+
+    Mathematical Formulation:
+        Given N particles with normalized weights w₁, ..., wₙ:
+
+        ESS = 1 / Σᵢ wᵢ² = (Σᵢ wᵢ)² / Σᵢ wᵢ²
+
+        Since Σᵢ wᵢ = 1 for normalized weights:
+
+        ESS = 1 / Σᵢ wᵢ²
+
+    Interpretation:
+        - ESS = N: Perfect sampling (uniform weights)
+        - ESS = 1: Complete degeneracy (single particle has all weight)
+        - ESS/N: Efficiency ratio, often used to trigger resampling when < 0.5
+
+    Connection to Importance Sampling:
+        The ESS approximates the variance inflation factor for importance
+        sampling estimates. For self-normalized importance sampling:
+
+        Var[𝔼[f]] ≈ (N/ESS) × Var_π[f]
+
+        where π is the target distribution.
 
     Args:
-        log_weights: Array of log importance weights
+        log_weights: Array of unnormalized log importance weights of shape (N,)
 
     Returns:
-        Effective sample size in [1, num_samples]
+        Effective sample size as a scalar in range [1, N]
+
+    References:
+        .. [1] Kong, A., Liu, J. S., & Wong, W. H. (1994). "Sequential imputations
+               and Bayesian missing data problems". Journal of the American
+               Statistical Association, 89(425), 278-288.
+        .. [2] Liu, J. S. (2001). "Monte Carlo strategies in scientific computing".
+               Springer, Chapter 3.
+        .. [3] Doucet, A., de Freitas, N., & Gordon, N. (2001). "Sequential Monte
+               Carlo methods in practice". Springer, Chapter 1.
+
+    Notes:
+        - Computed in log-space for numerical stability
+        - Input weights need not be normalized (handled internally)
+        - Common resampling threshold: ESS < N/2 (Doucet et al., 2001)
     """
     log_weights_normalized = log_weights - jax.scipy.special.logsumexp(log_weights)
     weights_normalized = jnp.exp(log_weights_normalized)
@@ -38,14 +78,51 @@ def effective_sample_size(log_weights: jnp.ndarray) -> jnp.ndarray:
 
 def systematic_resample(log_weights: jnp.ndarray, n_samples: int) -> jnp.ndarray:
     """
-    Systematic resampling from importance weights using GenJAX distributions.
+    Systematic resampling from importance weights with minimal variance.
+
+    Implements the systematic resampling algorithm (Kitagawa, 1996), which has
+    lower variance than multinomial resampling while maintaining unbiasedness.
+    This is the preferred resampling method for particle filters.
+
+    Mathematical Formulation:
+        Given normalized weights w₁, ..., wₙ and cumulative sum Cᵢ = Σⱼ≤ᵢ wⱼ:
+
+        1. Draw U ~ Uniform(0, 1/M) where M is the output sample size
+        2. For i = 1, ..., M:
+           - Set pointer position: uᵢ = (i-1)/M + U
+           - Select particle: Iᵢ = min{j : Cⱼ ≥ uᵢ}
+
+    Properties:
+        - Unbiased: 𝔼[Nᵢ] = M × wᵢ where Nᵢ is count of particle i
+        - Lower variance than multinomial: Var[Nᵢ] ≤ M × wᵢ × (1 - wᵢ)
+        - Deterministic given U: reduces Monte Carlo variance
+        - Preserves particle order (stratified structure)
+
+    Time Complexity: O(N + M) using binary search
+    Space Complexity: O(N) for cumulative weights
 
     Args:
-        log_weights: Log importance weights
-        n_samples: Number of samples to draw
+        log_weights: Unnormalized log importance weights of shape (N,)
+        n_samples: Number of samples to draw (M)
 
     Returns:
-        Array of indices for resampling
+        Array of particle indices of shape (M,) for resampling
+
+    References:
+        .. [1] Kitagawa, G. (1996). "Monte Carlo filter and smoother for non-Gaussian
+               nonlinear state space models". Journal of Computational and Graphical
+               Statistics, 5(1), 1-25.
+        .. [2] Doucet, A., & Johansen, A. M. (2009). "A tutorial on particle filtering
+               and smoothing: Fifteen years later". Handbook of Nonlinear Filtering,
+               12(656-704), 3.
+        .. [3] Hol, J. D., Schon, T. B., & Gustafsson, F. (2006). "On resampling
+               algorithms for particle filters". In IEEE Nonlinear Statistical Signal
+               Processing Workshop (pp. 79-82).
+
+    Notes:
+        - Systematic resampling is preferred over multinomial for most applications
+        - Maintains particle diversity better than multinomial resampling
+        - For theoretical analysis of resampling methods, see [3]
     """
     log_weights_normalized = log_weights - jax.scipy.special.logsumexp(log_weights)
     weights = jnp.exp(log_weights_normalized)
