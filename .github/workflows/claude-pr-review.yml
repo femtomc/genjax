@@ -69,6 +69,8 @@ jobs:
 
       - name: Read CLAUDE.md files
         id: claude-context
+        env:
+          PR_FILES: ${{ toJson(fromJson(steps.pr-details.outputs.result).files) }}
         run: |
           # Find and concatenate relevant CLAUDE.md files
           claude_content=""
@@ -79,7 +81,7 @@ jobs:
           fi
 
           # Include CLAUDE.md files from changed directories
-          changed_dirs=$(echo '${{ steps.pr-details.outputs.result }}' | jq -r '.files[]' | xargs -n1 dirname | sort -u)
+          changed_dirs=$(echo "$PR_FILES" | jq -r '.[]' | xargs -n1 dirname | sort -u)
 
           for dir in $changed_dirs; do
             claude_file="$dir/CLAUDE.md"
@@ -95,6 +97,10 @@ jobs:
         id: claude-review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_TITLE: ${{ fromJson(steps.pr-details.outputs.result).title }}
+          PR_BODY: ${{ fromJson(steps.pr-details.outputs.result).body }}
+          PR_FILES_LIST: ${{ join(fromJson(steps.pr-details.outputs.result).files, ', ') }}
+          PR_DIFF: ${{ fromJson(steps.pr-details.outputs.result).diff }}
         run: |
           # Prepare the prompt
           cat > prompt.txt << 'EOF'
@@ -114,18 +120,18 @@ jobs:
 
           cat claude_context.txt >> prompt.txt
 
-          cat >> prompt.txt << 'EOF'
+          cat >> prompt.txt << EOF
 
-          PR Title: ${{ fromJson(steps.pr-details.outputs.result).title }}
-          PR Description: ${{ fromJson(steps.pr-details.outputs.result).body }}
+          PR Title: $PR_TITLE
+          PR Description: $PR_BODY
 
-          Files changed: ${{ join(fromJson(steps.pr-details.outputs.result).files, ', ') }}
+          Files changed: $PR_FILES_LIST
 
           Here is the diff:
 
-          ```diff
-          ${{ fromJson(steps.pr-details.outputs.result).diff }}
-          ```
+          \`\`\`diff
+          $PR_DIFF
+          \`\`\`
 
           Please provide:
           1. A summary of the changes
