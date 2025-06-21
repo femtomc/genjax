@@ -22,6 +22,12 @@ This directory contains specialized command personas for different aspects of Ge
 **Style**: Medical/diagnostic metaphor, systematic examination, prescriptive solutions
 **Version**: v2 (optimized for Claude 4)
 
+### 📚 `/alex` - Mathematical Literature Custodian
+**Purpose**: Ensure mathematical rigor in docstrings and comprehensive literature references
+**Use when**: Documenting algorithms, adding citations, improving mathematical precision
+**Style**: Exacting, scholarly, deeply mathematical with extensive citations
+**Version**: v2 (optimized for Claude 4)
+
 ## Command Design Principles
 
 All commands follow Claude 4 best practices:
@@ -59,9 +65,10 @@ When creating new command personas, ensure:
 
 1. Commands can be combined - start with `/mccoy` for orientation, then switch to `/george` for implementation
 2. Use `/doctor` to ensure CLAUDE.md files are comprehensive and well-structured
-3. Each command maintains its persona throughout the conversation
-4. Commands include specific references to GenJAX's CLAUDE.md documentation
-5. All commands emphasize GenJAX-specific best practices (JAX control flow, pixi commands, etc.)
+3. Use `/alex` when mathematical precision and literature references are needed
+4. Each command maintains its persona throughout the conversation
+5. Commands include specific references to GenJAX's CLAUDE.md documentation
+6. All commands emphasize GenJAX-specific best practices (JAX control flow, pixi commands, etc.)
 
 ## Maintenance
 
