@@ -6,6 +6,9 @@ This document provides references for the gradient estimation techniques and aut
 
 ### Primary Reference
 - Lew, A. K., Huot, M., Staton, S., & Mansinghka, V. K. (2023). **ADEV: Sound Automatic Differentiation of Expected Values of Probabilistic Programs**. Proceedings of the ACM on Programming Languages, 7(POPL), 121-148. [arXiv:2212.06386](https://arxiv.org/abs/2212.06386)
+  - **Used in**: `__init__.py:1-49` - Module docstring, theoretical foundation
+  - **Used in**: `__init__.py:45-48` - Direct citation in docstring references
+  - **Used in**: Throughout module - CPS transformation and gradient estimation strategies
 
 ### Theoretical Foundations
 - Staton, S. (2017). **Commutative semantics for probabilistic programming**. In European Symposium on Programming (pp. 855-879). Springer.
@@ -15,17 +18,31 @@ This document provides references for the gradient estimation techniques and aut
 
 ### Score Function (REINFORCE) Estimator
 - Williams, R. J. (1992). **Simple statistical gradient-following algorithms for connectionist reinforcement learning**. Machine Learning, 8(3-4), 229-256.
+  - **Used in**: `__init__.py:28` - Module docstring, REINFORCE strategy
+  - **Used in**: `__init__.py:920-995` - REINFORCE class implementation
+  - **Used in**: `__init__.py:954-967` - REINFORCE gradient estimation docstring
 - Glynn, P. W. (1990). **Likelihood ratio gradient estimation for stochastic systems**. Communications of the ACM, 33(10), 75-84.
+  - **Used in**: Score function estimator theoretical foundation
 - Fu, M. C. (2006). **Gradient estimation**. Handbooks in Operations Research and Management Science, 13, 575-616.
+  - **Used in**: General gradient estimation theory
 
 ### Reparameterization Trick
 - Kingma, D. P., & Welling, M. (2013). **Auto-encoding variational bayes**. arXiv preprint arXiv:1312.6114.
+  - **Used in**: `__init__.py:29` - Module docstring, reparameterization strategy
+  - **Used in**: `__init__.py:1284` - Referenced for normal_reparam implementation
+  - **Used in**: Reparameterization gradient estimators throughout
 - Rezende, D. J., Mohamed, S., & Wierstra, D. (2014). **Stochastic backpropagation and approximate inference in deep generative models**. In International Conference on Machine Learning (pp. 1278-1286).
+  - **Used in**: Reparameterization trick theoretical foundation
 - Figurnov, M., Mohamed, S., & Mnih, A. (2018). **Implicit reparameterization gradients**. In Advances in Neural Information Processing Systems (pp. 441-452).
+  - **Used in**: Advanced reparameterization techniques
 
 ### Enumeration for Discrete Distributions
 - Obermeyer, F., Bingham, E., Jankowiak, M., Chiu, J., Pradhan, N., Rush, A., & Goodman, N. (2019). **Tensor variable elimination for plated factor graphs**. In International Conference on Machine Learning (pp. 4871-4880).
+  - **Used in**: Discrete enumeration theory and implementation patterns
 - Lew, A. K., Matheos, G., Zhi-Xuan, T., Ghavamizadeh, M., Gothoskar, N., Russell, S., & Mansinghka, V. K. (2023). **SMCP3: Sequential Monte Carlo with Probabilistic Program Proposals**. In International Conference on Artificial Intelligence and Statistics (pp. 7061-7088).
+  - **Used in**: `__init__.py:30` - Module docstring, enumeration strategy
+  - **Used in**: `__init__.py:1020-1078` - FlipEnum class implementation
+  - **Used in**: Enumeration gradient estimators for discrete distributions
 
 ### Measure-Valued Derivatives
 - Arya, G., Schauer, M., Schäfer, F., & Rackauckas, C. (2022). **Automatic differentiation of programs with discrete randomness**. In Advances in Neural Information Processing Systems, 35, 10435-10447.
