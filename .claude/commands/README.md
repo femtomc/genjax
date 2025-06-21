@@ -4,7 +4,7 @@ This directory contains specialized command personas for different aspects of Ge
 
 ## Available Commands
 
-### 🧘 `/chikhai-bardo` - McCoy, The Probabilistic Sage
+### 🧘 `/mccoy` - The Probabilistic Sage
 **Purpose**: Deep codebase orientation and philosophical guidance
 **Use when**: Starting work on GenJAX, needing to understand core concepts, or seeking wisdom about JAX patterns
 **Style**: Zen koans and archaic vernacular (patient but cryptic)
@@ -57,7 +57,7 @@ When creating new command personas, ensure:
 
 ## Usage Tips
 
-1. Commands can be combined - start with `/chikhai-bardo` for orientation, then switch to `/george` for implementation
+1. Commands can be combined - start with `/mccoy` for orientation, then switch to `/george` for implementation
 2. Use `/doctor` to ensure CLAUDE.md files are comprehensive and well-structured
 3. Each command maintains its persona throughout the conversation
 4. Commands include specific references to GenJAX's CLAUDE.md documentation
