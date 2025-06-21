@@ -55,12 +55,12 @@ def polyfn(x, coeffs):
 @gen
 def polynomial():
     # Use normal distributions for polynomial coefficients
-    # Prioritize simpler polynomials with smaller std for higher-order terms
+    # Wider priors to allow more flexibility in curve fitting
     a = normal(0.0, 1.0) @ "a"  # Constant term (std=1.0 - free to vary)
-    b = normal(0.0, 0.5) @ "b"  # Linear coefficient (std=0.5 - moderate flexibility)
+    b = normal(0.0, 1.5) @ "b"  # Linear coefficient (std=1.5 - increased flexibility)
     c = (
-        normal(0.0, 0.2) @ "c"
-    )  # Quadratic coefficient (std=0.2 - some curvature allowed)
+        normal(0.0, 0.8) @ "c"
+    )  # Quadratic coefficient (std=0.8 - more curvature allowed)
     return Lambda(Const(polyfn), jnp.array([a, b, c]))
 
 
@@ -188,11 +188,11 @@ def numpyro_npoint_model(xs, obs_dict=None):
     # Match GenJAX model with normal distributions
     a = numpyro.sample("a", numpyro_dist.Normal(0.0, 1.0))  # Constant term (std=1.0)
     b = numpyro.sample(
-        "b", numpyro_dist.Normal(0.0, 0.5)
-    )  # Linear coefficient (std=0.5)
+        "b", numpyro_dist.Normal(0.0, 1.5)
+    )  # Linear coefficient (std=1.5 - increased flexibility)
     c = numpyro.sample(
-        "c", numpyro_dist.Normal(0.0, 0.2)
-    )  # Quadratic coefficient (std=0.2)
+        "c", numpyro_dist.Normal(0.0, 0.8)
+    )  # Quadratic coefficient (std=0.8 - more curvature allowed)
 
     with numpyro.plate("data", len(xs)):
         obs_vals = None
@@ -208,10 +208,10 @@ def numpyro_npoint_model(xs, obs_dict=None):
 def numpyro_guide_npoint(xs, obs_dict=None):
     """Guide for importance sampling that samples from the prior."""
     numpyro.sample("a", numpyro_dist.Normal(0.0, 1.0))  # Constant term (std=1.0)
-    numpyro.sample("b", numpyro_dist.Normal(0.0, 0.5))  # Linear coefficient (std=0.5)
+    numpyro.sample("b", numpyro_dist.Normal(0.0, 1.5))  # Linear coefficient (std=1.5)
     numpyro.sample(
-        "c", numpyro_dist.Normal(0.0, 0.2)
-    )  # Quadratic coefficient (std=0.2)
+        "c", numpyro_dist.Normal(0.0, 0.8)
+    )  # Quadratic coefficient (std=0.8)
 
 
 def numpyro_single_importance_sample(key, xs, obs_dict):

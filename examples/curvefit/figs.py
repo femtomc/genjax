@@ -933,8 +933,8 @@ def save_log_density_viz():
 
     # Define grid for polynomial parameters - match the normal prior ranges
     n_grid = 50
-    a_range = jnp.linspace(-0.3, 0.3, n_grid)  # 3 std devs for a ~ Normal(0, 0.1)
-    b_range = jnp.linspace(-1.5, 1.5, n_grid)  # 3 std devs for b ~ Normal(0, 0.5)
+    a_range = jnp.linspace(-3.0, 3.0, n_grid)  # 3 std devs for a ~ Normal(0, 1.0)
+    b_range = jnp.linspace(-4.5, 4.5, n_grid)  # 3 std devs for b ~ Normal(0, 1.5)
 
     # Compute log densities on grid
     log_densities = jnp.zeros((n_grid, n_grid))
