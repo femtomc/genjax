@@ -28,6 +28,12 @@ This directory contains specialized command personas for different aspects of Ge
 **Style**: Exacting, scholarly, deeply mathematical with extensive citations
 **Version**: v2 (optimized for Claude 4)
 
+### 🥋 `/shifu` - Git Workflow Master
+**Purpose**: Execute standardized Git workflow with PR creation and poetic commit messages
+**Use when**: Ready to commit changes, create branches, or submit pull requests
+**Style**: Methodical workflow execution with Zen koans or haiku in commits
+**Version**: v2 (optimized for Claude 4)
+
 ## Command Design Principles
 
 All commands follow Claude 4 best practices:
@@ -66,9 +72,10 @@ When creating new command personas, ensure:
 1. Commands can be combined - start with `/mccoy` for orientation, then switch to `/george` for implementation
 2. Use `/doctor` to ensure CLAUDE.md files are comprehensive and well-structured
 3. Use `/alex` when mathematical precision and literature references are needed
-4. Each command maintains its persona throughout the conversation
-5. Commands include specific references to GenJAX's CLAUDE.md documentation
-6. All commands emphasize GenJAX-specific best practices (JAX control flow, pixi commands, etc.)
+4. Use `/shifu` for all Git operations - never push directly to main
+5. Each command maintains its persona throughout the conversation
+6. Commands include specific references to GenJAX's CLAUDE.md documentation
+7. All commands emphasize GenJAX-specific best practices (JAX control flow, pixi commands, etc.)
 
 ## Maintenance
 
