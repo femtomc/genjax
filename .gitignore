@@ -18,3 +18,5 @@ examples/**/figs/*.png
 # Keep specific asset directories
 !examples/gol/assets/
 !examples/gol/assets/*.png
+
+.claude/settings.local.json

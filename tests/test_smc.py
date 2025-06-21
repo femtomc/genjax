@@ -244,7 +244,13 @@ class TestImportanceSampling:
         # Use discrete_hmm directly with rejuvenation_smc
         @gen
         def hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples from uniform distribution over states."""
             n_states = initial_probs.shape[0]
@@ -316,7 +322,13 @@ class TestImportanceSampling:
         # Use rejuvenation_smc for proper sequential inference
         @gen
         def simple_hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal for HMM states."""
             n_states = initial_probs.shape[0]
@@ -388,7 +400,13 @@ class TestImportanceSampling:
         # Use discrete_hmm directly with rejuvenation_smc
         @gen
         def complex_hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples from uniform distribution over states."""
             n_states = initial_probs.shape[0]
@@ -456,7 +474,13 @@ class TestImportanceSampling:
         # Use discrete_hmm directly with rejuvenation_smc
         @gen
         def convergence_hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples from uniform distribution over states."""
             n_states = initial_probs.shape[0]
@@ -623,7 +647,13 @@ class TestRobustness:
         # Use discrete_hmm directly with rejuvenation_smc
         @gen
         def small_hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples from uniform distribution over states."""
             n_states = initial_probs.shape[0]
@@ -696,7 +726,13 @@ class TestRobustness:
         # Use discrete_hmm directly with rejuvenation_smc
         @gen
         def deterministic_hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples from uniform distribution over states."""
             n_states = initial_probs.shape[0]
@@ -848,7 +884,7 @@ class TestSMCComponents:
             return (y, z)
 
         @gen
-        def custom_proposal():
+        def custom_proposal(constraints, old_choices):
             # Custom proposal for z
             z = normal(0.5, 0.2) @ "z"  # Different parameters than target
             return z
@@ -977,7 +1013,7 @@ class TestRejuvenationSMC:
             return obs  # Return value feeds into next timestep
 
         @gen
-        def transition_proposal(prev_obs):
+        def transition_proposal(constraints, old_choices, prev_obs):
             # Proposal that considers previous state through prev_obs
             return normal(prev_obs * 0.5, 0.5) @ "x"
 
@@ -1040,7 +1076,13 @@ class TestRejuvenationSMC:
         # Use discrete_hmm directly with rejuvenation_smc (like other working tests)
         @gen
         def discrete_hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples from uniform distribution over states."""
             n_states = initial_probs.shape[0]
@@ -1131,7 +1173,13 @@ class TestRejuvenationSMC:
         # Use discrete_hmm directly with rejuvenation_smc (like other working tests)
         @gen
         def monotonic_hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples from uniform distribution over states."""
             n_states = initial_probs.shape[0]
@@ -1253,7 +1301,18 @@ class TestRejuvenationSMC:
 
         # Use linear_gaussian directly with rejuvenation_smc (similar to discrete_hmm pattern)
         @gen
-        def lg_proposal(prev_state, time_index, initial_mean, initial_cov, A, Q, C, R):
+        def lg_proposal(
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_mean,
+            initial_cov,
+            A,
+            Q,
+            C,
+            R,
+        ):
             """Simple proposal that samples from prior distribution."""
             # For simplicity, use a simple prior-based proposal
             is_initial = time_index == 0
@@ -1402,7 +1461,16 @@ class TestRejuvenationSMC:
         # Use linear_gaussian directly with rejuvenation_smc (similar to 1D case)
         @gen
         def lg_2d_proposal(
-            prev_state, time_index, initial_mean, initial_cov, A, Q, C, R
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_mean,
+            initial_cov,
+            A,
+            Q,
+            C,
+            R,
         ):
             """Simple proposal for 2D linear Gaussian."""
             is_initial = time_index == 0
@@ -1733,7 +1801,18 @@ class TestRejuvenationSMC:
 
         # Prior proposal
         @gen
-        def lg_proposal(prev_state, time_index, initial_mean, initial_cov, A, Q, C, R):
+        def lg_proposal(
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_mean,
+            initial_cov,
+            A,
+            Q,
+            C,
+            R,
+        ):
             """Prior proposal for linear Gaussian."""
             mean = jnp.where(time_index == 0, initial_mean, A @ prev_state)
             cov = jnp.where(time_index == 0, initial_cov, Q)
@@ -1839,7 +1918,13 @@ class TestWeightEvolution:
         # Use discrete_hmm with rejuvenation_smc
         @gen
         def hmm_proposal(
-            prev_state, time_index, initial_probs, transition_matrix, emission_matrix
+            constraints,
+            old_choices,
+            prev_state,
+            time_index,
+            initial_probs,
+            transition_matrix,
+            emission_matrix,
         ):
             """Simple proposal that samples uniformly."""
             n_states = initial_probs.shape[0]
@@ -1968,7 +2053,7 @@ class TestWeightEvolution:
 
         # Custom proposal that introduces diversity
         @gen
-        def diverse_proposal(prev_obs):
+        def diverse_proposal(constraints, old_choices, prev_obs):
             # Deliberately diverse proposal to create weight differences
             return normal(prev_obs * 0.2, 1.5) @ "x"
 
@@ -2042,10 +2127,10 @@ class TestWeightEvolution:
         # Test 3: Diagnostic ESS should vary (showing actual particle diversity before resampling)
         diagnostic_ess_values = []
         for t in range(n_timesteps):
-            if all_particles.log_weights_normalized.ndim == 2:
-                weights_norm = all_particles.log_weights_normalized[t]
+            if all_particles.diagnostic_weights.ndim == 2:
+                weights_norm = all_particles.diagnostic_weights[t]
             else:
-                weights_norm = all_particles.log_weights_normalized
+                weights_norm = all_particles.diagnostic_weights
             ess = 1.0 / jnp.sum(jnp.exp(weights_norm) ** 2)
             diagnostic_ess_values.append(float(ess))
 

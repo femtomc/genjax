@@ -1133,7 +1133,7 @@ class GFI(Generic[X, R], Pytree):
         x_: X | None,
         *args,
         **kwargs,
-    ) -> tuple[Tr[X, R], Weight, X | None]:
+    ) -> tuple[Trace[X, R], Weight, X | None]:
         """Update a trace with new arguments and/or choice constraints.
 
         Mathematical specification:
@@ -1172,7 +1172,7 @@ class GFI(Generic[X, R], Pytree):
         sel: Selection,
         *args,
         **kwargs,
-    ) -> tuple[Tr[X, R], Weight, X | None]:
+    ) -> tuple[Trace[X, R], Weight, X | None]:
         """Regenerate selected choices in a trace while keeping others fixed.
 
         Mathematical specification:
@@ -1354,7 +1354,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
         self,
         *args,
         **kwargs,
-    ) -> Tr[X, R]:
+    ) -> Trace[X, R]:
         return modular_vmap(
             self.gen_fn.simulate,
             in_axes=self.in_axes.value,
@@ -1368,7 +1368,7 @@ class Vmap(Generic[X, R], GFI[X, R]):
         x: X,
         *args,
         **kwargs,
-    ) -> tuple[Tr[X, R], Weight]:
+    ) -> tuple[Trace[X, R], Weight]:
         if self.in_axes.value is None:
             in_axes = (0,) + (None,) * len(args)
         else:
@@ -1403,11 +1403,11 @@ class Vmap(Generic[X, R], GFI[X, R]):
 
     def update(
         self,
-        tr: Tr[X, R],
+        tr: Trace[X, R],
         x_: X,
         *args,
         **kwargs,
-    ) -> tuple[Tr[X, R], Weight, X | None]:
+    ) -> tuple[Trace[X, R], Weight, X | None]:
         if self.in_axes.value is None:
             in_axes = (0, 0) + (None,) * len(args)
         else:
@@ -1423,11 +1423,11 @@ class Vmap(Generic[X, R], GFI[X, R]):
 
     def regenerate(
         self,
-        tr: Tr[X, R],
+        tr: Trace[X, R],
         s: Selection,
         *args,
         **kwargs,
-    ) -> tuple[Tr[X, R], Weight, X | None]:
+    ) -> tuple[Trace[X, R], Weight, X | None]:
         if self.in_axes.value is None:
             in_axes = (0, None) + (None,) * len(args)
         else:

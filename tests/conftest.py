@@ -6,9 +6,11 @@ that can be used across all test files to reduce duplication and improve
 maintainability.
 """
 
+import jax
 import jax.numpy as jnp
 import jax.random as jrand
 import pytest
+from typing import Callable
 from genjax import gen, normal, exponential
 from genjax.adev import expectation
 
@@ -361,6 +363,103 @@ def pytest_collection_modifyitems(config, items):
             item.module.__dict__.get("__file__", "")
         ):
             item.add_marker(pytest.mark.tfp)
+
+
+# ============================================================================
+# JIT Compilation Fixtures for Test Optimization
+# ============================================================================
+
+
+@pytest.fixture(scope="session")
+def jit_cache():
+    """Session-wide cache for JIT-compiled functions."""
+    return {}
+
+
+@pytest.fixture(scope="module")
+def jit_compiler(jit_cache):
+    """Provide JIT compilation with caching."""
+
+    def compile_and_cache(name: str, fn: Callable, static_argnames=None) -> Callable:
+        """Compile a function with JIT and cache it."""
+        if name in jit_cache:
+            return jit_cache[name]
+
+        if static_argnames:
+            jitted = jax.jit(fn, static_argnames=static_argnames)
+        else:
+            jitted = jax.jit(fn)
+
+        jit_cache[name] = jitted
+        return jitted
+
+    return compile_and_cache
+
+
+@pytest.fixture(scope="module")
+def batch_tester():
+    """Utilities for batch testing with vmap."""
+
+    def create_batch_test(test_fn: Callable) -> Callable:
+        """Convert single-input test to batch test."""
+        return jax.vmap(test_fn)
+
+    return {
+        "create_batch": create_batch_test,
+        "assert_close": lambda a, e, **kw: jnp.allclose(a, e, **kw),
+    }
+
+
+@pytest.fixture(scope="module")
+def jitted_distributions(jit_compiler):
+    """Pre-compiled distribution operations for fast testing."""
+    from genjax.distributions import normal, binomial
+
+    distributions = {}
+
+    # Compile batch assess operations
+    @jax.jit
+    def normal_assess_batch(samples, mu, sigma):
+        def single(s):
+            lp, _ = normal.assess(s, mu, sigma)
+            return lp
+
+        return jax.vmap(single)(samples)
+
+    @jax.jit
+    def binomial_assess_batch(samples, n, p):
+        def single(s):
+            lp, _ = binomial.assess(s, n, p)
+            return lp
+
+        return jax.vmap(single)(samples)
+
+    distributions["normal_batch"] = normal_assess_batch
+    distributions["binomial_batch"] = binomial_assess_batch
+
+    return distributions
+
+
+@pytest.fixture(scope="module")
+def jitted_hmm_ops(jit_compiler):
+    """Pre-compiled HMM operations for fast testing."""
+    from genjax.extras.state_space import forward_filter
+
+    ops = {}
+    ops["forward_filter"] = jit_compiler("hmm_forward", forward_filter)
+
+    @jax.jit
+    def batch_forward(sequences, initial_probs, transition_matrix, emission_matrix):
+        def single(seq):
+            _, lm = forward_filter(
+                seq, initial_probs, transition_matrix, emission_matrix
+            )
+            return lm
+
+        return jax.vmap(single)(sequences)
+
+    ops["batch_forward"] = batch_forward
+    return ops
 
 
 # ============================================================================

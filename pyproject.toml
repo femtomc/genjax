@@ -75,6 +75,8 @@ precommit-run = "pre-commit run --all-files"  # Run pre-commit hooks
 [tool.pixi.feature.test.tasks]
 # Testing and coverage
 test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"  # Run tests with coverage
+test-parallel = "pytest tests/ -v -n auto --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"  # Run tests in parallel with auto-detected cores
+test-fast = "pytest tests/ -v -n 4 -m 'not slow' --cov=src/genjax"  # Run fast tests on 4 cores
 coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=term && echo 'Coverage report available at htmlcov/index.html'"  # Generate coverage report
 doctest = "xdoctest src/genjax --verbose=2"  # Run doctests only
 doctest-module = "xdoctest src/genjax/{module} --verbose=2"  # Run doctests for specific module
@@ -231,6 +233,7 @@ test = [
     "pytest-cov>=6.0,<7",
     "coverage>=7.0,<8",
     "xdoctest>=1.1.0,<2",
+    "pytest-xdist>=3.0,<4",
 ]
 
 [tool.coverage.run]

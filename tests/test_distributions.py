@@ -70,6 +70,14 @@ def standard_tolerance():
     return 1e-4
 
 
+# JIT-compiled version of assess for better performance
+@jax.jit
+def _jitted_assess_single(dist_fn, sample, params):
+    """JIT-compiled single sample assessment."""
+    logprob, _ = dist_fn.assess(sample, *params)
+    return logprob
+
+
 def assert_distribution_consistency(
     dist_fn, tfp_dist_fn, params, samples, tolerance=1e-4, skip_sampling=False
 ):
@@ -151,20 +159,32 @@ def test_flip_consistency(key, standard_tolerance):
 @pytest.mark.distributions
 @pytest.mark.unit
 @pytest.mark.fast
-def test_binomial_consistency(key, standard_tolerance):
+def test_binomial_consistency(key, standard_tolerance, jitted_distributions):
     """Test Binomial distribution consistency with TFP."""
     total_count = 10.0  # Float to match TFP expectations
     probs = 0.3
     logits = jnp.log(probs / (1 - probs))  # Convert probs to logits
     samples = jnp.array([2.0, 5.0, 8.0, 3.0])  # Float samples for consistency
 
-    assert_distribution_consistency(
-        binomial,
-        lambda n, logits_val: tfd.Binomial(total_count=n, logits=logits_val),
-        (total_count, logits),
-        samples,
-        standard_tolerance,
-    )
+    # Use JIT-compiled batch assess if available
+    if "binomial_batch" in jitted_distributions:
+        genjax_logprobs = jitted_distributions["binomial_batch"](
+            samples, total_count, logits
+        )
+        tfp_dist = tfd.Binomial(total_count=total_count, logits=logits)
+        tfp_logprobs = jax.vmap(tfp_dist.log_prob)(samples)
+
+        assert jnp.allclose(genjax_logprobs, tfp_logprobs, atol=standard_tolerance), (
+            f"Batch log probabilities differ: GenJAX={genjax_logprobs}, TFP={tfp_logprobs}"
+        )
+    else:
+        assert_distribution_consistency(
+            binomial,
+            lambda n, logits_val: tfd.Binomial(total_count=n, logits=logits_val),
+            (total_count, logits),
+            samples,
+            standard_tolerance,
+        )
 
 
 @pytest.mark.distributions
@@ -232,12 +252,22 @@ def test_multinomial_consistency(key, standard_tolerance):
         [[2.0, 5.0, 3.0], [1.0, 6.0, 3.0], [3.0, 4.0, 3.0]]
     )  # Float samples
 
-    assert_distribution_consistency(
-        multinomial,
-        lambda n, logits_val: tfd.Multinomial(total_count=n, logits=logits_val),
-        (total_count, logits),
-        samples,
-        standard_tolerance,
+    # JIT-compile the assessment function for multinomial
+    @jax.jit
+    def batch_assess_multinomial(samples_batch, n, logits_val):
+        def single_assess(s):
+            lp, _ = multinomial.assess(s, n, logits_val)
+            return lp
+
+        return jax.vmap(single_assess)(samples_batch)
+
+    # Test with JIT-compiled version
+    genjax_logprobs = batch_assess_multinomial(samples, total_count, logits)
+    tfp_dist = tfd.Multinomial(total_count=total_count, logits=logits)
+    tfp_logprobs = jax.vmap(tfp_dist.log_prob)(samples)
+
+    assert jnp.allclose(genjax_logprobs, tfp_logprobs, atol=standard_tolerance), (
+        f"Batch log probabilities differ: GenJAX={genjax_logprobs}, TFP={tfp_logprobs}"
     )
 
 
@@ -579,13 +609,14 @@ def test_distributions_in_generative_functions(key, standard_tolerance):
         x4 = beta(a, b) @ "beta"
         return x1 + x2, x3, x4
 
-    # Test simulate
+    # Test simulate without JIT first
     trace = test_model.simulate(0.0, 1.0, 2.0, 1.0, 10.0, 0.5, 2.0, 3.0)
-    assert trace.get_retval() is not None
+    retval = trace.get_retval()
+    choices = trace.get_choices()
+    assert retval is not None
 
     # Test assess
-    choices = trace.get_choices()
-    log_prob, retval = test_model.assess(
+    log_prob, retval2 = test_model.assess(
         choices, 0.0, 1.0, 2.0, 1.0, 10.0, 0.5, 2.0, 3.0
     )
     assert jnp.isfinite(log_prob)
@@ -665,13 +696,15 @@ def test_distributions_vectorization(key):
     def vector_model(n, mu, sigma):
         return normal.repeat(n)(mu, sigma) @ "samples"
 
-    # Test vectorized sampling
-    trace = vector_model.simulate(100, 0.0, 1.0)
+    # Test vectorized sampling (n must be a regular int, not const)
+    n = 100
+    trace = vector_model.simulate(n, 0.0, 1.0)
     samples = trace.get_retval()
+    choices = trace.get_choices()
+
     assert samples.shape == (100,)
     assert jnp.all(jnp.isfinite(samples))
 
     # Test that we can access the samples from the trace
-    choices = trace.get_choices()
     assert "samples" in choices
     assert choices["samples"].shape == (100,)

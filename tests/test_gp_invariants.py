@@ -4,7 +4,8 @@ import jax
 import jax.numpy as jnp
 import genjax
 from genjax.gp import GP, RBF, Matern52, Sum, Product
-from genjax import gen, const
+from genjax.gp.mean import Zero
+from genjax import gen
 
 
 class TestGPInvariants:
@@ -12,19 +13,21 @@ class TestGPInvariants:
 
     def test_prior_posterior_consistency(self):
         """Test that posterior with no data equals prior."""
+        from genjax import seed
+
         key = jax.random.PRNGKey(0)
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         x_test = jnp.linspace(-2, 2, 10).reshape(-1, 1)
 
         # Prior sample
-        prior_trace = gp.simulate(x_test, key=key)
+        prior_trace = seed(lambda: gp.simulate(x_test))(key)
 
         # "Posterior" with empty training data
-        posterior_trace = gp.simulate(
-            x_test, x_train=jnp.empty((0, 1)), y_train=jnp.empty(0), key=key
-        )
+        posterior_trace = seed(
+            lambda: gp.simulate(x_test, x_train=jnp.empty((0, 1)), y_train=jnp.empty(0))
+        )(key)
 
         # Should give same result
         assert jnp.allclose(prior_trace.y_test, posterior_trace.y_test)
@@ -33,15 +36,17 @@ class TestGPInvariants:
     def test_interpolation_property(self):
         """Test that GP interpolates training data exactly (with zero noise)."""
         key = jax.random.PRNGKey(1)
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=1e-10)  # Near-zero noise
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(
+            kernel, mean_fn=Zero(), noise_variance=1e-10, jitter=1e-6
+        )  # Near-zero noise
 
         # Training data
         x_train = jnp.array([[0.0], [1.0], [2.0]])
         y_train = jnp.array([0.5, -0.3, 1.2])
 
         # Evaluate at training points
-        trace = gp.simulate(x_train, x_train=x_train, y_train=y_train, key=key)
+        _ = gp.simulate(x_train, x_train=x_train, y_train=y_train, key=key)
 
         # Mean should interpolate the data
         mean, _ = gp._compute_posterior(x_train, y_train, x_train)
@@ -49,8 +54,8 @@ class TestGPInvariants:
 
     def test_uncertainty_increases_with_distance(self):
         """Test that prediction uncertainty increases with distance from data."""
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         # Single training point
         x_train = jnp.array([[0.0]])
@@ -75,10 +80,15 @@ class TestGPInvariants:
     def test_kernel_positive_definiteness(self):
         """Test that kernel matrices are positive definite."""
         kernels = [
-            RBF(variance=1.0, lengthscale=0.5),
-            Matern52(variance=1.0, lengthscale=0.5),
-            Sum(RBF(1.0, 0.5), RBF(0.5, 2.0)),
-            Product(RBF(1.0, 1.0), Matern52(1.0, 1.0)),
+            RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5)),
+            Matern52(variance=jnp.array(1.0), lengthscale=jnp.array(0.5)),
+            Sum(
+                RBF(jnp.array(1.0), jnp.array(0.5)), RBF(jnp.array(0.5), jnp.array(2.0))
+            ),
+            Product(
+                RBF(jnp.array(1.0), jnp.array(1.0)),
+                Matern52(jnp.array(1.0), jnp.array(1.0)),
+            ),
         ]
 
         x = jax.random.normal(jax.random.PRNGKey(2), (20, 3))
@@ -95,13 +105,13 @@ class TestGPInvariants:
 
             # Check Cholesky decomposition works
             K_jittered = K + 1e-6 * jnp.eye(K.shape[0])
-            L = jnp.linalg.cholesky(K_jittered)  # Should not raise
+            _ = jnp.linalg.cholesky(K_jittered)  # Should not raise
 
     def test_marginal_consistency(self):
         """Test that marginals of joint distribution are consistent."""
         key = jax.random.PRNGKey(3)
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         # Sample at multiple points
         x_all = jnp.array([[0.0], [1.0], [2.0]])
@@ -126,8 +136,8 @@ class TestJAXBehavior:
 
     def test_dynamic_data_sizes(self):
         """Test that GP works with different data sizes without recompilation."""
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         @jax.jit
         def evaluate_gp(x_test, x_train, y_train):
@@ -154,8 +164,10 @@ class TestJAXBehavior:
 
         @jax.jit
         def gp_with_dynamic_hyperparams(x_test, lengthscale, variance):
-            kernel = RBF(variance=variance, lengthscale=lengthscale)
-            gp = GP(kernel, noise_variance=0.01)
+            kernel = RBF(
+                variance=jnp.array(variance), lengthscale=jnp.array(lengthscale)
+            )
+            gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
             # Should work with traced hyperparameters
             mean, cov = gp._compute_posterior(None, None, x_test)
@@ -174,8 +186,8 @@ class TestJAXBehavior:
         """Test vmapping over GP hyperparameters."""
 
         def evaluate_gp_likelihood(lengthscale, x_train, y_train):
-            kernel = RBF(variance=1.0, lengthscale=lengthscale)
-            gp = GP(kernel, noise_variance=0.01)
+            kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(lengthscale))
+            gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
             log_prob, _ = gp.assess(y_train, x_train)
             return log_prob
 
@@ -200,8 +212,10 @@ class TestJAXBehavior:
         """Test gradient computation through GP operations."""
 
         def gp_log_likelihood(lengthscale, variance, x_train, y_train):
-            kernel = RBF(variance=variance, lengthscale=lengthscale)
-            gp = GP(kernel, noise_variance=0.01)
+            kernel = RBF(
+                variance=jnp.array(variance), lengthscale=jnp.array(lengthscale)
+            )
+            gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
             log_prob, _ = gp.assess(y_train, x_train)
             return log_prob
 
@@ -223,8 +237,8 @@ class TestGPComposition:
 
     def test_gp_in_gen_function(self):
         """Test basic usage of GP in @gen function."""
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         @gen
         def model(x_test):
@@ -250,8 +264,10 @@ class TestGPComposition:
             variance = jnp.exp(log_variance)
 
             # Create and use GP
-            kernel = RBF(variance=variance, lengthscale=lengthscale)
-            gp = GP(kernel, noise_variance=0.01)
+            kernel = RBF(
+                variance=jnp.array(variance), lengthscale=jnp.array(lengthscale)
+            )
+            gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
             y_test = gp(x_test, x_train=x_train, y_train=y_train) @ "y_test"
 
@@ -278,11 +294,21 @@ class TestGPComposition:
         @gen
         def additive_model(x):
             # Smooth component
-            gp_smooth = GP(RBF(variance=1.0, lengthscale=1.0))
+            gp_smooth = GP(
+                RBF(variance=jnp.array(1.0), lengthscale=jnp.array(1.0)),
+                mean_fn=Zero(),
+                noise_variance=0.01,
+                jitter=1e-6,
+            )
             smooth = gp_smooth(x) @ "smooth"
 
             # Rough component
-            gp_rough = GP(Matern52(variance=0.5, lengthscale=0.1))
+            gp_rough = GP(
+                Matern52(variance=jnp.array(0.5), lengthscale=jnp.array(0.1)),
+                mean_fn=Zero(),
+                noise_variance=0.01,
+                jitter=1e-6,
+            )
             rough = gp_rough(x) @ "rough"
 
             # Combine
@@ -291,7 +317,7 @@ class TestGPComposition:
             # Add observation noise
             sigma = genjax.exponential(10.0) @ "sigma"
             for i in range(x.shape[0]):
-                obs = genjax.normal(y[i], sigma) @ f"obs_{i}"
+                _ = genjax.normal(y[i], sigma) @ f"obs_{i}"
 
             return y
 
@@ -307,19 +333,24 @@ class TestGPComposition:
 
     def test_gp_with_vmap(self):
         """Test GP with vmap for multiple independent GPs."""
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        from genjax import seed
+
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         @gen
         def independent_gps(x_test, n_samples):
             # Sample multiple independent GP realizations
-            samples = gp.vmap().repeat(n_samples)(x_test) @ "samples"
+            samples = gp.repeat(n_samples)(x_test) @ "samples"
             return samples
 
         x_test = jnp.array([[0.0], [1.0], [2.0]])
-        n_samples = const(10)
+        n_samples = 10
 
-        trace = independent_gps.simulate(x_test, n_samples)
+        # Need to use seed transformation
+        trace = seed(lambda: independent_gps.simulate(x_test, n_samples))(
+            jax.random.PRNGKey(0)
+        )
         samples = trace.get_choices()["samples"]
 
         assert samples.shape == (10, 3)  # n_samples x n_test_points
@@ -332,8 +363,8 @@ class TestNumericalStability:
 
     def test_near_duplicate_points(self):
         """Test stability with nearly duplicate training points."""
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         # Nearly duplicate points
         x_train = jnp.array([[0.0], [0.0 + 1e-8], [1.0]])
@@ -351,8 +382,8 @@ class TestNumericalStability:
     def test_large_condition_number(self):
         """Test with poorly conditioned kernel matrix."""
         # Very small lengthscale leads to poor conditioning
-        kernel = RBF(variance=1.0, lengthscale=0.01)
-        gp = GP(kernel, noise_variance=1e-6, jitter=1e-5)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.01))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=1e-6, jitter=1e-5)
 
         x_train = jnp.linspace(0, 1, 20).reshape(-1, 1)
         y_train = jnp.sin(10 * x_train[:, 0])
@@ -364,8 +395,8 @@ class TestNumericalStability:
 
     def test_empty_training_data(self):
         """Test GP with no training data."""
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         x_test = jnp.array([[0.0], [1.0]])
 
@@ -377,8 +408,8 @@ class TestNumericalStability:
 
     def test_single_training_point(self):
         """Test GP with single training point."""
-        kernel = RBF(variance=1.0, lengthscale=0.5)
-        gp = GP(kernel, noise_variance=0.01)
+        kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+        gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
         x_train = jnp.array([[0.5]])
         y_train = jnp.array([1.0])
@@ -396,8 +427,8 @@ class TestNumericalStability:
 
 def test_gp_importance_weights():
     """Test that GP importance weights are correct."""
-    kernel = RBF(variance=1.0, lengthscale=0.5)
-    gp = GP(kernel, noise_variance=0.01)
+    kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+    gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
     x_test = jnp.array([[0.0], [1.0]])
     constraints = jnp.array([0.5, -0.5])
@@ -414,8 +445,8 @@ def test_gp_importance_weights():
 
 def test_gp_score_computation():
     """Test that GP scores are computed correctly."""
-    kernel = RBF(variance=1.0, lengthscale=0.5)
-    gp = GP(kernel, noise_variance=0.01)
+    kernel = RBF(variance=jnp.array(1.0), lengthscale=jnp.array(0.5))
+    gp = GP(kernel, mean_fn=Zero(), noise_variance=0.01, jitter=1e-6)
 
     x = jnp.array([[0.0], [1.0]])
     y = jnp.array([0.0, 0.0])

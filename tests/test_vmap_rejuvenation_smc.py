@@ -46,7 +46,7 @@ def model_with_vmap(prev_state):
 
 
 @gen
-def simple_proposal(prev_state):
+def simple_proposal(constraints, old_choices, prev_state):
     """Simple proposal function."""
     return normal(prev_state, 0.1) @ "state"
 
@@ -268,7 +268,7 @@ def localization_like_model(prev_pose, world_size):
 
 
 @gen
-def localization_proposal(prev_pose, world_size):
+def localization_proposal(constraints, old_choices, prev_pose, world_size):
     """Proposal for localization-like model."""
     x = normal(prev_pose[0], 0.5) @ "x"
     y = normal(prev_pose[1], 0.5) @ "y"

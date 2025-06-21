@@ -49,8 +49,8 @@ def test_gp_simulate():
     gp = GP(
         kernel=kernel,
         mean_fn=Zero(),
-        noise_variance=jnp.array(0.01),
-        jitter=jnp.array(1e-6),
+        noise_variance=0.01,
+        jitter=1e-6,
     )
 
     # Test points
@@ -73,8 +73,8 @@ def test_gp_conditioning():
     gp = GP(
         kernel=kernel,
         mean_fn=Zero(),
-        noise_variance=jnp.array(0.01),
-        jitter=jnp.array(1e-6),
+        noise_variance=0.01,
+        jitter=1e-6,
     )
 
     # Training data
@@ -102,8 +102,8 @@ def test_gp_assess():
     gp = GP(
         kernel=kernel,
         mean_fn=Zero(),
-        noise_variance=jnp.array(0.01),
-        jitter=jnp.array(1e-6),
+        noise_variance=0.01,
+        jitter=1e-6,
     )
 
     # Test data
@@ -124,8 +124,8 @@ def test_gp_in_gen_function():
     gp = GP(
         kernel=kernel,
         mean_fn=Zero(),
-        noise_variance=jnp.array(0.01),
-        jitter=jnp.array(1e-6),
+        noise_variance=0.01,
+        jitter=1e-6,
     )
 
     @gen
@@ -164,8 +164,8 @@ def test_gp_generate_with_constraints():
     gp = GP(
         kernel=kernel,
         mean_fn=Zero(),
-        noise_variance=jnp.array(0.01),
-        jitter=jnp.array(1e-6),
+        noise_variance=0.01,
+        jitter=1e-6,
     )
 
     # Test points
@@ -185,14 +185,14 @@ def test_gp_composition_example():
     gp1 = GP(
         kernel=RBF(variance=jnp.array(1.0), lengthscale=jnp.array(1.0)),
         mean_fn=Zero(),
-        noise_variance=jnp.array(0.01),
-        jitter=jnp.array(1e-6),
+        noise_variance=0.01,
+        jitter=1e-6,
     )
     gp2 = GP(
         kernel=Matern52(variance=jnp.array(0.5), lengthscale=jnp.array(0.5)),
         mean_fn=Zero(),
-        noise_variance=jnp.array(0.01),
-        jitter=jnp.array(1e-6),
+        noise_variance=0.01,
+        jitter=1e-6,
     )
 
     @gen
@@ -202,11 +202,11 @@ def test_gp_composition_example():
 
         # Create GP with sampled hyperparameters
         kernel = RBF(variance=jnp.array(1.0), lengthscale=lengthscale)
-        gp = GP(
+        _ = GP(
             kernel=kernel,
             mean_fn=Zero(),
-            noise_variance=jnp.array(0.01),
-            jitter=jnp.array(1e-6),
+            noise_variance=0.01,
+            jitter=1e-6,
         )
 
         # Sample base function from first GP
@@ -220,7 +220,7 @@ def test_gp_composition_example():
 
         # Add observation noise
         for i in range(x_test.shape[0]):
-            obs = genjax.normal(y[i], 0.1) @ f"obs_{i}"
+            _ = genjax.normal(y[i], 0.1) @ f"obs_{i}"
 
         return y
 

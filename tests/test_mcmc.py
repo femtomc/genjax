@@ -1194,9 +1194,20 @@ def test_mala_in_smc_vectorization():
     key, subkey = jrand.split(key)
     observations = jax.random.normal(subkey, (T, d_obs))
 
-    # Proposal
+    # Proposal - takes (constraints, old_choices, *model_args)
     @gen
-    def lg_proposal(prev_state, time_index, initial_mean, initial_cov, A, Q, C, R):
+    def lg_proposal(
+        constraints,
+        old_choices,
+        prev_state,
+        time_index,
+        initial_mean,
+        initial_cov,
+        A,
+        Q,
+        C,
+        R,
+    ):
         mean = jnp.where(time_index == 0, initial_mean, A @ prev_state)
         cov = jnp.where(time_index == 0, initial_cov, Q)
         return multivariate_normal(mean, cov) @ "state"
@@ -1223,11 +1234,11 @@ def test_mala_in_smc_vectorization():
     result = seed(rejuvenation_smc)(
         subkey,
         linear_gaussian,
-        lg_proposal,
-        const(mala_kernel),
-        obs_sequence,
-        initial_args,
-        const(n_particles),
+        lg_proposal,  # transition_proposal
+        const(mala_kernel),  # mcmc_kernel
+        obs_sequence,  # observations
+        initial_args,  # initial_model_args
+        const(n_particles),  # n_particles
         const(False),  # return_all_particles
         const(2),  # n_rejuvenation_moves
     )

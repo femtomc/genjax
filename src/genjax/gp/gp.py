@@ -93,7 +93,12 @@ class GP(GFI[Array, Array]):
         x_test: Array,
     ) -> Tuple[Array, Array]:
         """Compute GP posterior mean and covariance."""
-        if x_train is None or y_train is None:
+        if (
+            x_train is None
+            or y_train is None
+            or (hasattr(x_train, "shape") and x_train.shape[0] == 0)
+            or (hasattr(y_train, "shape") and y_train.shape[0] == 0)
+        ):
             # Prior distribution
             mean = self.mean_fn(x_test)
             cov = self.kernel(x_test, x_test)
@@ -156,7 +161,7 @@ class GP(GFI[Array, Array]):
             y_test=y_test,
             kernel=self.kernel,
             mean_fn=self.mean_fn,
-            noise_variance=self.noise_variance,
+            noise_variance=jnp.array(self.noise_variance),
             score=-log_prob,  # Score is negative log probability
             args=(x_test,),
             kwargs={"x_train": x_train, "y_train": y_train},
@@ -225,7 +230,7 @@ class GP(GFI[Array, Array]):
             y_test=y_test,
             kernel=self.kernel,
             mean_fn=self.mean_fn,
-            noise_variance=self.noise_variance,
+            noise_variance=jnp.array(self.noise_variance),
             score=-log_prob,  # Score is negative log probability
             args=(x_test,),
             kwargs={"x_train": x_train, "y_train": y_train},

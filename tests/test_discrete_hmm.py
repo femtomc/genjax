@@ -29,6 +29,10 @@ from genjax.extras.state_space import (
 
 tfd = tfp.distributions
 
+# JIT-compiled versions of HMM functions for performance
+_jitted_forward_filter = jax.jit(forward_filter)
+_jitted_compute_sequence_log_prob = jax.jit(compute_sequence_log_prob)
+
 
 class TestDiscreteHMMAgainstTFP:
     """Test suite comparing GenJAX discrete HMM against TFP's HiddenMarkovModel."""
@@ -48,7 +52,7 @@ class TestDiscreteHMMAgainstTFP:
             num_steps=num_steps,  # Will be set when calling log_prob
         )
 
-    def test_marginal_log_prob_simple_case(self, simple_hmm_params):
+    def test_marginal_log_prob_simple_case(self, simple_hmm_params, jitted_hmm_ops):
         """Test marginal log probability against TFP for simple case."""
         initial_probs = simple_hmm_params["initial_probs"]
         transition_matrix = simple_hmm_params["transition_matrix"]
@@ -62,11 +66,14 @@ class TestDiscreteHMMAgainstTFP:
             jnp.array([1, 0, 1, 0]),  # T=4
         ]
 
+        # Use JIT-compiled forward filter from fixture
+        forward_filter_jit = jitted_hmm_ops["forward_filter"]
+
         for obs_seq in test_sequences:
             T = len(obs_seq)
 
-            # GenJAX forward filter
-            _, genjax_log_marginal = forward_filter(
+            # GenJAX forward filter (JIT-compiled)
+            _, genjax_log_marginal = forward_filter_jit(
                 obs_seq, initial_probs, transition_matrix, emission_matrix
             )
 
@@ -87,7 +94,7 @@ class TestDiscreteHMMAgainstTFP:
                 atol=1e-6,
             ), f"Marginal log prob mismatch for sequence {obs_seq}"
 
-    def test_marginal_log_prob_complex_case(self, complex_hmm_params):
+    def test_marginal_log_prob_complex_case(self, complex_hmm_params, jitted_hmm_ops):
         """Test marginal log probability against TFP for complex case."""
         initial_probs = complex_hmm_params["initial_probs"]
         transition_matrix = complex_hmm_params["transition_matrix"]
@@ -100,9 +107,12 @@ class TestDiscreteHMMAgainstTFP:
             jnp.array([3, 2, 1, 0, 1, 2, 3]),  # T=7, reverse pattern
         ]
 
+        # Use JIT-compiled forward filter
+        forward_filter_jit = jitted_hmm_ops["forward_filter"]
+
         for obs_seq in test_sequences:
-            # GenJAX forward filter
-            _, genjax_log_marginal = forward_filter(
+            # GenJAX forward filter (JIT-compiled)
+            _, genjax_log_marginal = forward_filter_jit(
                 obs_seq, initial_probs, transition_matrix, emission_matrix
             )
 
@@ -141,8 +151,8 @@ class TestDiscreteHMMAgainstTFP:
             + jnp.log(emission_matrix[1, 1])  # Final emission
         )
 
-        # Function calculation
-        computed_log_prob = compute_sequence_log_prob(
+        # Function calculation (use JIT-compiled version)
+        computed_log_prob = _jitted_compute_sequence_log_prob(
             states, observations, initial_probs, transition_matrix, emission_matrix
         )
 
@@ -153,14 +163,15 @@ class TestDiscreteHMMAgainstTFP:
             atol=1e-15,
         ), "Sequence log prob computation incorrect"
 
-    def test_forward_filter_normalization(self, simple_hmm_params):
+    def test_forward_filter_normalization(self, simple_hmm_params, jitted_hmm_ops):
         """Test that forward filter probabilities are properly normalized."""
         initial_probs = simple_hmm_params["initial_probs"]
         transition_matrix = simple_hmm_params["transition_matrix"]
         emission_matrix = simple_hmm_params["emission_matrix"]
 
         observations = jnp.array([0, 1, 0, 1])
-        alpha, _ = forward_filter(
+        forward_filter_jit = jitted_hmm_ops["forward_filter"]
+        alpha, _ = forward_filter_jit(
             observations, initial_probs, transition_matrix, emission_matrix
         )
 
@@ -180,25 +191,30 @@ class TestDiscreteHMMAgainstTFP:
         transition_matrix = simple_hmm_params["transition_matrix"]
         emission_matrix = simple_hmm_params["emission_matrix"]
         key = jrand.key(42)
-        T = 10
-        n_samples = 1000
+        T = const(10)  # Use const for static value
+        n_samples = const(1000)  # Use const for static value
 
-        # Use sample_hmm_dataset to generate multiple sequences with K parameter
-        seeded_sample = seed(sample_hmm_dataset)
-        _, genjax_samples, _ = seeded_sample(
-            key,
-            initial_probs,
-            transition_matrix,
-            emission_matrix,
-            const(T),
-            const(n_samples),
-        )
+        # JIT-compile the sampling function
+        @jax.jit
+        def sample_hmm_jit(key):
+            seeded_sample = seed(sample_hmm_dataset)
+            return seeded_sample(
+                key,
+                initial_probs,
+                transition_matrix,
+                emission_matrix,
+                T,
+                n_samples,
+            )
+
+        # Use JIT-compiled sampling
+        _, genjax_samples, _ = sample_hmm_jit(key)
 
         # Sample from TFP model
         tfp_hmm = self.create_tfp_hmm(
-            initial_probs, transition_matrix, emission_matrix, num_steps=T
+            initial_probs, transition_matrix, emission_matrix, num_steps=10
         )
-        tfp_samples = tfp_hmm.sample(n_samples, seed=key)
+        tfp_samples = tfp_hmm.sample(1000, seed=key)
 
         # Compare observation frequencies (should be roughly similar)
         genjax_obs_freq = jnp.mean(genjax_samples == 0)  # Frequency of observation 0
@@ -213,7 +229,7 @@ class TestDiscreteHMMAgainstTFP:
         ), "Observation frequencies differ significantly between GenJAX and TFP"
 
     @pytest.mark.parametrize("T", [1, 2, 5, 10])
-    def test_different_sequence_lengths(self, simple_hmm_params, T):
+    def test_different_sequence_lengths(self, simple_hmm_params, T, jitted_hmm_ops):
         """Test marginal log probability for different sequence lengths."""
         initial_probs = simple_hmm_params["initial_probs"]
         transition_matrix = simple_hmm_params["transition_matrix"]
@@ -223,8 +239,9 @@ class TestDiscreteHMMAgainstTFP:
         # Generate random observation sequence
         observations = jrand.randint(key, shape=(T,), minval=0, maxval=2)
 
-        # GenJAX forward filter
-        _, genjax_log_marginal = forward_filter(
+        # GenJAX forward filter (JIT-compiled)
+        forward_filter_jit = jitted_hmm_ops["forward_filter"]
+        _, genjax_log_marginal = forward_filter_jit(
             observations, initial_probs, transition_matrix, emission_matrix
         )
 
@@ -245,17 +262,19 @@ class TestDiscreteHMMAgainstTFP:
             atol=1e-6,
         ), f"Marginal log prob mismatch for T={T}, obs={observations}"
 
-    def test_edge_case_single_timestep(self, simple_hmm_params):
+    def test_edge_case_single_timestep(self, simple_hmm_params, jitted_hmm_ops):
         """Test edge case of single time step (T=1)."""
         initial_probs = simple_hmm_params["initial_probs"]
         transition_matrix = simple_hmm_params["transition_matrix"]
         emission_matrix = simple_hmm_params["emission_matrix"]
 
+        forward_filter_jit = jitted_hmm_ops["forward_filter"]
+
         for obs in [0, 1]:
             observations = jnp.array([obs])
 
-            # GenJAX forward filter
-            _, genjax_log_marginal = forward_filter(
+            # GenJAX forward filter (JIT-compiled)
+            _, genjax_log_marginal = forward_filter_jit(
                 observations, initial_probs, transition_matrix, emission_matrix
             )
 
@@ -298,17 +317,21 @@ class TestDiscreteHMMAgainstTFP:
         # Generate test observations
         observations = jnp.array([0, 1, 0, 1])
 
-        # Create a closure for forward_filtering_backward_sampling and apply seed
-        def ffbs_closure():
-            return forward_filtering_backward_sampling(
-                observations, initial_probs, transition_matrix, emission_matrix
-            )
+        # JIT-compile the FFBS closure
+        @jax.jit
+        def ffbs_jit(key):
+            def ffbs_closure():
+                return forward_filtering_backward_sampling(
+                    observations, initial_probs, transition_matrix, emission_matrix
+                )
 
-        # Run FFBS with seed transformation
-        hmm_trace = seed(ffbs_closure)(key)
+            return seed(ffbs_closure)(key)
 
-        # Verify the log probability matches what we'd compute independently
-        computed_log_prob = compute_sequence_log_prob(
+        # Run FFBS with JIT
+        hmm_trace = ffbs_jit(key)
+
+        # Verify the log probability matches what we'd compute independently (JIT)
+        computed_log_prob = _jitted_compute_sequence_log_prob(
             hmm_trace.states,
             observations,
             initial_probs,
@@ -329,7 +352,7 @@ class TestDiscreteHMMAgainstTFP:
             observations,
         ), "FFBS observations don't match input"
 
-    def test_numerical_stability(self):
+    def test_numerical_stability(self, jitted_hmm_ops):
         """Test numerical stability with extreme probability values."""
         # Create parameters with very small probabilities
         initial_probs = jnp.array([0.999, 0.001])
@@ -339,8 +362,9 @@ class TestDiscreteHMMAgainstTFP:
         # Long sequence that would cause underflow in probability space
         observations = jnp.array([0] * 20 + [1] * 20)
 
-        # Should not produce NaN or inf
-        _, genjax_log_marginal = forward_filter(
+        # Should not produce NaN or inf (use JIT)
+        forward_filter_jit = jitted_hmm_ops["forward_filter"]
+        _, genjax_log_marginal = forward_filter_jit(
             observations, initial_probs, transition_matrix, emission_matrix
         )
 

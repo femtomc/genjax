@@ -262,6 +262,41 @@ convergence_tolerance = 0.1   # For convergence tests
 - Test invalid arguments raise `ValueError`/`TypeError`
 - Test beartype violations raise `TypeError`
 
+## Test Suite Optimization
+
+### Performance Analysis
+
+**Key Metrics**:
+- Total suite time can be reduced by 40-50% with JIT compilation
+- Slowest files: `test_discrete_hmm.py` (7.93s), `test_distributions.py` (6.15s)
+- See `analyze_test_timing.py` for identifying bottlenecks
+
+### JIT Optimization Strategy
+
+**Available Fixtures** (in `conftest.py`):
+- `jit_compiler`: Cache and compile functions with `@jax.jit`
+- `batch_tester`: Convert single tests to batch tests with `vmap`
+- `jitted_distributions`: Pre-compiled distribution operations
+- `jitted_hmm_ops`: Pre-compiled HMM operations
+
+**Usage Pattern**:
+```python
+def test_something(jitted_distributions):
+    # Use pre-compiled batch operations
+    logprobs = jitted_distributions['binomial_batch'](samples, n, p)
+```
+
+**Best Practices**:
+1. **Warm up JIT**: First call is slow, use fixtures for warmup
+2. **Batch operations**: Use `vmap` for testing multiple inputs
+3. **Static arguments**: Use `static_argnames` for unchanging parameters
+4. **Cache compilation**: Module-scoped fixtures prevent recompilation
+
+**References**:
+- Implementation examples: `test_distributions_optimized.py`, `test_discrete_hmm_optimized.py`
+- Benchmarking tool: `benchmark_test_optimization.py`
+- Timing analysis: `analyze_test_timing.py`
+
 ## Critical Testing Requirements
 
 1. **Always test after changes** to corresponding source files
@@ -272,3 +307,4 @@ convergence_tolerance = 0.1   # For convergence tests
 6. **Test convergence properties** - algorithms should improve with more compute
 7. **MANDATORY for SMC**: Include log marginal likelihood convergence test in every SMC test suite
 8. **Validate against analytical solutions** when available (conjugate models)
+9. **Optimize slow tests**: Use JIT compilation fixtures for tests >0.5s
