@@ -9,7 +9,7 @@ import numpy as np
 from pathlib import Path
 from typing import List, Optional
 
-from data import generate_tracking_data
+from examples.gen2d.data import generate_tracking_data
 
 # Set seaborn style and color palette
 sns.set_style("whitegrid")
