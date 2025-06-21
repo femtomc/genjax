@@ -46,6 +46,14 @@ def point(x, curve):
     return y_observed
 
 
+@gen
+def point_with_noise(x, curve, noise_std):
+    """Point model with configurable noise level."""
+    y_det = curve(x)
+    y_observed = normal(y_det, noise_std) @ "obs"
+    return y_observed
+
+
 def polyfn(x, coeffs):
     """Degree 2 polynomial: y = a + b*x + c*x^2"""
     a, b, c = coeffs[0], coeffs[1], coeffs[2]
@@ -79,6 +87,17 @@ def npoint_curve(xs):
     return curve, (xs, ys)
 
 
+@gen
+def npoint_curve_easy(xs, noise_std=Const(0.15)):
+    """N-point curve model with configurable noise for easier inference."""
+    curve = polynomial() @ "curve"
+    ys = (
+        point_with_noise.vmap(in_axes=(0, None, None))(xs, curve, noise_std.value)
+        @ "ys"
+    )
+    return curve, (xs, ys)
+
+
 def infer_latents(xs, ys, n_samples: Const[int]):
     """
     Infer latent curve parameters using GenJAX SMC importance sampling.
@@ -101,6 +120,33 @@ def infer_latents(xs, ys, n_samples: Const[int]):
     )
 
     # Extract samples (traces) and weights for compatibility
+    return result.traces, result.log_weights
+
+
+def infer_latents_easy(
+    xs, ys, n_samples: Const[int], noise_std: Const[float] = Const(0.15)
+):
+    """
+    Infer latent curve parameters using easier model with more noise.
+
+    Args:
+        xs: Input points where observations were made
+        ys: Observed values at xs
+        n_samples: Number of importance samples (wrapped in Const)
+        noise_std: Observation noise std (default: 0.15, 3x standard)
+    """
+    from genjax.inference import init
+
+    constraints = {"ys": {"obs": ys}}
+
+    # Use easier model with configurable noise
+    result = init(
+        npoint_curve_easy,  # easier model
+        (xs, noise_std),  # pass noise level
+        n_samples,
+        constraints,
+    )
+
     return result.traces, result.log_weights
 
 

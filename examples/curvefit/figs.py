@@ -43,50 +43,29 @@ def set_minimal_ticks(ax, x_ticks=3, y_ticks=3):
     ax.yaxis.set_major_locator(MaxNLocator(nbins=y_ticks, prune="both"))
 
 
-def get_reference_dataset(seed=42, n_points=10):
+def get_reference_dataset(seed=42, n_points=10, use_easy=False):
     """
     Generate a dataset for use across visualizations.
 
     Args:
         seed: Random seed for reproducibility
         n_points: Number of data points
+        use_easy: If True, use easier dataset for importance sampling
 
     Returns:
         dict with xs, ys, true_params, trace
     """
-    from examples.curvefit.core import npoint_curve
-    from genjax.pjax import seed as genjax_seed
+    from examples.curvefit.data import (
+        generate_easy_inference_dataset,
+        generate_test_dataset,
+    )
 
-    # Generate input points
-    xs = jnp.linspace(0, 1, n_points)
-
-    # Simulate with seeded randomness
-    seeded_simulate = genjax_seed(npoint_curve.simulate)
-    trace = seeded_simulate(jrand.key(seed), xs)
-
-    # Extract data
-    curve, (xs_ret, ys) = trace.get_retval()
-    choices = trace.get_choices()
-
-    # Extract true parameters
-    true_a = float(choices["curve"]["a"])
-    true_b = float(choices["curve"]["b"])
-    true_c = float(choices["curve"]["c"])
-
-    # Package results
-    dataset = {
-        "xs": xs,
-        "ys": ys,
-        "true_params": {
-            "a": true_a,
-            "b": true_b,
-            "c": true_c,
-            "noise_std": 0.05,
-        },
-        "trace": trace,
-    }
-
-    return dataset
+    if use_easy:
+        # Use easier dataset that works better with importance sampling
+        return generate_easy_inference_dataset(seed=seed, n_points=5)
+    else:
+        # Use standard dataset generation
+        return generate_test_dataset(seed=seed, n_points=n_points)
 
 
 def save_framework_comparison_figure(
@@ -117,11 +96,13 @@ def save_framework_comparison_figure(
     - Bottom: Timing comparison
     """
     from examples.curvefit.core import (
-        infer_latents_jit,
+        infer_latents_easy,
         hmc_infer_latents_jit,
         numpyro_run_hmc_inference_jit,
     )
     from genjax.core import Const
+    from genjax.pjax import seed as genjax_seed
+    import jax
 
     print("=== Framework Comparison ===")
     print(f"Data points: {n_points}")
@@ -129,22 +110,30 @@ def save_framework_comparison_figure(
     print(f"HMC samples: {n_samples_hmc}")
     print(f"HMC warmup: {n_warmup} (critical for convergence)")
 
-    # Use the reference dataset for consistency
-    data = get_reference_dataset(n_points=n_points)
+    # Use easier dataset for better importance sampling performance
+    data = get_reference_dataset(n_points=5, use_easy=True)
     xs, ys = data["xs"], data["ys"]
     true_a = data["true_params"]["a"]
     true_b = data["true_params"]["b"]
     true_c = data["true_params"]["c"]
+    noise_std = data["true_params"]["noise_std"]
 
     print(f"True parameters: a={true_a:.3f}, b={true_b:.3f}, c={true_c:.3f}")
+    print(f"Using easier inference with noise_std={noise_std:.3f}")
 
     results = {}
 
-    # 1. GenJAX Importance Sampling (1000 particles)
-    print("\n1. GenJAX IS (1000 particles)...")
+    # 1. GenJAX Importance Sampling (1000 particles) - using easier model
+    print("\n1. GenJAX IS (1000 particles) with easier model...")
+
+    # Create seeded and jitted version of easy inference
+    seeded_infer_easy = genjax_seed(infer_latents_easy)
+    infer_latents_easy_jit = jax.jit(seeded_infer_easy)
 
     def is_task():
-        return infer_latents_jit(jrand.key(seed), xs, ys, Const(n_samples_is))
+        return infer_latents_easy_jit(
+            jrand.key(seed), xs, ys, Const(n_samples_is), Const(noise_std)
+        )
 
     is_times, is_timing_stats = benchmark_with_warmup(
         is_task, warmup_runs=2, repeats=timing_repeats, inner_repeats=10

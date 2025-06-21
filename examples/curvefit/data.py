@@ -56,7 +56,7 @@ def generate_test_dataset(
         key = jrand.key(seed)
 
     # Import model from core
-    from examples.curvefit.core import npoint_curve
+    from .core import npoint_curve
 
     # Generate input locations uniformly in [0, 1]
     xs = jnp.linspace(0, 1, n_points, dtype=jnp.float32)
@@ -89,6 +89,67 @@ def generate_test_dataset(
         },
         "clean_ys": clean_ys,
         "trace": trace,  # Include trace for debugging
+    }
+
+    return result
+
+
+def generate_easy_inference_dataset(
+    seed=42, n_points=5, noise_std=0.15, param_scale=0.3, key=None
+):
+    """
+    Generate an easier dataset for importance sampling.
+
+    This creates data that's more compatible with importance sampling from the prior:
+    - Fewer data points (less concentrated posterior)
+    - More observation noise (wider posterior)
+    - Parameters closer to prior mean (better prior-posterior overlap)
+
+    Args:
+        seed: Random seed for reproducibility
+        n_points: Number of data points (default: 5, fewer than standard)
+        noise_std: Observation noise std (default: 0.15, 3x standard)
+        param_scale: Scale factor for parameters (default: 0.3, keeps them near 0)
+        key: Optional JAX PRNG key
+
+    Returns:
+        Dictionary with same structure as generate_test_dataset
+    """
+    if key is None:
+        key = jrand.key(seed)
+
+    # Generate input locations
+    xs = jnp.linspace(0, 1, n_points, dtype=jnp.float32)
+
+    # Generate parameters closer to prior mean (0)
+    key, subkey = jrand.split(key)
+    # These will be small values, making inference easier
+    true_a = param_scale * jrand.normal(subkey, shape=())
+    key, subkey = jrand.split(key)
+    true_b = param_scale * jrand.normal(subkey, shape=())
+    key, subkey = jrand.split(key)
+    true_c = param_scale * jrand.normal(subkey, shape=())
+
+    # Generate clean polynomial values
+    clean_ys = polyfn(xs, true_a, true_b, true_c)
+
+    # Add more noise than usual
+    key, subkey = jrand.split(key)
+    noise = noise_std * jrand.normal(subkey, shape=(n_points,))
+    ys = clean_ys + noise
+
+    # Package results
+    result = {
+        "xs": xs,
+        "ys": ys,
+        "true_params": {
+            "a": float(true_a),
+            "b": float(true_b),
+            "c": float(true_c),
+            "noise_std": noise_std,
+        },
+        "clean_ys": clean_ys,
+        "n_points": n_points,
     }
 
     return result
