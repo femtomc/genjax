@@ -18,10 +18,10 @@ def parse_args():
 
     parser.add_argument(
         "mode",
-        choices=["quick", "full", "benchmark"],
+        choices=["quick", "full", "benchmark", "generative", "vectorization"],
         nargs="?",
         default="quick",
-        help="Analysis mode: quick (fast viz), full (complete), benchmark (compare frameworks)",
+        help="Analysis mode: quick (fast viz), full (complete), benchmark (compare frameworks), generative (programming figure), vectorization (patterns figure)",
     )
 
     # Analysis parameters
@@ -177,6 +177,32 @@ def run_benchmark_mode(args):
     print("Generated comparison figure in examples/curvefit/figs/")
 
 
+def run_generative_mode(args):
+    """Run generative programming figure mode."""
+    from examples.curvefit.figs import save_programming_with_generative_functions_figure
+
+    print("=== Generative Mode: Programming with Generative Functions Figure ===")
+
+    print("\nGenerating programming with generative functions figure...")
+    save_programming_with_generative_functions_figure()
+
+    print("\n✓ Generative mode complete!")
+    print("Generated figure in examples/curvefit/figs/")
+
+
+def run_vectorization_mode(args):
+    """Run vectorization patterns figure mode."""
+    from examples.curvefit.figs import save_vectorization_patterns_figure
+
+    print("=== Vectorization Mode: Two Natural Vectorization Patterns Figure ===")
+
+    print("\nGenerating vectorization patterns figure...")
+    save_vectorization_patterns_figure()
+
+    print("\n✓ Vectorization mode complete!")
+    print("Generated figure in examples/curvefit/figs/")
+
+
 def main():
     """Main entry point."""
     args = parse_args()
@@ -190,6 +216,10 @@ def main():
         run_full_mode(args)
     elif args.mode == "benchmark":
         run_benchmark_mode(args)
+    elif args.mode == "generative":
+        run_generative_mode(args)
+    elif args.mode == "vectorization":
+        run_vectorization_mode(args)
 
     print("\n✨ Done!")
 
