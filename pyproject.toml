@@ -50,6 +50,7 @@ faircoin-combined = "pixi run python -m examples.faircoin.main --combined"  # Co
 [tool.pixi.feature.curvefit.dependencies]
 matplotlib = "*"
 numpy = "*"
+pygments = "*"
 
 [tool.pixi.feature.curvefit.pypi-dependencies]
 numpyro = "*"

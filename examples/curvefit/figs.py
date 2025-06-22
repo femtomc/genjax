@@ -1,15 +1,66 @@
 """
 Clean figure generation for curvefit case study.
 Focuses on essential comparisons: IS (1000 particles) vs HMC methods.
+
+Figure Size Standards
+--------------------
+This module uses standardized figure sizes to ensure consistency across all plots
+and proper integration with LaTeX documents. The FIGURE_SIZES dictionary provides
+pre-defined sizes for common layouts:
+
+1. Single-panel figures:
+   - single_small: 4.33" x 3.25" (1/3 textwidth) - for inline figures
+   - single_medium: 6.5" x 4.875" (1/2 textwidth) - standard single figure
+   - single_large: 8.66" x 6.5" (2/3 textwidth) - for important results
+
+2. Multi-panel figures:
+   - two_panel_horizontal: 12" x 5" - panels side by side
+   - two_panel_vertical: 6.5" x 8" - stacked panels
+   - three_panel_horizontal: 18" x 5" - three panels in a row
+   - four_panel_grid: 10" x 8" - 2x2 grid layout
+
+3. Custom sizes:
+   - framework_comparison: 12" x 8" - for the main comparison figure
+   - parameter_posterior: 15" x 10" - for 3D parameter visualizations
+
+All sizes are designed to work well with standard LaTeX column widths and
+maintain consistent aspect ratios for visual harmony in documents.
+
+Usage:
+    fig = plt.figure(figsize=FIGURE_SIZES["single_medium"])
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator
+from matplotlib import font_manager
 import numpy as np
 import jax.numpy as jnp
 import jax.random as jrand
 import jax
 from examples.utils import benchmark_with_warmup
+
+# Standardized figure sizes for consistent layout
+# All sizes are in inches and follow LaTeX document conventions
+FIGURE_SIZES = {
+    # Single-panel figures (aspect ratio ~4:3 for readability)
+    "single_small": (4.33, 3.25),  # 1/3 of textwidth, for inline figures
+    "single_medium": (6.5, 4.875),  # 1/2 of textwidth, standard single figure
+    "single_large": (8.66, 6.5),  # 2/3 of textwidth, for important results
+    # Two-panel figures (horizontal layout)
+    "two_panel_horizontal": (12, 5),  # Full textwidth, panels side by side
+    "two_panel_square": (12, 6),  # Full textwidth, square panels
+    # Two-panel figures (vertical layout)
+    "two_panel_vertical": (6.5, 8),  # Half textwidth, stacked panels
+    # Three-panel figures
+    "three_panel_horizontal": (18, 5),  # Extended width for 3 panels
+    "three_panel_grid": (15, 10),  # 3x2 grid layout
+    # Four-panel figures
+    "four_panel_grid": (10, 8),  # 2x2 grid, common for comparisons
+    # Custom sizes for specific visualizations
+    "framework_comparison": (12, 8),  # Two stacked panels with legend
+    "parameter_posterior": (15, 10),  # 3x2 grid with 3D plots
+}
 
 # Publication-quality plot settings with improved readability
 plt.rcParams.update(
@@ -103,7 +154,7 @@ def save_framework_comparison_figure(
     n_warmup=500,
     seed=42,
     timing_repeats=10,
-    figsize=(12, 8),
+    figsize=None,
 ):
     """
     Create a clean framework comparison figure.
@@ -371,6 +422,8 @@ def save_framework_comparison_figure(
     print(f"  NumPyro HMC: {len(numpyro_a)} total samples")
 
     # Create figure
+    if figsize is None:
+        figsize = FIGURE_SIZES["framework_comparison"]
     fig = plt.figure(figsize=figsize)
     gs = fig.add_gridspec(2, 1, height_ratios=[2, 1], hspace=0.5)
 
@@ -551,7 +604,7 @@ def visualize_onepoint_trace(trace, ylim=(-1.5, 1.5)):
     """Visualize a single point trace."""
     curve, pt = trace.get_retval()
     xvals = jnp.linspace(0, 1, 300)
-    fig = plt.figure(figsize=(4, 3))
+    fig = plt.figure(figsize=FIGURE_SIZES["single_small"])
     plt.plot(xvals, jax.vmap(curve)(xvals), color="#333333", linewidth=2)
     plt.scatter(
         pt[0],
@@ -581,12 +634,14 @@ def save_onepoint_trace_viz():
     plt.close()
 
 
-def visualize_multipoint_trace(trace, figsize=(6, 4), yrange=None, ax=None):
+def visualize_multipoint_trace(trace, figsize=None, yrange=None, ax=None):
     """Visualize a multipoint trace."""
     curve, (xs, ys) = trace.get_retval()
     xvals = jnp.linspace(0, 1, 300)
 
     if ax is None:
+        if figsize is None:
+            figsize = FIGURE_SIZES["single_medium"]
         fig, ax = plt.subplots(figsize=figsize)
     else:
         fig = None
@@ -626,7 +681,7 @@ def save_four_multipoint_trace_vizs():
 
     xs = jnp.linspace(0, 1, 10)
 
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    fig, axes = plt.subplots(2, 2, figsize=FIGURE_SIZES["four_panel_grid"])
     axes = axes.flatten()
 
     # Use seeded simulation for reproducibility
@@ -753,7 +808,7 @@ def save_inference_viz(n_curves_to_plot=200, seed=42):
         0.05, jnp.sqrt(weights_normalized)
     )  # Reduced minimum alpha for denser look
 
-    fig = plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=FIGURE_SIZES["single_medium"])
 
     # Plot true curve
     true_curve = true_a + true_b * xvals + true_c * xvals**2
@@ -829,7 +884,7 @@ def save_genjax_posterior_comparison(
     )
 
     # Create figure
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    fig, axes = plt.subplots(1, 2, figsize=FIGURE_SIZES["two_panel_horizontal"])
 
     x_fine = np.linspace(0, 1, 300)
     true_curve = true_a + true_b * x_fine + true_c * x_fine**2
@@ -954,7 +1009,9 @@ def save_inference_scaling_viz():
         ess_values.append(float(ess))
 
     # Create figure with 3 subplots
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+    fig, (ax1, ax2, ax3) = plt.subplots(
+        1, 3, figsize=FIGURE_SIZES["three_panel_horizontal"]
+    )
 
     # Define consistent color for GenJAX IS
     genjax_is_color = "#0173B2"
@@ -1054,7 +1111,7 @@ def save_log_density_viz():
             log_densities = log_densities.at[i, j].set(log_weight)
 
     # Create figure
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
 
     # Plot density as heatmap
     im = ax.imshow(
@@ -1092,6 +1149,1229 @@ def save_log_density_viz():
     plt.close()
 
     print("✓ Saved log density visualization")
+
+
+def save_multiple_curves_single_point_viz():
+    """Save visualization of multiple (curve + single point) samples.
+
+    This demonstrates nested vectorization where we sample multiple
+    independent curves, each with a single observation point.
+    """
+    from examples.curvefit.core import onepoint_curve
+    from genjax.pjax import seed as genjax_seed
+
+    print("Making and saving multiple curves with single point visualization.")
+
+    # Fixed x position for all samples
+    x_position = 0.5
+
+    # Generate multiple independent samples
+    n_samples = 6
+    fig, axes = plt.subplots(2, 3, figsize=FIGURE_SIZES["four_panel_grid"])
+    axes = axes.flatten()
+
+    # Use seeded simulation
+    seeded_simulate = genjax_seed(onepoint_curve.simulate)
+
+    # Generate keys
+    key = jrand.key(42)
+    keys = jrand.split(key, n_samples)
+
+    # Common x values for plotting curves
+    xvals = jnp.linspace(0, 1, 300)
+
+    for i, (ax, subkey) in enumerate(zip(axes, keys)):
+        # Generate independent curve + point sample
+        trace = seeded_simulate(subkey, x_position)
+        curve, (x, y) = trace.get_retval()
+
+        # Plot the curve
+        ax.plot(
+            xvals, jax.vmap(curve)(xvals), color="#0173B2", linewidth=2.5, alpha=0.9
+        )
+
+        # Plot the observation point
+        ax.scatter(
+            x, y, color="#CC3311", s=120, zorder=10, edgecolor="#882255", linewidth=2
+        )
+
+        # Add vertical line to show x position
+        ax.axvline(x=x_position, color="gray", linestyle="--", alpha=0.3, linewidth=1)
+
+        # Set consistent y limits
+        ax.set_ylim(-2, 2)
+        ax.set_xlim(0, 1)
+
+        # Minimal labeling
+        if i >= 3:  # Bottom row
+            ax.set_xlabel("x")
+        if i % 3 == 0:  # Left column
+            ax.set_ylabel("y")
+
+        # Add sample number
+        ax.text(
+            0.05,
+            0.95,
+            f"Sample {i + 1}",
+            transform=ax.transAxes,
+            fontsize=12,
+            verticalalignment="top",
+        )
+
+        # Minimal ticks
+        set_minimal_ticks(ax, x_ticks=3, y_ticks=3)
+
+    plt.suptitle("Multiple Independent (Curve + Point) Samples", fontsize=18, y=0.98)
+    plt.tight_layout()
+    fig.savefig("examples/curvefit/figs/025_multiple_curves_single_point.pdf")
+    plt.close()
+
+    print("✓ Saved multiple curves single point visualization")
+
+
+def save_single_curve_multiple_points_viz():
+    """Save visualization of single curve + multiple points.
+
+    This demonstrates vectorization where we have one curve
+    with multiple observation points.
+    """
+    from examples.curvefit.core import npoint_curve
+    from genjax.pjax import seed as genjax_seed
+
+    print("Making and saving single curve with multiple points visualization.")
+
+    # Generate different numbers of points
+    point_counts = [1, 3, 5, 10, 20, 50]
+
+    fig, axes = plt.subplots(2, 3, figsize=FIGURE_SIZES["four_panel_grid"])
+    axes = axes.flatten()
+
+    # Use seeded simulation
+    seeded_simulate = genjax_seed(npoint_curve.simulate)
+
+    # Use same key for consistent curve across subplots
+    key = jrand.key(42)
+
+    # Common x values for plotting curves
+    xvals = jnp.linspace(0, 1, 300)
+
+    for i, (ax, n_points) in enumerate(zip(axes, point_counts)):
+        # Generate observation points
+        xs = jnp.linspace(0.1, 0.9, n_points)
+
+        # Generate trace
+        trace = seeded_simulate(key, xs)
+        curve, (xs_ret, ys) = trace.get_retval()
+
+        # Plot the curve
+        ax.plot(
+            xvals,
+            jax.vmap(curve)(xvals),
+            color="#0173B2",
+            linewidth=2.5,
+            alpha=0.9,
+            label="Same curve",
+        )
+
+        # Plot the observation points
+        ax.scatter(
+            xs_ret,
+            ys,
+            color="#CC3311",
+            s=max(20, 120 / np.sqrt(n_points)),  # Smaller points as count increases
+            zorder=10,
+            edgecolor="#882255",
+            linewidth=1.5,
+            label=f"{n_points} points",
+        )
+
+        # Set consistent y limits
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_xlim(0, 1)
+
+        # Minimal labeling
+        if i >= 3:  # Bottom row
+            ax.set_xlabel("x")
+        if i % 3 == 0:  # Left column
+            ax.set_ylabel("y")
+
+        # Add point count as title
+        ax.set_title(f"N = {n_points}", fontsize=14)
+
+        # Minimal ticks
+        set_minimal_ticks(ax, x_ticks=3, y_ticks=3)
+
+    plt.suptitle("Single Curve with Varying Numbers of Points", fontsize=18, y=0.98)
+    plt.tight_layout()
+    fig.savefig("examples/curvefit/figs/026_single_curve_multiple_points.pdf")
+    plt.close()
+
+    print("✓ Saved single curve multiple points visualization")
+
+
+def create_code_visualization_figure(
+    code_text,
+    visualization_func,
+    vis_args=(),
+    vis_kwargs={},
+    main_title="",
+    code_title="Code",
+    vis_title="Result",
+    figsize=(14, 6),
+    filename="code_vis_figure.pdf",
+    highlight_patterns=None,
+    highlight_lines=None,
+    code_fontsize=10,
+):
+    """
+    Create a publication-quality two-pane figure with code and visualization.
+
+    Left pane: Code with syntax highlighting
+    Right pane: Visualization result
+
+    Args:
+        code_text: Python code to display
+        visualization_func: Function that creates the visualization (should return fig)
+        vis_args: Arguments for visualization function
+        vis_kwargs: Keyword arguments for visualization function
+        main_title: Overall figure title
+        code_title: Title for code pane
+        vis_title: Title for visualization pane
+        figsize: Overall figure size
+        filename: Output filename
+        highlight_patterns: List of patterns to highlight in code
+        highlight_lines: List of line numbers to highlight
+        code_fontsize: Font size for code
+    """
+
+    # Create figure with GridSpec for better control
+    fig = plt.figure(figsize=figsize)
+    gs = fig.add_gridspec(1, 2, width_ratios=[1, 1], wspace=0.3)
+
+    # Add main title if provided
+    if main_title:
+        fig.suptitle(main_title, fontsize=16, weight="bold", y=0.98)
+
+    # Left panel: Code
+    ax_code = fig.add_subplot(gs[0])
+    ax_code.axis("off")
+
+    # Code styling
+    bg_color = "#f8f8f8"
+    border_color = "#cccccc"
+
+    # Draw code background
+    code_bg = plt.Rectangle(
+        (0.05, 0.05),
+        0.9,
+        0.85,
+        facecolor=bg_color,
+        edgecolor=border_color,
+        linewidth=1.5,
+        transform=ax_code.transAxes,
+    )
+    ax_code.add_patch(code_bg)
+
+    # Add code title
+    ax_code.text(
+        0.5,
+        0.94,
+        code_title,
+        fontsize=12,
+        weight="bold",
+        ha="center",
+        transform=ax_code.transAxes,
+    )
+
+    # Render code with basic syntax highlighting
+    render_code_with_highlighting(
+        ax_code,
+        code_text,
+        highlight_patterns=highlight_patterns,
+        highlight_lines=highlight_lines,
+        fontsize=code_fontsize,
+    )
+
+    # Right panel: Visualization
+    ax_vis = fig.add_subplot(gs[1])
+
+    # Generate the visualization
+    # Save current figure to restore later
+    current_fig = plt.gcf()
+
+    # Call visualization function
+    vis_fig = visualization_func(*vis_args, **vis_kwargs)
+
+    # If the visualization function returned a figure, extract its contents
+    if vis_fig is not None and hasattr(vis_fig, "axes"):
+        # Get the axes from the visualization figure
+        for vis_ax in vis_fig.axes:
+            # Copy the contents to our subplot
+            # This is a bit hacky but works for most cases
+            for artist in vis_ax.get_children():
+                try:
+                    artist_copy = artist
+                    artist_copy.remove()
+                    ax_vis.add_artist(artist_copy)
+                except Exception:
+                    pass
+
+            # Copy axis properties
+            ax_vis.set_xlim(vis_ax.get_xlim())
+            ax_vis.set_ylim(vis_ax.get_ylim())
+            ax_vis.set_xlabel(vis_ax.get_xlabel())
+            ax_vis.set_ylabel(vis_ax.get_ylabel())
+
+        # Close the temporary figure
+        plt.close(vis_fig)
+
+    # Add visualization title
+    ax_vis.text(
+        0.5,
+        0.94,
+        vis_title,
+        fontsize=12,
+        weight="bold",
+        ha="center",
+        transform=ax_vis.transAxes,
+    )
+
+    # Restore current figure
+    plt.figure(current_fig.number)
+
+    # Save the combined figure
+    plt.tight_layout()
+    if main_title:
+        plt.subplots_adjust(top=0.93)
+
+    plt.savefig(filename, dpi=300, bbox_inches="tight", facecolor="white")
+    plt.close()
+
+    print(f"✓ Created code+visualization figure: {filename}")
+    return filename
+
+
+def render_code_with_highlighting(
+    ax, code_text, highlight_patterns=None, highlight_lines=None, fontsize=10
+):
+    """Helper function to render code with basic highlighting in an axes."""
+
+    # Font
+    mono_font = font_manager.FontProperties(family="monospace", size=fontsize)
+
+    # Colors for different code elements
+    colors = {
+        "keyword": "#0000ff",
+        "decorator": "#cc0000",
+        "string": "#008000",
+        "comment": "#808080",
+        "function": "#008b8b",
+        "normal": "#000000",
+    }
+
+    highlight_color = "#fff59d"
+
+    # Split code into lines
+    lines = code_text.strip().split("\n")
+
+    # Calculate positions
+    y_start = 0.85
+    line_height = 0.75 / max(len(lines), 20)
+    x_start = 0.08
+
+    # Python keywords not used in current implementation
+    # keywords = {"def", "return", "import", "from", "as", "for", "in", "if", "else"}
+
+    for i, line in enumerate(lines):
+        y_pos = y_start - i * line_height
+
+        # Highlight line background if requested
+        if highlight_lines and (i + 1) in highlight_lines:
+            highlight_rect = plt.Rectangle(
+                (x_start - 0.02, y_pos - line_height * 0.5),
+                0.85,
+                line_height * 0.9,
+                facecolor=highlight_color,
+                edgecolor="none",
+                transform=ax.transAxes,
+                alpha=0.6,
+            )
+            ax.add_patch(highlight_rect)
+
+        # Simple syntax coloring
+        color = colors["normal"]
+        if line.strip().startswith("#"):
+            color = colors["comment"]
+        elif line.strip().startswith("@"):
+            color = colors["decorator"]
+        elif "def " in line:
+            color = colors["keyword"]
+        elif any(
+            f'"{s}"' in line or f"'{s}'" in line
+            for s in ["a", "b", "c", "obs", "curve", "y"]
+        ):
+            # Crude string detection
+            pass
+
+        # Check for highlight patterns
+        text_to_render = line
+        for pattern in highlight_patterns or []:
+            if pattern in line:
+                # Add inline highlighting (simplified)
+                parts = line.split(pattern)
+                x_offset = 0
+                for j, part in enumerate(parts):
+                    if j > 0:
+                        # Draw highlighted pattern
+                        ax.text(
+                            x_start + x_offset * 0.007,
+                            y_pos,
+                            pattern,
+                            fontproperties=mono_font,
+                            color=color,
+                            transform=ax.transAxes,
+                            bbox=dict(
+                                boxstyle="round,pad=0.1",
+                                facecolor=highlight_color,
+                                edgecolor="none",
+                                alpha=0.7,
+                            ),
+                        )
+                        x_offset += len(pattern)
+
+                    # Draw normal part
+                    if part:
+                        ax.text(
+                            x_start + x_offset * 0.007,
+                            y_pos,
+                            part,
+                            fontproperties=mono_font,
+                            color=color,
+                            transform=ax.transAxes,
+                        )
+                        x_offset += len(part)
+
+                text_to_render = None
+                break
+
+        # Render the whole line if no pattern matching
+        if text_to_render:
+            ax.text(
+                x_start,
+                y_pos,
+                text_to_render,
+                fontproperties=mono_font,
+                color=color,
+                ha="left",
+                va="top",
+                transform=ax.transAxes,
+            )
+
+        # Add line numbers
+        ax.text(
+            0.03,
+            y_pos,
+            f"{i + 1:2d}",
+            fontproperties=font_manager.FontProperties(
+                family="monospace", size=fontsize - 2
+            ),
+            color="#999999",
+            ha="right",
+            va="top",
+            transform=ax.transAxes,
+        )
+
+
+def save_programming_with_generative_functions_figure():
+    """
+    Create figure showing programming with generative functions syntax with code and visualization.
+
+    Shows how users can specify probability distributions and sample from them.
+    """
+    from examples.curvefit.core import onepoint_curve
+
+    # Code to display - split between left and right panels
+    full_code = """@gen
+def polynomial():
+    # Sample polynomial coefficients
+    a = normal(0.0, 1.0) @ "a"
+    b = normal(0.0, 1.0) @ "b"
+    c = normal(0.0, 1.0) @ "c"
+    # Return function that evaluates polynomial
+    return lambda x: a + b * x + c * x**2
+
+@gen
+def onepoint_curve(x):
+    # Sample a curve
+    curve = polynomial() @ "curve"
+    # Sample observation with noise
+    y = normal(curve(x), 0.2) @ "y"
+    return curve, (x, y)
+
+# Sample from the model
+trace = onepoint_curve.simulate(0.5)
+curve, point = trace.get_retval()"""
+
+    # Split code - first 15 lines for left panel
+    code_lines_all = full_code.strip().split("\n")
+    code_text = "\n".join(code_lines_all[:-3])  # All but last 3 lines
+
+    # Create figure with adjusted layout
+    fig = plt.figure(figsize=(9.5, 4))  # Slightly wider for better spacing
+
+    # Main title - updated
+    fig.suptitle(
+        "Probabilistic programming with generative functions",
+        fontsize=14,
+        weight="bold",
+        y=0.96,
+    )
+
+    # Create custom layout for nestled visualization
+    # Left panel: Code (full height)
+    ax_code = fig.add_axes([0.05, 0.05, 0.65, 0.85])  # [left, bottom, width, height]
+    ax_code.axis("off")
+
+    # Add subtitle for left column (no box)
+    ax_code.text(
+        0.335,
+        0.92,
+        "Distributions as programs",
+        ha="center",
+        fontsize=10,
+        weight="bold",
+        color="#444444",
+        transform=ax_code.transAxes,
+    )
+
+    # Render code with Pygments Tango style
+    render_code_with_pygments(
+        ax_code, code_text, style_name="tango", highlight_lines=[1, 4, 13], y_start=0.88
+    )
+
+    # Add annotation text for highlighted lines
+    # Get the actual number of lines being rendered
+    rendered_lines = code_text.strip().split("\n")
+    num_rendered_lines = len(rendered_lines)
+
+    # Calculate line height based on actual rendering (matching render_code_simple)
+    y_start_render = 0.88  # Lowered to make room for subtitle
+    line_height_render = 0.83 / num_rendered_lines  # Adjusted for subtitle space
+
+    # Annotations for highlighted lines with exact line alignment
+    annotations = [
+        (1, "Domain-specific syntax"),
+        (4, "Addresses denote random variables"),
+        (13, "Hierarchical models"),
+    ]
+
+    for line_num, text in annotations:
+        # Calculate y position to match the line rendering exactly
+        # Center vertically to match the centered line numbers and code
+        y_pos = (
+            y_start_render
+            - (line_num - 1) * line_height_render
+            - line_height_render * 0.5
+        )
+
+        # Add annotation text to the right, vertically centered
+        ax_code.text(
+            0.64,
+            y_pos,
+            text,  # Adjusted to 0.64 for better spacing
+            ha="left",
+            va="center",  # Center vertically to match code and line numbers
+            fontsize=8,
+            style="italic",
+            color="#555555",
+            transform=ax_code.transAxes,
+        )
+
+    # Right panel: Code fragment with last 3 lines
+    # Use the same axes bounds as the left panel for perfect alignment
+    ax_code_right = fig.add_axes(
+        [0.69, 0.05, 0.26, 0.85]
+    )  # Adjusted to 0.69 for better spacing
+    ax_code_right.axis("off")
+
+    # Add subtitle for right column (no box)
+    ax_code_right.text(
+        0.5,
+        0.92,
+        "Interfaces for probabilistic operations",
+        ha="center",
+        fontsize=10,
+        weight="bold",
+        color="#444444",
+        transform=ax_code_right.transAxes,
+    )
+
+    # Extract last 2 lines for right panel (excluding line 18)
+    last_three_lines = code_lines_all[-3:-1]  # Only lines 16-17, excluding line 18
+
+    # Get proper font for code rendering
+    font_options = [
+        "Berkeley Mono",
+        "Berkeley Mono Variable",
+        "Fira Code",
+        "Source Code Pro",
+        "DejaVu Sans Mono",
+        "monospace",
+    ]
+    selected_font = "monospace"
+    for font_name in font_options:
+        try:
+            fp = font_manager.FontProperties(family=font_name)
+            if font_manager.findfont(fp):
+                selected_font = font_name
+                break
+        except Exception:
+            pass
+
+    mono_font = font_manager.FontProperties(family=selected_font, size=9, weight=500)
+
+    # Tango-inspired colors (same as render_code_simple)
+    colors = {
+        "comment": "#8f5902",  # Brown
+        "decorator": "#5c35cc",  # Purple
+        "keyword": "#204a87",  # Dark blue
+        "string": "#4e9a06",  # Green
+        "number": "#0000cf",  # Blue
+        "function": "#000000",  # Black
+        "operator": "#ce5c00",  # Orange
+        "default": "#000000",  # Black
+    }
+
+    keywords = {
+        "def",
+        "return",
+        "lambda",
+        "import",
+        "from",
+        "class",
+        "if",
+        "else",
+        "elif",
+        "for",
+        "while",
+        "in",
+        "and",
+        "or",
+        "not",
+        "is",
+        "with",
+        "as",
+    }
+
+    # Manually render the lines to ensure perfect alignment with left panel
+    # Use the exact same y_start and line_height as the left panel
+    for i, line in enumerate(last_three_lines):
+        line_num = i + 16  # Starting from line 16
+        y_pos = 0.88 - i * line_height_render  # Use same y_start as left panel
+
+        # Line number (centered vertically like in render_code_simple)
+        ax_code_right.text(
+            0.04,
+            y_pos - line_height_render * 0.5,
+            f"{line_num:2d}",
+            fontproperties=font_manager.FontProperties(
+                family=selected_font, size=7, weight=500
+            ),
+            color="#666666",
+            ha="right",
+            va="center",
+            transform=ax_code_right.transAxes,
+        )
+
+        # Determine line color based on content
+        stripped = line.strip()
+        color = colors["default"]
+
+        if stripped.startswith("#"):
+            color = colors["comment"]
+        elif stripped.startswith("@"):
+            color = colors["decorator"]
+        elif any(kw in line.split() for kw in keywords):
+            color = colors["keyword"]
+        elif '"' in line or "'" in line:
+            color = colors["default"]
+
+        # Code text (centered vertically like in render_code_simple)
+        ax_code_right.text(
+            0.08,
+            y_pos - line_height_render * 0.5,
+            line,
+            fontproperties=mono_font,
+            color=color,
+            ha="left",
+            va="center",
+            transform=ax_code_right.transAxes,
+        )
+
+    # Add trace tree visualization below the code fragment
+    # Position below the 2 lines of code
+    trace_height = 0.25
+    trace_top = (
+        y_start_render - 2 * line_height_render - 0.1
+    )  # Below line 17 with spacing
+    trace_bottom = (
+        0.05 + 0.85 * trace_top - trace_height
+    )  # Convert to figure coordinates
+    ax_trace = fig.add_axes([0.69, trace_bottom, 0.26, trace_height])
+    ax_trace.axis("off")
+
+    # Add subtitle for trace visualization
+    ax_trace.text(
+        0.5,
+        1.05,
+        "Probabilistic program traces",
+        ha="center",
+        fontsize=9,
+        weight="bold",
+        color="#444444",
+        transform=ax_trace.transAxes,
+    )
+
+    # Simplified tree structure
+    # Center positions for cleaner layout
+    center_x = 0.5
+
+    # Root at top center (invisible connection point)
+    root_x, root_y = center_x, 0.90  # Moved up from 0.85
+
+    # First level
+    curve_x, curve_y = center_x - 0.2, 0.60  # Moved up from 0.55
+    y_x, y_y = center_x + 0.2, 0.60  # Moved up from 0.55
+
+    # Second level - coefficients below curve
+    a_x, a_y = center_x - 0.35, 0.35  # Moved up from 0.30
+    b_x, b_y = center_x - 0.2, 0.35  # Moved up from 0.30
+    c_x, c_y = center_x - 0.05, 0.35  # Moved up from 0.30
+
+    # Draw edges - create a T-junction from root (using axes coordinates)
+    # Vertical line from root
+    ax_trace.plot(
+        [root_x, root_x],
+        [root_y, root_y - 0.15],
+        "k-",
+        linewidth=1,
+        alpha=0.6,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+
+    # Horizontal line at junction - stop exactly at the branch points
+    junction_y = root_y - 0.15
+    ax_trace.plot(
+        [curve_x, y_x],
+        [junction_y, junction_y],
+        "k-",
+        linewidth=1,
+        alpha=0.6,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+
+    # Vertical lines down to nodes - ensure they reach the nodes
+    ax_trace.plot(
+        [curve_x, curve_x],
+        [junction_y, curve_y + 0.08],
+        "k-",
+        linewidth=1,
+        alpha=0.6,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+    ax_trace.plot(
+        [y_x, y_x],
+        [junction_y, y_y + 0.08],
+        "k-",
+        linewidth=1,
+        alpha=0.6,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+
+    # Curve to coefficients
+    ax_trace.plot(
+        [curve_x, a_x],
+        [curve_y, a_y],
+        "k-",
+        linewidth=1,
+        alpha=0.6,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+    ax_trace.plot(
+        [curve_x, b_x],
+        [curve_y, b_y],
+        "k-",
+        linewidth=1,
+        alpha=0.6,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+    ax_trace.plot(
+        [curve_x, c_x],
+        [curve_y, c_y],
+        "k-",
+        linewidth=1,
+        alpha=0.6,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+
+    # Draw nodes with addresses
+    node_props = dict(
+        boxstyle="round,pad=0.3",
+        facecolor="white",
+        edgecolor="#666666",
+        linewidth=1,
+        zorder=10,
+    )
+
+    # Root (no visual representation - just a connection point)
+
+    # Address nodes
+    ax_trace.text(
+        curve_x,
+        curve_y,
+        '"curve"',
+        ha="center",
+        va="center",
+        fontsize=7,
+        fontfamily="monospace",
+        bbox=node_props,
+        transform=ax_trace.transAxes,
+        zorder=10,
+    )
+
+    ax_trace.text(
+        y_x,
+        y_y,
+        '"y"',
+        ha="center",
+        va="center",
+        fontsize=7,
+        fontfamily="monospace",
+        bbox=node_props,
+        transform=ax_trace.transAxes,
+        zorder=10,
+    )
+
+    # Coefficient nodes as simple addresses under "curve"
+    ax_trace.text(
+        a_x,
+        a_y,
+        '"a"',
+        ha="center",
+        va="center",
+        fontsize=7,
+        fontfamily="monospace",
+        bbox=node_props,
+        transform=ax_trace.transAxes,
+        zorder=10,
+    )
+
+    ax_trace.text(
+        b_x,
+        b_y,
+        '"b"',
+        ha="center",
+        va="center",
+        fontsize=7,
+        fontfamily="monospace",
+        bbox=node_props,
+        transform=ax_trace.transAxes,
+        zorder=10,
+    )
+
+    ax_trace.text(
+        c_x,
+        c_y,
+        '"c"',
+        ha="center",
+        va="center",
+        fontsize=7,
+        fontfamily="monospace",
+        bbox=node_props,
+        transform=ax_trace.transAxes,
+        zorder=10,
+    )
+
+    # Add f32[] annotations to all leaf nodes
+    # Positions for f32[] labels - straight down with more spacing
+    f32_offset_y = -0.30  # Pushed even lower
+
+    # Vertical branch lines from leaf nodes to f32[] annotations
+    # From "a"
+    ax_trace.plot(
+        [a_x, a_x],
+        [a_y - 0.05, a_y + f32_offset_y + 0.06],
+        "k-",
+        linewidth=0.8,
+        alpha=0.5,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+    # From "b"
+    ax_trace.plot(
+        [b_x, b_x],
+        [b_y - 0.05, b_y + f32_offset_y + 0.06],
+        "k-",
+        linewidth=0.8,
+        alpha=0.5,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+    # From "c"
+    ax_trace.plot(
+        [c_x, c_x],
+        [c_y - 0.05, c_y + f32_offset_y + 0.06],
+        "k-",
+        linewidth=0.8,
+        alpha=0.5,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+    # From "y"
+    ax_trace.plot(
+        [y_x, y_x],
+        [y_y - 0.05, y_y + f32_offset_y + 0.06],
+        "k-",
+        linewidth=0.8,
+        alpha=0.5,
+        zorder=1,
+        transform=ax_trace.transAxes,
+    )
+
+    # f32[] text annotations
+    f32_props = dict(
+        fontsize=6, fontfamily="monospace", color="#666666", style="italic"
+    )
+
+    ax_trace.text(
+        a_x,
+        a_y + f32_offset_y,
+        "f32[]",
+        ha="center",
+        va="center",
+        transform=ax_trace.transAxes,
+        **f32_props,
+    )
+    ax_trace.text(
+        b_x,
+        b_y + f32_offset_y,
+        "f32[]",
+        ha="center",
+        va="center",
+        transform=ax_trace.transAxes,
+        **f32_props,
+    )
+    ax_trace.text(
+        c_x,
+        c_y + f32_offset_y,
+        "f32[]",
+        ha="center",
+        va="center",
+        transform=ax_trace.transAxes,
+        **f32_props,
+    )
+    ax_trace.text(
+        y_x,
+        y_y + f32_offset_y,
+        "f32[]",
+        ha="center",
+        va="center",
+        transform=ax_trace.transAxes,
+        **f32_props,
+    )
+
+    # Visualization (curve plot) below the trace tree
+    vis_height = 0.17  # Reduced to 85% of 0.20
+    vis_bottom = trace_bottom - vis_height - 0.08  # Increased spacing to move down
+    ax_vis = fig.add_axes(
+        [0.69, vis_bottom, 0.26, vis_height]
+    )  # Adjusted to 0.69 to match code panel
+
+    # Add subtitle for trace visualization
+    ax_vis.text(
+        0.5,
+        0.95,
+        "Trace visual",
+        ha="center",
+        fontsize=9,
+        weight="bold",
+        color="#444444",
+        transform=ax_vis.transAxes,
+    )
+
+    # Generate and plot trace
+    trace = onepoint_curve.simulate(0.5)
+    curve, pt = trace.get_retval()
+    xvals = jnp.linspace(0, 1, 300)
+
+    # Plot curve
+    yvals = jax.vmap(curve)(xvals)
+    ax_vis.plot(xvals, yvals, color="#0173B2", linewidth=2.5, alpha=0.9)
+
+    # Add text label for the curve - positioned higher and to the left
+    text_x = 0.2  # Closer to the y-axis
+    # Find the y value at this x position
+    text_idx = int(len(xvals) * 0.2)
+    text_y = float(yvals[text_idx])
+
+    # Add the text without rotation, positioned higher above the curve
+    ax_vis.text(
+        text_x,
+        text_y + 0.5,
+        'trace["curve"]',
+        fontsize=8,
+        fontfamily="monospace",
+        color="#0173B2",
+        ha="center",
+        va="bottom",
+    )
+
+    # Plot point - smaller size for smaller figure
+    ax_vis.scatter(
+        pt[0],
+        pt[1],
+        color="#CC3311",
+        s=60,
+        zorder=10,
+        edgecolor="#882255",
+        linewidth=1.0,
+    )
+
+    # Styling - tighter limits
+    ax_vis.set_ylim(-1.5, 1.5)
+    ax_vis.set_xlim(0, 1)
+    ax_vis.set_ylabel("y", fontsize=8)
+    ax_vis.grid(True, alpha=0.3, linestyle="--")
+    # No title for small nestled plot
+
+    # Simpler annotation - smaller for smaller figure
+    ax_vis.annotate(
+        '(x, trace["y"])',
+        xy=(pt[0], pt[1]),
+        xytext=(pt[0] + 0.15, pt[1] + 0.4),
+        fontsize=7.5,
+        fontfamily="monospace",
+        color="#CC3311",
+        ha="center",
+        arrowprops=dict(arrowstyle="->", color="#CC3311", lw=1.0),
+    )
+
+    # Clean up ticks
+    set_minimal_ticks(ax_vis, x_ticks=3, y_ticks=3)
+    ax_vis.tick_params(labelsize=7)
+
+    # Save figure (no tight_layout with custom axes positioning)
+    plt.savefig(
+        "examples/curvefit/figs/001_programming_with_generative_functions.pdf",
+        dpi=300,
+        bbox_inches="tight",
+        facecolor="white",
+    )
+    plt.close()
+
+    print(
+        "✓ Created programming with generative functions figure: figs/001_programming_with_generative_functions.pdf"
+    )
+
+
+def render_code_with_pygments(
+    ax, code_text, style_name="tango", highlight_lines=None, y_start=None
+):
+    """Render code with Pygments syntax highlighting using simple approach."""
+    # Use simple rendering for better alignment
+    render_code_simple(
+        ax, code_text, highlight_lines=highlight_lines, y_start_override=y_start
+    )
+
+
+def render_code_simple(
+    ax, code_text, highlight_lines=None, start_line_num=1, y_start_override=None
+):
+    """Simple code rendering with Tango-like syntax highlighting."""
+    # Font - Berkeley Mono is our preferred font
+    font_options = [
+        "Berkeley Mono",
+        "Berkeley Mono Variable",
+        "Fira Code",
+        "Source Code Pro",
+        "DejaVu Sans Mono",
+        "monospace",
+    ]
+
+    # Find first available font
+    selected_font = "monospace"  # fallback
+    for font_name in font_options:
+        try:
+            fp = font_manager.FontProperties(family=font_name)
+            if font_manager.findfont(fp):
+                selected_font = font_name
+                break
+        except Exception:
+            pass
+
+    # Use appropriate size for smaller figure with weight 500 (medium)
+    mono_font = font_manager.FontProperties(family=selected_font, size=11, weight=500)
+
+    # Split code into lines
+    lines = code_text.strip().split("\n")
+
+    # Calculate positions - adjusted for no background/title
+    y_start = (
+        y_start_override if y_start_override is not None else 0.95
+    )  # Start higher since no title
+    # Use a fixed line height for better spacing
+    line_height = 0.045  # Tighter line height for more compact display
+    x_start = 0.08
+
+    # Set of lines to highlight
+    highlight_lines = set(highlight_lines) if highlight_lines else set()
+
+    # Tango-inspired colors
+    colors = {
+        "comment": "#8f5902",  # Brown
+        "decorator": "#5c35cc",  # Purple
+        "keyword": "#204a87",  # Dark blue
+        "string": "#4e9a06",  # Green
+        "number": "#0000cf",  # Blue
+        "function": "#000000",  # Black
+        "operator": "#ce5c00",  # Orange
+        "default": "#000000",  # Black
+    }
+
+    # Keywords to highlight
+    keywords = {
+        "def",
+        "return",
+        "lambda",
+        "import",
+        "from",
+        "class",
+        "if",
+        "else",
+        "elif",
+        "for",
+        "while",
+        "in",
+        "and",
+        "or",
+        "not",
+        "is",
+        "with",
+        "as",
+    }
+
+    # Render each line
+    for i, line in enumerate(lines):
+        y_pos = y_start - i * line_height
+        line_num = i + start_line_num
+
+        # Add highlight background if this line should be highlighted
+        if line_num in highlight_lines:
+            # Draw highlight rectangle centered on the line
+            highlight_rect = mpatches.Rectangle(
+                (0.02, y_pos - line_height * 0.95),
+                0.61,
+                line_height * 0.9,  # Adjusted to 0.61 for better coverage
+                facecolor="#e6f2ff",  # Light blue highlight
+                edgecolor="none",
+                alpha=0.8,  # Visible highlighting
+                transform=ax.transAxes,
+                zorder=-1,  # Ensure it's behind text
+            )
+            ax.add_patch(highlight_rect)
+
+        # Line number
+        ax.text(
+            0.04,
+            y_pos - line_height * 0.5,
+            f"{line_num:2d}",
+            fontproperties=font_manager.FontProperties(
+                family=selected_font, size=9, weight=500
+            ),
+            color="#666666",
+            ha="right",
+            va="center",
+            transform=ax.transAxes,
+        )
+
+        # Determine line color based on content
+        stripped = line.strip()
+        color = colors["default"]
+
+        if stripped.startswith("#"):
+            color = colors["comment"]
+        elif stripped.startswith("@"):
+            color = colors["decorator"]
+        elif any(kw in line.split() for kw in keywords):
+            # For lines with keywords, still render as one piece but with keyword color
+            color = colors["keyword"]
+        elif '"' in line or "'" in line:
+            # Lines containing strings - render in default but we could enhance this
+            color = colors["default"]
+
+        # Render entire line as one text element for perfect alignment
+        ax.text(
+            x_start,
+            y_pos - line_height * 0.5,
+            line,
+            fontproperties=mono_font,
+            color=color,
+            ha="left",
+            va="center",
+            transform=ax.transAxes,
+        )
+
+
+def visualize_onepoint_trace_for_figure(ax=None):
+    """Modified version of visualize_onepoint_trace that works with subplots."""
+    from examples.curvefit.core import onepoint_curve
+
+    # Generate a trace
+    trace = onepoint_curve.simulate(0.5)
+    curve, pt = trace.get_retval()
+    xvals = jnp.linspace(0, 1, 300)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_small"])
+    else:
+        fig = ax.figure
+
+    ax.plot(xvals, jax.vmap(curve)(xvals), color="#0173B2", linewidth=3, alpha=0.9)
+    ax.scatter(
+        pt[0],
+        pt[1],
+        color="#CC3311",
+        s=120,
+        zorder=10,
+        edgecolor="#882255",
+        linewidth=2,
+    )
+    ax.set_ylim(-2, 2)
+    ax.set_xlabel("x", fontsize=14)
+    ax.set_ylabel("y", fontsize=14)
+    ax.grid(True, alpha=0.3, linestyle="--")
+    set_minimal_ticks(ax, x_ticks=3, y_ticks=3)
+
+    # Add annotation
+    ax.annotate(
+        f"Sampled point\n({pt[0]:.1f}, {pt[1]:.2f})",
+        xy=(pt[0], pt[1]),
+        xytext=(0.7, -1.5),
+        fontsize=11,
+        ha="center",
+        arrowprops=dict(
+            arrowstyle="->", connectionstyle="arc3,rad=0.3", color="#CC3311", lw=2
+        ),
+    )
+
+    return fig if ax is None else None
 
 
 def save_parameter_posterior_methods_comparison(seed=42):
@@ -1165,7 +2445,7 @@ def save_parameter_posterior_methods_comparison(seed=42):
     print(f"  NumPyro c range: [{numpyro_c.min():.3f}, {numpyro_c.max():.3f}]")
 
     # Create figure with 3 columns (one for each method)
-    fig = plt.figure(figsize=(15, 10))
+    fig = plt.figure(figsize=FIGURE_SIZES["parameter_posterior"])
 
     # Create grid spec for mixed 2D/3D layout
     gs = fig.add_gridspec(2, 3, height_ratios=[1, 1.2], hspace=0.3)
@@ -1437,3 +2717,423 @@ def save_parameter_posterior_methods_comparison(seed=42):
     plt.close()
 
     print("✓ Saved parameter posterior methods comparison")
+
+
+def save_vectorization_patterns_figure():
+    """Generate the vectorization patterns figure in the same style as programming with generative functions.
+
+    Layout: (2, 3) grid
+    - Row 1: Multiple curves, single point (vmap entire model)
+    - Row 2: Single curve, multiple points (vmap observation model)
+    - Column 1: Code in monospace font
+    - Column 2: Trace data plots showing the pattern
+    - Column 3: Tree trace diagrams showing the structure
+    """
+
+    # Create figure with custom layout
+    fig = plt.figure(figsize=(18, 10))
+
+    # Define the grid - use equal sizes for all subplots
+    subplot_size = 0.4  # Square subplots
+    gap = 0.03
+
+    # Row heights and positions
+    row_height = 0.4  # Square subplots
+    row1_bottom = 0.53
+    row2_bottom = 0.08
+
+    # Create axes for each panel - all same size
+    # Row 1 (Pattern 1: Multiple curves)
+    ax_code1 = fig.add_axes([0.02, row1_bottom, subplot_size, row_height])
+    ax_plot1 = fig.add_axes(
+        [0.02 + subplot_size + gap, row1_bottom, subplot_size, row_height]
+    )
+    ax_tree1 = fig.add_axes(
+        [0.02 + 2 * (subplot_size + gap), row1_bottom, subplot_size, row_height]
+    )
+
+    # Row 2 (Pattern 2: Single curve, multiple points)
+    ax_code2 = fig.add_axes([0.02, row2_bottom, subplot_size, row_height])
+    ax_plot2 = fig.add_axes(
+        [0.02 + subplot_size + gap, row2_bottom, subplot_size, row_height]
+    )
+    ax_tree2 = fig.add_axes(
+        [0.02 + 2 * (subplot_size + gap), row2_bottom, subplot_size, row_height]
+    )
+
+    # Pattern 1: Multiple curves, single point
+    # Code panel
+    code1 = """# Pattern 1: Multiple curves, each with one point
+# Natural for: parameter uncertainty, model comparison
+
+# Just use vmap on the entire model!
+traces = onepoint_curve.vmap()(
+    jnp.full(4, 0.5)  # Same x for all
+)
+
+# Result: 4 independent polynomial curves,
+# each with their own observation"""
+
+    # Remove axes elements for code panels
+    for ax in [ax_code1, ax_code2]:
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis("off")
+
+    # Render code for pattern 1 with pygments/simple rendering
+    # Start very close to the top of the axes
+    render_code_simple(ax_code1, code1, y_start_override=0.98)
+
+    # Plot panel for pattern 1 - show multiple curves in 2x2 grid
+    # Remove the main axes elements
+    ax_plot1.set_xlim(0, 1)
+    ax_plot1.set_ylim(0, 1)
+    ax_plot1.axis("off")
+
+    # Generate and plot multiple curves
+    import jax.random as jrand
+    from examples.curvefit.core import onepoint_curve
+    from genjax import seed
+
+    key = jrand.key(42)
+    x_plot = jnp.linspace(-0.5, 1.5, 100)
+
+    # Create 4 curves for the 2x2 grid
+    # First, let's define the absolute positions based on the row layout
+    # Row 1 spans from row1_bottom to (row1_bottom + row_height)
+    # We need to fit the 2x2 grid within this space
+
+    # Define subplot dimensions as fractions of the plot area
+    subplot_width = 0.12  # Absolute width of each subplot
+    subplot_height = 0.15  # Absolute height of each subplot
+    h_gap = 0.02  # Horizontal gap between subplots
+    v_gap = 0.02  # Vertical gap between subplots
+
+    # Calculate total grid dimensions
+    total_grid_width = 2 * subplot_width + h_gap
+    total_grid_height = 2 * subplot_height + v_gap
+
+    # Center the grid within column 2's space
+    col2_center = 0.02 + subplot_size + gap + subplot_size / 2
+    grid_left = col2_center - total_grid_width / 2
+
+    # Center vertically within row 1
+    row1_center = row1_bottom + row_height / 2
+    grid_bottom = row1_center - total_grid_height / 2
+
+    for idx in range(4):
+        row = idx // 2
+        col = idx % 2
+
+        # Calculate absolute position for each subplot
+        left = grid_left + col * (subplot_width + h_gap)
+        bottom = grid_bottom + (1 - row) * (subplot_height + v_gap)
+
+        # Create sub-axes with absolute positioning
+        sub_ax = fig.add_axes([left, bottom, subplot_width, subplot_height])
+        sub_ax.set_xlim(-0.5, 1.5)
+        sub_ax.set_ylim(-2.5, 2.5)
+
+        # Generate trace
+        subkey = jrand.fold_in(key, idx)
+        trace = seed(onepoint_curve.simulate)(subkey, 0.5)
+
+        # Extract parameters
+        curve_params = trace.get_choices()["curve"]
+        a = curve_params["a"]
+        b = curve_params["b"]
+        c = curve_params["c"]
+        y_plot = a + b * x_plot + c * x_plot**2
+
+        # Plot curve
+        sub_ax.plot(x_plot, y_plot, "b-", alpha=0.8, linewidth=1.5)
+
+        # Plot observation point
+        y_obs = trace.get_choices()["y"]["obs"]
+        sub_ax.scatter(
+            0.5, y_obs, color="red", s=30, zorder=5, edgecolor="black", linewidth=0.5
+        )
+
+        # Add grid
+        sub_ax.axhline(y=0, color="gray", linestyle="-", alpha=0.2, linewidth=0.5)
+        sub_ax.axvline(x=0, color="gray", linestyle="-", alpha=0.2, linewidth=0.5)
+
+        # Remove tick labels for cleaner look
+        sub_ax.set_xticks([])
+        sub_ax.set_yticks([])
+
+        # Add border
+        for spine in sub_ax.spines.values():
+            spine.set_linewidth(0.5)
+            spine.set_color("#cccccc")
+
+    # Add title above the 2x2 grid
+    # Position it above the grid
+    title_y = grid_bottom + total_grid_height + 0.02
+    fig.text(
+        col2_center,
+        title_y,
+        "4 Independent Curves at x=0.5",
+        ha="center",
+        va="bottom",
+        fontsize=14,
+    )
+
+    # Tree panel for pattern 1
+    ax_tree1.set_xlim(0, 1)
+    ax_tree1.set_ylim(0, 1)
+    ax_tree1.axis("off")
+
+    # Draw tree structure
+    ax_tree1.text(
+        0.5,
+        0.9,
+        "traces[0:4]",
+        ha="center",
+        va="center",
+        fontsize=12,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="#f0f0f0", edgecolor="black"),
+    )
+
+    # Tree for 4 traces
+    branch_y = 0.65
+    # Show all 4 traces
+    trace_positions = [0.2, 0.35, 0.65, 0.8]
+    trace_labels = ["[0]", "[1]", "[2]", "[3]"]
+
+    # Draw main vertical line from root
+    ax_tree1.plot([0.5, 0.5], [0.85, 0.75], "k-", linewidth=1, alpha=0.6)
+    # Draw horizontal line
+    ax_tree1.plot([0.15, 0.85], [0.75, 0.75], "k-", linewidth=1, alpha=0.6)
+
+    for i, (x_pos, label) in enumerate(zip(trace_positions, trace_labels)):
+        if label == "...":
+            # Just show ellipsis, no branches
+            ax_tree1.text(
+                x_pos,
+                branch_y,
+                "...",
+                ha="center",
+                va="center",
+                fontsize=12,
+                fontweight="bold",
+            )
+        else:
+            # Branch down
+            ax_tree1.plot(
+                [x_pos, x_pos], [0.75, branch_y], "k-", linewidth=1, alpha=0.6
+            )
+
+            # Trace box
+            ax_tree1.text(
+                x_pos,
+                branch_y - 0.05,
+                label,
+                ha="center",
+                va="top",
+                fontsize=10,
+                bbox=dict(
+                    boxstyle="round,pad=0.2", facecolor="white", edgecolor="gray"
+                ),
+            )
+
+            # Sub-branches
+            ax_tree1.plot(
+                [x_pos, x_pos],
+                [branch_y - 0.1, branch_y - 0.2],
+                "k-",
+                linewidth=0.8,
+                alpha=0.6,
+            )
+            ax_tree1.plot(
+                [x_pos - 0.03, x_pos + 0.03],
+                [branch_y - 0.2, branch_y - 0.2],
+                "k-",
+                linewidth=0.8,
+                alpha=0.6,
+            )
+
+            # Leaves
+            ax_tree1.text(
+                x_pos - 0.03,
+                branch_y - 0.25,
+                "curve",
+                ha="center",
+                va="top",
+                fontsize=8,
+            )
+            ax_tree1.text(
+                x_pos + 0.03, branch_y - 0.25, "y", ha="center", va="top", fontsize=8
+            )
+
+    ax_tree1.set_title("Vectorized traces", fontsize=14)
+
+    # Pattern 2: Single curve, multiple points
+    code2 = """# Pattern 2: One curve, multiple points
+# Natural for: regression, time series
+
+@gen
+def npoint_curve(xs):
+    curve = polynomial() @ "curve"
+    # Vectorize just the observations
+    ys = point.vmap(xs, curve) @ "ys"
+    return curve, (xs, ys)
+
+# Sample one curve with N observations
+trace = npoint_curve.simulate(xs)"""
+
+    # Render code for pattern 2 with pygments/simple rendering
+    # Start near the top of the axes
+    render_code_simple(ax_code2, code2, y_start_override=0.95)
+
+    # Plot panel for pattern 2 - single curve, multiple points
+    # Match the width and horizontal position of the 2x2 grid above
+    total_grid_width = 2 * 0.12 + 0.02  # Same dimensions as 2x2 grid
+    col2_center = 0.02 + subplot_size + gap + subplot_size / 2  # Same center as above
+
+    # Position the single plot
+    new_width = total_grid_width
+    new_left = col2_center - new_width / 2
+    new_height = 0.32  # Most of the row height
+    new_bottom = row2_bottom + (row_height - new_height) / 2  # Center in row 2
+
+    # Create a new axes with the adjusted position
+    ax_plot2_new = fig.add_axes([new_left, new_bottom, new_width, new_height])
+    ax_plot2.remove()  # Remove the old axes
+    ax_plot2 = ax_plot2_new  # Use the new one
+
+    ax_plot2.set_xlim(-0.5, 3.5)
+    ax_plot2.set_ylim(-2, 3)
+    ax_plot2.axhline(y=0, color="gray", linestyle="-", alpha=0.3)
+    ax_plot2.axvline(x=0, color="gray", linestyle="-", alpha=0.3)
+
+    # Generate single curve with multiple points
+    from examples.curvefit.core import npoint_curve
+
+    xs_multi = jnp.linspace(0, 3, 10)
+    trace2 = npoint_curve.simulate(xs_multi)
+
+    curve_ret, (xs_ret, ys_ret) = trace2.get_retval()
+
+    # Plot the curve
+    x_plot = jnp.linspace(-0.5, 3.5, 100)
+    y_plot = curve_ret(x_plot)
+    ax_plot2.plot(x_plot, y_plot, "b-", alpha=0.8, linewidth=2, label="True curve")
+
+    # Plot observations
+    ax_plot2.scatter(
+        xs_ret,
+        ys_ret,
+        color="red",
+        s=60,
+        zorder=5,
+        edgecolor="black",
+        linewidth=1,
+        label="Observations",
+    )
+
+    ax_plot2.set_xlabel("x")
+    ax_plot2.set_ylabel("y")
+    ax_plot2.set_title("Single curve, 10 points", fontsize=14)
+    ax_plot2.legend(fontsize=10)
+    set_minimal_ticks(ax_plot2)
+
+    # Tree panel for pattern 2
+    ax_tree2.set_xlim(0, 1)
+    ax_tree2.set_ylim(0, 1)
+    ax_tree2.axis("off")
+
+    # Draw tree structure
+    ax_tree2.text(
+        0.5,
+        0.9,
+        "trace",
+        ha="center",
+        va="center",
+        fontsize=12,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="#f0f0f0", edgecolor="black"),
+    )
+
+    # Branch to curve and ys
+    ax_tree2.plot([0.5, 0.5], [0.85, 0.7], "k-", linewidth=1, alpha=0.6)
+    ax_tree2.plot([0.3, 0.7], [0.7, 0.7], "k-", linewidth=1, alpha=0.6)
+
+    # Curve branch
+    ax_tree2.plot([0.3, 0.3], [0.7, 0.6], "k-", linewidth=1, alpha=0.6)
+    ax_tree2.text(
+        0.3,
+        0.55,
+        "curve",
+        ha="center",
+        va="top",
+        fontsize=11,
+        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="gray"),
+    )
+
+    # Sub-branches for curve
+    ax_tree2.plot([0.3, 0.3], [0.5, 0.4], "k-", linewidth=0.8, alpha=0.6)
+    ax_tree2.plot([0.2, 0.4], [0.4, 0.4], "k-", linewidth=0.8, alpha=0.6)
+    ax_tree2.text(0.2, 0.35, "a", ha="center", va="top", fontsize=9)
+    ax_tree2.text(0.3, 0.35, "b", ha="center", va="top", fontsize=9)
+    ax_tree2.text(0.4, 0.35, "c", ha="center", va="top", fontsize=9)
+
+    # ys branch
+    ax_tree2.plot([0.7, 0.7], [0.7, 0.6], "k-", linewidth=1, alpha=0.6)
+    ax_tree2.text(
+        0.7,
+        0.55,
+        "ys[0:10]",
+        ha="center",
+        va="top",
+        fontsize=11,
+        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="gray"),
+    )
+
+    # Show vectorized structure
+    ax_tree2.plot([0.7, 0.7], [0.5, 0.4], "k-", linewidth=0.8, alpha=0.6)
+    ax_tree2.plot([0.6, 0.8], [0.4, 0.4], "k-", linewidth=0.8, alpha=0.6)
+
+    for i, x in enumerate([0.62, 0.7, 0.78]):
+        ax_tree2.plot([x, x], [0.4, 0.35], "k-", linewidth=0.8, alpha=0.6)
+        if i == 1:
+            ax_tree2.text(x, 0.32, "...", ha="center", va="top", fontsize=9)
+        else:
+            ax_tree2.text(x, 0.32, f"obs[{i * 9}]", ha="center", va="top", fontsize=8)
+
+    ax_tree2.set_title("Single trace structure", fontsize=14)
+
+    # Add overall title
+    fig.suptitle(
+        "Two Natural Vectorization Patterns", fontsize=20, fontweight="bold", y=0.98
+    )
+
+    # Add pattern labels
+    fig.text(
+        0.02,
+        0.95,
+        "Pattern 1: Multiple Independent Models",
+        fontsize=16,
+        fontweight="bold",
+        color="#333333",
+    )
+    fig.text(
+        0.02,
+        0.48,
+        "Pattern 2: Single Model, Multiple Observations",
+        fontsize=16,
+        fontweight="bold",
+        color="#333333",
+    )
+
+    # Save figure
+    # Don't use tight_layout with absolute positioning
+    fig.savefig(
+        "examples/curvefit/figs/002_vectorization_patterns.pdf",
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close()
+
+    print("✓ Saved vectorization patterns figure")
