@@ -148,6 +148,76 @@ def infer_latents_easy(
     return result.traces, result.log_weights
 
 
+def hmc_infer_latents_vectorized(
+    key,
+    xs,
+    ys,
+    n_samples: Const[int],
+    n_warmup: Const[int] = Const(500),
+    step_size: Const[float] = Const(0.05),
+    n_steps: Const[int] = Const(10),
+    n_chains: Const[int] = Const(4),
+):
+    """
+    Infer latent curve parameters using vectorized GenJAX HMC across multiple chains.
+
+    Args:
+        key: JAX random key
+        xs: Input points where observations were made
+        ys: Observed values at xs
+        n_samples: Number of MCMC samples per chain (wrapped in Const)
+        n_warmup: Number of warmup/burn-in samples (wrapped in Const)
+        step_size: HMC step size (wrapped in Const)
+        n_steps: Number of leapfrog steps (wrapped in Const)
+        n_chains: Number of parallel chains (wrapped in Const)
+
+    Returns:
+        (samples, diagnostics): HMC samples and diagnostics
+    """
+    from genjax.inference import hmc, chain
+    from genjax.core import sel
+
+    constraints = {"ys": {"obs": ys}}
+    
+    # Define HMC kernel for continuous parameters
+    def hmc_kernel(trace):
+        # Select the entire curve (which contains polynomial parameters)
+        selection = sel("curve")
+        return hmc(trace, selection, step_size=step_size.value, n_steps=n_steps.value)
+
+    # Create MCMC chain
+    hmc_chain = chain(hmc_kernel)
+    
+    # Function to run single chain
+    def run_single_chain(chain_key):
+        # Split key for initialization and chain
+        init_key, chain_key = jrand.split(chain_key)
+        
+        # Generate initial trace with this chain's key
+        initial_trace, _ = seed(npoint_curve.generate)(init_key, constraints, xs)
+        
+        # Run HMC with burn-in
+        total_steps = n_samples.value + n_warmup.value
+        result = seed(hmc_chain)(chain_key, initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
+        return result
+    
+    # Vectorize across chains
+    vectorized_chains = jax.vmap(run_single_chain)
+    
+    # Split keys for chains
+    chain_keys = jrand.split(key, n_chains.value)
+    results = vectorized_chains(chain_keys)
+    
+    # Combine results from all chains
+    return results.traces, {
+        "acceptance_rate": jnp.mean(results.acceptance_rate),
+        "n_samples": n_samples.value,
+        "n_chains": n_chains.value,
+        "n_total_samples": n_samples.value * n_chains.value,
+    }
+
+
+# Keep old single-chain version for compatibility
 def hmc_infer_latents(
     xs,
     ys,
@@ -157,18 +227,8 @@ def hmc_infer_latents(
     n_steps: Const[int] = Const(10),
 ):
     """
-    Infer latent curve parameters using GenJAX HMC.
-
-    Args:
-        xs: Input points where observations were made
-        ys: Observed values at xs
-        n_samples: Number of MCMC samples (wrapped in Const)
-        n_warmup: Number of warmup/burn-in samples (wrapped in Const)
-        step_size: HMC step size (wrapped in Const)
-        n_steps: Number of leapfrog steps (wrapped in Const)
-
-    Returns:
-        (samples, diagnostics): HMC samples and diagnostics
+    Single-chain HMC for backward compatibility.
+    This function expects seed() to be applied externally.
     """
     from genjax.inference import hmc, chain
     from genjax.core import sel
@@ -179,7 +239,6 @@ def hmc_infer_latents(
 
     # Define HMC kernel for continuous parameters
     def hmc_kernel(trace):
-        # Select the entire curve (which contains freq and off parameters)
         selection = sel("curve")
         return hmc(trace, selection, step_size=step_size.value, n_steps=n_steps.value)
 
@@ -193,7 +252,7 @@ def hmc_infer_latents(
     return result.traces, {
         "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
-        "n_chains": result.n_chains.value,
+        "n_chains": 1,
     }
 
 
@@ -300,8 +359,8 @@ def numpyro_run_importance_sampling(key, xs, ys, num_samples=1000):
     }
 
 
-def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500):
-    """Run HMC inference using NumPyro (non-JIT version, same parameters as GenJAX)."""
+def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500, num_chains=4):
+    """Run vectorized HMC inference using NumPyro across multiple chains."""
     obs_dict = {"obs": ys}
 
     def conditioned_model(xs, obs_dict):
@@ -314,6 +373,7 @@ def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500):
         hmc_kernel,
         num_warmup=num_warmup,
         num_samples=num_samples,
+        num_chains=num_chains,
         jit_model_args=False,
         progress_bar=False,
     )  # No JIT for this version
@@ -334,13 +394,15 @@ def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500):
         "diagnostics": diagnostics,
         "num_samples": num_samples,
         "num_warmup": num_warmup,
+        "num_chains": num_chains,
+        "num_total_samples": num_samples * num_chains,
     }
 
 
 def numpyro_run_hmc_inference_jit_impl(
-    key, xs, ys, num_samples=1000, num_warmup=500, step_size=0.01, num_steps=20
+    key, xs, ys, num_samples=1000, num_warmup=500, step_size=0.01, num_steps=20, num_chains=4
 ):
-    """Run HMC inference using NumPyro with JIT compilation (same parameters as GenJAX)."""
+    """Run vectorized HMC inference using NumPyro with JIT compilation across multiple chains."""
     obs_dict = {"obs": ys}
 
     def conditioned_model(xs, obs_dict):
@@ -353,6 +415,7 @@ def numpyro_run_hmc_inference_jit_impl(
         hmc_kernel,
         num_warmup=num_warmup,
         num_samples=num_samples,
+        num_chains=num_chains,
         jit_model_args=True,
         progress_bar=False,
     )  # Enable JIT for this version
@@ -373,13 +436,15 @@ def numpyro_run_hmc_inference_jit_impl(
         "diagnostics": diagnostics,
         "num_samples": num_samples,
         "num_warmup": num_warmup,
+        "num_chains": num_chains,
+        "num_total_samples": num_samples * num_chains,
     }
 
 
 # JIT-compiled version for fair performance comparison
 numpyro_run_hmc_inference_jit = jax.jit(
-    numpyro_run_hmc_inference_jit_impl, static_argnums=(3, 4, 6)
-)  # num_samples, num_warmup, num_steps (step_size is not static)
+    numpyro_run_hmc_inference_jit_impl, static_argnums=(3, 4, 6, 7)
+)  # num_samples, num_warmup, num_steps, num_chains (step_size is not static)
 
 
 # Outlier models for GenJAX
@@ -528,6 +593,7 @@ def hmc_infer_latents_with_outliers(
 # GenJAX JIT-compiled functions - apply seed() before jit()
 infer_latents_seeded = seed(infer_latents)
 hmc_infer_latents_seeded = seed(hmc_infer_latents)
+hmc_infer_latents_vectorized_jit = jax.jit(hmc_infer_latents_vectorized)
 infer_latents_with_outliers_seeded = seed(infer_latents_with_outliers)
 hmc_infer_latents_with_outliers_seeded = seed(hmc_infer_latents_with_outliers)
 
@@ -607,13 +673,15 @@ def run_comprehensive_benchmark(
         "ess": effective_sample_size(genjax_is_weights),
     }
 
-    # GenJAX HMC
-    print("Running GenJAX HMC...")
+    # GenJAX Vectorized HMC
+    print("Running GenJAX Vectorized HMC (4 chains)...")
 
-    # Use the pre-seeded JIT-compiled HMC function
+    # Use the JIT-compiled vectorized HMC function
     def genjax_hmc_task():
-        return hmc_infer_latents_jit(
-            jrand.key(seed), xs, ys, Const(n_samples), Const(n_warmup)
+        return hmc_infer_latents_vectorized_jit(
+            jrand.key(seed), xs, ys, 
+            Const(n_samples), Const(n_warmup),
+            Const(0.05), Const(10), Const(4)  # 4 chains
         )
 
     genjax_hmc_times, genjax_hmc_stats = benchmark_with_warmup(
@@ -621,12 +689,14 @@ def run_comprehensive_benchmark(
     )
 
     # Get samples for posterior analysis
-    genjax_hmc_samples, genjax_hmc_diagnostics = hmc_infer_latents_jit(
-        jrand.key(seed), xs, ys, Const(n_samples), Const(n_warmup)
+    genjax_hmc_samples, genjax_hmc_diagnostics = hmc_infer_latents_vectorized_jit(
+        jrand.key(seed), xs, ys, 
+        Const(n_samples), Const(n_warmup),
+        Const(0.05), Const(10), Const(4)  # 4 chains
     )
 
     results["genjax_hmc"] = {
-        "method": "HMC",
+        "method": f"HMC (K=4, L={n_samples})",
         "framework": "GenJAX",
         "samples": genjax_hmc_samples,
         "diagnostics": genjax_hmc_diagnostics,
@@ -658,19 +728,19 @@ def run_comprehensive_benchmark(
         "ess": effective_sample_size(numpyro_is_result["log_weights"]),
     }
 
-    print("Running NumPyro HMC...")
+    print("Running NumPyro Vectorized HMC (4 chains)...")
 
     def numpyro_hmc_task():
-        return numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup)
+        return numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup, num_chains=4)
 
     numpyro_hmc_times, numpyro_hmc_stats = benchmark_with_warmup(
         numpyro_hmc_task, repeats=timing_repeats
     )
 
-    numpyro_hmc_result = numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup)
+    numpyro_hmc_result = numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup, num_chains=4)
 
     results["numpyro_hmc"] = {
-        "method": "HMC",
+        "method": f"HMC (K=4, L={n_samples})",
         "framework": "NumPyro",
         "samples": numpyro_hmc_result["samples"],
         "diagnostics": numpyro_hmc_result["diagnostics"],
@@ -712,12 +782,20 @@ def extract_posterior_samples(benchmark_results):
                 b_samples = traces.get_choices()["curve"]["b"][indices]
                 c_samples = traces.get_choices()["curve"]["c"][indices]
 
-            elif method == "HMC":
+            elif method in ["HMC", "Vectorized HMC"]:
                 # Extract MCMC samples directly
                 traces = result["samples"]
+                # For vectorized HMC, samples are shape (n_chains, n_samples, ...)
+                # We'll flatten them to (n_chains * n_samples, ...)
                 a_samples = traces.get_choices()["curve"]["a"]
                 b_samples = traces.get_choices()["curve"]["b"]
                 c_samples = traces.get_choices()["curve"]["c"]
+                
+                # Flatten if vectorized (shape has more than 1 dimension)
+                if a_samples.ndim > 1:
+                    a_samples = a_samples.reshape(-1)
+                    b_samples = b_samples.reshape(-1)
+                    c_samples = c_samples.reshape(-1)
 
         elif framework == "NumPyro":
             if method == "Importance Sampling":
@@ -733,12 +811,14 @@ def extract_posterior_samples(benchmark_results):
                 b_samples = samples["b"][indices]
                 c_samples = samples["c"][indices]
 
-            elif method == "HMC":
+            elif method in ["HMC", "Vectorized HMC"]:
                 # MCMC samples
                 samples = result["samples"]
                 a_samples = samples["a"]
                 b_samples = samples["b"]
                 c_samples = samples["c"]
+                
+                # NumPyro already flattens chains, so shape is (n_chains * n_samples,)
 
         posterior_samples[method_name] = {
             "framework": framework,
