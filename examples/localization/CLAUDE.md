@@ -94,6 +94,25 @@ data/localization_r{rays}_p{particles}_{world_type}_{timestamp}/
 
 ## Visualization (`figs.py`)
 
+### GenJAX Research Visualization Standards (GRVS)
+
+All visualization functions use the shared `examples.viz` module for consistent styling across case studies:
+
+**Core Standards:**
+- **Typography**: 18pt base fonts, bold axis labels, 16pt legends
+- **Colors**: Colorblind-friendly palette with consistent SMC method colors
+- **Clean Room Visualization**: LIDAR and trajectory plots remove axes/grid for cleaner spatial view
+- **Shared Axes**: Distance readings plots use shared y-axis with single "Distance" label
+- **Publication Quality**: 300 DPI PDF output with GRVS compliance
+
+**Usage Pattern:**
+```python
+from examples.viz import (
+    setup_publication_fonts, FIGURE_SIZES, get_method_color,
+    apply_grid_style, save_publication_figure
+)
+```
+
 ### SMC Method Comparison Plot
 **4-row layout** (`plot_smc_method_comparison()`):
 1. **Initial particles** with "Start" label (left side)
@@ -106,6 +125,21 @@ data/localization_r{rays}_p{particles}_{world_type}_{timestamp}/
 - **ESS thresholds**: Good ≥50% particles, Medium ≥25%, Bad <25%
 - **Ground truth**: Marked with 'x' symbols
 - **Particle blending**: Shows temporal evolution with alpha transparency
+
+### Clean Room Visualization
+**LIDAR and trajectory plots** (`plot_lidar_demo()`, `plot_ground_truth_trajectory()`):
+- **No axes, ticks, or grid**: Clean spatial visualization focusing on room layout
+- **Hidden spines**: All axis borders removed for uncluttered view
+- **Room-only focus**: Emphasizes spatial relationships without distracting elements
+- **Enhanced visibility**: Legend placed inside room (lower left), doubled marker sizes (160 vs 80), increased legend font size (20pt), larger robot arrows with thicker lines
+- **Larger room labels**: "Room _" labels increased from 14pt to 20pt for better readability in LIDAR demo
+
+### Shared Distance Plots
+**Sensor observations** (`plot_sensor_observations()`):
+- **Shared y-axis**: All subplots use consistent distance scaling
+- **Single label**: "Distance" label only on leftmost column
+- **Ray-specific plots**: Each LIDAR ray shown in separate subplot with shared scaling
+- **Improved label positioning**: "Ray _" labels moved from (0.02, 0.98) to (0.15, 0.85) for better visibility within subplots
 
 ### Other Plots
 - **`plot_particle_filter_evolution()`**: 4×4 grid showing particle evolution over 16 timesteps
@@ -130,7 +164,7 @@ pixi run cuda-localization
 ```bash
 # Generate data with specific parameters
 pixi run -e cuda python -m examples.localization.main generate-data \
-    --n-particles 100 --k-rejuv 10 --timing-repeats 5 \
+    --n-particles 100 --k-rejuv 20 --timing-repeats 5 \
     --include-basic-demo --include-smc-comparison
 
 # Plot from specific experiment
@@ -142,7 +176,7 @@ pixi run -e cuda python -m examples.localization.main plot-figures \
 - **`--include-basic-demo`**: Include basic particle filter demo
 - **`--include-smc-comparison`**: Include 4-method SMC comparison (adds computation time)
 - **`--n-particles N`**: Particle count (default: 200)
-- **`--k-rejuv K`**: MCMC rejuvenation steps (default: 10)
+- **`--k-rejuv K`**: MCMC rejuvenation steps (default: 20)
 - **`--timing-repeats R`**: Timing repetitions (default: 20)
 - **`--experiment-name NAME`**: Custom experiment name (defaults to timestamped)
 
@@ -211,3 +245,82 @@ pixi run -e cuda python -m examples.localization.main plot-figures \
 - **Fast performance** suitable for real-time applications
 
 All functionality tested and verified with the drift-only model providing excellent convergence properties.
+
+## Figure Generation and Naming
+
+### 📊 Generated Figures
+The localization case study generates 15 distinct visualizations, each with descriptive filenames:
+
+1. **`localization_r8_p200_basic_true_robot_path_with_lidar_observations.pdf`**
+   - Ground truth robot trajectory through the multi-room environment
+   - LIDAR sensor readings annotated along the path
+   - Shows actual robot movement for comparison with estimates
+
+2. **`localization_r8_p200_basic_trajectory_types_exploration_vs_navigation.pdf`**
+   - Compares different movement strategies: exploration vs room navigation
+   - Multiple trajectories overlaid on the same world map
+   - Demonstrates variety in robot movement patterns
+
+3. **`localization_r8_p200_basic_lidar_8ray_wall_detection_visualization.pdf`**
+   - Single robot pose with 8 LIDAR rays extending to walls
+   - Shows how distance measurements are computed
+   - Illustrates sensor model used in particle filtering
+
+4. **`localization_r8_p200_basic_particle_filter_temporal_evolution_16steps.pdf`**
+   - 4×4 grid showing particle cloud evolution over 16 timesteps
+   - Visualizes convergence from initial uncertainty to final estimate
+   - Particles colored by viridis colormap for visual distinction
+
+5. **`localization_r8_p200_basic_final_particle_distribution_at_convergence.pdf`**
+   - Final timestep particles showing convergence to true location
+   - Weighted particle sizes indicate importance
+   - Demonstrates successful localization
+
+6. **`localization_r8_p200_basic_position_and_heading_error_over_time.pdf`**
+   - Two subplots: position error (meters) and heading error (radians)
+   - Tracks estimation accuracy throughout trajectory
+   - Shows convergence behavior over time
+
+7. **`localization_r8_p200_basic_particle_weights_and_ess_percentage_timeline.pdf`**
+   - Raincloud plots of particle weight distributions
+   - ESS (Effective Sample Size) shown as percentage of total particles
+   - Color-coded by ESS quality: good (>50%), fair (10-50%), poor (<10%)
+
+8. **`localization_r8_p200_basic_lidar_distance_readings_along_trajectory.pdf`**
+   - LIDAR distance measurements plotted over trajectory steps
+   - 8 lines representing each LIDAR ray's readings
+   - Shows sensor data variation along the path
+
+9. **`localization_r8_p200_basic_inference_runtime_performance_comparison.pdf`**
+   - Horizontal bar chart comparing SMC method execution times
+   - Error bars show standard deviation across timing runs
+   - Methods sorted by speed (fastest to slowest)
+
+10. **`localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf`**
+    - Main 4-row comparison figure with all SMC variants
+    - Row 1: Initial particle distributions with method titles
+    - Row 2: Particle evolution showing trajectory blending
+    - Row 3: Raincloud plots with ESS percentages
+    - Row 4: Timing comparison bars
+    - Legend at bottom with method descriptions
+
+11-14. **Per-method particle evolution timelines**:
+    - `smc-basic_particle_evolution_timeline.pdf` - Bootstrap filter
+    - `smc-hmc_particle_evolution_timeline.pdf` - SMC with HMC rejuvenation
+    - `smc-locally-optimal_particle_evolution_timeline.pdf` - SMC with locally optimal proposal
+    - `smc-locally-optimal-big-grid_particle_evolution_timeline.pdf` - SMC with 5 particles
+
+15. **`localization_r8_p200_basic_all_methods_tracking_accuracy_comparison.pdf`**
+    - Side-by-side position and heading error plots for all methods
+    - Direct comparison of tracking accuracy
+    - Shows which methods maintain lowest error
+
+### 🎨 Visualization Features
+- **ESS Display**: Shows as percentage (e.g., "ESS: 75%") for intuitive understanding
+- **Legend Design**: 
+  - Large colored squares (3×2 units) for visibility
+  - 18pt font at bottom of figure
+  - Line breaks in method labels for readability
+- **Method Titles**: Each subplot shows method name with parameters
+- **Consistent Prefix**: All figures start with "localization_" for clear identification
+- **Parametric Naming**: Configuration encoded in filename (r8=8 rays, p200=200 particles, basic=world type)

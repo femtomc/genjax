@@ -333,9 +333,9 @@ def localization_model(prev_pose, time_index, world, n_rays=Const(8)):
     initial_theta = 0.0
 
     # Drift parameters (no velocity, just positional drift)
-    drift_noise_x = 0.15
-    drift_noise_y = 0.15
-    drift_noise_theta = 0.05
+    drift_noise_x = 0.25  # Increased from 0.15
+    drift_noise_y = 0.25  # Increased from 0.15
+    drift_noise_theta = 0.1  # Increased from 0.05
 
     # Initial uncertainty
     initial_noise_x = 0.5
@@ -823,9 +823,9 @@ def run_smc_with_locally_optimal(
     dummy_pose = Pose(x=0.0, y=0.0, theta=0.0)
     initial_args = (dummy_pose, jnp.array(0), world, const(n_rays))
 
-    # Create locally optimal proposal with moderate grid centered on particle
+    # Create locally optimal proposal with 25x25x25 grid centered on particle
     locally_optimal_proposal = create_locally_optimal_proposal(
-        world, grid_size=10, noise_std=0.15, grid_radius=2.0
+        world, grid_size=25, noise_std=0.15, grid_radius=2.0
     )
 
     # Run SMC with locally optimal proposal (no mcmc_kernel needed)
@@ -839,6 +839,92 @@ def run_smc_with_locally_optimal(
         return_all_particles=const(True),
         n_rejuvenation_moves=K,
     )
+    
+    # Extract particle history and weights from SMC result
+    all_traces = particles_smc.traces
+    all_weights = particles_smc.log_weights
+
+    choices = all_traces.get_choices()
+    n_timesteps = choices["x"].shape[0]
+
+    particle_history = []
+    weight_history = []
+
+    for t in range(n_timesteps):
+        timestep_particles = []
+        for i in range(n_particles):
+            pose = Pose(
+                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
+            )
+            timestep_particles.append(pose)
+
+        particle_history.append(timestep_particles)
+
+        timestep_weights = jnp.exp(all_weights[t])
+        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
+        weight_history.append(timestep_weights)
+
+    diagnostic_weights = particles_smc.diagnostic_weights
+    return particle_history, weight_history, diagnostic_weights
+
+
+def run_smc_with_locally_optimal_big_grid(
+    n_particles, observations, world, key, n_rays=8, K: Const[int] = const(10)
+):
+    """Run SMC with locally optimal proposal using a bigger grid (25x25x25)."""
+    from genjax.inference import rejuvenation_smc
+    from genjax.core import const
+
+    # Prepare observations
+    obs_array = jnp.array(observations)
+    obs_sequence = {"measurements": {"distance": obs_array}}
+
+    dummy_pose = Pose(x=0.0, y=0.0, theta=0.0)
+    initial_args = (dummy_pose, jnp.array(0), world, const(n_rays))
+
+    # Create locally optimal proposal with bigger grid and wider search radius
+    locally_optimal_proposal = create_locally_optimal_proposal(
+        world, grid_size=25, noise_std=0.1, grid_radius=3.0
+    )
+
+    # Run SMC with locally optimal proposal (no mcmc_kernel needed)
+    particles_smc = seed(rejuvenation_smc)(
+        key,
+        localization_model,
+        transition_proposal=locally_optimal_proposal,
+        observations=obs_sequence,
+        initial_model_args=initial_args,
+        n_particles=const(n_particles),
+        return_all_particles=const(True),
+        n_rejuvenation_moves=K,
+    )
+    
+    # Extract particle history and weights from SMC result
+    all_traces = particles_smc.traces
+    all_weights = particles_smc.log_weights
+
+    choices = all_traces.get_choices()
+    n_timesteps = choices["x"].shape[0]
+
+    particle_history = []
+    weight_history = []
+
+    for t in range(n_timesteps):
+        timestep_particles = []
+        for i in range(n_particles):
+            pose = Pose(
+                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
+            )
+            timestep_particles.append(pose)
+
+        particle_history.append(timestep_particles)
+
+        timestep_weights = jnp.exp(all_weights[t])
+        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
+        weight_history.append(timestep_weights)
+
+    diagnostic_weights = particles_smc.diagnostic_weights
+    return particle_history, weight_history, diagnostic_weights
 
     # Extract particle history and weights from SMC result
     all_traces = particles_smc.traces
@@ -869,37 +955,42 @@ def run_smc_with_locally_optimal(
 
 
 def benchmark_smc_methods(
-    n_particles, observations, world, key, n_rays=8, repeats=5, K=10
+    n_particles, observations, world, key, n_rays=8, repeats=5, K=20, K_hmc=25, n_particles_big_grid=5
 ):
     """Benchmark different SMC methods and return timing results."""
     import jax
     from examples.utils import benchmark_with_warmup
     from genjax.core import const
 
+    # Define methods with their specific particle counts
     methods = {
-        "smc_basic": run_smc_basic,
-        "smc_mh": run_smc_with_mh,
-        "smc_hmc": run_smc_with_hmc,
-        "smc_locally_optimal": run_smc_with_locally_optimal,
+        "smc_basic": (run_smc_basic, n_particles),
+        "smc_hmc": (run_smc_with_hmc, n_particles),
+        "smc_locally_optimal": (run_smc_with_locally_optimal, n_particles),
+        "smc_locally_optimal_big_grid": (run_smc_with_locally_optimal_big_grid, n_particles_big_grid),  # Use parameter
     }
 
     results = {}
 
-    for method_name, method_func in methods.items():
+    for method_name, (method_func, method_n_particles) in methods.items():
         print(f"Benchmarking {method_name}...")
 
         # JIT compile the method for fair timing comparison
         # Note: With Const[...] pattern, we don't need K in static_argnames
         jitted_method = jax.jit(method_func, static_argnames=("n_particles", "n_rays"))
 
-        # Prepare function for timing (pass const(K) for MCMC methods)
+        # Prepare function for timing (pass const(K) for methods that need it)
         def run_method():
-            if method_name in ["smc_mh", "smc_hmc", "smc_locally_optimal"]:
+            if method_name == "smc_hmc":
                 return jitted_method(
-                    n_particles, observations, world, key, n_rays, const(K)
+                    method_n_particles, observations, world, key, n_rays, const(K_hmc)
+                )
+            elif method_name in ["smc_locally_optimal", "smc_locally_optimal_big_grid"]:
+                return jitted_method(
+                    method_n_particles, observations, world, key, n_rays, const(K)
                 )
             else:
-                return jitted_method(n_particles, observations, world, key, n_rays)
+                return jitted_method(method_n_particles, observations, world, key, n_rays)
 
         # Warm up and time the method
         times, (mean_time, std_time) = benchmark_with_warmup(
@@ -917,6 +1008,7 @@ def benchmark_smc_methods(
             "particle_history": particle_history,
             "weight_history": weight_history,
             "diagnostic_weights": diagnostic_weights,
+            "n_particles": method_n_particles,  # Store actual particle count used
         }
 
         print(f"  {method_name}: {mean_time:.3f} ± {std_time:.3f} seconds")

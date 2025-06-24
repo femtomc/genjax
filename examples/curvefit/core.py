@@ -1,5 +1,5 @@
-from genjax import gen, normal, Cond, flip
-from genjax.core import Const
+from genjax import gen, normal, Cond, flip, uniform, beta
+from genjax.core import Const, sel
 from genjax.pjax import seed
 import jax.numpy as jnp
 import jax.random as jrand
@@ -9,13 +9,23 @@ from tensorflow_probability.substrates import jax as tfp
 from genjax import tfp_distribution
 import jax
 
-# NumPyro imports
-import numpyro
-import numpyro.distributions as numpyro_dist
-from numpyro.handlers import replay, seed as numpyro_seed
-
-# from numpyro.contrib.funsor import log_density  # Moved to function for lazy loading
-from numpyro.infer import HMC, MCMC
+# NumPyro imports (conditional)
+try:
+    import numpyro
+    import numpyro.distributions as numpyro_dist
+    from numpyro.handlers import replay, seed as numpyro_seed
+    # from numpyro.contrib.funsor import log_density  # Moved to function for lazy loading
+    from numpyro.infer import HMC, MCMC
+    HAS_NUMPYRO = True
+except ImportError:
+    HAS_NUMPYRO = False
+    # Create dummy objects to prevent NameError
+    numpyro = None
+    numpyro_dist = None
+    replay = None
+    numpyro_seed = None
+    HMC = None
+    MCMC = None
 
 
 from genjax import Pytree
@@ -42,7 +52,7 @@ class Lambda(Pytree):
 @gen
 def point(x, curve):
     y_det = curve(x)
-    y_observed = normal(y_det, 0.2) @ "obs"
+    y_observed = normal(y_det, 0.05) @ "obs"  # Reduced observation noise
     return y_observed
 
 
@@ -148,76 +158,6 @@ def infer_latents_easy(
     return result.traces, result.log_weights
 
 
-def hmc_infer_latents_vectorized(
-    key,
-    xs,
-    ys,
-    n_samples: Const[int],
-    n_warmup: Const[int] = Const(500),
-    step_size: Const[float] = Const(0.05),
-    n_steps: Const[int] = Const(10),
-    n_chains: Const[int] = Const(4),
-):
-    """
-    Infer latent curve parameters using vectorized GenJAX HMC across multiple chains.
-
-    Args:
-        key: JAX random key
-        xs: Input points where observations were made
-        ys: Observed values at xs
-        n_samples: Number of MCMC samples per chain (wrapped in Const)
-        n_warmup: Number of warmup/burn-in samples (wrapped in Const)
-        step_size: HMC step size (wrapped in Const)
-        n_steps: Number of leapfrog steps (wrapped in Const)
-        n_chains: Number of parallel chains (wrapped in Const)
-
-    Returns:
-        (samples, diagnostics): HMC samples and diagnostics
-    """
-    from genjax.inference import hmc, chain
-    from genjax.core import sel
-
-    constraints = {"ys": {"obs": ys}}
-    
-    # Define HMC kernel for continuous parameters
-    def hmc_kernel(trace):
-        # Select the entire curve (which contains polynomial parameters)
-        selection = sel("curve")
-        return hmc(trace, selection, step_size=step_size.value, n_steps=n_steps.value)
-
-    # Create MCMC chain
-    hmc_chain = chain(hmc_kernel)
-    
-    # Function to run single chain
-    def run_single_chain(chain_key):
-        # Split key for initialization and chain
-        init_key, chain_key = jrand.split(chain_key)
-        
-        # Generate initial trace with this chain's key
-        initial_trace, _ = seed(npoint_curve.generate)(init_key, constraints, xs)
-        
-        # Run HMC with burn-in
-        total_steps = n_samples.value + n_warmup.value
-        result = seed(hmc_chain)(chain_key, initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
-        return result
-    
-    # Vectorize across chains
-    vectorized_chains = jax.vmap(run_single_chain)
-    
-    # Split keys for chains
-    chain_keys = jrand.split(key, n_chains.value)
-    results = vectorized_chains(chain_keys)
-    
-    # Combine results from all chains
-    return results.traces, {
-        "acceptance_rate": jnp.mean(results.acceptance_rate),
-        "n_samples": n_samples.value,
-        "n_chains": n_chains.value,
-        "n_total_samples": n_samples.value * n_chains.value,
-    }
-
-
-# Keep old single-chain version for compatibility
 def hmc_infer_latents(
     xs,
     ys,
@@ -227,8 +167,18 @@ def hmc_infer_latents(
     n_steps: Const[int] = Const(10),
 ):
     """
-    Single-chain HMC for backward compatibility.
-    This function expects seed() to be applied externally.
+    Infer latent curve parameters using GenJAX HMC.
+
+    Args:
+        xs: Input points where observations were made
+        ys: Observed values at xs
+        n_samples: Number of MCMC samples (wrapped in Const)
+        n_warmup: Number of warmup/burn-in samples (wrapped in Const)
+        step_size: HMC step size (wrapped in Const)
+        n_steps: Number of leapfrog steps (wrapped in Const)
+
+    Returns:
+        (samples, diagnostics): HMC samples and diagnostics
     """
     from genjax.inference import hmc, chain
     from genjax.core import sel
@@ -239,6 +189,7 @@ def hmc_infer_latents(
 
     # Define HMC kernel for continuous parameters
     def hmc_kernel(trace):
+        # Select the entire curve (which contains freq and off parameters)
         selection = sel("curve")
         return hmc(trace, selection, step_size=step_size.value, n_steps=n_steps.value)
 
@@ -252,8 +203,49 @@ def hmc_infer_latents(
     return result.traces, {
         "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
-        "n_chains": 1,
+        "n_chains": result.n_chains.value,
     }
+
+
+def hmc_infer_latents_vectorized(
+    xs,
+    ys,
+    n_samples: Const[int],
+    n_warmup: Const[int] = Const(500),
+    step_size: Const[float] = Const(0.05),
+    n_steps: Const[int] = Const(10),
+    n_chains: Const[int] = Const(4),
+):
+    """
+    Vectorized HMC inference running multiple chains in parallel.
+    
+    Args:
+        xs: Input points where observations were made
+        ys: Observed values at xs
+        n_samples: Number of MCMC samples per chain (wrapped in Const)
+        n_warmup: Number of warmup/burn-in samples (wrapped in Const)
+        step_size: HMC step size (wrapped in Const)
+        n_steps: Number of leapfrog steps (wrapped in Const)
+        n_chains: Number of parallel chains (wrapped in Const)
+        
+    Returns:
+        tuple: (trace with shape (n_chains, n_samples), diagnostics dict)
+    """
+    # Create a function that runs a single chain with key as argument
+    def run_single_chain(key, xs, ys):
+        return seed(hmc_infer_latents)(key, xs, ys, n_samples, n_warmup, step_size, n_steps)
+    
+    # Generate keys for each chain
+    keys = jrand.split(jrand.key(0), n_chains.value)
+    
+    # Run chains in parallel using vmap
+    vectorized_hmc = jax.vmap(run_single_chain, in_axes=(0, None, None))
+    traces, diagnostics = vectorized_hmc(keys, xs, ys)
+    
+    # Update diagnostics to reflect multiple chains
+    diagnostics["n_chains"] = n_chains.value
+    
+    return traces, diagnostics
 
 
 def get_points_for_inference(n_points=10):
@@ -303,7 +295,7 @@ def numpyro_npoint_model(xs, obs_dict=None):
             obs_vals = obs_dict["obs"]
         y_det = numpyro_polyfn(xs, a, b, c)
         y_observed = numpyro.sample(
-            "obs", numpyro_dist.Normal(y_det, 0.2), obs=obs_vals
+            "obs", numpyro_dist.Normal(y_det, 0.05), obs=obs_vals  # Reduced observation noise
         )
     return y_observed
 
@@ -359,8 +351,8 @@ def numpyro_run_importance_sampling(key, xs, ys, num_samples=1000):
     }
 
 
-def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500, num_chains=4):
-    """Run vectorized HMC inference using NumPyro across multiple chains."""
+def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500):
+    """Run HMC inference using NumPyro (non-JIT version, same parameters as GenJAX)."""
     obs_dict = {"obs": ys}
 
     def conditioned_model(xs, obs_dict):
@@ -373,7 +365,6 @@ def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500, num
         hmc_kernel,
         num_warmup=num_warmup,
         num_samples=num_samples,
-        num_chains=num_chains,
         jit_model_args=False,
         progress_bar=False,
     )  # No JIT for this version
@@ -394,15 +385,13 @@ def numpyro_run_hmc_inference(key, xs, ys, num_samples=1000, num_warmup=500, num
         "diagnostics": diagnostics,
         "num_samples": num_samples,
         "num_warmup": num_warmup,
-        "num_chains": num_chains,
-        "num_total_samples": num_samples * num_chains,
     }
 
 
 def numpyro_run_hmc_inference_jit_impl(
-    key, xs, ys, num_samples=1000, num_warmup=500, step_size=0.01, num_steps=20, num_chains=4
+    key, xs, ys, num_samples=1000, num_warmup=500, step_size=0.01, num_steps=20
 ):
-    """Run vectorized HMC inference using NumPyro with JIT compilation across multiple chains."""
+    """Run HMC inference using NumPyro with JIT compilation (same parameters as GenJAX)."""
     obs_dict = {"obs": ys}
 
     def conditioned_model(xs, obs_dict):
@@ -415,7 +404,6 @@ def numpyro_run_hmc_inference_jit_impl(
         hmc_kernel,
         num_warmup=num_warmup,
         num_samples=num_samples,
-        num_chains=num_chains,
         jit_model_args=True,
         progress_bar=False,
     )  # Enable JIT for this version
@@ -436,65 +424,131 @@ def numpyro_run_hmc_inference_jit_impl(
         "diagnostics": diagnostics,
         "num_samples": num_samples,
         "num_warmup": num_warmup,
-        "num_chains": num_chains,
-        "num_total_samples": num_samples * num_chains,
     }
 
 
 # JIT-compiled version for fair performance comparison
 numpyro_run_hmc_inference_jit = jax.jit(
-    numpyro_run_hmc_inference_jit_impl, static_argnums=(3, 4, 6, 7)
-)  # num_samples, num_warmup, num_steps, num_chains (step_size is not static)
+    numpyro_run_hmc_inference_jit_impl, static_argnums=(3, 4, 6)
+)  # num_samples, num_warmup, num_steps (step_size is not static)
+
+
+def numpyro_hmc_summary_statistics(hmc_result):
+    """Extract summary statistics from NumPyro HMC results."""
+    diagnostics = hmc_result.get("diagnostics", {})
+    accept_probs = diagnostics.get("accept_probs", jnp.array([]))
+    
+    # Calculate acceptance rate - handle empty arrays
+    if accept_probs.size > 0:
+        accept_rate = jnp.mean(accept_probs)
+    else:
+        accept_rate = 0.0
+    
+    return {
+        "accept_rate": float(accept_rate),  # Convert to Python float to avoid JAX tracer issues
+        "num_samples": hmc_result.get("num_samples", 0),
+        "num_warmup": hmc_result.get("num_warmup", 0),
+    }
 
 
 # Outlier models for GenJAX
 
 
+# Define branch functions outside to avoid JAX local function comparison issues
 @gen
-def point_with_outliers(x, curve, outlier_rate=0.1, outlier_std=1.0):
+def inlier_branch(mean, std):
+    """Inlier branch: follows the polynomial regression with small noise."""
+    # For inliers, we use the mean (y_det) but ignore std, using fixed 0.05
+    return normal(mean, 0.05) @ "obs"  # Same address in both branches
+
+
+@gen
+def outlier_branch(mean, std):
+    """Outlier branch: samples from a uniform distribution [-4, 4]."""
+    # For outliers, we ignore both mean and std and use uniform[-4, 4]
+    return uniform(-4.0, 4.0) @ "obs"  # Same address in both branches
+
+
+@gen
+def point_with_outliers(x, curve, outlier_rate=0.1, outlier_mean=0.0, outlier_std=5.0):
     """Point model that can be either inlier or outlier.
+
+    This model uses the Cond combinator to naturally express a mixture model where:
+    - Inliers: follow the polynomial regression with small observation noise
+    - Outliers: come from a uniform distribution on [-4, 4] independent of the curve
+    
+    This models realistic scenarios where outliers are measurement errors,
+    sensor failures, or corrupted data unrelated to the true underlying curve.
 
     Args:
         x: Input point
         curve: Curve function
         outlier_rate: Probability of being an outlier (default 0.1)
-        outlier_std: Standard deviation for outlier distribution (default 1.0)
+        outlier_mean: (ignored - kept for API compatibility)
+        outlier_std: (ignored - kept for API compatibility)
     """
     y_det = curve(x)
 
     # Sample whether this point is an outlier
     is_outlier = flip(outlier_rate) @ "is_outlier"
 
-    # Define inlier and outlier branches with SAME address (now supported!)
-    @gen
-    def inlier_branch():
-        # Normal observation with small noise
-        return normal(y_det, 0.2) @ "obs"
-
-    @gen
-    def outlier_branch():
-        # Outlier: wide normal centered at y_det
-        return normal(y_det, outlier_std) @ "obs"
-
-    # Use Cond to select between branches
+    # Use Cond combinator with proper branches
     cond_model = Cond(outlier_branch, inlier_branch)
-    y_observed = cond_model(is_outlier) @ "y"
-
+    
+    # Call Cond with appropriate arguments for each branch
+    # When is_outlier=True: outlier_branch() - ignores parameters, uses uniform[-4,4]
+    # When is_outlier=False: inlier_branch(y_det) - uses polynomial value
+    # Both branches need same signature, so we pass dummy values to outlier branch
+    y_observed = cond_model(is_outlier, jnp.where(is_outlier, 0.0, y_det),
+                           outlier_std) @ "y"
+    
     return y_observed
 
 
 @gen
-def npoint_curve_with_outliers(xs, outlier_rate=Const(0.1), outlier_std=Const(1.0)):
+def npoint_curve_with_outliers(xs, outlier_rate=Const(0.1), outlier_mean=Const(0.0), 
+                               outlier_std=Const(5.0)):
     """N-point curve model with outlier detection.
 
     Each point can be classified as inlier or outlier.
+    Inliers follow the polynomial curve, outliers are from an independent Gaussian.
     """
     curve = polynomial() @ "curve"
 
     # Vectorize the outlier model
     ys = (
-        point_with_outliers.vmap(in_axes=(0, None, None, None))(
-            xs, curve, outlier_rate.value, outlier_std.value
+        point_with_outliers.vmap(in_axes=(0, None, None, None, None))(
+            xs, curve, outlier_rate.value, outlier_mean.value, outlier_std.value
+        )
+        @ "ys"
+    )
+
+    return curve, (xs, ys)
+
+
+@gen
+def npoint_curve_with_outliers_beta(xs, alpha=Const(1.0), beta_param=Const(10.0)):
+    """N-point curve model with outlier detection using beta prior.
+
+    Uses a beta prior for the outlier probability, allowing inference
+    over the outlier rate itself.
+
+    Args:
+        xs: Input points
+        alpha: Beta distribution alpha parameter (default 1.0)
+        beta_param: Beta distribution beta parameter (default 10.0)
+    """
+    # Sample outlier rate from beta prior
+    # Beta(1, 10) has mean 1/11 ≈ 0.09, skewed towards low outlier rates
+    outlier_rate = beta(alpha.value, beta_param.value) @ "outlier_rate"
+    
+    # Sample polynomial coefficients
+    curve = polynomial() @ "curve"
+
+    # Vectorize the outlier model with sampled outlier rate
+    ys = (
+        point_with_outliers.vmap(in_axes=(0, None, None, None, None))(
+            xs, curve, outlier_rate, 0.0, 5.0  # outlier_mean and std are ignored
         )
         @ "ys"
     )
@@ -507,7 +561,8 @@ def infer_latents_with_outliers(
     ys,
     n_samples: Const[int],
     outlier_rate: Const[float] = Const(0.1),
-    outlier_std: Const[float] = Const(1.0),
+    outlier_mean: Const[float] = Const(0.0),
+    outlier_std: Const[float] = Const(5.0),
 ):
     """
     Infer latent curve parameters and outlier indicators using GenJAX SMC.
@@ -517,17 +572,18 @@ def infer_latents_with_outliers(
         ys: Observed values at xs
         n_samples: Number of importance samples (wrapped in Const)
         outlier_rate: Prior probability of outlier (wrapped in Const)
+        outlier_mean: Mean of outlier distribution (wrapped in Const)
         outlier_std: Std dev for outlier distribution (wrapped in Const)
     """
     from genjax.inference import init
 
-    # With the fixed Cond, we can now properly constrain observations!
+    # Constraint on observations - address the Cond output properly
     constraints = {"ys": {"y": {"obs": ys}}}
 
     # Use SMC init for importance sampling
     result = init(
         npoint_curve_with_outliers,  # outlier-aware model
-        (xs, outlier_rate, outlier_std),  # model args
+        (xs, outlier_rate, outlier_mean, outlier_std),  # model args
         n_samples,
         constraints,
     )
@@ -543,35 +599,98 @@ def hmc_infer_latents_with_outliers(
     step_size: Const[float] = Const(0.05),
     n_steps: Const[int] = Const(10),
     outlier_rate: Const[float] = Const(0.1),
-    outlier_std: Const[float] = Const(1.0),
+    outlier_mean: Const[float] = Const(0.0),
+    outlier_std: Const[float] = Const(5.0),
 ):
     """
-    Infer latent curve parameters using HMC, marginalizing over outlier indicators.
+    Infer latent curve parameters using HMC on continuous parameters only.
 
-    Note: HMC only updates continuous parameters (curve coefficients).
-    The discrete outlier indicators are handled through regeneration.
+    For this simplified version, we only update the curve parameters with HMC,
+    keeping outlier indicators fixed at their initial values.
     """
-    from genjax.inference import hmc, mh, chain
+    from genjax.inference import hmc, chain
     from genjax.core import sel
 
+    # Constraint on observations - address the Cond output properly
     constraints = {"ys": {"y": {"obs": ys}}}
 
     # Generate initial trace
     initial_trace, _ = npoint_curve_with_outliers.generate(
-        constraints, xs, outlier_rate, outlier_std
+        constraints, xs, outlier_rate, outlier_mean, outlier_std
     )
 
-    # Define mixed kernel: HMC for continuous, MH for discrete
-    def mixed_kernel(trace):
-        # First update curve parameters with HMC
-        trace = hmc(
+    # Define HMC kernel for continuous parameters only
+    def hmc_kernel(trace):
+        # Only update curve parameters with HMC
+        return hmc(
             trace, sel("curve"), step_size=step_size.value, n_steps=n_steps.value
         )
 
-        # Then update outlier indicators with MH
-        # Select all outlier indicators
-        trace = mh(trace, sel("ys") & sel("is_outlier"))
+    # Create MCMC chain
+    mcmc_chain = chain(hmc_kernel)
 
+    # Run MCMC with burn-in
+    total_steps = n_samples.value + n_warmup.value
+    result = mcmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
+
+    return result.traces, {
+        "acceptance_rate": result.acceptance_rate,
+        "n_samples": result.n_steps.value,
+        "n_chains": result.n_chains.value,
+    }
+
+
+def mixed_infer_latents_with_outliers_beta(
+    xs,
+    ys,
+    n_samples: Const[int],
+    n_warmup: Const[int] = Const(500),
+    mh_moves_per_step: Const[int] = Const(5),
+    hmc_step_size: Const[float] = Const(0.01),
+    hmc_n_steps: Const[int] = Const(10),
+    alpha: Const[float] = Const(1.0),
+    beta_param: Const[float] = Const(10.0),
+):
+    """
+    Infer latent parameters using mixed MCMC:
+    - MH for discrete outlier indicators
+    - HMC for continuous parameters (curve coefficients and outlier rate)
+
+    Args:
+        xs: Input points
+        ys: Observed values
+        n_samples: Number of MCMC samples
+        n_warmup: Number of warmup samples
+        mh_moves_per_step: Number of MH moves for outlier indicators per MCMC step
+        hmc_step_size: Step size for HMC
+        hmc_n_steps: Number of leapfrog steps for HMC
+        alpha: Beta distribution alpha parameter
+        beta_param: Beta distribution beta parameter
+    """
+    from genjax.inference import hmc, mh, chain
+
+    # Constraint on observations
+    constraints = {"ys": {"y": {"obs": ys}}}
+
+    # Generate initial trace with beta model
+    initial_trace, _ = npoint_curve_with_outliers_beta.generate(
+        constraints, xs, alpha, beta_param
+    )
+
+    # Define mixed kernel
+    def mixed_kernel(trace):
+        # First, MH moves on outlier indicators
+        for i in range(mh_moves_per_step.value):
+            trace = mh(trace, sel({"ys": sel("is_outlier")}))
+        
+        # Then, HMC on continuous parameters (curve and outlier_rate)
+        trace = hmc(
+            trace, 
+            sel("curve") | sel("outlier_rate"), 
+            step_size=hmc_step_size.value, 
+            n_steps=hmc_n_steps.value
+        )
+        
         return trace
 
     # Create MCMC chain
@@ -585,6 +704,9 @@ def hmc_infer_latents_with_outliers(
         "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
         "n_chains": result.n_chains.value,
+        "rhat": result.rhat,
+        "ess_bulk": result.ess_bulk,
+        "ess_tail": result.ess_tail,
     }
 
 
@@ -593,9 +715,10 @@ def hmc_infer_latents_with_outliers(
 # GenJAX JIT-compiled functions - apply seed() before jit()
 infer_latents_seeded = seed(infer_latents)
 hmc_infer_latents_seeded = seed(hmc_infer_latents)
-hmc_infer_latents_vectorized_jit = jax.jit(hmc_infer_latents_vectorized)
+hmc_infer_latents_vectorized_seeded = seed(hmc_infer_latents_vectorized)
 infer_latents_with_outliers_seeded = seed(infer_latents_with_outliers)
 hmc_infer_latents_with_outliers_seeded = seed(hmc_infer_latents_with_outliers)
+mixed_infer_latents_with_outliers_beta_seeded = seed(mixed_infer_latents_with_outliers_beta)
 
 infer_latents_jit = jax.jit(
     infer_latents_seeded
@@ -603,8 +726,12 @@ infer_latents_jit = jax.jit(
 hmc_infer_latents_jit = jax.jit(
     hmc_infer_latents_seeded
 )  # Use Const pattern instead of static_argnums
+hmc_infer_latents_vectorized_jit = jax.jit(
+    hmc_infer_latents_vectorized_seeded
+)  # Use Const pattern instead of static_argnums
 infer_latents_with_outliers_jit = jax.jit(infer_latents_with_outliers_seeded)
 hmc_infer_latents_with_outliers_jit = jax.jit(hmc_infer_latents_with_outliers_seeded)
+mixed_infer_latents_with_outliers_beta_jit = jax.jit(mixed_infer_latents_with_outliers_beta_seeded)
 
 # NumPyro JIT-compiled functions
 numpyro_run_importance_sampling_jit = jax.jit(
@@ -614,7 +741,11 @@ numpyro_run_importance_sampling_jit = jax.jit(
 
 #
 def run_comprehensive_benchmark(
-    n_points=20, n_samples=1000, n_warmup=500, seed=42, timing_repeats=50
+    n_points=20,
+    n_samples=1000,
+    n_warmup=500,
+    seed=42,
+    timing_repeats=20,
 ):
     """
         Run comprehensive benchmarking across all frameworks and methods.
@@ -673,15 +804,13 @@ def run_comprehensive_benchmark(
         "ess": effective_sample_size(genjax_is_weights),
     }
 
-    # GenJAX Vectorized HMC
-    print("Running GenJAX Vectorized HMC (4 chains)...")
+    # GenJAX HMC
+    print("Running GenJAX HMC...")
 
-    # Use the JIT-compiled vectorized HMC function
+    # Use the pre-seeded JIT-compiled HMC function
     def genjax_hmc_task():
-        return hmc_infer_latents_vectorized_jit(
-            jrand.key(seed), xs, ys, 
-            Const(n_samples), Const(n_warmup),
-            Const(0.05), Const(10), Const(4)  # 4 chains
+        return hmc_infer_latents_jit(
+            jrand.key(seed), xs, ys, Const(n_samples), Const(n_warmup)
         )
 
     genjax_hmc_times, genjax_hmc_stats = benchmark_with_warmup(
@@ -689,14 +818,12 @@ def run_comprehensive_benchmark(
     )
 
     # Get samples for posterior analysis
-    genjax_hmc_samples, genjax_hmc_diagnostics = hmc_infer_latents_vectorized_jit(
-        jrand.key(seed), xs, ys, 
-        Const(n_samples), Const(n_warmup),
-        Const(0.05), Const(10), Const(4)  # 4 chains
+    genjax_hmc_samples, genjax_hmc_diagnostics = hmc_infer_latents_jit(
+        jrand.key(seed), xs, ys, Const(n_samples), Const(n_warmup)
     )
 
     results["genjax_hmc"] = {
-        "method": f"HMC (K=4, L={n_samples})",
+        "method": "HMC",
         "framework": "GenJAX",
         "samples": genjax_hmc_samples,
         "diagnostics": genjax_hmc_diagnostics,
@@ -728,19 +855,19 @@ def run_comprehensive_benchmark(
         "ess": effective_sample_size(numpyro_is_result["log_weights"]),
     }
 
-    print("Running NumPyro Vectorized HMC (4 chains)...")
+    print("Running NumPyro HMC...")
 
     def numpyro_hmc_task():
-        return numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup, num_chains=4)
+        return numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup)
 
     numpyro_hmc_times, numpyro_hmc_stats = benchmark_with_warmup(
         numpyro_hmc_task, repeats=timing_repeats
     )
 
-    numpyro_hmc_result = numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup, num_chains=4)
+    numpyro_hmc_result = numpyro_run_hmc_inference_jit(key, xs, ys, n_samples, n_warmup)
 
     results["numpyro_hmc"] = {
-        "method": f"HMC (K=4, L={n_samples})",
+        "method": "HMC",
         "framework": "NumPyro",
         "samples": numpyro_hmc_result["samples"],
         "diagnostics": numpyro_hmc_result["diagnostics"],
@@ -782,20 +909,12 @@ def extract_posterior_samples(benchmark_results):
                 b_samples = traces.get_choices()["curve"]["b"][indices]
                 c_samples = traces.get_choices()["curve"]["c"][indices]
 
-            elif method in ["HMC", "Vectorized HMC"]:
+            elif method == "HMC":
                 # Extract MCMC samples directly
                 traces = result["samples"]
-                # For vectorized HMC, samples are shape (n_chains, n_samples, ...)
-                # We'll flatten them to (n_chains * n_samples, ...)
                 a_samples = traces.get_choices()["curve"]["a"]
                 b_samples = traces.get_choices()["curve"]["b"]
                 c_samples = traces.get_choices()["curve"]["c"]
-                
-                # Flatten if vectorized (shape has more than 1 dimension)
-                if a_samples.ndim > 1:
-                    a_samples = a_samples.reshape(-1)
-                    b_samples = b_samples.reshape(-1)
-                    c_samples = c_samples.reshape(-1)
 
         elif framework == "NumPyro":
             if method == "Importance Sampling":
@@ -811,14 +930,12 @@ def extract_posterior_samples(benchmark_results):
                 b_samples = samples["b"][indices]
                 c_samples = samples["c"][indices]
 
-            elif method in ["HMC", "Vectorized HMC"]:
+            elif method == "HMC":
                 # MCMC samples
                 samples = result["samples"]
                 a_samples = samples["a"]
                 b_samples = samples["b"]
                 c_samples = samples["c"]
-                
-                # NumPyro already flattens chains, so shape is (n_chains * n_samples,)
 
         posterior_samples[method_name] = {
             "framework": framework,

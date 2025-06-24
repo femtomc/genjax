@@ -51,6 +51,7 @@ faircoin-combined = "pixi run python -m examples.faircoin.main --combined"  # Co
 matplotlib = "*"
 numpy = "*"
 pygments = "*"
+seaborn = "*"
 
 [tool.pixi.feature.curvefit.pypi-dependencies]
 numpyro = "*"
@@ -83,6 +84,12 @@ coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=ter
 doctest = "xdoctest src/genjax --verbose=2"  # Run doctests only
 doctest-module = "xdoctest src/genjax/{module} --verbose=2"  # Run doctests for specific module
 test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"  # Run tests + doctests
+# Benchmarking tasks
+benchmark = "pytest tests/ --benchmark-only -v"  # Run only benchmark tests
+benchmark-all = "pytest tests/ --benchmark-disable-gc --benchmark-sort=mean -v"  # Run all tests with benchmarking
+benchmark-compare = "pytest tests/ --benchmark-compare=0001 --benchmark-compare-fail=mean:10% -v"  # Compare with previous benchmark results
+benchmark-save = "pytest tests/ --benchmark-save=current --benchmark-disable-gc -v"  # Save benchmark results
+benchmark-slowest = "pytest tests/ --durations=20 --benchmark-disable -v"  # Show 20 slowest tests without benchmarking
 
 [tool.pixi.feature.examples.tasks]
 # Run all case studies
@@ -237,6 +244,7 @@ test = [
     "coverage>=7.0,<8",
     "xdoctest>=1.1.0,<2",
     "pytest-xdist>=3.0,<4",
+    "pytest-benchmark>=4.0,<5",
 ]
 
 [tool.coverage.run]
@@ -288,12 +296,27 @@ markers = [
     "distributions: marks tests for probability distributions",
     "tfp: marks tests requiring TensorFlow Probability",
     "requires_gpu: marks tests that need GPU acceleration",
+    "benchmark: marks tests that should be benchmarked",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:jax.*",
     "ignore::DeprecationWarning:tensorflow_probability.*",
     "error::UserWarning",                                  # Turn UserWarnings into errors to catch issues
 ]
+
+[tool.pytest-benchmark]
+# Configuration for pytest-benchmark
+min_rounds = 3                    # Minimum number of benchmark rounds
+max_time = 10.0                   # Maximum time per benchmark (seconds)
+min_time = 0.01                   # Minimum time per round (seconds)
+timer = "time.perf_counter"       # High-resolution timer
+disable_gc = true                 # Disable garbage collection during benchmarks
+sort = "mean"                     # Sort results by mean time
+columns = ["min", "max", "mean", "stddev", "median", "iqr", "outliers", "ops", "rounds"]
+histogram = true                  # Generate histogram data
+save = ".benchmarks/benchmarks.json"  # Save results to file
+save_data = true                  # Save benchmark data
+autosave = true                   # Automatically save results
 
 [tool.xdoctest]
 # Configure xdoctest for running doctests

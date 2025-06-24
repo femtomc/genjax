@@ -45,8 +45,8 @@ def main():
         "--grid-sizes",
         type=int,
         nargs="+",
-        default=[10, 100, 200, 300, 400],
-        help="Grid sizes for timing analysis (default: [10, 100, 200, 300, 400])",
+        default=[10, 50, 100, 150, 200],
+        help="Grid sizes for timing analysis (default: [10, 50, 100, 150, 200])",
     )
     parser.add_argument(
         "--timing-repeats",

@@ -12,6 +12,14 @@ htmlcov/
 coverage.xml
 .coverage
 
+# Benchmark results
+.benchmarks/
+
+# Data directories
+data/
+/data/
+**/data/
+
 # Generated figures and outputs (keep logo assets)
 figs/
 examples/**/figs/*.pdf

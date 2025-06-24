@@ -19,11 +19,11 @@ examples/gol/
 │   ├── mit.png         # MIT logo pattern
 │   └── popl.png        # POPL logo pattern
 └── figs/               # Generated visualizations (parametrized outputs)
-    ├── blinker_4x4_monitoring_chain1000_flip0.030_seed1.pdf   # Blinker monitoring
-    ├── blinker_4x4_samples_chain1000_flip0.030_seed1.pdf      # Blinker samples with Gibbs indices
-    ├── mit_logo_128x128_monitoring_chain250_flip0.030_seed1.pdf # Logo monitoring
-    ├── mit_logo_128x128_samples_chain250_flip0.030_seed1.pdf   # Logo samples with Gibbs indices
-    ├── timing_scaling_cpu_gpu_chain250_flip0.030.pdf          # Performance analysis
+    ├── gol_gibbs_convergence_monitoring_blinker_4x4_chain250_flip0.030_seed1.pdf   # Blinker Gibbs convergence monitoring
+    ├── gol_gibbs_inferred_states_grid_blinker_4x4_chain250_flip0.030_seed1.pdf      # Blinker inferred states grid
+    ├── gol_gibbs_convergence_monitoring_mit_logo_128x128_chain250_flip0.030_seed1.pdf # Logo convergence monitoring
+    ├── gol_gibbs_inferred_states_grid_mit_logo_128x128_chain250_flip0.030_seed1.pdf   # Logo inferred states grid
+    ├── gol_performance_scaling_analysis_gpu_chain10_flip0.030.pdf          # GPU performance scaling analysis
     ├── gibbs_on_blinker_monitoring.pdf                        # Legacy monitoring
     └── gibbs_on_blinker_samples.pdf                           # Legacy samples
 ```
@@ -79,13 +79,41 @@ examples/gol/
 
 ### `figs.py` - Figure Generation and Benchmarks
 
+**IMPORTANT**: All visualization functions now use the shared GenJAX Research Visualization Standards (GRVS) from `examples.viz` module for consistent styling across case studies.
+
 **Modern Figure Generation**:
 
 - **`save_blinker_gibbs_figure()`**: Generate separate monitoring and samples figures for blinker reconstruction
 - **`save_logo_gibbs_figure()`**: Generate logo reconstruction with error metrics
-- **`save_timing_scaling_figure()`**: Performance scaling analysis with professional formatting
+- **`save_timing_scaling_figure()`**: Performance scaling analysis with GRVS styling
 - **Parametrized filenames**: Include experimental parameters (chain length, flip probability, seed) in output names
-- **Research quality**: 300 DPI PDF output with faircoin-style aesthetics
+- **Research quality**: 300 DPI PDF output with GRVS standards
+
+**GRVS Features Applied:**
+- **Typography**: 18pt base fonts, bold axis labels, 16pt legends
+- **Colors**: GRVS colorblind-friendly palette for CPU/GPU comparisons and visual elements
+- **No Titles Policy**: Showcase figures designed for LaTeX integration without titles
+- **Figure Sizing**: Standardized dimensions using `FIGURE_SIZES` for consistency
+- **Clean Grid**: Applied via `apply_grid_style()` for consistent appearance
+- **Save Quality**: Using `save_publication_figure()` for 300 DPI output
+
+**Usage Pattern:**
+```python
+from examples.viz import (
+    setup_publication_fonts, FIGURE_SIZES, get_method_color,
+    apply_grid_style, save_publication_figure
+)
+
+# Colors automatically mapped: CPU → genjax_is, GPU → genjax_hmc
+```
+
+**Showcase Figures for Publications** (consolidated from showcase_figure.py):
+
+- **`create_showcase_figure()`**: Main 4-panel GOL showcase figure with target state, Gibbs chain, evolution, and performance
+- **`create_nested_vectorization_figure()`**: Illustration of 3-level vectorization (experiments, chains, spatial)
+- **`create_generative_conditional_figure()`**: Demonstration of stochastic rule violations with softness parameter
+- **`save_showcase_figure()`**, **`save_nested_vectorization_figure()`**, **`save_generative_conditional_figure()`**: Individual save functions
+- **`save_all_showcase_figures()`**: Convenience function to generate all showcase figures
 
 **Timing Infrastructure**:
 
@@ -248,7 +276,7 @@ print(f"Reconstruction: {n_errors} errors, {accuracy:.1f}% accuracy")
 pixi run -e gol gol-blinker                    # Quick blinker reconstruction
 pixi run -e gol gol-logo                       # Logo reconstruction
 pixi run -e gol gol-timing                     # Performance scaling analysis
-pixi run -e gol gol-all                        # Generate all figures
+pixi run -e gol gol-all                        # Generate all figures (includes showcase figures)
 
 # Custom parameters with CLI
 pixi run -e gol python -m examples.gol.main --mode blinker --chain-length 1000 --flip-prob 0.05
@@ -256,8 +284,9 @@ pixi run -e gol python -m examples.gol.main --mode timing --grid-sizes 10 50 100
 
 # Direct figure generation
 pixi run -e gol python -c "
-from examples.gol.figs import save_blinker_gibbs_figure
+from examples.gol.figs import save_blinker_gibbs_figure, save_all_showcase_figures
 save_blinker_gibbs_figure(chain_length=500, flip_prob=0.03, seed=42)
+save_all_showcase_figures()  # Generate all showcase figures
 "
 ```
 
@@ -326,9 +355,9 @@ The Game of Life case study showcases GenJAX capabilities for discrete probabili
 
 The GoL case study represents a sophisticated application of probabilistic programming to discrete dynamical systems with practical relevance to pattern recognition and rule inference problems.
 
-## Recent Improvements (2025)
+## Implementation Standards
 
-### Modernization and Best Practices
+### Structure and Best Practices
 
 ✅ **Structure Standardization**: Updated to follow `examples/` directory best practices
 - Modern CLI with argparse and multiple execution modes
@@ -351,6 +380,12 @@ The GoL case study represents a sophisticated application of probabilistic progr
 - Statistical rigor with multiple repeats and JIT warm-up
 - Professional scaling plots with large fonts and error bars
 
+✅ **Code Consolidation**: Streamlined file organization
+- **Showcase figures consolidated**: `showcase_figure.py` merged into `figs.py` for better organization
+- **Single import location**: All figure generation now available from `examples.gol.figs`
+- **Maintained functionality**: All showcase figure functions preserved with same API
+- **Enhanced discoverability**: `save_all_showcase_figures()` generates all publication-ready figures
+
 ### Key Technical Achievements
 
 - **Sample Diversity Visualization**: 4×4 grids showing 16 different Gibbs samples across timeline
@@ -359,9 +394,9 @@ The GoL case study represents a sophisticated application of probabilistic progr
 - **Robust CLI**: Modern interface supporting all experimental parameters
 - **Backward Compatibility**: Legacy functions maintained for existing workflows
 
-### Latest Enhancements (2025 - Current Session)
+### Logo Experiment Optimization
 
-✅ **Logo Experiment Optimization**: Solved target state recognition issues
+✅ **Target State Recognition**: Solved visibility issues
 - **Root cause**: 32×32 downsampling too aggressive (99.6% information loss)
 - **Solution**: Upgraded to 128×128 downsampling (6.6% structure preservation vs 1.5% for 64×64)
 - **Performance**: Maintains ~2.8s execution time with 97.3% reconstruction accuracy
@@ -384,3 +419,82 @@ The GoL case study represents a sophisticated application of probabilistic progr
 - **128×128**: 1,873 active cells (6.6% preservation) - optimal balance of detail and performance
 
 The GOL case study now represents the gold standard for discrete probabilistic modeling in GenJAX, combining computational efficiency with publication-ready visualization quality.
+
+## Performance Configuration
+
+### Optimized Timing Parameters
+
+- **Reduced default chain length for timing**: From 250 to 10 steps in `save_timing_scaling_figure()`
+- **Adjusted grid sizes**: From `[10, 100, 200, 300, 400]` to `[10, 50, 100, 150, 200]`
+- **Rationale**: Timing benchmarks need fewer steps to measure performance characteristics
+
+### Figure Naming Convention
+
+All figures use descriptive names prefixed with "gol" for clear identification:
+
+- **Convergence Monitoring**: `gol_gibbs_convergence_monitoring_{pattern}_{size}_chain{N}_flip{P}_seed{S}.pdf`
+  - Shows predictive posterior score evolution, softness parameter, and target state
+  - Clear indication this tracks Gibbs sampling convergence over time
+
+- **Inferred States Grid**: `gol_gibbs_inferred_states_grid_{pattern}_{size}_chain{N}_flip{P}_seed{S}.pdf`
+  - Shows 4x4 grid of inferred previous states and their one-step rollouts
+  - Demonstrates sample diversity with Gibbs chain indices
+
+- **Performance Scaling**: `gol_performance_scaling_analysis_{device}_chain{N}_flip{P}.pdf`
+  - Shows execution time vs grid size for performance analysis
+  - Device can be "cpu", "gpu", or "cpu_gpu" for comparison
+
+The descriptive naming ensures anyone can understand figure content from the filename alone.
+
+### CUDA Execution
+
+The GOL case study fully supports GPU acceleration:
+
+```bash
+# CPU execution
+pixi run -e gol gol-blinker
+
+# GPU execution (recommended for larger grids)
+pixi run -e gol-cuda gol-blinker
+pixi run -e gol-cuda gol-timing --device gpu
+```
+
+GPU acceleration provides significant speedup for larger grid sizes (100x100+) and when running many Gibbs steps.
+
+## Showcase Figure Design
+
+### 4-Panel Layout
+
+The main showcase figure (`gol_showcase_inverse_dynamics.pdf`) features a 4-panel layout:
+
+1. **Observed Future State** - Target pattern with red highlight box
+2. **Vectorized Gibbs Chain** - 2×4 grid showing inference progression (t=0 to t=499)
+3. **One-Step Evolution** - Shows what happens when the final inferred state evolves forward one time step
+4. **Performance Scaling** - CPU vs GPU performance comparison with speedup annotations
+
+### Key Implementation Details
+
+**`showcase_figure.py` Implementation**:
+- **4-panel layout**: Changed from 3 to 4 panels with width ratios `[1, 2.2, 1, 1.5]`
+- **One-step evolution panel**: Uses `run_summary.inferred_reconstructed_targets[-1].astype(int)`
+- **Compact performance plot**: Reduced y-axis padding to 8% with smaller fonts (12pt labels, 10pt ticks)
+- **GPU simulation**: Realistic speedup factors `[1.5, 3.5, 8.0, 12.0]` for increasing grid sizes
+- **Spacing optimization**: `wspace=0.25` to prevent panel overlap
+- **Grid resolution**: 512×512 for optimal performance/quality balance
+
+### Visual Refinements
+
+- **Evolution annotation**: Positioned at y=-0.12 for better spacing
+- **Performance y-label**: Shortened to "Time (s)" to prevent overlap
+- **Legend positioning**: Upper left with 12pt font
+- **Title alignment**: Consistent 18pt bold titles at y=0.95
+
+### Figure Generation
+
+```python
+# Generate showcase figure with all enhancements
+showcase_fig = create_showcase_figure(pattern_type="mit", size=512, chain_length=500)
+showcase_fig.savefig("gol_showcase_inverse_dynamics.pdf", bbox_inches='tight', dpi=300)
+```
+
+The showcase figure now provides a complete narrative: from observed future state, through the inference process, to validation via forward evolution, with performance characteristics.

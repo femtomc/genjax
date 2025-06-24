@@ -18,10 +18,10 @@ def parse_args():
 
     parser.add_argument(
         "mode",
-        choices=["quick", "full", "benchmark", "traces"],
+        choices=["quick", "full", "benchmark", "generative", "vectorization", "outlier", "is-only", "scaling"],
         nargs="?",
         default="quick",
-        help="Analysis mode: quick (fast viz), full (complete), benchmark (compare frameworks), traces (only trace figures)",
+        help="Analysis mode: quick (fast viz), full (complete), benchmark (compare frameworks), generative (programming figure), vectorization (patterns figure), outlier (generative conditionals), is-only (IS comparison only), scaling (inference scaling analysis)",
     )
 
     # Analysis parameters
@@ -55,40 +55,40 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed (default: 42)"
     )
+    
+    # Outlier model parameters
+    parser.add_argument(
+        "--outlier-rate", type=float, default=0.2, help="Prior outlier probability (default: 0.2)"
+    )
+    parser.add_argument(
+        "--outlier-mean", type=float, default=0.0, help="Outlier distribution mean (default: 0.0)"
+    )
+    parser.add_argument(
+        "--outlier-std", type=float, default=5.0, help="Outlier distribution std dev (default: 5.0)"
+    )
+    parser.add_argument(
+        "--outlier-comprehensive", action="store_true", 
+        help="Run comprehensive outlier analysis with all figures"
+    )
 
     return parser.parse_args()
 
 
 def run_quick_mode(args):
     """Run quick demonstration mode."""
-    import jax.random as jrand
     from examples.curvefit.figs import (
-        # save_onepoint_trace_viz,  # UNUSED: generates 010_onepoint_trace.pdf
-        save_four_separate_onepoint_traces,
-        # save_four_onepoint_trace_densities,  # UNUSED: generates 051-054_onepoint_trace_density.pdf
+        save_onepoint_trace_viz,
         save_multipoint_trace_viz,
         save_four_multipoint_trace_vizs,
-        save_four_separate_batched_multipoint_traces,
-        save_four_batched_multipoint_trace_densities,
         save_inference_viz,
     )
 
     print("=== Quick Mode: Basic Visualizations ===")
-    
-    # Initialize the master key from CLI seed
-    key = jrand.key(args.seed)
-    
-    # Split keys for each visualization function
-    keys = jrand.split(key, 5)  # Reduced to 5 functions that need keys
 
     print("\n1. Generating trace visualizations...")
-    # save_onepoint_trace_viz(keys[0])  # UNUSED
-    save_four_separate_onepoint_traces(keys[0])
-    # save_four_onepoint_trace_densities(keys[2])  # UNUSED
-    save_multipoint_trace_viz(keys[1])
-    save_four_multipoint_trace_vizs(keys[2])
-    save_four_separate_batched_multipoint_traces(keys[3])
-    save_four_batched_multipoint_trace_densities(keys[4])
+    save_onepoint_trace_viz()
+    save_multipoint_trace_viz()
+    save_four_multipoint_trace_vizs()
 
     print("\n2. Generating inference visualization...")
     save_inference_viz(seed=args.seed)
@@ -100,38 +100,28 @@ def run_quick_mode(args):
 def run_full_mode(args):
     """Run full analysis mode."""
     from examples.curvefit.figs import (
-        # save_onepoint_trace_viz,  # UNUSED: generates 010_onepoint_trace.pdf
-        save_four_separate_onepoint_traces,
-        # save_four_onepoint_trace_densities,  # UNUSED: generates 051-054_onepoint_trace_density.pdf
+        save_onepoint_trace_viz,
         save_multipoint_trace_viz,
         save_four_multipoint_trace_vizs,
-        save_four_separate_batched_multipoint_traces,
-        save_four_batched_multipoint_trace_densities,
         save_inference_viz,
         save_inference_scaling_viz,
-        # save_genjax_posterior_comparison,  # UNUSED: generates 090_genjax_posterior_comparison.pdf
-        # save_framework_comparison_figure,  # UNUSED: generates 080_framework_comparison_n{n}.pdf
-        # save_log_density_viz,  # UNUSED: generates 070_log_density.pdf
-        # save_parameter_posterior_methods_comparison,  # UNUSED: generates 100_parameter_posterior_3d_comparison.pdf
+        save_genjax_posterior_comparison,
+        save_framework_comparison_figure,
+        save_log_density_viz,
+        save_individual_method_parameter_density,
+        save_is_comparison_parameter_density,
+        save_is_single_resample_comparison,
+        save_is_only_timing_comparison,
+        save_is_only_parameter_density,
+        create_all_legends,
     )
 
     print("=== Full Mode: Complete Analysis ===")
-    
-    # Initialize the master key from CLI seed
-    import jax.random as jrand
-    key = jrand.key(args.seed)
-    
-    # Split keys for each visualization function
-    keys = jrand.split(key, 5)  # Reduced to 5 functions that need keys
 
     print("\n1. Generating trace visualizations...")
-    # save_onepoint_trace_viz(keys[0])  # UNUSED
-    save_four_separate_onepoint_traces(keys[0])
-    # save_four_onepoint_trace_densities(keys[2])  # UNUSED
-    save_multipoint_trace_viz(keys[1])
-    save_four_multipoint_trace_vizs(keys[2])
-    save_four_separate_batched_multipoint_traces(keys[3])
-    save_four_batched_multipoint_trace_densities(keys[4])
+    save_onepoint_trace_viz()
+    save_multipoint_trace_viz()
+    save_four_multipoint_trace_vizs()
 
     print("\n2. Generating inference scaling analysis...")
     save_inference_scaling_viz()
@@ -139,18 +129,68 @@ def run_full_mode(args):
     print("\n3. Generating inference visualization...")
     save_inference_viz(seed=args.seed)
 
-    # UNUSED: Commented out sections that generate figures not used in paper
-    # print("\n4. Generating GenJAX posterior comparison...")
-    # save_genjax_posterior_comparison(...)
-    
-    # print("\n5. Generating framework comparison...")
-    # save_framework_comparison_figure(...)
-    
-    # print("\n6. Generating density visualizations...")
-    # save_log_density_viz()
-    
-    # print("\n7. Generating parameter posterior methods comparison...")
-    # save_parameter_posterior_methods_comparison(seed=args.seed)
+    print("\n4. Generating GenJAX posterior comparison...")
+    save_genjax_posterior_comparison(
+        n_points=args.n_points,
+        n_samples_is=args.n_samples_is,
+        n_samples_hmc=args.n_samples_hmc,
+        n_warmup=args.n_warmup,
+        seed=args.seed,
+        timing_repeats=args.timing_repeats,
+    )
+
+    print("\n5. Generating framework comparison...")
+    print(
+        f"   Parameters: {args.n_points} points, IS {args.n_samples_is} particles, HMC {args.n_samples_hmc} samples"
+    )
+
+    save_framework_comparison_figure(
+        n_points=args.n_points,
+        n_samples_is=args.n_samples_is,
+        n_samples_hmc=args.n_samples_hmc,
+        n_warmup=args.n_warmup,
+        seed=args.seed,
+        timing_repeats=args.timing_repeats,
+    )
+
+    print("\n6. Generating density visualizations...")
+    save_log_density_viz()
+
+    print("\n7. Generating individual method parameter density figures...")
+    save_individual_method_parameter_density(
+        n_points=args.n_points,
+        n_samples=args.n_samples_is,
+        seed=args.seed
+    )
+
+    print("\n8. Generating IS comparison parameter density figures...")
+    save_is_comparison_parameter_density(
+        n_points=args.n_points,
+        seed=args.seed
+    )
+
+    print("\n9. Generating IS single particle resampling comparison...")
+    save_is_single_resample_comparison(
+        n_points=args.n_points,
+        seed=args.seed,
+        n_trials=1000
+    )
+
+    print("\n10. Generating IS-only timing comparison...")
+    save_is_only_timing_comparison(
+        n_points=args.n_points,
+        seed=args.seed,
+        timing_repeats=args.timing_repeats
+    )
+
+    print("\n11. Generating IS-only parameter density figures...")
+    save_is_only_parameter_density(
+        n_points=args.n_points,
+        seed=args.seed
+    )
+
+    print("\n12. Creating all legends...")
+    create_all_legends()
 
     print("\n✓ Full mode complete!")
     print("Generated figures in examples/curvefit/figs/")
@@ -158,167 +198,141 @@ def run_full_mode(args):
 
 def run_benchmark_mode(args):
     """Run benchmark comparison mode."""
-    # UNUSED: Both functions generate figures not used in paper
-    # from examples.curvefit.figs import (
-    #     save_framework_comparison_figure,  # UNUSED: generates 080_framework_comparison_n{n}.pdf
-    #     save_parameter_posterior_methods_comparison,  # UNUSED: generates 100_parameter_posterior_3d_comparison.pdf
-    # )
+    from examples.curvefit.figs import save_framework_comparison_figure
 
     print("=== Benchmark Mode: Framework Comparison ===")
-    print("NOTE: Benchmark mode currently disabled - generates unused figures")
-    print("The following figures are not used in the paper:")
-    print("  - 080_framework_comparison_n{n}.pdf")
-    print("  - 100_parameter_posterior_3d_comparison.pdf")
-    
-    # UNUSED: Commented out benchmark execution
-    # print("Parameters:")
-    # print(f"  - Data points: {args.n_points}")
-    # print(f"  - IS particles: {args.n_samples_is}")
-    # print(f"  - HMC samples: {args.n_samples_hmc}")
-    # print(f"  - HMC warmup: {args.n_warmup}")
-    # print(f"  - Timing repeats: {args.timing_repeats}")
-    # print(f"  - Random seed: {args.seed}")
+    print("Parameters:")
+    print(f"  - Data points: {args.n_points}")
+    print(f"  - IS particles: {args.n_samples_is}")
+    print(f"  - HMC samples: {args.n_samples_hmc}")
+    print(f"  - HMC warmup: {args.n_warmup}")
+    print(f"  - Timing repeats: {args.timing_repeats}")
+    print(f"  - Random seed: {args.seed}")
 
-    # results = save_framework_comparison_figure(
-    #     n_points=args.n_points,
-    #     n_samples_is=args.n_samples_is,
-    #     n_samples_hmc=args.n_samples_hmc,
-    #     n_warmup=args.n_warmup,
-    #     seed=args.seed,
-    #     timing_repeats=args.timing_repeats,
-    # )
-
-    # print("\n=== Benchmark Summary ===")
-    # for method_key, result in results.items():
-    #     mean_time = result["timing"][0] * 1000
-    #     std_time = result["timing"][1] * 1000
-    #     print(f"{result['method']}: {mean_time:.1f} ± {std_time:.1f} ms")
-    #     if "accept_rate" in result:
-    #         print(f"  Accept rate: {result['accept_rate']:.3f}")
-
-    # print("\n✓ Benchmark complete!")
-    # print("Generated comparison figure in examples/curvefit/figs/")
-    
-    # print("\n8. Generating 3D parameter posterior comparison...")
-    # save_parameter_posterior_methods_comparison(
-    #     n_points=args.n_points,
-    #     n_samples_is=5000,  # Fixed for 3D comparison
-    #     n_samples_hmc=args.n_samples_hmc,
-    #     n_warmup=args.n_warmup,
-    #     seed=args.seed,
-    # )
-    
-    # # Also generate the density sphere version
-    # try:
-    #     from examples.curvefit.figs_3d_sphere import save_parameter_posterior_3d_sphere
-    #     print("\n9. Generating 3D density sphere visualization...")
-    #     save_parameter_posterior_3d_sphere(
-    #         n_points=args.n_points,
-    #         n_samples_is=5000,
-    #         n_samples_hmc=args.n_samples_hmc,
-    #         n_warmup=args.n_warmup,
-    #         seed=args.seed,
-    #     )
-    # except Exception as e:
-    #     print(f"  Density sphere visualization failed: {e}")
-    
-    # # Generate the voxel version
-    # try:
-    #     from examples.curvefit.figs_3d_voxels import save_parameter_posterior_3d_voxels
-    #     print("\n10. Generating 3D voxel visualization...")
-    #     save_parameter_posterior_3d_voxels(
-    #         n_points=args.n_points,
-    #         n_samples_is=5000,
-    #         n_samples_hmc=args.n_samples_hmc,
-    #         n_warmup=args.n_warmup,
-    #         seed=args.seed,
-    #     )
-    # except Exception as e:
-    #     print(f"  Voxel visualization failed: {e}")
-    
-    # # Generate the density surface comparison
-    # try:
-    #     from examples.curvefit.figs_density_3d import save_genjax_density_comparison
-    #     print("\n11. Generating GenJAX density surface comparison...")
-    #     save_genjax_density_comparison(
-    #         n_points=args.n_points,
-    #         n_samples_is=5000,
-    #         n_samples_hmc_single=1500,
-    #         n_samples_hmc_multi=1500,
-    #         n_warmup=args.n_warmup,
-    #         seed=args.seed,
-    #         timing_repeats=args.timing_repeats,
-    #     )
-    # except Exception as e:
-    #     print(f"  Density surface comparison failed: {e}")
-    
-    # NOTE: Overview IS figures are no longer used in the paper
-    # Commenting out to avoid generating unused figures
-    # # Generate overview IS figures
-    # try:
-    #     from examples.curvefit.figs_overview_is import generate_overview_figures
-    #     print("\n12. Generating overview IS comparison figures...")
-    #     generate_overview_figures(
-    #         n_points=args.n_points,
-    #         n_samples_50=50,
-    #         n_samples_5000=5000,
-    #         seed=args.seed,
-    #         timing_repeats=args.timing_repeats,
-    #     )
-    # except Exception as e:
-    #     print(f"  Overview figures failed: {e}")
-
-
-
-
-def run_traces_mode(args):
-    """Run traces-only mode - generates all trace figures without inference."""
-    import jax.random as jrand
-    from examples.curvefit.figs import (
-        # save_onepoint_trace_viz,  # UNUSED: generates 010_onepoint_trace.pdf
-        save_four_separate_onepoint_traces,
-        # save_four_onepoint_trace_densities,  # UNUSED: generates 051-054_onepoint_trace_density.pdf
-        save_multipoint_trace_viz,
-        save_four_multipoint_trace_vizs,
-        save_four_separate_batched_multipoint_traces,
-        save_four_batched_multipoint_trace_densities,
+    results = save_framework_comparison_figure(
+        n_points=args.n_points,
+        n_samples_is=args.n_samples_is,
+        n_samples_hmc=args.n_samples_hmc,
+        n_warmup=args.n_warmup,
+        seed=args.seed,
+        timing_repeats=args.timing_repeats,
     )
 
-    print("=== Traces Mode: Generate All Trace Figures ===")
-    print("This mode generates trace visualizations without running inference.")
-    
-    # Initialize the master key from CLI seed
-    key = jrand.key(args.seed)
-    
-    # Split keys for each visualization function
-    keys = jrand.split(key, 5)  # Reduced to 5 functions that need keys
+    print("\n=== Benchmark Summary ===")
+    for method_key, result in results.items():
+        mean_time = result["timing"][0] * 1000
+        std_time = result["timing"][1] * 1000
+        print(f"{result['method']}: {mean_time:.1f} ± {std_time:.1f} ms")
+        if "accept_rate" in result:
+            print(f"  Accept rate: {result['accept_rate']:.3f}")
 
-    print("\n1. Generating onepoint trace visualizations...")
-    # save_onepoint_trace_viz(keys[0])  # UNUSED
-    save_four_separate_onepoint_traces(keys[0])
-    
-    # UNUSED: Onepoint trace density visualizations
-    # print("\n2. Generating onepoint trace density visualizations...")
-    # save_four_onepoint_trace_densities(keys[2])
-    
-    print("\n2. Generating multipoint trace visualizations...")
-    save_multipoint_trace_viz(keys[1])
-    save_four_multipoint_trace_vizs(keys[2])
-    
-    print("\n3. Generating batched multipoint trace visualizations...")
-    save_four_separate_batched_multipoint_traces(keys[3])
-    
-    print("\n4. Generating batched multipoint trace density visualizations...")
-    save_four_batched_multipoint_trace_densities(keys[4])
+    print("\n✓ Benchmark complete!")
+    print("Generated comparison figure in examples/curvefit/figs/")
 
-    print("\n✓ Traces mode complete!")
-    print("Generated trace figures in examples/curvefit/figs/")
-    print("\nFigures generated (used in paper):")
-    print("  - 011-013_onepoint_trace.pdf")
-    print("  - 020_multipoint_trace.pdf")
-    print("  - 030_four_multipoint_traces.pdf")
-    print("  - 031-034_batched_multipoint_trace.pdf")
-    print("  - 040-043_batched_multipoint_trace_density.pdf")
+
+def run_generative_mode(args):
+    """Run generative programming figure mode."""
+    print("=== Generative Mode: Programming with Generative Functions Figure ===")
+    print("\n⚠️  This mode has been removed during cleanup.")
+    print("The 'programming with generative functions' plotting code was removed as requested.")
+
+
+def run_vectorization_mode(args):
+    """Run vectorization patterns figure mode."""
+    print("=== Vectorization Mode: Two Natural Vectorization Patterns Figure ===")
+    print("\n⚠️  This mode has been removed during cleanup.")
+    print("The 'vectorization patterns' plotting code was removed as requested.")
+
+
+def run_outlier_mode(args):
+    """Run outlier model experiments for generative conditionals validation."""
+    from examples.curvefit.figs import (
+        # Outlier-specific visualizations
+        save_outlier_conditional_demo,
+        save_outlier_trace_viz,
+        save_outlier_inference_viz_beta,
+        save_outlier_posterior_comparison_beta,
+        save_outlier_data_viz,
+        save_outlier_inference_comparison,
+        save_outlier_indicators_viz,
+        save_outlier_method_comparison,
+        save_outlier_framework_comparison,
+        save_outlier_parameter_posterior_histogram,
+        save_outlier_scaling_study,
+        save_outlier_rate_sensitivity,
+    )
+    
+    print("=== Outlier Mode: Demonstrating Robust Curve Fitting with Generative Conditionals ===")
+    print("Model features:")
+    print("  - GenJAX Cond combinator for mixture modeling")
+    print("  - Automatic outlier detection")
+    print("  - Robustness comparison vs standard model")
+    print("\nParameters:")
+    print(f"  - Data points: {args.n_points}")
+    print(f"  - Outlier rate: {args.outlier_rate}")
+    print(f"  - IS particles: {args.n_samples_is}")
+    print(f"  - Random seed: {args.seed}")
+    
+    # Generate the main demo figure
+    save_outlier_conditional_demo(
+        n_points=args.n_points,
+        outlier_rate=args.outlier_rate,
+        seed=args.seed,
+        n_samples_is=args.n_samples_is,
+    )
+    
+    print("\n✓ Outlier mode complete!")
+    print("Generated figure demonstrates:")
+    print("  - GenJAX's Cond combinator for natural mixture modeling")
+    print("  - Improved robustness with automatic outlier detection")
+    print("  - Zero-cost abstraction (compiles to efficient jnp.where)")
+    print("  - Seamless integration with all inference algorithms")
+
+
+def run_is_only_mode(args):
+    """Run IS-only comparison mode."""
+    from examples.curvefit.figs import (
+        save_is_only_timing_comparison,
+        save_is_only_parameter_density,
+    )
+
+    print("=== IS-Only Mode: Importance Sampling Comparison ===")
+    print("Comparing IS methods with N=5, N=1000, and N=5000 particles")
+    print(f"Parameters:")
+    print(f"  - Data points: {args.n_points}")
+    print(f"  - Random seed: {args.seed}")
+    print(f"  - Timing repeats: {args.timing_repeats}")
+
+    print("\n1. Generating IS-only timing comparison...")
+    save_is_only_timing_comparison(
+        n_points=args.n_points,
+        seed=args.seed,
+        timing_repeats=args.timing_repeats,
+    )
+
+    print("\n2. Generating IS-only parameter density comparison...")
+    save_is_only_parameter_density(
+        n_points=args.n_points,
+        seed=args.seed,
+    )
+
+    print("\n✓ IS-only mode complete!")
+    print("Generated figures in examples/curvefit/figs/")
+
+
+def run_scaling_mode(args):
+    """Run inference scaling analysis mode."""
+    from examples.curvefit.figs import save_inference_scaling_viz
+
+    print("=== Scaling Mode: Inference Scaling Analysis ===")
+    print("Analyzing performance scaling with different particle counts")
+    print("This demonstrates GPU vectorization benefits")
+    
+    print("\nGenerating inference scaling visualization...")
+    save_inference_scaling_viz()
+    
+    print("\n✓ Scaling mode complete!")
+    print("Generated figure in examples/curvefit/figs/")
 
 
 def main():
@@ -334,8 +348,16 @@ def main():
         run_full_mode(args)
     elif args.mode == "benchmark":
         run_benchmark_mode(args)
-    elif args.mode == "traces":
-        run_traces_mode(args)
+    elif args.mode == "generative":
+        run_generative_mode(args)
+    elif args.mode == "vectorization":
+        run_vectorization_mode(args)
+    elif args.mode == "outlier":
+        run_outlier_mode(args)
+    elif args.mode == "is-only":
+        run_is_only_mode(args)
+    elif args.mode == "scaling":
+        run_scaling_mode(args)
 
     print("\n✨ Done!")
 

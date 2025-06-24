@@ -1,5 +1,6 @@
 from functools import partial
 
+import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import matplotlib.pyplot as plt
@@ -188,6 +189,8 @@ def full_gibbs_sweep(
     future_state: jnp.ndarray,
     p_flip: jnp.ndarray,
 ):
+    # Python loops are OK here since it's only 3x3 = 9 iterations
+    # and avoiding them causes JAX tracing issues with the gen functions
     for oy in range(3):
         for ox in range(3):
             current_state = gibbs_move_on_all_cells_at_offset(
@@ -559,7 +562,6 @@ def get_gol_figure_and_updater(
     n_steps_per_frame: int,
     *,
     include_time_line=True,
-    grid_layout=True,
 ):
     """Create combined figure (backwards compatibility)"""
     # For backwards compatibility with animation, create the combined figure
@@ -815,7 +817,6 @@ def get_gol_sampler_lastframe_figure(
         target_image,
         run_summary,
         n_steps_per_frame,
-        grid_layout=True,
         include_time_line=False,
         **anim_kwargs,
     )

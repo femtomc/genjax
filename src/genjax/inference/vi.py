@@ -80,7 +80,7 @@ def elbo_factory(
         q_score = tr.get_score()
 
         # Evaluate target density: log p(x,z)
-        merged_choices = target_gf.merge(constraint, tr.get_choices())
+        merged_choices, _ = target_gf.merge(constraint, tr.get_choices())
         p_density, _ = target_gf.assess(merged_choices, *target_args)
 
         # ELBO = log p(x,z) - log q(z|theta) = p_density - (-log q) = p_density + q_score

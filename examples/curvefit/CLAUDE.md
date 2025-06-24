@@ -64,33 +64,75 @@ examples/curvefit/
 - **Noise Modeling**: Standardized Gaussian noise (σ=0.05) for realistic observations
 - **Benchmark Suites**: Pre-configured datasets for performance and accuracy comparisons
 
-### `figs.py` - Visualization
+### `figs.py` - Comprehensive Visualization Suite
 
-- **Trace visualizations**: Single and multi-point curve traces
-- **Inference visualizations**: Posterior curve overlays with uncertainty
-- **Scaling studies**: Performance and quality analysis across sample sizes
-- **Density visualizations**: Log-density comparisons
+**IMPORTANT**: All visualization functions now use the shared GenJAX Research Visualization Standards (GRVS) from `examples.viz` module for consistent styling across case studies.
 
-### `figs.py` - Clean Visualization Suite
+**Trace Visualizations:**
+- **`save_onepoint_trace_viz()`**: Single curve from prior → `curvefit_prior_trace.pdf`
+- **`save_multiple_onepoint_traces_with_density()`**: 3 prior curves with log density → `curvefit_prior_traces_density.pdf`
+- **`save_multipoint_trace_viz()`**: Single posterior curve with data → `curvefit_posterior_trace.pdf`
+- **`save_multiple_multipoint_traces_with_density()`**: 3 posterior curves with log density → `curvefit_posterior_traces_density.pdf`
+- **`save_four_multipoint_trace_vizs()`**: 2x2 grid of posterior curves → `curvefit_posterior_traces_grid.pdf`
 
-**Core Visualizations:**
-- **`save_onepoint_trace_viz()`**: Single point curve trace
-- **`save_multipoint_trace_viz()`**: Multi-point curve trace
-- **`save_inference_viz()`**: Posterior curve overlay with uncertainty
+**Inference and Scaling:**
+- **`save_inference_scaling_viz()`**: 3-panel scaling analysis → `curvefit_scaling_performance.pdf`
+  - Runtime vs N (flat line showing vectorization benefit)
+  - Log Marginal Likelihood estimates vs N
+  - Effective Sample Size (ESS) vs N
+  - Uses 100 trials per N for Monte Carlo noise reduction
+  - Scientific notation on x-axis ($10^2$, $10^3$, $10^4$)
+- **`save_inference_viz()`**: Posterior uncertainty bands from IS → `curvefit_posterior_curves.pdf`
 
-**Framework Comparison:**
-- **`save_framework_comparison_figure()`**: Clean comparison of IS (1000) vs HMC methods
-  - **Methods compared**: GenJAX IS (1000 particles), GenJAX HMC, NumPyro HMC
+**Method Comparisons:**
+- **`save_genjax_posterior_comparison()`**: IS vs HMC comparison → `curvefit_posterior_comparison.pdf`
+- **`save_framework_comparison_figure()`**: Main framework comparison → `curvefit_framework_comparison_n10.pdf`
+  - **Methods compared**: GenJAX IS (1000), GenJAX HMC, NumPyro HMC
   - **Two-panel layout**: Posterior curves (top), timing comparison (bottom)
-  - **JIT-compiled performance**: Fair comparison with proper warm-up
-  - **Professional styling**: Publication-ready with clear legends
-  - **Focused metrics**: Essential timing and acceptance rate information
 
-### `main.py` - Simplified Entry Point
+**Parameter Density Visualizations:**
+- **`save_individual_method_parameter_density()`**: Main inference methods
+  - GenJAX IS (N=1000) → `curvefit_params_is1000.pdf`
+  - GenJAX HMC → `curvefit_params_hmc.pdf`
+  - NumPyro HMC → `curvefit_params_numpyro.pdf`
+- **`save_is_comparison_parameter_density()`**: IS variants with N=50, 500, 5000
+  - N=50 → `curvefit_params_is50.pdf`
+  - N=500 → `curvefit_params_is500.pdf`
+  - N=5000 → `curvefit_params_is5000.pdf`
+- **`save_is_single_resample_comparison()`**: Single particle resampling distributions
+  - N=50 → `curvefit_params_resample50.pdf`
+  - N=500 → `curvefit_params_resample500.pdf`
+  - N=5000 → `curvefit_params_resample5000.pdf`
 
-- **Three clean modes**: quick (fast demo), full (complete analysis), benchmark (framework comparison)
-- **Focused on essentials**: IS with 1000 particles vs HMC methods
-- **Standard parameters**: Consistent defaults for reproducibility
+**Timing Comparisons:**
+- **`save_is_only_timing_comparison()`**: Horizontal bar chart for IS methods only
+- **`save_parameter_density_timing_comparison()`**: Timing for all parameter density methods
+
+**Legends:**
+- **`create_all_legends()`**: Complete method legend → `curvefit_legend_all.pdf`
+- **`create_genjax_is_legend()`**: GenJAX IS-only legends
+  - Horizontal → `curvefit_legend_is_horiz.pdf`
+  - Vertical → `curvefit_legend_is_vert.pdf`
+  - Consistent color scheme throughout
+
+**Other Visualizations:**
+- **`save_log_density_viz()`**: Log joint density surface → `curvefit_logprob_surface.pdf`
+- **`save_multiple_curves_single_point_viz()`**: Posterior marginal at x → `curvefit_posterior_marginal.pdf`
+
+### `main.py` - Entry Point with Multiple Modes
+
+**Available Modes:**
+- **`quick`**: Fast demonstration with basic visualizations
+- **`full`**: Complete analysis with all visualizations
+- **`benchmark`**: Framework comparison (IS vs HMC methods)
+- **`is-only`**: IS-only comparison (N=5, 1000, 5000)
+- **`scaling`**: Inference scaling analysis only
+- **`outlier`**: Outlier model analysis (generative conditionals)
+
+**Key Features:**
+- **Consistent parameters**: Standard defaults for reproducibility
+- **CUDA support**: Use `pixi run -e curvefit-cuda` for GPU acceleration
+- **Flexible customization**: Command-line args for all parameters
 
 ## Key Implementation Details
 
@@ -189,11 +231,39 @@ class Lambda(Pytree):
 
 ## Visualization Features
 
+### GenJAX Research Visualization Standards (GRVS)
+
+All figures use the shared `examples.viz` module for consistent styling:
+
+**Core Standards:**
+- **Typography**: 18pt base fonts, bold axis labels, 16pt legends
+- **3-Tick Standard**: Exactly 3 tick marks per axis for optimal readability (ENFORCED)
+- **Colors**: Colorblind-friendly palette with consistent method colors
+- **No Titles Policy**: Figures designed for LaTeX integration
+- **Clean Grid**: 30% alpha grid lines, major lines only
+- **Publication Quality**: 300 DPI PDF output with tight layout
+
+**Usage Pattern:**
+```python
+from examples.viz import (
+    setup_publication_fonts, FIGURE_SIZES, get_method_color,
+    apply_grid_style, apply_standard_ticks, save_publication_figure
+)
+
+setup_publication_fonts()
+fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
+ax.plot(x, y, color=get_method_color("curves"), **LINE_SPECS["curve_main"])
+apply_grid_style(ax)
+apply_standard_ticks(ax)  # GRVS 3-tick standard
+save_publication_figure(fig, "output.pdf")
+```
+
 ### Research Quality Outputs
 
 - **High DPI PDF generation**: Publication-ready figures
 - **Multiple visualization types**: Traces, densities, inference results, scaling studies
 - **Systematic organization**: Numbered figure outputs for paper inclusion
+- **Consistent aesthetics**: All figures follow GRVS standards
 
 ### Scaling Studies
 
@@ -421,34 +491,38 @@ f"Value: {float(jax_array):.2f}"
 
 ### Cond Combinator for Mixture Models
 
-The `Cond` combinator now fully supports mixture models with same addresses in both branches:
+The `Cond` combinator now fully supports mixture models with same addresses in both branches. The outlier model in this case study demonstrates this capability:
 
 ```python
-# ✅ Mixture model with outliers - natural expression!
+# ✅ Mixture model with outliers using Cond combinator
+# Define branch functions outside to avoid JAX local function comparison issues
+@gen
+def inlier_branch(y_det, outlier_std):
+    # outlier_std is ignored for inliers but needed for consistent signatures
+    return normal(y_det, 0.2) @ "obs"  # Same address in both branches
+
+@gen  
+def outlier_branch(y_det, outlier_std):
+    return normal(y_det, outlier_std) @ "obs"  # Same address in both branches
+
 @gen
 def point_with_outliers(x, curve, outlier_rate=0.1, outlier_std=1.0):
     y_det = curve(x)
     is_outlier = flip(outlier_rate) @ "is_outlier"
-
-    @gen
-    def inlier_branch():
-        return normal(y_det, 0.2) @ "obs"  # Same address works!
-
-    @gen
-    def outlier_branch():
-        return normal(y_det, outlier_std) @ "obs"  # Same address works!
-
-    # Natural mixture model expression
+    
+    # Natural mixture model using Cond
     cond_model = Cond(outlier_branch, inlier_branch)
-    y_observed = cond_model(is_outlier) @ "y"
+    y_observed = cond_model(is_outlier, y_det, outlier_std) @ "y"
     return y_observed
 ```
 
 **Key Features**:
 - **Natural syntax**: Express mixture models as you would mathematically
-- **Full inference support**: Works with all GenJAX inference algorithms
+- **Full inference support**: Works with all GenJAX inference algorithms (IS, HMC)
 - **JAX optimized**: Uses efficient `jnp.where` for conditional selection
-- **Type safe**: Branches must have compatible return types
+- **Type safe**: Branches must have compatible return types and signatures
+
+**Implementation Note**: Define branch functions at module level (not as local functions) to avoid JAX's local function comparison issues during tracing.
 
 ### Import Dependencies
 
@@ -456,26 +530,44 @@ def point_with_outliers(x, curve, outlier_rate=0.1, outlier_std=1.0):
 - **NumPy compatibility**: Used alongside JAX for some visualizations
 - **Environment**: Use `pixi run -e curvefit` for proper dependencies
 
-## Recent Updates (2025)
+## Recent Updates (June 2025)
 
-### Simplified and Focused Structure
+### Enhanced Visualization Suite
 
-The case study has been streamlined to focus on essential comparisons:
+The case study has been significantly enhanced with comprehensive visualizations:
 
-**Key Changes**:
-- **Clean `figs.py`**: Focused on core visualizations and framework comparison
-- **Simplified `main.py`**: Three clear modes (quick, full, benchmark)
-- **Essential benchmarks**: IS with 1000 particles vs HMC methods only
-- **Reduced complexity**: From 2000+ lines to ~350 lines in figs.py
+**New Figure Types Added**:
+- **Multiple trace figures**: 3-panel trace visualizations with log density values
+- **IS comparison suite**: Comprehensive comparison of IS with N=50, 500, 5000
+- **Parameter density plots**: 2D hexbin + 3D surface visualizations for all methods
+- **Timing comparisons**: Horizontal bar charts for method performance
+- **Legend figures**: Standalone legends for flexible LaTeX integration
 
-**Framework Comparison Focus**:
-- **GenJAX IS**: 1000 particles (fixed) for consistent comparison
-- **GenJAX HMC**: Standard parameters matching NumPyro
-- **NumPyro HMC**: JIT-compiled for fair performance comparison
-- **Clean visualization**: Two-panel figure with posterior curves and timing
+**Inference Scaling Improvements**:
+- **Monte Carlo noise reduction**: 100 trials per N for stable estimates
+- **Scientific notation**: Clean x-axis labels ($10^2$, $10^3$, $10^4$)
+- **Runtime analysis**: Shows flat performance due to GPU vectorization
+- **No error bars**: Cleaner runtime plot focusing on the mean
+- **Y-axis limits**: Zoomed to 0.2-0.3ms range to emphasize flatness
 
-**Benefits**:
-- **Faster execution**: Reduced from minutes to seconds for benchmarks
-- **Clearer focus**: Essential comparisons without overwhelming details
-- **Better maintainability**: Simpler code structure following standards
-- **Educational value**: Clear demonstration of key concepts
+**Visual Consistency**:
+- **No titles**: Figures designed to be understood from context
+- **Consistent colors**: 
+  - IS N=50: Light purple (#B19CD9)
+  - IS N=500: Medium blue (#0173B2)
+  - IS N=5000: Dark green (#029E73)
+  - HMC: Orange (#DE8F05)
+  - NumPyro: Green (#029E73)
+- **Reduced noise**: Observation noise reduced from 0.2 to 0.05 for tighter posteriors
+- **Vertical red lines**: Ground truth indicators in 3D parameter density plots
+
+**Figure Naming Update**:
+- **Descriptive names**: Replaced cryptic numbers with self-explanatory names
+- **Clear prefixes**: `trace_`, `posterior_`, `params_`, `legend_` for grouping
+- **Explicit particle counts**: `is50`, `is500`, `is5000` instead of generic numbers
+- **Resample clarity**: `params_resample` instead of ambiguous "single"
+
+**CUDA Integration**:
+- **GPU acceleration**: All timing benchmarks run with CUDA when available
+- **Proper environments**: Use `pixi run -e curvefit-cuda` for GPU support
+- **Vectorization demonstration**: Runtime plots clearly show GPU benefits
