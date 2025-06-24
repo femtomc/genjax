@@ -95,7 +95,7 @@ def generate_test_dataset(
 
 
 def generate_easy_inference_dataset(
-    seed=42, n_points=5, noise_std=0.2, param_scale=0.3, key=None
+    seed=42, n_points=5, noise_std=0.05, param_scale=0.3, key=None  # Reduced noise to match model
 ):
     """
     Generate an easier dataset for importance sampling.
@@ -155,12 +155,59 @@ def generate_easy_inference_dataset(
     return result
 
 
+def generate_fixed_dataset(
+    n_points=10, x_min=0.0, x_max=1.0,
+    true_a=-0.211, true_b=-0.395, true_c=0.673,
+    noise_std=0.05, seed=42  # Reduced noise to match model
+):
+    """
+    Generate a fixed dataset with specified parameters for consistent visualization.
+    
+    Args:
+        n_points: Number of data points
+        x_min, x_max: Range for x values
+        true_a, true_b, true_c: True polynomial coefficients
+        noise_std: Standard deviation of observation noise
+        seed: Random seed for noise generation
+        
+    Returns:
+        Dictionary with same structure as generate_test_dataset
+    """
+    key = jrand.key(seed)
+    
+    # Generate input locations
+    xs = jnp.linspace(x_min, x_max, n_points, dtype=jnp.float32)
+    
+    # Generate clean polynomial values
+    clean_ys = polyfn(xs, true_a, true_b, true_c)
+    
+    # Add noise
+    key, subkey = jrand.split(key)
+    noise = noise_std * jrand.normal(subkey, shape=(n_points,))
+    ys = clean_ys + noise
+    
+    # Package results
+    result = {
+        "xs": xs,
+        "ys": ys,
+        "true_params": {
+            "a": true_a,
+            "b": true_b,
+            "c": true_c,
+        },
+        "noise_std": noise_std,
+        "clean_ys": clean_ys,
+    }
+    
+    return result
+
+
 def generate_dataset_with_outliers(
     key=None,
     n_points=20,
     outlier_fraction=0.15,
     outlier_scale=3.0,
-    noise_std=0.2,
+    noise_std=0.05,  # Reduced noise to match model
     seed=42,
     true_a=None,
     true_b=None,

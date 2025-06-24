@@ -470,20 +470,20 @@ def diagnostic_raincloud(
 
     # Compute ESS (Effective Sample Size)
     ess = 1.0 / jnp.sum(data**2)
+    
+    # Compute ESS ratio (ESS / n_particles)
+    ess_ratio = ess / n_particles if n_particles is not None else ess
 
-    # Determine ESS quality and color
+    # Determine ESS quality and color based on ratio
     ess_color = "#000000"  # Default black
     if n_particles is not None:
-        # Set default thresholds as fractions of n_particles
+        # Set default thresholds as fractions (already ratios)
         if ess_thresholds is None:
             ess_thresholds = {"good": 0.5, "medium": 0.25}
 
-        good_threshold = ess_thresholds["good"] * n_particles
-        medium_threshold = ess_thresholds["medium"] * n_particles
-
-        if ess >= good_threshold:
+        if ess_ratio >= ess_thresholds["good"]:
             ess_color = "#2E8B57"  # Sea green - good
-        elif ess >= medium_threshold:
+        elif ess_ratio >= ess_thresholds["medium"]:
             ess_color = "#FF8C00"  # Dark orange - medium
         else:
             ess_color = "#DC143C"  # Crimson - bad
@@ -540,4 +540,4 @@ def diagnostic_raincloud(
             # Fallback if KDE fails
             pass
 
-    return float(ess), ess_color
+    return float(ess_ratio), ess_color

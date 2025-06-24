@@ -163,13 +163,205 @@ def generate_standard_data(num_obs=50, seed=42):
 
 ### Visualization Standards
 
+**IMPORTANT**: All case studies must follow the GenJAX Research Visualization Standards (GRVS). Use the shared `examples.viz` module for consistent styling.
+
+#### Core Aesthetic Principles
+
+1. **No Titles Policy**: Figures designed for LaTeX integration without axis titles
+2. **Large Typography**: 18pt base fonts for publication readability  
+3. **Bold Axis Labels**: Clear variable identification
+4. **3-Tick Standard**: Exactly 3 tick marks per axis for optimal readability (ENFORCED)
+5. **Colorblind-Friendly Palette**: Accessible to all readers
+6. **Consistent Sizing**: Standardized figure dimensions
+7. **Publication Quality**: 300 DPI vector output
+
+#### Typography Standards
+
 ```python
-def comparison_fig(num_obs=50, num_samples=1000, **kwargs):
-    """Research-quality figure generation."""
-    # 300 DPI, large fonts
-    # Parametrized filename
-    # Professional styling
+# Use examples.viz for consistent font settings
+from examples.viz import setup_publication_fonts, FONT_HIERARCHY
+
+setup_publication_fonts()  # Applies GRVS typography
+
+# Font hierarchy (applied automatically):
+# - Base text: 18pt
+# - Axis labels: 18pt bold  
+# - Tick labels: 16pt
+# - Legends: 16pt
+# - Titles: 20pt (when used)
 ```
+
+#### Figure Sizing
+
+```python
+from examples.viz import FIGURE_SIZES
+
+# Standard sizes for consistent LaTeX integration
+fig = plt.figure(figsize=FIGURE_SIZES["single_medium"])  # 6.5×4.875"
+
+# Available sizes:
+# - single_small: (4.33, 3.25) - 1/3 textwidth
+# - single_medium: (6.5, 4.875) - 1/2 textwidth  
+# - single_large: (8.66, 6.5) - 2/3 textwidth
+# - two_panel_horizontal: (12, 5) - side-by-side
+# - framework_comparison: (12, 8) - comparison plots
+```
+
+#### Color Standards
+
+```python
+from examples.viz import PRIMARY_COLORS, get_method_color
+
+# Use consistent method colors
+genjax_color = get_method_color("genjax_is")     # #0173B2 (blue)
+hmc_color = get_method_color("genjax_hmc")       # #DE8F05 (orange)
+numpyro_color = get_method_color("numpyro_hmc")  # #029E73 (green)
+data_color = get_method_color("data_points")     # #CC3311 (red)
+```
+
+#### Visual Elements
+
+```python
+from examples.viz import MARKER_SPECS, LINE_SPECS, apply_grid_style, apply_standard_ticks
+
+# Consistent marker sizes
+ax.scatter(x, y, **MARKER_SPECS["data_points"])  # s=120, proper edges
+
+# Standard line weights  
+ax.plot(x, y, **LINE_SPECS["curve_main"])        # linewidth=3, alpha=0.9
+
+# Clean grid styling
+apply_grid_style(ax)  # alpha=0.3, major only
+
+# GRVS 3-tick standard (ENFORCED)
+apply_standard_ticks(ax)  # Exactly 3 ticks per axis
+```
+
+#### Research-Quality Output
+
+```python
+from examples.viz import save_publication_figure
+
+# Standard save configuration (300 DPI, tight layout, PDF)
+save_publication_figure(fig, "figure_name.pdf")
+
+# Automatic cleanup and optimization
+# - Applies tight_layout()
+# - Saves with bbox_inches="tight" 
+# - Closes figure to prevent memory leaks
+```
+
+#### Complete Example
+
+```python
+from examples.viz import (
+    setup_publication_fonts, FIGURE_SIZES, get_method_color,
+    apply_grid_style, apply_standard_ticks, save_publication_figure
+)
+
+# Setup
+setup_publication_fonts()
+fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
+
+# Plot with GRVS standards
+ax.scatter(x_data, y_data, color=get_method_color("data_points"), 
+           s=120, zorder=10, edgecolor="white", linewidth=2)
+ax.plot(x_curve, y_curve, color=get_method_color("genjax_is"),
+        linewidth=3, alpha=0.9, label="GenJAX IS")
+
+# Styling
+ax.set_xlabel("X Variable", fontweight='bold')
+ax.set_ylabel("Y Variable", fontweight='bold')
+apply_grid_style(ax)
+apply_standard_ticks(ax)  # GRVS 3-tick standard
+ax.legend(fontsize=16)
+
+# Save
+save_publication_figure(fig, "comparison_figure.pdf")
+```
+
+#### Migration Status
+
+**Completed Migrations:**
+- **curvefit**: Fully migrated to shared `examples.viz` module
+- **localization**: Fully migrated with additional clean room visualization and shared axes
+- **gol**: Fully migrated with GRVS styling for showcase figures and performance plots
+
+**Pending Migrations:**
+- **faircoin**: Uses local `plt.rcParams.update()` calls, should migrate to GRVS
+- **gen2d**: May have local styling (needs assessment)
+- **state_space**: May have local styling (needs assessment)
+
+**Migration Priority**: Major case studies (curvefit, localization, gol) are complete. Remaining case studies should be migrated as they are actively developed.
+
+#### Migration Guide for Future Case Studies
+
+To update new case studies to use the shared `examples.viz` module:
+
+**1. Replace Local Styling**
+```python
+# OLD: Local matplotlib settings
+plt.rcParams.update({'font.size': 18, 'axes.labelsize': 18, ...})
+
+# NEW: Import and apply GRVS
+from examples.viz import setup_publication_fonts
+setup_publication_fonts()
+```
+
+**2. Replace Local Figure Sizes**
+```python
+# OLD: Local FIGURE_SIZES dictionary
+FIGURE_SIZES = {"single_medium": (6.5, 4.875), ...}
+
+# NEW: Import shared sizes
+from examples.viz import FIGURE_SIZES
+```
+
+**3. Replace Local Colors**
+```python
+# OLD: Hardcoded colors
+ax.scatter(x, y, color="red", s=80)
+
+# NEW: Standardized colors and markers
+from examples.viz import get_method_color, MARKER_SPECS
+ax.scatter(x, y, color=get_method_color("data_points"), **MARKER_SPECS["data_points"])
+```
+
+**4. Replace Manual Grid Styling**
+```python
+# OLD: Manual grid configuration
+ax.grid(True, alpha=0.3)
+
+# NEW: Standardized grid styling
+from examples.viz import apply_grid_style
+apply_grid_style(ax)
+```
+
+**5. Replace Manual Save Configuration**
+```python
+# OLD: Manual save parameters
+fig.savefig("output.pdf", dpi=300, bbox_inches="tight")
+plt.close(fig)
+
+# NEW: Standardized save with cleanup
+from examples.viz import save_publication_figure
+save_publication_figure(fig, "output.pdf")
+```
+
+#### GRVS Compliance Checklist
+
+When creating or updating case studies, ensure:
+
+- [ ] Import `examples.viz` for all styling needs
+- [ ] Call `setup_publication_fonts()` early in module
+- [ ] Use `FIGURE_SIZES` for all figure dimensions
+- [ ] Use `get_method_color()` for consistent color palette
+- [ ] Apply `apply_grid_style()` to all plots
+- [ ] Use `MARKER_SPECS` and `LINE_SPECS` for visual elements
+- [ ] Remove all figure titles (no `ax.set_title()` calls)
+- [ ] Use `fontweight='bold'` for axis labels
+- [ ] Save with `save_publication_figure()` for consistency
+- [ ] Test with `validate_grvs_compliance()` if needed
 
 ## CLI Standards
 

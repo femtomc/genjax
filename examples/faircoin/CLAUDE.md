@@ -34,12 +34,16 @@ examples/faircoin/
 
 ### `figs.py` - Visualization
 
+**NOTE**: This case study uses local styling and should be migrated to the shared `examples.viz` module for consistency with GenJAX Research Visualization Standards (GRVS).
+
 - **`timing_comparison_fig()`**: Generates horizontal bar chart comparisons
 - **`posterior_comparison_fig()`**: Generates 2x2 grid of posterior histograms vs exact posterior
 - **`combined_comparison_fig()`**: Generates 3x2 layout with posterior plots (top) and timing (bottom)
 - **Research paper ready**: Large fonts, high DPI, professional formatting
 - **Error bars**: Standard deviation whiskers on timing measurements
 - **Parametrized filenames**: Includes experimental parameters in output filename
+
+**Migration needed**: Replace local `plt.rcParams.update()` calls with `examples.viz` imports and GRVS standards.
 
 ### `main.py` - CLI Interface
 
@@ -105,56 +109,105 @@ All frameworks implement the same importance sampling strategy:
 
 ### Parametrized Filenames
 
-- Timing: `comparison_obs{N}_samples{M}_repeats{R}.pdf`
-- Posterior: `posterior_comparison_obs{N}_samples{M}.pdf`
-- Combined: `combined_3x2_obs{N}_samples{M}.pdf`
+All figures use descriptive names prefixed with "faircoin" for clear identification:
 
-Enables experiment tracking and reproducibility with multiple configurations coexisting.
+- **Timing**: `faircoin_timing_performance_comparison_obs{N}_samples{M}_repeats{R}.pdf`
+  - Shows horizontal bar chart comparing execution time performance across frameworks
+  - Clear indication that this figure is about timing/performance benchmarking
+
+- **Posterior**: `faircoin_posterior_accuracy_comparison_obs{N}_samples{M}.pdf`
+  - Shows 2x2 grid comparing posterior sample histograms against exact Beta distribution
+  - Clear indication that this figure is about posterior inference accuracy
+
+- **Combined**: `faircoin_combined_posterior_and_timing_obs{N}_samples{M}.pdf`
+  - Shows 3x2 layout with posterior histograms (top row) and timing comparison (bottom row)
+  - Clear indication that this figure combines both analyses
+
+The descriptive naming ensures anyone can understand the figure content from the filename alone, while maintaining experiment tracking with parameters.
 
 ## Usage Patterns
+
+### Execution Environments
+
+The faircoin case study can be run in different environments:
+
+- **CPU environment**: `pixi run -e faircoin` (default, works everywhere)
+- **CUDA environment**: `pixi run -e faircoin-cuda` (GPU acceleration when available)
 
 ### Timing Comparison Only
 
 ```bash
+# CPU version
 pixi run -e faircoin faircoin-timing
+
+# CUDA version (recommended for better performance)
+pixi run -e faircoin-cuda faircoin-timing
 ```
 
 ### Combined Figure (Recommended)
 
 ```bash
+# CPU version
 pixi run -e faircoin faircoin-combined
+
+# CUDA version (recommended)
+pixi run -e faircoin-cuda faircoin-combined
 ```
 
 ### Posterior Comparison Only
 
 ```bash
+# CPU version
 pixi run -e faircoin python -m examples.faircoin.main --posterior
+
+# CUDA version
+pixi run -e faircoin-cuda python -m examples.faircoin.main --posterior
 ```
 
 ### All Figures
 
 ```bash
+# CPU version
 pixi run -e faircoin python -m examples.faircoin.main --all
+
+# CUDA version (recommended)
+pixi run -e faircoin-cuda python -m examples.faircoin.main --all
 ```
 
 ### Custom Parameters
 
 ```bash
+# CPU version
 pixi run -e faircoin python -m examples.faircoin.main --combined --num-obs 100 --num-samples 5000
+
+# CUDA version
+pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 100 --num-samples 5000
 ```
 
 ## Performance Expectations
 
-### Typical Results
+### Typical Results (CPU)
 
 - **GenJAX**: ~100% of handcoded baseline (identical performance)
 - **Handcoded JAX**: 100% baseline (theoretical optimum)
-- **NumPyro**: ~400% of baseline (mature framework with reasonable overhead)
+- **NumPyro**: ~130-400% of baseline (varies by workload)
+
+### Typical Results (CUDA/GPU)
+
+With GPU acceleration (e.g., cuda:0):
+- **GenJAX**: ~0.000087s (~97% of handcoded baseline)
+- **Handcoded JAX**: ~0.000090s (baseline)
+- **NumPyro**: ~0.000141s (~157% of baseline)
+
+GPU execution shows:
+- Much faster absolute times (microsecond range)
+- GenJAX maintains near-identical performance to handcoded
+- NumPyro overhead is reduced with GPU acceleration (~1.6x vs ~1.3-4x on CPU)
 
 ### Framework Characteristics
 
 - **GenJAX**: Clean syntax with zero performance overhead - compiles to identical performance as handcoded JAX
-- **NumPyro**: Mature ecosystem, good performance for complex models, ~4x overhead for simple models
+- **NumPyro**: Mature ecosystem, good performance for complex models, moderate overhead for simple models
 - **Handcoded**: Raw JAX performance ceiling - serves as the reference implementation
 
 ## Development Guidelines

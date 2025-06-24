@@ -26,6 +26,7 @@ tfd = tfp.distributions
 ##########
 
 Any = btyping.Any
+Union = btyping.Union
 Addr = btyping.Tuple | str
 PRNGKey = jtyping.PRNGKeyArray
 Array = jtyping.Array
@@ -807,6 +808,40 @@ class StrSel(Pytree):
 
 
 @Pytree.dataclass
+class TupleSel(Pytree):
+    """Selection that matches a hierarchical tuple address.
+    
+    Tuple addresses represent hierarchical paths like ("outer", "inner", "leaf").
+    When matched against a single string address, it checks if that string
+    matches the first element of the tuple, and returns a selection for
+    the remaining path.
+    
+    Args:
+        t: Tuple of strings representing the hierarchical path.
+    """
+    
+    t: Const[tuple[str, ...]]
+    
+    def match(self, addr) -> tuple[bool, Union[AllSel, NoneSel, "TupleSel"]]:
+        path = self.t.value
+        if not path:
+            # Empty tuple matches nothing
+            return False, NoneSel()
+        
+        if len(path) == 1:
+            # Single element tuple behaves like StrSel
+            check = addr == path[0]
+            return check, AllSel() if check else NoneSel()
+        else:
+            # Multi-element tuple: check first element and return rest
+            check = addr == path[0]
+            if check:
+                return True, TupleSel(const(path[1:]))
+            else:
+                return False, NoneSel()
+
+
+@Pytree.dataclass
 class DictSel(Pytree):
     """Selection that matches addresses using a dictionary mapping.
 
@@ -904,7 +939,7 @@ class Selection(Pytree):
         s: The underlying selection implementation (one of the concrete selection types)
     """
 
-    s: NoneSel | AllSel | StrSel | DictSel | ComplSel | InSel | OrSel
+    s: NoneSel | AllSel | StrSel | TupleSel | DictSel | ComplSel | InSel | OrSel
 
     def match(self, addr) -> "tuple[bool, Selection]":
         check, rest = self.s.match(addr)
@@ -927,7 +962,7 @@ class Selection(Pytree):
         return self.match(addr)
 
 
-def sel(*v: tuple[()] | str | dict[str, Any] | None) -> Selection:
+def sel(*v: tuple[()] | str | tuple[str, ...] | dict[str, Any] | None) -> Selection:
     """Create a Selection from various input types.
 
     This is a convenience function to create Selection objects from common patterns.
@@ -937,6 +972,7 @@ def sel(*v: tuple[()] | str | dict[str, Any] | None) -> Selection:
     Args:
         *v: Variable arguments specifying the selection pattern:
             - str: Select a specific address (e.g., sel("x"))
+            - tuple[str, ...]: Select hierarchical address (e.g., sel(("outer", "inner")))
             - (): Select all addresses (e.g., sel(()))
             - dict: Select nested addresses (e.g., sel({"outer": sel("inner")}))
             - None or no args: Select no addresses (e.g., sel() or sel(None))
@@ -948,6 +984,9 @@ def sel(*v: tuple[()] | str | dict[str, Any] | None) -> Selection:
         ```python
         # Select specific address
         sel("x")                    # Matches address "x"
+        
+        # Select hierarchical address
+        sel(("outer", "inner"))     # Matches hierarchical path outer/inner
 
         # Select all addresses
         sel(())                     # Matches all addresses
@@ -967,6 +1006,9 @@ def sel(*v: tuple[()] | str | dict[str, Any] | None) -> Selection:
             return Selection(AllSel())
         elif isinstance(v[0], dict):
             return Selection(DictSel(v[0]))
+        elif isinstance(v[0], tuple) and all(isinstance(s, str) for s in v[0]):
+            # Tuple of strings for hierarchical addresses
+            return Selection(TupleSel(const(v[0])))
         else:
             assert isinstance(v[0], str)
             return Selection(StrSel(const(v[0])))
@@ -2712,7 +2754,7 @@ class Cond(Generic[X, R], GFI[X, R]):
         merged_discard, _ = self.callee.merge(discard, discard_)
         return (
             CondTr(self, check, [new_tr, new_tr_]),
-            jnp.select(check, [w, w_]),
+            jnp.where(check, w, w_),
             merged_discard,
         )
 

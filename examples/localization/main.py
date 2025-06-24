@@ -94,8 +94,15 @@ def parse_args():
     parser.add_argument(
         "--k-rejuv",
         type=int,
-        default=10,
+        default=20,
         help="Number of rejuvenation steps (K) for MCMC methods",
+    )
+
+    parser.add_argument(
+        "--n-particles-big-grid",
+        type=int,
+        default=5,
+        help="Number of particles for the big grid locally optimal method",
     )
 
     # Trajectory configuration
@@ -188,8 +195,8 @@ def generate_data(args):
 
     # Create timestamped experiment directory
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    param_prefix = f"r{args.n_rays}_p{args.n_particles}_{args.world_type}"
-    experiment_name = args.experiment_name or f"localization_{param_prefix}_{timestamp}"
+    param_prefix = f"localization_r{args.n_rays}_p{args.n_particles}_{args.world_type}"
+    experiment_name = args.experiment_name or f"{param_prefix}_{timestamp}"
     experiment_data_dir = os.path.join(data_dir, experiment_name)
     os.makedirs(experiment_data_dir, exist_ok=True)
 
@@ -222,6 +229,7 @@ def generate_data(args):
         "timestamp": timestamp,
         "n_rays": args.n_rays,
         "n_particles": args.n_particles,
+        "n_particles_big_grid": args.n_particles_big_grid,
         "n_steps": args.n_steps,
         "seed": args.seed,
         "world_type": args.world_type,
@@ -293,6 +301,8 @@ def generate_data(args):
             n_rays=args.n_rays,
             repeats=args.timing_repeats,
             K=args.k_rejuv,
+            K_hmc=25,  # Special K value for HMC
+            n_particles_big_grid=args.n_particles_big_grid,
         )
 
         # Save benchmark results
@@ -366,7 +376,7 @@ def plot_figures(args):
 
     # Create parametrized filename prefix
     param_prefix = (
-        f"r{config['n_rays']}_p{config['n_particles']}_{config['world_type']}"
+        f"localization_r{config['n_rays']}_p{config['n_particles']}_{config['world_type']}"
     )
 
     print("\nGenerating figures...")
@@ -392,7 +402,7 @@ def plot_figures(args):
     ax1b.legend()
     ax1b.set_title("Ground Truth Trajectory with Sensor Observations")
     plt.tight_layout()
-    filename1b = f"{param_prefix}_ground_truth.pdf"
+    filename1b = f"{param_prefix}_true_robot_path_with_lidar_observations.pdf"
     plt.savefig(os.path.join(figs_dir, filename1b), dpi=150, bbox_inches="tight")
     plt.close(fig1b)
     print(f"    Saved: {filename1b}")
@@ -413,7 +423,7 @@ def plot_figures(args):
                 trajectory_data_list.append((traj_type, (poses, controls, obs)))
 
         fig6, ax6 = plot_multiple_trajectories(trajectory_data_list, world)
-        filename6 = f"{param_prefix}_multiple_trajectories.pdf"
+        filename6 = f"{param_prefix}_trajectory_types_exploration_vs_navigation.pdf"
         plt.savefig(os.path.join(figs_dir, filename6), dpi=150, bbox_inches="tight")
         plt.close(fig6)
         print(f"    Saved: {filename6}")
@@ -422,7 +432,7 @@ def plot_figures(args):
     print("  - LIDAR sensor demonstration...")
     demo_pose = true_poses[len(true_poses) // 2]
     fig7, ax7 = plot_lidar_demo(demo_pose, world, n_rays=config["n_rays"])
-    filename7 = f"{param_prefix}_lidar_demo.pdf"
+    filename7 = f"{param_prefix}_lidar_8ray_wall_detection_visualization.pdf"
     plt.savefig(os.path.join(figs_dir, filename7), dpi=150, bbox_inches="tight")
     plt.close(fig7)
     print(f"    Saved: {filename7}")
@@ -464,7 +474,7 @@ def plot_figures(args):
             observations_history=observations if show_lidar else None,
             n_rays=config["n_rays"],
         )
-        filename2 = f"{param_prefix}_particle_evolution.pdf"
+        filename2 = f"{param_prefix}_particle_filter_temporal_evolution_16steps.pdf"
         plt.savefig(os.path.join(figs_dir, filename2), dpi=150, bbox_inches="tight")
         plt.close(fig2)
         print(f"    Saved: {filename2}")
@@ -480,7 +490,7 @@ def plot_figures(args):
             observations=observations[-1] if show_lidar else None,
             n_rays=config["n_rays"],
         )
-        filename3 = f"{param_prefix}_final_step.pdf"
+        filename3 = f"{param_prefix}_final_particle_distribution_at_convergence.pdf"
         plt.savefig(os.path.join(figs_dir, filename3), dpi=150, bbox_inches="tight")
         plt.close(fig3)
         print(f"    Saved: {filename3}")
@@ -490,14 +500,14 @@ def plot_figures(args):
             fig4, axes4 = plot_estimation_error(
                 true_poses[: len(estimated_poses)], estimated_poses
             )
-            filename4 = f"{param_prefix}_estimation_error.pdf"
+            filename4 = f"{param_prefix}_position_and_heading_error_over_time.pdf"
             plt.savefig(os.path.join(figs_dir, filename4), dpi=150, bbox_inches="tight")
             plt.close(fig4)
             print(f"    Saved: {filename4}")
 
         # Diagnostic weights flow
         fig8, ax8 = plot_weight_flow(diagnostic_weights)
-        filename8 = f"{param_prefix}_diagnostic_weight_flow.pdf"
+        filename8 = f"{param_prefix}_particle_weights_and_ess_percentage_timeline.pdf"
         plt.savefig(os.path.join(figs_dir, filename8), dpi=300, bbox_inches="tight")
         plt.close(fig8)
         print(f"    Saved: {filename8}")
@@ -509,7 +519,7 @@ def plot_figures(args):
         for pose in true_poses
     ]
     fig5, ax5 = plot_sensor_observations(observations, true_lidar_distances)
-    filename5 = f"{param_prefix}_sensor_observations.pdf"
+    filename5 = f"{param_prefix}_lidar_distance_readings_along_trajectory.pdf"
     plt.savefig(os.path.join(figs_dir, filename5), dpi=150, bbox_inches="tight")
     plt.close(fig5)
     print(f"    Saved: {filename5}")
@@ -520,18 +530,19 @@ def plot_figures(args):
         benchmark_results = load_benchmark_results(experiment_data_dir)
 
         # Timing comparison
-        timing_filename = f"{param_prefix}_smc_timing_comparison.pdf"
+        timing_filename = f"{param_prefix}_inference_runtime_performance_comparison.pdf"
         timing_path = os.path.join(figs_dir, timing_filename)
         plot_smc_timing_comparison(
             benchmark_results,
             save_path=timing_path,
             n_particles=config["n_particles"],
             K=config["k_rejuv"],
+            n_particles_big_grid=config.get("n_particles_big_grid", 5),
         )
         print(f"    Saved: {timing_filename}")
 
         # Method comparison
-        comparison_filename = f"{param_prefix}_smc_method_comparison.pdf"
+        comparison_filename = f"{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf"
         comparison_path = os.path.join(figs_dir, comparison_filename)
         plot_smc_method_comparison(
             benchmark_results,
@@ -541,6 +552,7 @@ def plot_figures(args):
             n_rays=config["n_rays"],
             n_particles=config["n_particles"],
             K=config["k_rejuv"],
+            n_particles_big_grid=config.get("n_particles_big_grid", 5),
         )
         print(f"    Saved: {comparison_filename}")
 
@@ -548,9 +560,9 @@ def plot_figures(args):
         print("  - Particle evolution plots for each SMC method...")
         method_names = {
             "smc_basic": "Bootstrap Filter",
-            "smc_mh": "SMC + MH",
             "smc_hmc": "SMC + HMC",
             "smc_locally_optimal": "SMC + Locally Optimal",
+            "smc_locally_optimal_big_grid": "SMC (N=5) + Locally Optimal (L=25)",
         }
 
         for method_key, method_display_name in method_names.items():
@@ -573,7 +585,7 @@ def plot_figures(args):
 
                 # Save with method-specific filename
                 method_slug = method_key.replace("_", "-")
-                evolution_filename = f"{param_prefix}_evolution_{method_slug}.pdf"
+                evolution_filename = f"{param_prefix}_{method_slug}_particle_evolution_timeline.pdf"
                 evolution_path = os.path.join(figs_dir, evolution_filename)
                 plt.savefig(evolution_path, dpi=150, bbox_inches="tight")
                 plt.close(fig_evolution)
@@ -581,7 +593,7 @@ def plot_figures(args):
 
         # Multi-method estimation error plot
         print("  - Multi-method estimation error analysis...")
-        error_filename = f"{param_prefix}_multi_method_errors.pdf"
+        error_filename = f"{param_prefix}_all_methods_tracking_accuracy_comparison.pdf"
         error_path = os.path.join(figs_dir, error_filename)
         plot_multi_method_estimation_error(
             benchmark_results, true_poses, save_path=error_path

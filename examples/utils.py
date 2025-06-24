@@ -8,8 +8,8 @@ from typing import Callable, Tuple, Any, Optional
 
 def timing(
     fn: Callable[[], Any],
-    repeats: int = 200,
-    inner_repeats: int = 200,
+    repeats: int = 20,
+    inner_repeats: int = 20,
     auto_sync: bool = True,
 ) -> Tuple[jnp.ndarray, Tuple[float, float]]:
     """Benchmark function execution time with multiple runs.
@@ -69,8 +69,8 @@ def timing(
 def benchmark_with_warmup(
     fn: Callable[[], Any],
     warmup_runs: int = 2,
-    repeats: int = 200,
-    inner_repeats: int = 200,
+    repeats: int = 10,
+    inner_repeats: int = 10,
     auto_sync: bool = True,
 ) -> Tuple[jnp.ndarray, Tuple[float, float]]:
     """Benchmark function with automatic JIT warm-up runs.

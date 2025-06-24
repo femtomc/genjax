@@ -3,13 +3,21 @@ Visualization functions for the localization case study.
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import jax.numpy as jnp
 import numpy as np
 from typing import Dict, Any, List
 from .core import Pose, World
 
-# Set up plotting style
-plt.style.use("default")
+# Import shared GenJAX Research Visualization Standards
+from examples.viz import (
+    setup_publication_fonts, FIGURE_SIZES, get_method_color,
+    apply_grid_style, set_minimal_ticks, apply_standard_ticks, save_publication_figure,
+    SMC_METHOD_COLORS, PRIMARY_COLORS, MARKER_SPECS, LINE_SPECS
+)
+
+# Apply GRVS typography standards
+setup_publication_fonts()
 
 
 def plot_world(world: World, ax=None, room_label_fontsize=14):
@@ -83,13 +91,14 @@ def plot_pose(
     arrow_length=0.5,
     marker="o",
     show_arrow=True,
+    markersize=100,
 ):
     """Plot a single robot pose with position and heading."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 8))
 
     # Plot position
-    ax.scatter(pose.x, pose.y, color=color, s=100, label=label, zorder=5, marker=marker)
+    ax.scatter(pose.x, pose.y, color=color, s=markersize, label=label, zorder=5, marker=marker)
 
     # Plot heading arrow if requested
     if show_arrow:
@@ -100,12 +109,13 @@ def plot_pose(
             pose.y,
             dx,
             dy,
-            head_width=0.1,
-            head_length=0.1,
+            head_width=0.15,
+            head_length=0.15,
             fc=color,
             ec=color,
-            alpha=0.7,
+            alpha=0.8,
             zorder=4,
+            linewidth=3,
         )
 
     return ax
@@ -143,13 +153,11 @@ def plot_lidar_rays(
         ax: Matplotlib axis
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 8))
-        # Remove axis frame and grid for clean LIDAR visualization
-        ax.grid(False)
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-        ax.set_xticks([])
-        ax.set_yticks([])
+        fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_large"])
+        # Apply GRVS styling
+        apply_grid_style(ax)
+        ax.set_xlabel("X Position (m)", fontweight='bold')
+        ax.set_ylabel("Y Position (m)", fontweight='bold')
 
     # Import distance computation function
     from .core import distance_to_wall_lidar
@@ -168,28 +176,28 @@ def plot_lidar_rays(
         end_x = pose.x + distance * jnp.cos(angle)
         end_y = pose.y + distance * jnp.sin(angle)
 
-        # Plot ray line only if requested
+        # Plot ray line with GRVS line specifications
         if show_rays:
+            line_spec = LINE_SPECS["lidar_rays"].copy()
+            line_spec["alpha"] = ray_alpha  # Override with custom alpha
             ax.plot(
                 [pose.x, end_x],
                 [pose.y, end_y],
                 color=ray_color,
-                linewidth=1.0,
-                alpha=ray_alpha,
                 zorder=2,
+                **line_spec
             )
 
-        # Plot measurement endpoint
+        # Plot measurement endpoint with enlarged marker specifications
         if show_measurements:
+            marker_spec = MARKER_SPECS["lidar_endpoints"].copy()
+            marker_spec["alpha"] = 0.8  # Override alpha for visibility
+            marker_spec["s"] = 160      # Double the default size for better visibility
             ax.scatter(
                 end_x,
                 end_y,
                 color=measurement_color,
-                s=20,
-                alpha=0.8,
-                zorder=3,
-                edgecolor="black",
-                linewidth=0.3,
+                **marker_spec
             )
 
     return ax
@@ -267,7 +275,7 @@ def plot_particles(
     else:
         sizes = size_scale / 10  # Default small size
 
-    # Plot particles
+    # Plot particles with enhanced visibility
     if color is not None:
         scatter = ax.scatter(
             xs,
@@ -277,6 +285,8 @@ def plot_particles(
             c=color,
             label=label,
             zorder=3,
+            edgecolors='black',  # Add black edge for better visibility
+            linewidth=0.5,
         )
     else:
         scatter = ax.scatter(
@@ -288,6 +298,8 @@ def plot_particles(
             cmap=cmap,
             label=label if label else f"Particles (n={len(particles)})",
             zorder=3,
+            edgecolors='black',  # Add black edge for better visibility
+            linewidth=0.5,
         )
 
     return ax, scatter
@@ -353,7 +365,7 @@ def plot_particle_filter_step(
                 show_measurements=True,
             )
 
-    # Plot true pose
+    # Plot true pose with medium marker
     plot_pose(
         true_pose,
         ax,
@@ -362,6 +374,7 @@ def plot_particle_filter_step(
         arrow_length=0.4,
         marker="x",
         show_arrow=False,
+        markersize=70,  # Medium size
     )
 
     # Compute and display weighted mean
@@ -647,21 +660,23 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
                     label="True Mean Distance",
                 )
 
-            ax.set_xlabel("Ray Angle (radians)")
-            ax.set_ylabel("Distance")
-            ax.set_title(f"LIDAR Sensor Observations ({n_rays} rays)")
-            ax.legend()
+            ax.set_xlabel("Ray Angle (radians)", fontweight='bold')
+            ax.set_ylabel("Distance (m)", fontweight='bold')
+            # Title removed following curvefit "no titles" principle
+            ax.legend(fontsize=16)
             ax.grid(True, alpha=0.3)
+            set_minimal_ticks(ax)
 
             if save_path:
-                plt.savefig(save_path, dpi=150, bbox_inches="tight")
+                save_publication_figure(fig, save_path)
 
             return fig, ax
         else:
-            # For smaller numbers of rays, use individual subplot approach
+            # For smaller numbers of rays, use shared y-axis approach
             n_cols = min(4, n_rays)
             n_rows = (n_rays + n_cols - 1) // n_cols
-            fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), 
+                                   sharey=True)
 
             if n_rows == 1 and n_cols == 1:
                 axes = [axes]
@@ -669,12 +684,6 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
                 axes = axes.flatten()
             else:
                 axes = axes.flatten()
-
-            # Define ray angles for labeling (relative to robot heading)
-            ray_angles = np.linspace(0, 2 * np.pi, n_rays, endpoint=False)
-            ray_labels = [
-                f"Ray {i} ({angle:.1f} rad)" for i, angle in enumerate(ray_angles)
-            ]
 
             # Colors for each ray
             colors = plt.cm.tab10(np.linspace(0, 1, n_rays))
@@ -725,43 +734,47 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
                             alpha=0.7,
                         )
 
-                ax.set_xlabel("Time Step")
-                ax.set_ylabel("Distance")
-                ax.set_title(ray_labels[ray_idx])
-                ax.grid(True, alpha=0.3)
-                ax.legend(fontsize=8)
-
-                # Set consistent y-axis limits across all subplots
-                ax.set_ylim(0, max(10, max(ray_observations) * 1.1))
+                ax.set_xlabel("Time Step", fontweight='bold')
+                
+                # Only add y-label to leftmost column 
+                if ray_idx % n_cols == 0:
+                    ax.set_ylabel("Distance", fontweight='bold')
+                
+                # Show ray info in text box instead of title - moved further into subplot
+                ax.text(0.15, 0.85, f"Ray {ray_idx}", transform=ax.transAxes, 
+                       verticalalignment='top', fontsize=14, fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
+                apply_grid_style(ax)
+                ax.legend(fontsize=12)
+                set_minimal_ticks(ax)
 
             # Hide unused subplots
             for i in range(n_rays, len(axes)):
                 axes[i].set_visible(False)
 
-            plt.suptitle(
-                f"LIDAR Sensor Observations ({n_rays} Directional Rays)", fontsize=14
-            )
             plt.tight_layout()
 
     else:
         # Backward compatibility: scalar observations
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
 
-        # Plot observations
-        ax.plot(observations, "b-", linewidth=2, label="Observed Distance", marker="o")
+        # Plot observations with larger markers (following curvefit standards)
+        ax.plot(observations, "b-", linewidth=3, label="Observed Distance", 
+                marker="o", markersize=8)
 
         # Plot true distances if available
         if true_distances is not None:
-            ax.plot(true_distances, "r--", linewidth=2, label="True Distance")
+            ax.plot(true_distances, "r--", linewidth=3, label="True Distance")
 
-        ax.set_xlabel("Time Step")
-        ax.set_ylabel("Distance to Wall")
-        ax.set_title("Sensor Observations")
+        ax.set_xlabel("Time Step", fontweight='bold')
+        ax.set_ylabel("Distance to Wall (m)", fontweight='bold')
+        # Title removed following curvefit "no titles" principle
         ax.grid(True, alpha=0.3)
-        ax.legend()
+        ax.legend(fontsize=16)
+        set_minimal_ticks(ax)
 
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        save_publication_figure(fig, save_path)
 
     return fig, axes if is_vector_obs else ax
 
@@ -792,7 +805,16 @@ def plot_ground_truth_trajectory(
             bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.7),
         )
 
-    ax1.set_title("Ground Truth Trajectory")
+    # Clean room visualization - remove axes and grid for trajectory plot
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.set_xlabel("")
+    ax1.set_ylabel("")
+    ax1.grid(False)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_visible(False)
+    ax1.spines['left'].set_visible(False)
     ax1.legend()
 
     # Top right: Control commands over time
@@ -802,21 +824,21 @@ def plot_ground_truth_trajectory(
 
     ax2_twin = ax2.twinx()
 
-    line1 = ax2.plot(velocities, "b-", marker="o", label="Velocity", linewidth=2)
+    line1 = ax2.plot(velocities, "b-", marker="o", label="Velocity", linewidth=3, markersize=8)
     line2 = ax2_twin.plot(
-        angular_velocities, "r-", marker="s", label="Angular Velocity", linewidth=2
+        angular_velocities, "r-", marker="s", label="Angular Velocity", linewidth=3, markersize=8
     )
 
-    ax2.set_xlabel("Time Step")
-    ax2.set_ylabel("Velocity", color="b")
-    ax2_twin.set_ylabel("Angular Velocity (rad/s)", color="r")
-    ax2.set_title("Control Commands")
+    ax2.set_xlabel("Time Step", fontweight='bold')
+    ax2.set_ylabel("Velocity", color="b", fontweight='bold')
+    ax2_twin.set_ylabel("Angular Velocity (rad/s)", color="r", fontweight='bold')
+    # Title removed following curvefit "no titles" principle
     ax2.grid(True, alpha=0.3)
 
     # Combine legends
     lines = line1 + line2
     labels = [line.get_label() for line in lines]
-    ax2.legend(lines, labels, loc="upper left")
+    ax2.legend(lines, labels, loc="upper left", fontsize=16)
 
     # Bottom left: Position over time
     ax3 = axes[1, 0]
@@ -824,27 +846,27 @@ def plot_ground_truth_trajectory(
     ys = [initial_pose.y] + [p.y for p in poses]
     thetas = [initial_pose.theta] + [p.theta for p in poses]
 
-    ax3.plot(xs, "b-", marker="o", label="X Position", linewidth=2)
-    ax3.plot(ys, "g-", marker="s", label="Y Position", linewidth=2)
+    ax3.plot(xs, "b-", marker="o", label="X Position", linewidth=3, markersize=8)
+    ax3.plot(ys, "g-", marker="s", label="Y Position", linewidth=3, markersize=8)
     ax3_twin = ax3.twinx()
-    ax3_twin.plot(thetas, "r-", marker="^", label="Heading (rad)", linewidth=2)
+    ax3_twin.plot(thetas, "r-", marker="^", label="Heading (rad)", linewidth=3, markersize=8)
 
-    ax3.set_xlabel("Time Step")
-    ax3.set_ylabel("Position")
-    ax3_twin.set_ylabel("Heading (rad)", color="r")
-    ax3.set_title("Position and Heading Over Time")
+    ax3.set_xlabel("Time Step", fontweight='bold')
+    ax3.set_ylabel("Position", fontweight='bold')
+    ax3_twin.set_ylabel("Heading (rad)", color="r", fontweight='bold')
+    # Title removed following curvefit "no titles" principle
     ax3.grid(True, alpha=0.3)
-    ax3.legend(loc="upper left")
-    ax3_twin.legend(loc="upper right")
+    ax3.legend(loc="upper left", fontsize=16)
+    ax3_twin.legend(loc="upper right", fontsize=16)
 
     # Bottom right: Sensor observations
     ax4 = axes[1, 1]
-    ax4.plot(observations, "b-", marker="o", label="Observed Distance", linewidth=2)
-    ax4.set_xlabel("Time Step")
-    ax4.set_ylabel("Distance to Wall")
-    ax4.set_title("Sensor Observations")
+    ax4.plot(observations, "b-", marker="o", label="Observed Distance", linewidth=3, markersize=8)
+    ax4.set_xlabel("Time Step", fontweight='bold')
+    ax4.set_ylabel("Distance to Wall (m)", fontweight='bold')
+    # Title removed following curvefit "no titles" principle
     ax4.grid(True, alpha=0.3)
-    ax4.legend()
+    ax4.legend(fontsize=16)
 
     plt.tight_layout()
 
@@ -856,22 +878,25 @@ def plot_ground_truth_trajectory(
 
 def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=8):
     """Demo plot showing LIDAR measurements from a robot pose."""
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=FIGURE_SIZES["lidar_demo"])
 
-    # Plot world
-    plot_world(world, ax)
+    # Plot world with larger room labels for LIDAR demo
+    plot_world(world, ax, room_label_fontsize=20)
 
-    # Remove axis frames and grid for clean room-only visualization
-    ax.grid(False)
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+    # Clean room visualization - remove axes, grid, and labels for cleaner look
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlabel("")
     ax.set_ylabel("")
+    ax.grid(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
 
-    # Plot robot pose
-    plot_pose(pose, ax, color="red", label="Robot", arrow_length=0.5)
+    # Plot robot pose with GRVS color - increased arrow length and marker size
+    plot_pose(pose, ax, color=get_method_color("robot_pose"), label="Robot", 
+              arrow_length=0.8, markersize=180)
 
     # Plot LIDAR measurements with both true and noisy observations
     from .core import distance_to_wall_lidar, sensor_model_single_ray
@@ -920,32 +945,28 @@ def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=8):
         show_measurements=True,
     )
 
-    # Add legend entries
+    # Add legend entries with larger marker specs
+    lidar_marker_spec = MARKER_SPECS["lidar_endpoints"].copy()
+    lidar_marker_spec["s"] = 160  # Double the default size for better visibility
     ax.scatter(
         [],
         [],
         color="black",
-        s=20,
-        alpha=0.8,
-        edgecolor="black",
-        linewidth=0.3,
-        label=f"True Measurements ({n_rays} rays)",
+        label=f"True Measurements",
+        **lidar_marker_spec
     )
     ax.scatter(
         [],
         [],
-        color="orange",
-        s=20,
-        alpha=0.8,
-        edgecolor="black",
-        linewidth=0.3,
-        label=f"Noisy Measurements ({n_rays} rays)",
+        color="orange", 
+        label=f"Noisy Measurements",
+        **lidar_marker_spec
     )
 
-    ax.legend(loc="upper right", bbox_to_anchor=(1.15, 1))
-    ax.set_title(
-        f"LIDAR Sensor Demonstration\n{n_rays}-Ray Distance Measurements with Noise"
-    )
+    # Place legend inside the room at an appropriate location (lower left area)
+    ax.legend(loc="lower left", fontsize=20, bbox_to_anchor=(0.05, 0.05), 
+              frameon=True, fancybox=True, shadow=True, framealpha=0.9)
+    # Title removed following curvefit "no titles" principle
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
@@ -1010,8 +1031,9 @@ def plot_weight_evolution(weight_history, save_path=None):
         # Normalize weights
         weights_norm = weights / jnp.sum(weights)
 
-        # Compute effective sample size
+        # Compute effective sample size and ratio
         ess = 1.0 / jnp.sum(weights_norm**2)
+        ess_ratio = ess / len(weights)
 
         # Plot histogram - handle uniform weights case
         weight_std = jnp.std(weights_norm)
@@ -1058,7 +1080,7 @@ def plot_weight_evolution(weight_history, save_path=None):
         ax.text(
             0.02,
             0.98,
-            f"Step {timestep}\nESS: {ess:.1f}\nMax: {jnp.max(weights_norm):.3f}",
+            f"Step {timestep}\nESS: {ess_ratio*100:.0f}%\nMax: {jnp.max(weights_norm):.3f}",
             transform=ax.transAxes,
             verticalalignment="top",
             bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
@@ -1069,9 +1091,9 @@ def plot_weight_evolution(weight_history, save_path=None):
         ax.grid(True, alpha=0.3)
 
         # Color code by ESS quality
-        if ess > len(weights) * 0.5:  # Good diversity
+        if ess_ratio > 0.5:  # Good diversity
             ax.set_facecolor((0.9, 1.0, 0.9))  # Light green
-        elif ess > len(weights) * 0.1:  # Moderate diversity
+        elif ess_ratio > 0.1:  # Moderate diversity
             ax.set_facecolor((1.0, 1.0, 0.9))  # Light yellow
         else:  # Poor diversity
             ax.set_facecolor((1.0, 0.9, 0.9))  # Light red
@@ -1165,15 +1187,16 @@ def plot_weight_flow(weight_data, save_path=None):
         else:
             weights_norm = weights
 
-        # Compute ESS
+        # Compute ESS and ratio
         ess = 1.0 / jnp.sum(weights_norm**2)
-        ess_values.append(ess)
-
-        # Color based on ESS quality
         n_particles = len(weights)
-        if ess < n_particles * 0.1:
+        ess_ratio = ess / n_particles
+        ess_values.append(ess_ratio)
+
+        # Color based on ESS ratio
+        if ess_ratio < 0.1:
             colors.append("lightcoral")  # Poor ESS
-        elif ess < n_particles * 0.5:
+        elif ess_ratio < 0.5:
             colors.append("orange")  # Fair ESS
         else:
             colors.append("lightgreen")  # Good ESS
@@ -1195,12 +1218,12 @@ def plot_weight_flow(weight_data, save_path=None):
     )
 
     # Add ESS annotations (adjusted for horizontal time flow)
-    for t, ess in enumerate(ess_values):
+    for t, ess_ratio in enumerate(ess_values):
         weight_max = jnp.max(weight_history[t])
         ax.text(
             t,
             weight_max * 1.1,
-            f"ESS: {ess:.1f}",
+            f"ESS: {ess_ratio*100:.0f}%",
             fontsize=10,
             va="bottom",
             ha="center",
@@ -1297,7 +1320,7 @@ def plot_multiple_trajectories(trajectory_data_list, world, save_path=None):
 
 
 def plot_smc_timing_comparison(
-    benchmark_results, save_path=None, n_particles=200, K=10
+    benchmark_results, save_path=None, n_particles=200, K=20, n_particles_big_grid=5
 ):
     """Create horizontal bar chart comparing SMC method timing."""
     fig, ax = plt.subplots(figsize=(12, 8))
@@ -1305,17 +1328,28 @@ def plot_smc_timing_comparison(
     # Color scheme for different SMC methods
     colors = {
         "smc_basic": "#1f77b4",  # Blue - Bootstrap filter
-        "smc_mh": "#ff7f0e",  # Orange - MH rejuvenation
         "smc_hmc": "#2ca02c",  # Green - HMC rejuvenation
         "smc_locally_optimal": "#d62728",  # Red - Locally optimal proposal
+        "smc_locally_optimal_big_grid": "#ff7f0e",  # Orange - Locally optimal with big grid
     }
 
-    method_labels = {
-        "smc_basic": f"Bootstrap filter (N={n_particles})",
-        "smc_mh": f"SMC (N={n_particles}) + MH (K={K})",
-        "smc_hmc": f"SMC (N={n_particles}) + HMC (K={K})",
-        "smc_locally_optimal": f"SMC (N={n_particles}) + Locally Optimal (K={K})",
-    }
+    method_labels = {}
+    for method_name, result in benchmark_results.items():
+        if method_name in colors:
+            # Use n_particles_big_grid for the big grid variant
+            if method_name == "smc_locally_optimal_big_grid":
+                method_n_particles = n_particles_big_grid
+            else:
+                method_n_particles = result.get("n_particles", n_particles)
+            
+            if method_name == "smc_basic":
+                method_labels[method_name] = f"Bootstrap filter\n(N={method_n_particles})"
+            elif method_name == "smc_hmc":
+                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+            elif method_name == "smc_locally_optimal":
+                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+            elif method_name == "smc_locally_optimal_big_grid":
+                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
 
     # Extract timing data
     method_names = []
@@ -1335,6 +1369,13 @@ def plot_smc_timing_comparison(
             timing_means.append(timing_mean)
             timing_stds.append(timing_std)
             method_colors.append(colors[method_name])
+
+    # Sort by timing (fastest to slowest)
+    sorted_indices = np.argsort(timing_means)
+    method_names = [method_names[i] for i in sorted_indices]
+    timing_means = [timing_means[i] for i in sorted_indices]
+    timing_stds = [timing_stds[i] for i in sorted_indices]
+    method_colors = [method_colors[i] for i in sorted_indices]
 
     # Create horizontal bar chart
     y_pos = jnp.arange(len(method_names))
@@ -1378,15 +1419,16 @@ def plot_smc_method_comparison(
     save_path=None,
     n_rays=8,
     n_particles=200,
-    K=10,
+    K=20,
+    n_particles_big_grid=5,
 ):
     """Create comprehensive comparison plot for different SMC methods."""
     # Define colors first
     colors = {
         "smc_basic": "#1f77b4",
-        "smc_mh": "#ff7f0e",
         "smc_hmc": "#2ca02c",
         "smc_locally_optimal": "#d62728",
+        "smc_locally_optimal_big_grid": "#ff7f0e",
     }
 
     # Only count methods we have colors for
@@ -1406,19 +1448,30 @@ def plot_smc_method_comparison(
     # Bottom section for timing
     gs_bottom = gs_main[3]
 
-    method_labels = {
-        "smc_basic": f"Bootstrap filter (N={n_particles})",
-        "smc_mh": f"SMC (N={n_particles}) + MH (K={K})",
-        "smc_hmc": f"SMC (N={n_particles}) + HMC (K={K})",
-        "smc_locally_optimal": f"SMC (N={n_particles}) + Locally Optimal (K={K})",
-    }
+    method_labels = {}
+    for method_name, result in benchmark_results.items():
+        if method_name in colors:
+            # Use n_particles_big_grid for the big grid variant
+            if method_name == "smc_locally_optimal_big_grid":
+                method_n_particles = n_particles_big_grid
+            else:
+                method_n_particles = result.get("n_particles", n_particles)
+            
+            if method_name == "smc_basic":
+                method_labels[method_name] = f"Bootstrap filter\n(N={method_n_particles})"
+            elif method_name == "smc_hmc":
+                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+            elif method_name == "smc_locally_optimal":
+                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+            elif method_name == "smc_locally_optimal_big_grid":
+                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
 
     # Grayscale colors for raincloud plots
     grayscale_colors = {
         "smc_basic": "#404040",
-        "smc_mh": "#606060",
-        "smc_hmc": "#808080",
-        "smc_locally_optimal": "#a0a0a0",
+        "smc_hmc": "#606060",
+        "smc_locally_optimal": "#808080",
+        "smc_locally_optimal_big_grid": "#a0a0a0",
     }
 
     # Only process methods we have colors for
@@ -1451,7 +1504,7 @@ def plot_smc_method_comparison(
             first_particles, world, first_weights, ax_first, alpha=0.8, size_scale=50
         )
 
-        # Plot true first pose
+        # Plot true first pose with medium marker
         plot_pose(
             true_poses[0],
             ax_first,
@@ -1460,9 +1513,12 @@ def plot_smc_method_comparison(
             arrow_length=0.4,
             marker="x",
             show_arrow=False,
+            markersize=70,  # Medium size
         )
 
-        ax_first.set_title("", fontsize=20, fontweight="bold")
+        # Add method title with line breaks before +
+        method_title = method_labels[method_name]
+        ax_first.set_title(method_title, fontsize=16, fontweight="bold", pad=10)
         ax_first.legend().set_visible(False)
 
         # Color-code the method with frame
@@ -1535,7 +1591,8 @@ def plot_smc_method_comparison(
                 alpha=alpha,
                 c=range(len(particles)),
                 cmap="viridis",
-                edgecolors="none",
+                edgecolors="black",  # Black edges for better visibility
+                linewidth=0.3,  # Thin edge
                 zorder=3 + blend_idx,  # Later timesteps on top
             )
 
@@ -1573,15 +1630,15 @@ def plot_smc_method_comparison(
                 alpha = 0.3 + (0.7 * blend_idx / max(1, n_blend_steps - 1))
                 arrow_length = 0.15 + (0.35 * blend_idx / max(1, n_blend_steps - 1))
 
-                # Plot position with fading red - larger and more prominent
+                # Plot position with fading red - medium visibility
                 ax_particles.scatter(
                     true_pose.x,
                     true_pose.y,
                     color="red",
-                    s=80 + 80 * blend_idx / (n_blend_steps - 1),  # Size from 80 to 160
+                    s=50 + 50 * blend_idx / (n_blend_steps - 1),  # Size from 50 to 100
                     alpha=alpha,
                     zorder=20 + blend_idx,  # True poses on top of particles
-                    linewidth=2.0,
+                    linewidth=2.0,  # Medium line width
                     marker="x",
                 )
 
@@ -1595,6 +1652,7 @@ def plot_smc_method_comparison(
                 arrow_length=0.5,
                 marker="x",
                 show_arrow=False,
+                markersize=80,  # More prominent
             )
 
         ax_particles.set_title("", fontsize=20, fontweight="bold")  # Remove title
@@ -1666,11 +1724,11 @@ def plot_smc_method_comparison(
             for plot_pos, (timestep, ess, ess_color) in enumerate(
                 zip(valid_timesteps, ess_values, ess_colors)
             ):
-                # ESS annotation on the right
+                # ESS annotation on the right (as percentage)
                 ax_weights.text(
                     0.98,
                     plot_pos,
-                    f"ESS: {ess:.0f}",
+                    f"ESS: {ess*100:.0f}%",
                     fontsize=16,
                     va="center",
                     ha="right",
@@ -1730,6 +1788,13 @@ def plot_smc_method_comparison(
             timing_stds.append(timing_std)
             method_colors.append(colors[method_name])
 
+    # Sort by timing (fastest to slowest)
+    sorted_indices = np.argsort(timing_means)
+    method_names = [method_names[i] for i in sorted_indices]
+    timing_means = [timing_means[i] for i in sorted_indices]
+    timing_stds = [timing_stds[i] for i in sorted_indices]
+    method_colors = [method_colors[i] for i in sorted_indices]
+
     # Create horizontal bar chart
     y_pos = jnp.arange(len(method_names))
     bars = ax_timing.barh(
@@ -1777,6 +1842,9 @@ def plot_smc_method_comparison(
         bbox_to_anchor=(0.5, 0.02),
         ncol=len(legend_elements),
         fontsize=18,
+        handlelength=3,  # Make colored squares wider
+        handleheight=2,  # Make colored squares taller
+        columnspacing=2.5,  # Add more space between columns
     )
     # Make legend text bold
     for text in legend.get_texts():
@@ -1801,16 +1869,16 @@ def plot_multi_method_estimation_error(
 
     method_names = {
         "smc_basic": "Bootstrap Filter",
-        "smc_mh": "SMC + MH",
         "smc_hmc": "SMC + HMC",
         "smc_locally_optimal": "SMC + Locally Optimal",
+        "smc_locally_optimal_big_grid": "SMC (N=5) + Locally Optimal (L=25)",
     }
 
     colors = {
         "smc_basic": "#E74C3C",
-        "smc_mh": "#3498DB",
         "smc_hmc": "#2ECC71",
         "smc_locally_optimal": "#9B59B6",
+        "smc_locally_optimal_big_grid": "#3498DB",
     }
 
     # For each method
