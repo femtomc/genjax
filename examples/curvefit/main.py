@@ -30,11 +30,13 @@ def parse_args():
             "gibbs",
             "enum-gibbs",
             "gibbs-comparison",
+            "gibbs-efficiency",
+            "gibbs-vs-is",
             "narrative",
         ],
         nargs="?",
         default="quick",
-        help="Analysis mode: quick (fast viz), full (complete), benchmark (compare frameworks), generative (programming figure), vectorization (patterns figure), outlier (generative conditionals), is-only (IS comparison only), scaling (inference scaling analysis), gibbs (Gibbs sampling analysis), enum-gibbs (enumerative Gibbs), gibbs-comparison (complete Gibbs comparison), narrative (overview figures for paper)",
+        help="Analysis mode: quick (fast viz), full (complete), benchmark (compare frameworks), generative (programming figure), vectorization (patterns figure), outlier (generative conditionals), is-only (IS comparison only), scaling (inference scaling analysis), gibbs (Gibbs sampling analysis), enum-gibbs (enumerative Gibbs), gibbs-comparison (complete Gibbs comparison), gibbs-efficiency (efficiency frontier analysis), gibbs-vs-is (direct Gibbs vs IS comparison), narrative (overview figures for paper)",
     )
 
     # Analysis parameters
@@ -531,6 +533,50 @@ def run_gibbs_comparison_mode(args):
     print("  - curvefit_enumerative_gibbs_vectorization.pdf")
 
 
+def run_gibbs_efficiency_mode(args):
+    """Run Gibbs efficiency frontier analysis."""
+    print("🔬 Gibbs Efficiency Frontier Analysis")
+    print("=" * 40)
+
+    from examples.curvefit.figs import (
+        save_gibbs_efficiency_frontier_figure,
+    )
+
+    # Run efficiency frontier analysis
+    best_config, results = save_gibbs_efficiency_frontier_figure(
+        outlier_rate=args.outlier_rate,
+        n_points=args.n_points,
+        seed=42,
+    )
+
+    print("\n📈 Generated figures:")
+    print("  - gibbs_efficiency_frontier.pdf")
+
+    return best_config, results
+
+
+def run_gibbs_vs_is_mode(args):
+    """Run direct Gibbs vs IS(N=1000) comparison."""
+    print("⚡ Gibbs vs IS(N=1000) Direct Comparison")
+    print("=" * 45)
+
+    from examples.curvefit.figs import (
+        save_gibbs_vs_is_comparison_figure,
+    )
+
+    # Run direct comparison
+    results = save_gibbs_vs_is_comparison_figure(
+        n_points=args.n_points,
+        outlier_rate=args.outlier_rate,
+        seed=42,
+    )
+
+    print("\n📈 Generated figures:")
+    print("  - gibbs_vs_is_comparison.pdf")
+
+    return results
+
+
 def run_narrative_mode(args):
     """Run narrative figure generation for Overview section."""
     from examples.curvefit.narrative_figs import generate_all_overview_figures
@@ -586,6 +632,10 @@ def main():
         run_enum_gibbs_mode(args)
     elif args.mode == "gibbs-comparison":
         run_gibbs_comparison_mode(args)
+    elif args.mode == "gibbs-efficiency":
+        run_gibbs_efficiency_mode(args)
+    elif args.mode == "gibbs-vs-is":
+        run_gibbs_vs_is_mode(args)
     elif args.mode == "narrative":
         run_narrative_mode(args)
 

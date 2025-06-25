@@ -1348,3 +1348,244 @@ def extract_posterior_samples(benchmark_results):
         }
 
     return posterior_samples
+
+
+# =============================================================================
+# EFFICIENCY TESTING UTILITIES
+# =============================================================================
+
+
+def test_minimal_gibbs_configuration(
+    n_warmup, n_samples, n_points=15, outlier_rate=0.25, n_trials=3, seed=42
+):
+    """
+    Test a specific Gibbs configuration for efficiency and accuracy.
+
+    Args:
+        n_warmup: Number of warmup sweeps
+        n_samples: Number of sampling sweeps
+        n_points: Number of data points
+        outlier_rate: Outlier probability
+        n_trials: Number of trial runs for robustness
+        seed: Random seed
+
+    Returns:
+        Dictionary with performance metrics
+    """
+    import time
+    from examples.curvefit.data import polyfn
+
+    # Generate test data
+    true_a, true_b, true_c = -0.211, -0.395, 0.673
+    key = jrand.key(seed)
+    x_key, noise_key, outlier_key = jrand.split(key, 3)
+
+    xs_obs = jnp.linspace(0.0, 1.0, n_points)
+    y_true = jax.vmap(lambda x: polyfn(x, true_a, true_b, true_c))(xs_obs)
+    noise = jrand.normal(noise_key, shape=(n_points,)) * 0.05
+    is_outlier_true = jrand.uniform(outlier_key, shape=(n_points,)) < outlier_rate
+    outlier_vals = jrand.uniform(
+        outlier_key, shape=(n_points,), minval=-4.0, maxval=4.0
+    )
+    ys_obs = jnp.where(is_outlier_true, outlier_vals, y_true + noise)
+
+    results = []
+
+    for trial in range(n_trials):
+        # Run Gibbs with this configuration
+        start_time = time.time()
+        result = enumerative_gibbs_infer_latents_with_outliers_jit(
+            jrand.key(seed + trial),
+            xs_obs,
+            ys_obs,
+            n_samples=Const(n_samples),
+            n_warmup=Const(n_warmup),
+            outlier_rate=Const(outlier_rate),
+        )
+        jax.block_until_ready(result)
+        runtime = (time.time() - start_time) * 1000  # Convert to ms
+
+        # Evaluate performance
+        curve_samples = result["curve_samples"]
+        outlier_samples = result["outlier_samples"]
+
+        # Parameter estimation
+        a_mean = jnp.mean(curve_samples["a"])
+        b_mean = jnp.mean(curve_samples["b"])
+        c_mean = jnp.mean(curve_samples["c"])
+
+        param_mse = (
+            (a_mean - true_a) ** 2 + (b_mean - true_b) ** 2 + (c_mean - true_c) ** 2
+        )
+
+        # Outlier detection
+        outlier_probs = jnp.mean(outlier_samples, axis=0)
+        predicted_outliers = outlier_probs > 0.5
+
+        tp = jnp.sum(predicted_outliers & is_outlier_true)
+        fp = jnp.sum(predicted_outliers & ~is_outlier_true)
+        fn = jnp.sum(~predicted_outliers & is_outlier_true)
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if (precision + recall) > 0
+            else 0.0
+        )
+
+        results.append(
+            {
+                "trial": trial,
+                "runtime": runtime,
+                "param_mse": param_mse,
+                "f1": f1,
+                "precision": precision,
+                "recall": recall,
+            }
+        )
+
+    # Aggregate results
+    avg_runtime = jnp.mean(jnp.array([r["runtime"] for r in results]))
+    avg_f1 = jnp.mean(jnp.array([r["f1"] for r in results]))
+    avg_mse = jnp.mean(jnp.array([r["param_mse"] for r in results]))
+    std_f1 = jnp.std(jnp.array([r["f1"] for r in results]))
+
+    return {
+        "total_sweeps": n_warmup + n_samples,
+        "n_warmup": n_warmup,
+        "n_samples": n_samples,
+        "avg_runtime": avg_runtime,
+        "avg_f1": avg_f1,
+        "avg_mse": avg_mse,
+        "std_f1": std_f1,
+        "n_trials": n_trials,
+        "success_rate": jnp.mean(jnp.array([r["f1"] for r in results]) >= 0.9),
+        "results": results,
+    }
+
+
+def find_minimal_gibbs_configuration(
+    target_f1=0.9, max_total_sweeps=300, n_points=15, outlier_rate=0.25, seed=42
+):
+    """
+    Find the minimal Gibbs configuration that achieves target performance.
+
+    Args:
+        target_f1: Target F1 score to achieve
+        max_total_sweeps: Maximum total sweeps to consider
+        n_points: Number of data points
+        outlier_rate: Outlier probability
+        seed: Random seed
+
+    Returns:
+        Dictionary with best configuration found
+    """
+    # Test different configurations
+    configs_to_test = [
+        (5, 10),  # 15 total - extremely minimal
+        (10, 15),  # 25 total - very minimal
+        (10, 25),  # 35 total - minimal
+        (15, 35),  # 50 total - fast
+        (25, 50),  # 75 total - reasonable
+        (50, 100),  # 150 total - conservative
+        (100, 200),  # 300 total - thorough
+    ]
+
+    # Filter by max_total_sweeps
+    configs_to_test = [(w, s) for w, s in configs_to_test if w + s <= max_total_sweeps]
+
+    print(f"🔍 Searching for minimal configuration with F1 >= {target_f1:.2f}")
+    print(f"  Testing {len(configs_to_test)} configurations...")
+
+    successful_configs = []
+
+    for n_warmup, n_samples in configs_to_test:
+        result = test_minimal_gibbs_configuration(
+            n_warmup, n_samples, n_points, outlier_rate, n_trials=3, seed=seed
+        )
+
+        total = result["total_sweeps"]
+        f1 = result["avg_f1"]
+        runtime = result["avg_runtime"]
+
+        status = "✅" if f1 >= target_f1 else "❌"
+        print(
+            f"    {total:3d} sweeps (w={n_warmup:2d}, s={n_samples:2d}): F1={f1:.3f}, {runtime:5.1f}ms {status}"
+        )
+
+        if f1 >= target_f1:
+            successful_configs.append(result)
+
+    if successful_configs:
+        # Find the one with minimum total sweeps
+        best_config = min(successful_configs, key=lambda x: x["total_sweeps"])
+        print("\n🎯 Minimal configuration found:")
+        print(
+            f"  • Total sweeps: {best_config['total_sweeps']} (warmup={best_config['n_warmup']}, samples={best_config['n_samples']})"
+        )
+        print(
+            f"  • Performance: F1={best_config['avg_f1']:.3f}, MSE={best_config['avg_mse']:.3f}"
+        )
+        print(f"  • Runtime: {best_config['avg_runtime']:.1f}ms")
+        return best_config
+    else:
+        print(
+            f"\n⚠️ No configuration achieved F1 >= {target_f1:.2f} with <= {max_total_sweeps} sweeps"
+        )
+        return None
+
+
+def run_gibbs_efficiency_sweep(
+    outlier_rates=[0.2, 0.3, 0.4], n_points_list=[10, 15, 20], seed=42
+):
+    """
+    Run comprehensive efficiency sweep across different problem difficulties.
+
+    Args:
+        outlier_rates: List of outlier probabilities to test
+        n_points_list: List of data point counts to test
+        seed: Random seed
+
+    Returns:
+        Dictionary with efficiency results for each condition
+    """
+    print("🔬 Comprehensive Gibbs Efficiency Sweep")
+    print("=" * 40)
+
+    all_results = {}
+
+    for outlier_rate in outlier_rates:
+        for n_points in n_points_list:
+            condition = f"outlier_{int(outlier_rate * 100)}_points_{n_points}"
+            print(
+                f"\n📊 Testing {condition}: {outlier_rate * 100:.0f}% outliers, {n_points} points"
+            )
+
+            # Find minimal configuration for this condition
+            best_config = find_minimal_gibbs_configuration(
+                target_f1=0.9,
+                max_total_sweeps=300,
+                n_points=n_points,
+                outlier_rate=outlier_rate,
+                seed=seed,
+            )
+
+            all_results[condition] = {
+                "outlier_rate": outlier_rate,
+                "n_points": n_points,
+                "best_config": best_config,
+            }
+
+    # Summary
+    print("\n📋 Efficiency Sweep Summary:")
+    for condition, result in all_results.items():
+        if result["best_config"] is not None:
+            config = result["best_config"]
+            print(
+                f"  {condition}: {config['total_sweeps']} sweeps, F1={config['avg_f1']:.3f}"
+            )
+        else:
+            print(f"  {condition}: No viable configuration found")
+
+    return all_results

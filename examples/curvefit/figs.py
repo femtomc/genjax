@@ -38,6 +38,7 @@ import jax.numpy as jnp
 import jax.random as jrand
 import jax
 from examples.utils import benchmark_with_warmup
+from genjax.core import Const
 
 # Import shared GenJAX Research Visualization Standards
 from examples.viz import (
@@ -5257,4 +5258,511 @@ def save_enumerative_gibbs_vectorization_demo(
         "regular_times": regular_times,
         "enum_times": enum_times,
         "speedups": speedups,
+    }
+
+
+# =============================================================================
+# EFFICIENCY ANALYSIS FUNCTIONS
+# =============================================================================
+
+
+def generate_challenging_outlier_data(n_points=20, outlier_rate=0.4, seed=42):
+    """Generate challenging data with many outliers to stress-test convergence."""
+    from examples.curvefit.data import polyfn
+
+    true_a, true_b, true_c = -0.211, -0.395, 0.673
+    key = jrand.key(seed)
+    x_key, noise_key, outlier_key = jrand.split(key, 3)
+
+    xs_obs = jnp.linspace(0.0, 1.0, n_points)
+    y_true = jax.vmap(lambda x: polyfn(x, true_a, true_b, true_c))(xs_obs)
+    noise = jrand.normal(noise_key, shape=(n_points,)) * 0.05
+    is_outlier_true = jrand.uniform(outlier_key, shape=(n_points,)) < outlier_rate
+    outlier_vals = jrand.uniform(
+        outlier_key, shape=(n_points,), minval=-4.0, maxval=4.0
+    )
+    ys_obs = jnp.where(is_outlier_true, outlier_vals, y_true + noise)
+
+    return {
+        "xs": xs_obs,
+        "ys": ys_obs,
+        "is_outlier_true": is_outlier_true,
+        "true_params": {"a": true_a, "b": true_b, "c": true_c},
+        "n_true_outliers": jnp.sum(is_outlier_true),
+    }
+
+
+def evaluate_gibbs_performance(result, data):
+    """Evaluate Gibbs performance on detection and parameter estimation."""
+    # Extract results
+    curve_samples = result["curve_samples"]
+    outlier_samples = result["outlier_samples"]
+
+    # Parameter estimation
+    a_mean = jnp.mean(curve_samples["a"])
+    b_mean = jnp.mean(curve_samples["b"])
+    c_mean = jnp.mean(curve_samples["c"])
+
+    true_a = data["true_params"]["a"]
+    true_b = data["true_params"]["b"]
+    true_c = data["true_params"]["c"]
+
+    param_mse = (a_mean - true_a) ** 2 + (b_mean - true_b) ** 2 + (c_mean - true_c) ** 2
+
+    # Outlier detection
+    outlier_probs = jnp.mean(outlier_samples, axis=0)
+    predicted_outliers = outlier_probs > 0.5
+    is_outlier_true = data["is_outlier_true"]
+
+    tp = jnp.sum(predicted_outliers & is_outlier_true)
+    fp = jnp.sum(predicted_outliers & ~is_outlier_true)
+    fn = jnp.sum(~predicted_outliers & is_outlier_true)
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
+
+    return {
+        "param_mse": param_mse,
+        "detection_f1": f1,
+        "precision": precision,
+        "recall": recall,
+    }
+
+
+def save_gibbs_efficiency_frontier_figure(outlier_rate=0.4, n_points=20, seed=42):
+    """
+    Create comprehensive efficiency frontier analysis figure for Gibbs sampling.
+
+    Tests different (warmup, sampling) combinations to find the minimum viable
+    configuration for good performance.
+    """
+    print("🔬 Creating Gibbs Efficiency Frontier Analysis...")
+
+    from examples.curvefit.core import enumerative_gibbs_infer_latents_with_outliers_jit
+    import time
+
+    # Generate challenging test data
+    data = generate_challenging_outlier_data(
+        n_points=n_points, outlier_rate=outlier_rate, seed=seed
+    )
+    print(
+        f"  Generated challenging data: {data['n_true_outliers']}/{len(data['xs'])} outliers ({outlier_rate * 100:.0f}%)"
+    )
+
+    # Test different configurations
+    configs = [
+        # (n_warmup, n_samples, label)
+        (10, 25, "Minimal (35 total)"),
+        (20, 50, "Very Fast (70 total)"),
+        (50, 100, "Fast (150 total)"),
+        (100, 200, "Standard (300 total)"),
+        (200, 300, "Conservative (500 total)"),
+        (500, 500, "Thorough (1000 total)"),
+    ]
+
+    results = []
+
+    print("\n  Testing configurations:")
+    for n_warmup, n_samples, label in configs:
+        print(f"    {label}: warmup={n_warmup}, samples={n_samples}")
+
+        # Run Gibbs with this configuration
+        start_time = time.time()
+        gibbs_result = enumerative_gibbs_infer_latents_with_outliers_jit(
+            jrand.key(seed + n_warmup + n_samples),
+            data["xs"],
+            data["ys"],
+            n_samples=Const(n_samples),
+            n_warmup=Const(n_warmup),
+            outlier_rate=Const(outlier_rate),
+        )
+        jax.block_until_ready(gibbs_result)
+        runtime = time.time() - start_time
+
+        # Evaluate performance
+        perf = evaluate_gibbs_performance(gibbs_result, data)
+
+        results.append(
+            {
+                "n_warmup": n_warmup,
+                "n_samples": n_samples,
+                "total_sweeps": n_warmup + n_samples,
+                "label": label,
+                "runtime": runtime * 1000,  # Convert to ms
+                **perf,
+            }
+        )
+
+        print(
+            f"      F1: {perf['detection_f1']:.3f}, MSE: {perf['param_mse']:.3f}, Time: {runtime * 1000:.1f}ms"
+        )
+
+    # Create visualization
+    setup_publication_fonts()
+    fig, ((ax_f1, ax_mse), (ax_time, ax_pareto)) = plt.subplots(
+        2, 2, figsize=FIGURE_SIZES["framework_comparison"]
+    )
+
+    # Extract data
+    total_sweeps = [r["total_sweeps"] for r in results]
+    f1_scores = [r["detection_f1"] for r in results]
+    mse_values = [r["param_mse"] for r in results]
+    runtimes = [r["runtime"] for r in results]
+    labels = [r["label"] for r in results]
+
+    # Colors from fast (red) to slow (green)
+    colors = plt.cm.RdYlGn(np.linspace(0.2, 0.8, len(results)))
+
+    # Panel 1: F1 vs Total Sweeps
+    ax_f1.plot(
+        total_sweeps,
+        f1_scores,
+        "o-",
+        linewidth=2,
+        markersize=8,
+        color=get_method_color("genjax_hmc"),
+    )
+
+    # Highlight the "good enough" threshold
+    ax_f1.axhline(
+        0.95, color="red", linestyle="--", alpha=0.7, label="95% F1 threshold"
+    )
+
+    # Find first config that hits 95% F1
+    good_configs = [r for r in results if r["detection_f1"] >= 0.95]
+    if good_configs:
+        best_config = min(good_configs, key=lambda x: x["total_sweeps"])
+        ax_f1.scatter(
+            [best_config["total_sweeps"]],
+            [best_config["detection_f1"]],
+            s=200,
+            color="red",
+            marker="*",
+            zorder=10,
+            label="Minimum for 95% F1",
+        )
+        print(
+            f"  Minimum config for 95% F1: {best_config['label']} ({best_config['total_sweeps']} sweeps)"
+        )
+
+    ax_f1.set_xlabel("Total Gibbs Sweeps", fontweight="bold")
+    ax_f1.set_ylabel("Outlier Detection F1", fontweight="bold")
+    ax_f1.legend()
+    apply_grid_style(ax_f1)
+    apply_standard_ticks(ax_f1)
+
+    # Panel 2: MSE vs Total Sweeps
+    ax_mse.plot(
+        total_sweeps,
+        mse_values,
+        "s-",
+        linewidth=2,
+        markersize=8,
+        color=get_method_color("genjax_is"),
+    )
+
+    ax_mse.set_xlabel("Total Gibbs Sweeps", fontweight="bold")
+    ax_mse.set_ylabel("Parameter MSE", fontweight="bold")
+    apply_grid_style(ax_mse)
+    apply_standard_ticks(ax_mse)
+
+    # Panel 3: Runtime vs Total Sweeps
+    ax_time.plot(
+        total_sweeps,
+        runtimes,
+        "^-",
+        linewidth=2,
+        markersize=8,
+        color=get_method_color("data_points"),
+    )
+
+    ax_time.set_xlabel("Total Gibbs Sweeps", fontweight="bold")
+    ax_time.set_ylabel("Runtime (ms)", fontweight="bold")
+    apply_grid_style(ax_time)
+    apply_standard_ticks(ax_time)
+
+    # Panel 4: Efficiency frontier (F1 vs Runtime)
+    for i, (f1, runtime, label) in enumerate(zip(f1_scores, runtimes, labels)):
+        ax_pareto.scatter(
+            [runtime],
+            [f1],
+            s=150,
+            color=colors[i],
+            edgecolor="black",
+            linewidth=2,
+            zorder=10,
+        )
+
+        # Label the efficient configurations
+        if f1 > 0.9 or runtime < 100:  # Label high-performance or fast configs
+            ax_pareto.annotate(
+                f"{total_sweeps[i]}",
+                (runtime, f1),
+                xytext=(5, 5),
+                textcoords="offset points",
+                fontsize=10,
+                fontweight="bold",
+            )
+
+    # Connect points to show the frontier
+    sorted_by_runtime = sorted(zip(runtimes, f1_scores), key=lambda x: x[0])
+    runtime_sorted, f1_sorted = zip(*sorted_by_runtime)
+    ax_pareto.plot(runtime_sorted, f1_sorted, "-", color="gray", alpha=0.5, linewidth=1)
+
+    ax_pareto.set_xlabel("Runtime (ms)", fontweight="bold")
+    ax_pareto.set_ylabel("Detection F1", fontweight="bold")
+    ax_pareto.set_title("Efficiency Frontier", fontweight="bold")
+    apply_grid_style(ax_pareto)
+    apply_standard_ticks(ax_pareto)
+
+    plt.tight_layout()
+
+    filename = "examples/curvefit/figs/gibbs_efficiency_frontier.pdf"
+    save_publication_figure(fig, filename)
+    print(f"  ✓ Saved: {filename}")
+    _copy_to_main_figs("gibbs_efficiency_frontier.pdf")
+
+    # Return best configuration for further use
+    best_config = good_configs[0] if good_configs else results[-1]
+    print("\n📊 Efficiency Analysis Results:")
+    print(f"  • Best configuration: {best_config['label']}")
+    print(f"  • Total sweeps: {best_config['total_sweeps']}")
+    print(
+        f"  • Performance: F1={best_config['detection_f1']:.3f}, MSE={best_config['param_mse']:.3f}"
+    )
+    print(f"  • Runtime: {best_config['runtime']:.1f}ms")
+
+    return best_config, results
+
+
+def save_gibbs_vs_is_comparison_figure(n_points=20, outlier_rate=0.35, seed=42):
+    """Create horizontal bar plot comparing Gibbs vs IS(N=1000) accuracy and runtime."""
+    print("\n🔄 Creating Gibbs vs IS(N=1000) Comparison Figure...")
+
+    from examples.curvefit.core import (
+        enumerative_gibbs_infer_latents_with_outliers_jit,
+        infer_latents_with_outliers_jit,
+    )
+    import time
+
+    # Generate test data
+    data = generate_challenging_outlier_data(
+        n_points=n_points, outlier_rate=outlier_rate, seed=seed
+    )
+    print(
+        f"  Test data: {data['n_true_outliers']}/{len(data['xs'])} outliers ({outlier_rate * 100:.0f}%)"
+    )
+
+    # Run Gibbs (using minimal efficient configuration)
+    print("\n  Running Gibbs sampling...")
+    n_warmup, n_samples = 50, 100  # 150 total sweeps (minimal efficient config)
+
+    start_time = time.time()
+    gibbs_result = enumerative_gibbs_infer_latents_with_outliers_jit(
+        jrand.key(seed + 1),
+        data["xs"],
+        data["ys"],
+        n_samples=Const(n_samples),
+        n_warmup=Const(n_warmup),
+        outlier_rate=Const(outlier_rate),
+    )
+    jax.block_until_ready(gibbs_result)
+    gibbs_runtime = (time.time() - start_time) * 1000  # Convert to ms
+
+    gibbs_perf = evaluate_gibbs_performance(gibbs_result, data)
+
+    print(
+        f"    Gibbs ({n_warmup + n_samples} sweeps): F1={gibbs_perf['detection_f1']:.3f}, "
+        f"MSE={gibbs_perf['param_mse']:.3f}, Time={gibbs_runtime:.1f}ms"
+    )
+
+    # Run IS with N=1000
+    print("\n  Running IS(N=1000)...")
+
+    start_time = time.time()
+    is_result = infer_latents_with_outliers_jit(
+        jrand.key(seed + 2),
+        data["xs"],
+        data["ys"],
+        n_samples=Const(1000),
+        outlier_rate=Const(outlier_rate),
+        outlier_mean=Const(0.0),
+        outlier_std=Const(5.0),
+    )
+    jax.block_until_ready(is_result)
+    is_runtime = (time.time() - start_time) * 1000  # Convert to ms
+
+    # Evaluate IS performance
+    samples, log_weights = is_result
+    weights = jnp.exp(log_weights - jnp.max(log_weights))
+    weights = weights / jnp.sum(weights)
+
+    a_samples = samples.get_choices()["curve"]["a"]
+    b_samples = samples.get_choices()["curve"]["b"]
+    c_samples = samples.get_choices()["curve"]["c"]
+    outlier_samples = samples.get_choices()["ys"]["is_outlier"]
+
+    a_mean = jnp.average(a_samples, weights=weights)
+    b_mean = jnp.average(b_samples, weights=weights)
+    c_mean = jnp.average(c_samples, weights=weights)
+
+    true_a = data["true_params"]["a"]
+    true_b = data["true_params"]["b"]
+    true_c = data["true_params"]["c"]
+
+    is_param_mse = (
+        (a_mean - true_a) ** 2 + (b_mean - true_b) ** 2 + (c_mean - true_c) ** 2
+    )
+    param_accuracy_gibbs = 1.0 / (1.0 + gibbs_perf["param_mse"] * 100)
+    param_accuracy_is = 1.0 / (1.0 + is_param_mse * 100)
+
+    outlier_probs = jnp.average(outlier_samples, weights=weights, axis=0)
+    predicted_outliers = outlier_probs > 0.5
+    is_outlier_true = data["is_outlier_true"]
+
+    tp = jnp.sum(predicted_outliers & is_outlier_true)
+    fp = jnp.sum(predicted_outliers & ~is_outlier_true)
+    fn = jnp.sum(~predicted_outliers & is_outlier_true)
+
+    is_precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    is_recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    is_f1 = (
+        2 * is_precision * is_recall / (is_precision + is_recall)
+        if (is_precision + is_recall) > 0
+        else 0.0
+    )
+
+    print(
+        f"    IS (1000 particles): F1={is_f1:.3f}, "
+        f"MSE={is_param_mse:.3f}, Time={is_runtime:.1f}ms"
+    )
+
+    # Create comparison figure
+    setup_publication_fonts()
+    fig, (ax_accuracy, ax_runtime) = plt.subplots(
+        1, 2, figsize=FIGURE_SIZES["two_panel_horizontal"]
+    )
+
+    # Extract data
+    methods = ["Vectorized Gibbs", "IS(N=1000)"]
+    f1_scores = [gibbs_perf["detection_f1"], is_f1]
+    param_accuracies = [param_accuracy_gibbs, param_accuracy_is]
+    runtimes = [gibbs_runtime, is_runtime]
+
+    # Colors following GRVS
+    colors = [get_method_color("genjax_hmc"), get_method_color("genjax_is")]
+
+    # Panel 1: Accuracy Comparison (horizontal bars)
+    y_pos = np.arange(len(methods))
+
+    # F1 scores
+    bars_f1 = ax_accuracy.barh(
+        y_pos - 0.15,
+        f1_scores,
+        0.3,
+        label="Outlier Detection F1",
+        color=colors[0],
+        alpha=0.8,
+    )
+
+    # Parameter accuracy
+    bars_param = ax_accuracy.barh(
+        y_pos + 0.15,
+        param_accuracies,
+        0.3,
+        label="Parameter Accuracy",
+        color=colors[1],
+        alpha=0.8,
+    )
+
+    # Add value labels on bars
+    for i, (f1, param_acc) in enumerate(zip(f1_scores, param_accuracies)):
+        ax_accuracy.text(
+            f1 + 0.01,
+            i - 0.15,
+            f"{f1:.3f}",
+            va="center",
+            fontweight="bold",
+            fontsize=11,
+        )
+        ax_accuracy.text(
+            param_acc + 0.01,
+            i + 0.15,
+            f"{param_acc:.3f}",
+            va="center",
+            fontweight="bold",
+            fontsize=11,
+        )
+
+    ax_accuracy.set_yticks(y_pos)
+    ax_accuracy.set_yticklabels(methods, fontweight="bold")
+    ax_accuracy.set_xlabel("Accuracy Score", fontweight="bold")
+    ax_accuracy.set_title("Accuracy Comparison", fontweight="bold", fontsize=14)
+    ax_accuracy.legend(loc="lower right")
+    ax_accuracy.set_xlim(0, 1.1)
+    apply_grid_style(ax_accuracy)
+    apply_standard_ticks(ax_accuracy)
+
+    # Panel 2: Runtime Comparison (horizontal bars)
+    bars_runtime = ax_runtime.barh(y_pos, runtimes, 0.6, color=colors, alpha=0.8)
+
+    # Add value labels on bars
+    for i, runtime in enumerate(runtimes):
+        ax_runtime.text(
+            runtime + max(runtimes) * 0.02,
+            i,
+            f"{runtime:.1f}ms",
+            va="center",
+            fontweight="bold",
+            fontsize=11,
+        )
+
+    ax_runtime.set_yticks(y_pos)
+    ax_runtime.set_yticklabels(methods, fontweight="bold")
+    ax_runtime.set_xlabel("Runtime (ms)", fontweight="bold")
+    ax_runtime.set_title("Runtime Comparison", fontweight="bold", fontsize=14)
+    ax_runtime.set_xlim(0, max(runtimes) * 1.2)
+    apply_grid_style(ax_runtime)
+    apply_standard_ticks(ax_runtime)
+
+    plt.tight_layout()
+
+    filename = "examples/curvefit/figs/gibbs_vs_is_comparison.pdf"
+    save_publication_figure(fig, filename)
+    print(f"  ✓ Saved: {filename}")
+    _copy_to_main_figs("gibbs_vs_is_comparison.pdf")
+
+    # Print summary stats
+    print("\n📊 Comparison Summary:")
+    print("  Accuracy Advantage (Gibbs vs IS):")
+    print(
+        f"    • F1 Score: {f1_scores[0]:.3f} vs {f1_scores[1]:.3f} "
+        f"({(f1_scores[0] / f1_scores[1] - 1) * 100:+.1f}%)"
+    )
+    print(
+        f"    • Parameter Accuracy: {param_accuracies[0]:.3f} vs {param_accuracies[1]:.3f} "
+        f"({(param_accuracies[0] / param_accuracies[1] - 1) * 100:+.1f}%)"
+    )
+    print("  Runtime Comparison:")
+    print(
+        f"    • Gibbs: {runtimes[0]:.1f}ms vs IS: {runtimes[1]:.1f}ms "
+        f"({(runtimes[0] / runtimes[1] - 1) * 100:+.1f}%)"
+    )
+
+    return {
+        "gibbs": {
+            "f1": f1_scores[0],
+            "param_acc": param_accuracies[0],
+            "runtime": runtimes[0],
+        },
+        "is": {
+            "f1": f1_scores[1],
+            "param_acc": param_accuracies[1],
+            "runtime": runtimes[1],
+        },
     }
