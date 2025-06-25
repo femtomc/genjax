@@ -317,7 +317,7 @@ The localization case study generates 15 distinct visualizations, each with desc
 
 ### 🎨 Visualization Features
 - **ESS Display**: Shows as percentage (e.g., "ESS: 75%") for intuitive understanding
-- **Legend Design**: 
+- **Legend Design**:
   - Large colored squares (3×2 units) for visibility
   - 18pt font at bottom of figure
   - Line breaks in method labels for readability

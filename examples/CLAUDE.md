@@ -168,7 +168,7 @@ def generate_standard_data(num_obs=50, seed=42):
 #### Core Aesthetic Principles
 
 1. **No Titles Policy**: Figures designed for LaTeX integration without axis titles
-2. **Large Typography**: 18pt base fonts for publication readability  
+2. **Large Typography**: 18pt base fonts for publication readability
 3. **Bold Axis Labels**: Clear variable identification
 4. **3-Tick Standard**: Exactly 3 tick marks per axis for optimal readability (ENFORCED)
 5. **Colorblind-Friendly Palette**: Accessible to all readers
@@ -185,7 +185,7 @@ setup_publication_fonts()  # Applies GRVS typography
 
 # Font hierarchy (applied automatically):
 # - Base text: 18pt
-# - Axis labels: 18pt bold  
+# - Axis labels: 18pt bold
 # - Tick labels: 16pt
 # - Legends: 16pt
 # - Titles: 20pt (when used)
@@ -201,7 +201,7 @@ fig = plt.figure(figsize=FIGURE_SIZES["single_medium"])  # 6.5×4.875"
 
 # Available sizes:
 # - single_small: (4.33, 3.25) - 1/3 textwidth
-# - single_medium: (6.5, 4.875) - 1/2 textwidth  
+# - single_medium: (6.5, 4.875) - 1/2 textwidth
 # - single_large: (8.66, 6.5) - 2/3 textwidth
 # - two_panel_horizontal: (12, 5) - side-by-side
 # - framework_comparison: (12, 8) - comparison plots
@@ -227,7 +227,7 @@ from examples.viz import MARKER_SPECS, LINE_SPECS, apply_grid_style, apply_stand
 # Consistent marker sizes
 ax.scatter(x, y, **MARKER_SPECS["data_points"])  # s=120, proper edges
 
-# Standard line weights  
+# Standard line weights
 ax.plot(x, y, **LINE_SPECS["curve_main"])        # linewidth=3, alpha=0.9
 
 # Clean grid styling
@@ -247,7 +247,7 @@ save_publication_figure(fig, "figure_name.pdf")
 
 # Automatic cleanup and optimization
 # - Applies tight_layout()
-# - Saves with bbox_inches="tight" 
+# - Saves with bbox_inches="tight"
 # - Closes figure to prevent memory leaks
 ```
 
@@ -264,7 +264,7 @@ setup_publication_fonts()
 fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
 
 # Plot with GRVS standards
-ax.scatter(x_data, y_data, color=get_method_color("data_points"), 
+ax.scatter(x_data, y_data, color=get_method_color("data_points"),
            s=120, zorder=10, edgecolor="white", linewidth=2)
 ax.plot(x_curve, y_curve, color=get_method_color("genjax_is"),
         linewidth=3, alpha=0.9, label="GenJAX IS")
