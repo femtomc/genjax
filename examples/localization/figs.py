@@ -3,7 +3,6 @@ Visualization functions for the localization case study.
 """
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import jax.numpy as jnp
 import numpy as np
 from typing import Dict, Any, List
@@ -11,9 +10,14 @@ from .core import Pose, World
 
 # Import shared GenJAX Research Visualization Standards
 from examples.viz import (
-    setup_publication_fonts, FIGURE_SIZES, get_method_color,
-    apply_grid_style, set_minimal_ticks, apply_standard_ticks, save_publication_figure,
-    SMC_METHOD_COLORS, PRIMARY_COLORS, MARKER_SPECS, LINE_SPECS
+    setup_publication_fonts,
+    FIGURE_SIZES,
+    get_method_color,
+    apply_grid_style,
+    set_minimal_ticks,
+    save_publication_figure,
+    MARKER_SPECS,
+    LINE_SPECS,
 )
 
 # Apply GRVS typography standards
@@ -98,7 +102,9 @@ def plot_pose(
         fig, ax = plt.subplots(figsize=(8, 8))
 
     # Plot position
-    ax.scatter(pose.x, pose.y, color=color, s=markersize, label=label, zorder=5, marker=marker)
+    ax.scatter(
+        pose.x, pose.y, color=color, s=markersize, label=label, zorder=5, marker=marker
+    )
 
     # Plot heading arrow if requested
     if show_arrow:
@@ -156,8 +162,8 @@ def plot_lidar_rays(
         fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_large"])
         # Apply GRVS styling
         apply_grid_style(ax)
-        ax.set_xlabel("X Position (m)", fontweight='bold')
-        ax.set_ylabel("Y Position (m)", fontweight='bold')
+        ax.set_xlabel("X Position (m)", fontweight="bold")
+        ax.set_ylabel("Y Position (m)", fontweight="bold")
 
     # Import distance computation function
     from .core import distance_to_wall_lidar
@@ -181,24 +187,15 @@ def plot_lidar_rays(
             line_spec = LINE_SPECS["lidar_rays"].copy()
             line_spec["alpha"] = ray_alpha  # Override with custom alpha
             ax.plot(
-                [pose.x, end_x],
-                [pose.y, end_y],
-                color=ray_color,
-                zorder=2,
-                **line_spec
+                [pose.x, end_x], [pose.y, end_y], color=ray_color, zorder=2, **line_spec
             )
 
         # Plot measurement endpoint with enlarged marker specifications
         if show_measurements:
             marker_spec = MARKER_SPECS["lidar_endpoints"].copy()
             marker_spec["alpha"] = 0.8  # Override alpha for visibility
-            marker_spec["s"] = 160      # Double the default size for better visibility
-            ax.scatter(
-                end_x,
-                end_y,
-                color=measurement_color,
-                **marker_spec
-            )
+            marker_spec["s"] = 160  # Double the default size for better visibility
+            ax.scatter(end_x, end_y, color=measurement_color, **marker_spec)
 
     return ax
 
@@ -285,7 +282,7 @@ def plot_particles(
             c=color,
             label=label,
             zorder=3,
-            edgecolors='black',  # Add black edge for better visibility
+            edgecolors="black",  # Add black edge for better visibility
             linewidth=0.5,
         )
     else:
@@ -298,7 +295,7 @@ def plot_particles(
             cmap=cmap,
             label=label if label else f"Particles (n={len(particles)})",
             zorder=3,
-            edgecolors='black',  # Add black edge for better visibility
+            edgecolors="black",  # Add black edge for better visibility
             linewidth=0.5,
         )
 
@@ -660,8 +657,8 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
                     label="True Mean Distance",
                 )
 
-            ax.set_xlabel("Ray Angle (radians)", fontweight='bold')
-            ax.set_ylabel("Distance (m)", fontweight='bold')
+            ax.set_xlabel("Ray Angle (radians)", fontweight="bold")
+            ax.set_ylabel("Distance (m)", fontweight="bold")
             # Title removed following curvefit "no titles" principle
             ax.legend(fontsize=16)
             ax.grid(True, alpha=0.3)
@@ -675,8 +672,9 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
             # For smaller numbers of rays, use shared y-axis approach
             n_cols = min(4, n_rays)
             n_rows = (n_rays + n_cols - 1) // n_cols
-            fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), 
-                                   sharey=True)
+            fig, axes = plt.subplots(
+                n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), sharey=True
+            )
 
             if n_rows == 1 and n_cols == 1:
                 axes = [axes]
@@ -734,16 +732,23 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
                             alpha=0.7,
                         )
 
-                ax.set_xlabel("Time Step", fontweight='bold')
-                
-                # Only add y-label to leftmost column 
+                ax.set_xlabel("Time Step", fontweight="bold")
+
+                # Only add y-label to leftmost column
                 if ray_idx % n_cols == 0:
-                    ax.set_ylabel("Distance", fontweight='bold')
-                
+                    ax.set_ylabel("Distance", fontweight="bold")
+
                 # Show ray info in text box instead of title - moved further into subplot
-                ax.text(0.15, 0.85, f"Ray {ray_idx}", transform=ax.transAxes, 
-                       verticalalignment='top', fontsize=14, fontweight='bold',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
+                ax.text(
+                    0.15,
+                    0.85,
+                    f"Ray {ray_idx}",
+                    transform=ax.transAxes,
+                    verticalalignment="top",
+                    fontsize=14,
+                    fontweight="bold",
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7),
+                )
                 apply_grid_style(ax)
                 ax.legend(fontsize=12)
                 set_minimal_ticks(ax)
@@ -759,15 +764,21 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
         fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
 
         # Plot observations with larger markers (following curvefit standards)
-        ax.plot(observations, "b-", linewidth=3, label="Observed Distance", 
-                marker="o", markersize=8)
+        ax.plot(
+            observations,
+            "b-",
+            linewidth=3,
+            label="Observed Distance",
+            marker="o",
+            markersize=8,
+        )
 
         # Plot true distances if available
         if true_distances is not None:
             ax.plot(true_distances, "r--", linewidth=3, label="True Distance")
 
-        ax.set_xlabel("Time Step", fontweight='bold')
-        ax.set_ylabel("Distance to Wall (m)", fontweight='bold')
+        ax.set_xlabel("Time Step", fontweight="bold")
+        ax.set_ylabel("Distance to Wall (m)", fontweight="bold")
         # Title removed following curvefit "no titles" principle
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=16)
@@ -811,10 +822,10 @@ def plot_ground_truth_trajectory(
     ax1.set_xlabel("")
     ax1.set_ylabel("")
     ax1.grid(False)
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.spines['bottom'].set_visible(False)
-    ax1.spines['left'].set_visible(False)
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+    ax1.spines["bottom"].set_visible(False)
+    ax1.spines["left"].set_visible(False)
     ax1.legend()
 
     # Top right: Control commands over time
@@ -824,14 +835,21 @@ def plot_ground_truth_trajectory(
 
     ax2_twin = ax2.twinx()
 
-    line1 = ax2.plot(velocities, "b-", marker="o", label="Velocity", linewidth=3, markersize=8)
+    line1 = ax2.plot(
+        velocities, "b-", marker="o", label="Velocity", linewidth=3, markersize=8
+    )
     line2 = ax2_twin.plot(
-        angular_velocities, "r-", marker="s", label="Angular Velocity", linewidth=3, markersize=8
+        angular_velocities,
+        "r-",
+        marker="s",
+        label="Angular Velocity",
+        linewidth=3,
+        markersize=8,
     )
 
-    ax2.set_xlabel("Time Step", fontweight='bold')
-    ax2.set_ylabel("Velocity", color="b", fontweight='bold')
-    ax2_twin.set_ylabel("Angular Velocity (rad/s)", color="r", fontweight='bold')
+    ax2.set_xlabel("Time Step", fontweight="bold")
+    ax2.set_ylabel("Velocity", color="b", fontweight="bold")
+    ax2_twin.set_ylabel("Angular Velocity (rad/s)", color="r", fontweight="bold")
     # Title removed following curvefit "no titles" principle
     ax2.grid(True, alpha=0.3)
 
@@ -849,11 +867,13 @@ def plot_ground_truth_trajectory(
     ax3.plot(xs, "b-", marker="o", label="X Position", linewidth=3, markersize=8)
     ax3.plot(ys, "g-", marker="s", label="Y Position", linewidth=3, markersize=8)
     ax3_twin = ax3.twinx()
-    ax3_twin.plot(thetas, "r-", marker="^", label="Heading (rad)", linewidth=3, markersize=8)
+    ax3_twin.plot(
+        thetas, "r-", marker="^", label="Heading (rad)", linewidth=3, markersize=8
+    )
 
-    ax3.set_xlabel("Time Step", fontweight='bold')
-    ax3.set_ylabel("Position", fontweight='bold')
-    ax3_twin.set_ylabel("Heading (rad)", color="r", fontweight='bold')
+    ax3.set_xlabel("Time Step", fontweight="bold")
+    ax3.set_ylabel("Position", fontweight="bold")
+    ax3_twin.set_ylabel("Heading (rad)", color="r", fontweight="bold")
     # Title removed following curvefit "no titles" principle
     ax3.grid(True, alpha=0.3)
     ax3.legend(loc="upper left", fontsize=16)
@@ -861,9 +881,16 @@ def plot_ground_truth_trajectory(
 
     # Bottom right: Sensor observations
     ax4 = axes[1, 1]
-    ax4.plot(observations, "b-", marker="o", label="Observed Distance", linewidth=3, markersize=8)
-    ax4.set_xlabel("Time Step", fontweight='bold')
-    ax4.set_ylabel("Distance to Wall (m)", fontweight='bold')
+    ax4.plot(
+        observations,
+        "b-",
+        marker="o",
+        label="Observed Distance",
+        linewidth=3,
+        markersize=8,
+    )
+    ax4.set_xlabel("Time Step", fontweight="bold")
+    ax4.set_ylabel("Distance to Wall (m)", fontweight="bold")
     # Title removed following curvefit "no titles" principle
     ax4.grid(True, alpha=0.3)
     ax4.legend(fontsize=16)
@@ -889,14 +916,20 @@ def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=8):
     ax.set_xlabel("")
     ax.set_ylabel("")
     ax.grid(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(False)
 
     # Plot robot pose with GRVS color - increased arrow length and marker size
-    plot_pose(pose, ax, color=get_method_color("robot_pose"), label="Robot", 
-              arrow_length=0.8, markersize=180)
+    plot_pose(
+        pose,
+        ax,
+        color=get_method_color("robot_pose"),
+        label="Robot",
+        arrow_length=0.8,
+        markersize=180,
+    )
 
     # Plot LIDAR measurements with both true and noisy observations
     from .core import distance_to_wall_lidar, sensor_model_single_ray
@@ -948,24 +981,19 @@ def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=8):
     # Add legend entries with larger marker specs
     lidar_marker_spec = MARKER_SPECS["lidar_endpoints"].copy()
     lidar_marker_spec["s"] = 160  # Double the default size for better visibility
-    ax.scatter(
-        [],
-        [],
-        color="black",
-        label=f"True Measurements",
-        **lidar_marker_spec
-    )
-    ax.scatter(
-        [],
-        [],
-        color="orange", 
-        label=f"Noisy Measurements",
-        **lidar_marker_spec
-    )
+    ax.scatter([], [], color="black", label="True Measurements", **lidar_marker_spec)
+    ax.scatter([], [], color="orange", label="Noisy Measurements", **lidar_marker_spec)
 
     # Place legend inside the room at an appropriate location (lower left area)
-    ax.legend(loc="lower left", fontsize=20, bbox_to_anchor=(0.05, 0.05), 
-              frameon=True, fancybox=True, shadow=True, framealpha=0.9)
+    ax.legend(
+        loc="lower left",
+        fontsize=20,
+        bbox_to_anchor=(0.05, 0.05),
+        frameon=True,
+        fancybox=True,
+        shadow=True,
+        framealpha=0.9,
+    )
     # Title removed following curvefit "no titles" principle
 
     if save_path:
@@ -1080,7 +1108,7 @@ def plot_weight_evolution(weight_history, save_path=None):
         ax.text(
             0.02,
             0.98,
-            f"Step {timestep}\nESS: {ess_ratio*100:.0f}%\nMax: {jnp.max(weights_norm):.3f}",
+            f"Step {timestep}\nESS: {ess_ratio * 100:.0f}%\nMax: {jnp.max(weights_norm):.3f}",
             transform=ax.transAxes,
             verticalalignment="top",
             bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
@@ -1223,7 +1251,7 @@ def plot_weight_flow(weight_data, save_path=None):
         ax.text(
             t,
             weight_max * 1.1,
-            f"ESS: {ess_ratio*100:.0f}%",
+            f"ESS: {ess_ratio * 100:.0f}%",
             fontsize=10,
             va="bottom",
             ha="center",
@@ -1341,15 +1369,23 @@ def plot_smc_timing_comparison(
                 method_n_particles = n_particles_big_grid
             else:
                 method_n_particles = result.get("n_particles", n_particles)
-            
+
             if method_name == "smc_basic":
-                method_labels[method_name] = f"Bootstrap filter\n(N={method_n_particles})"
+                method_labels[method_name] = (
+                    f"Bootstrap filter\n(N={method_n_particles})"
+                )
             elif method_name == "smc_hmc":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                )
             elif method_name == "smc_locally_optimal":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                )
             elif method_name == "smc_locally_optimal_big_grid":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                )
 
     # Extract timing data
     method_names = []
@@ -1456,15 +1492,23 @@ def plot_smc_method_comparison(
                 method_n_particles = n_particles_big_grid
             else:
                 method_n_particles = result.get("n_particles", n_particles)
-            
+
             if method_name == "smc_basic":
-                method_labels[method_name] = f"Bootstrap filter\n(N={method_n_particles})"
+                method_labels[method_name] = (
+                    f"Bootstrap filter\n(N={method_n_particles})"
+                )
             elif method_name == "smc_hmc":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                )
             elif method_name == "smc_locally_optimal":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                )
             elif method_name == "smc_locally_optimal_big_grid":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                )
 
     # Grayscale colors for raincloud plots
     grayscale_colors = {
@@ -1728,7 +1772,7 @@ def plot_smc_method_comparison(
                 ax_weights.text(
                     0.98,
                     plot_pos,
-                    f"ESS: {ess*100:.0f}%",
+                    f"ESS: {ess * 100:.0f}%",
                     fontsize=16,
                     va="center",
                     ha="right",

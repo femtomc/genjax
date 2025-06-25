@@ -168,8 +168,11 @@ def quadratic_loss(mu, sigma):
     x = normal_reparam(mu, sigma)
     return x**2
 
-# Single parameter gradient
+# CORRECT: Use grad_estimate method
 grad = quadratic_loss.grad_estimate(0.5, 1.0)
+
+# INCORRECT: jax.grad cannot be used with ADEV programs
+# grad = jax.grad(quadratic_loss)(0.5, 1.0)  # This will fail!
 
 # Just compute expectation
 value = quadratic_loss.estimate(0.5, 1.0)
@@ -304,14 +307,15 @@ ADEV is the foundation for gradient-based inference in GenJAX:
 ADEV estimators are fully compatible with GenJAX's addressing system:
 - Use `@` operator with any ADEV primitive
 - Works with `seed` transformation
-- Compatible with `modular_vmap` for batching
+- Compatible with `modular_vmap` on `.grad_estimate()` method (but not inside `@expectation` functions)
 
 ### With PJAX
 
 ADEV primitives integrate with PJAX infrastructure:
 - Proper handling of random key splitting
-- Compatible with JAX transformations
+- Compatible with basic JAX transformations (jit) but **NOT** with `jax.grad` directly
 - Supports addressing and trace operations
+- **Note**: Complex JAX transformations (scan, vmap inside @expectation) have limitations
 
 ## Advanced Topics
 
@@ -368,10 +372,18 @@ ADEV provides several theoretical guarantees:
 
 ### Current Limitations
 
-1. **Variance reduction**: Limited built-in variance reduction techniques
-2. **Higher-order gradients**: Focus on first-order gradients
-3. **Implicit reparameterization**: Not yet implemented
-4. **Control variates**: No automatic control variate selection
+1. **JAX Control Flow**: Scan operations are not supported
+   - `jax.lax.scan` inside `@expectation` functions raises `NotImplementedError`
+   - Use alternative patterns or regular JAX for scan-based computations
+2. **JAX Transformations**: Limited support for JAX transformations
+   - **Standard JAX grad**: ADEV programs are probabilistic and incompatible with `jax.grad`
+   - **Correct usage**: Use `Expectation.grad_estimate()` method instead of `jax.grad`
+   - `modular_vmap` with ADEV primitives inside `@expectation` functions not supported
+   - Complex array indexing operations may fail in JAX tracing contexts
+3. **Variance reduction**: Limited built-in variance reduction techniques
+4. **Higher-order gradients**: Focus on first-order gradients
+5. **Implicit reparameterization**: Not yet implemented
+6. **Control variates**: No automatic control variate selection
 
 ### Planned Improvements
 

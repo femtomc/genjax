@@ -14,8 +14,10 @@ try:
     import numpyro
     import numpyro.distributions as numpyro_dist
     from numpyro.handlers import replay, seed as numpyro_seed
+
     # from numpyro.contrib.funsor import log_density  # Moved to function for lazy loading
     from numpyro.infer import HMC, MCMC
+
     HAS_NUMPYRO = True
 except ImportError:
     HAS_NUMPYRO = False
@@ -218,7 +220,7 @@ def hmc_infer_latents_vectorized(
 ):
     """
     Vectorized HMC inference running multiple chains in parallel.
-    
+
     Args:
         xs: Input points where observations were made
         ys: Observed values at xs
@@ -227,24 +229,27 @@ def hmc_infer_latents_vectorized(
         step_size: HMC step size (wrapped in Const)
         n_steps: Number of leapfrog steps (wrapped in Const)
         n_chains: Number of parallel chains (wrapped in Const)
-        
+
     Returns:
         tuple: (trace with shape (n_chains, n_samples), diagnostics dict)
     """
+
     # Create a function that runs a single chain with key as argument
     def run_single_chain(key, xs, ys):
-        return seed(hmc_infer_latents)(key, xs, ys, n_samples, n_warmup, step_size, n_steps)
-    
+        return seed(hmc_infer_latents)(
+            key, xs, ys, n_samples, n_warmup, step_size, n_steps
+        )
+
     # Generate keys for each chain
     keys = jrand.split(jrand.key(0), n_chains.value)
-    
+
     # Run chains in parallel using vmap
     vectorized_hmc = jax.vmap(run_single_chain, in_axes=(0, None, None))
     traces, diagnostics = vectorized_hmc(keys, xs, ys)
-    
+
     # Update diagnostics to reflect multiple chains
     diagnostics["n_chains"] = n_chains.value
-    
+
     return traces, diagnostics
 
 
@@ -295,7 +300,9 @@ def numpyro_npoint_model(xs, obs_dict=None):
             obs_vals = obs_dict["obs"]
         y_det = numpyro_polyfn(xs, a, b, c)
         y_observed = numpyro.sample(
-            "obs", numpyro_dist.Normal(y_det, 0.05), obs=obs_vals  # Reduced observation noise
+            "obs",
+            numpyro_dist.Normal(y_det, 0.05),
+            obs=obs_vals,  # Reduced observation noise
         )
     return y_observed
 
@@ -437,15 +444,17 @@ def numpyro_hmc_summary_statistics(hmc_result):
     """Extract summary statistics from NumPyro HMC results."""
     diagnostics = hmc_result.get("diagnostics", {})
     accept_probs = diagnostics.get("accept_probs", jnp.array([]))
-    
+
     # Calculate acceptance rate - handle empty arrays
     if accept_probs.size > 0:
         accept_rate = jnp.mean(accept_probs)
     else:
         accept_rate = 0.0
-    
+
     return {
-        "accept_rate": float(accept_rate),  # Convert to Python float to avoid JAX tracer issues
+        "accept_rate": float(
+            accept_rate
+        ),  # Convert to Python float to avoid JAX tracer issues
         "num_samples": hmc_result.get("num_samples", 0),
         "num_warmup": hmc_result.get("num_warmup", 0),
     }
@@ -476,7 +485,7 @@ def point_with_outliers(x, curve, outlier_rate=0.1, outlier_mean=0.0, outlier_st
     This model uses the Cond combinator to naturally express a mixture model where:
     - Inliers: follow the polynomial regression with small observation noise
     - Outliers: come from a uniform distribution on [-4, 4] independent of the curve
-    
+
     This models realistic scenarios where outliers are measurement errors,
     sensor failures, or corrupted data unrelated to the true underlying curve.
 
@@ -494,20 +503,22 @@ def point_with_outliers(x, curve, outlier_rate=0.1, outlier_mean=0.0, outlier_st
 
     # Use Cond combinator with proper branches
     cond_model = Cond(outlier_branch, inlier_branch)
-    
+
     # Call Cond with appropriate arguments for each branch
     # When is_outlier=True: outlier_branch() - ignores parameters, uses uniform[-4,4]
     # When is_outlier=False: inlier_branch(y_det) - uses polynomial value
     # Both branches need same signature, so we pass dummy values to outlier branch
-    y_observed = cond_model(is_outlier, jnp.where(is_outlier, 0.0, y_det),
-                           outlier_std) @ "y"
-    
+    y_observed = (
+        cond_model(is_outlier, jnp.where(is_outlier, 0.0, y_det), outlier_std) @ "y"
+    )
+
     return y_observed
 
 
 @gen
-def npoint_curve_with_outliers(xs, outlier_rate=Const(0.1), outlier_mean=Const(0.0), 
-                               outlier_std=Const(5.0)):
+def npoint_curve_with_outliers(
+    xs, outlier_rate=Const(0.1), outlier_mean=Const(0.0), outlier_std=Const(5.0)
+):
     """N-point curve model with outlier detection.
 
     Each point can be classified as inlier or outlier.
@@ -541,14 +552,18 @@ def npoint_curve_with_outliers_beta(xs, alpha=Const(1.0), beta_param=Const(10.0)
     # Sample outlier rate from beta prior
     # Beta(1, 10) has mean 1/11 ≈ 0.09, skewed towards low outlier rates
     outlier_rate = beta(alpha.value, beta_param.value) @ "outlier_rate"
-    
+
     # Sample polynomial coefficients
     curve = polynomial() @ "curve"
 
     # Vectorize the outlier model with sampled outlier rate
     ys = (
         point_with_outliers.vmap(in_axes=(0, None, None, None, None))(
-            xs, curve, outlier_rate, 0.0, 5.0  # outlier_mean and std are ignored
+            xs,
+            curve,
+            outlier_rate,
+            0.0,
+            5.0,  # outlier_mean and std are ignored
         )
         @ "ys"
     )
@@ -640,6 +655,379 @@ def hmc_infer_latents_with_outliers(
     }
 
 
+def compute_outlier_posterior_probs(xs, ys, curve_params, outlier_rate=0.1):
+    """Compute posterior probabilities for outlier indicators given curve parameters.
+
+    For each data point i, this evaluates:
+    - p(is_outlier[i]=True | obs[i], curve) ∝ uniform_pdf(obs[i], -4, 4) * outlier_rate
+    - p(is_outlier[i]=False | obs[i], curve) ∝ normal_pdf(obs[i], curve(x[i]), 0.05) * (1-outlier_rate)
+
+    Args:
+        xs: Input locations (n_points,)
+        ys: Observed values (n_points,)
+        curve_params: Dict with 'a', 'b', 'c' polynomial coefficients
+        outlier_rate: Prior probability of being outlier
+
+    Returns:
+        outlier_probs: Array (n_points,) with posterior probability of being outlier
+    """
+    from examples.curvefit.data import polyfn
+
+    # Extract curve parameters
+    a, b, c = curve_params["a"], curve_params["b"], curve_params["c"]
+
+    # Evaluate curve at observation points
+    curve_values = jax.vmap(lambda x: polyfn(x, a, b, c))(xs)
+
+    # Compute log probabilities for each choice
+    # Outlier: uniform[-4, 4] likelihood + outlier prior
+    log_prob_outlier = (
+        jnp.where(
+            (ys >= -4.0) & (ys <= 4.0),
+            jnp.log(1.0 / 8.0),  # uniform density on [-4, 4]
+            -jnp.inf,
+        )  # zero probability outside range
+        + jnp.log(outlier_rate)
+    )
+
+    # Inlier: normal(curve_value, 0.05) likelihood + inlier prior
+    log_prob_inlier = (
+        -0.5 * jnp.log(2 * jnp.pi * 0.05**2)
+        - 0.5 * ((ys - curve_values) / 0.05) ** 2
+        + jnp.log(1.0 - outlier_rate)
+    )
+
+    # Normalize to get posterior probabilities for outlier
+    log_evidence = jnp.logaddexp(log_prob_inlier, log_prob_outlier)
+    outlier_probs = jnp.exp(log_prob_outlier - log_evidence)
+
+    return outlier_probs
+
+
+def gibbs_infer_latents_with_outliers(
+    xs,
+    ys,
+    n_samples: Const[int],
+    n_warmup: Const[int] = Const(500),
+    outlier_rate: Const[float] = Const(0.1),
+    prior_precision: Const[float] = Const(1.0),
+    obs_precision: Const[float] = Const(400.0),  # 1/0.05^2 = 400
+):
+    """
+    Pure Gibbs sampling for outlier curve fitting model.
+
+    Alternates between:
+    1. Sampling curve parameters (a,b,c) | outlier_indicators, data
+    2. Sampling outlier_indicators | curve_parameters, data
+
+    Args:
+        xs: Input points
+        ys: Observed values
+        n_samples: Number of Gibbs samples
+        n_warmup: Number of burn-in samples
+        outlier_rate: Fixed outlier probability
+        prior_precision: Precision (1/variance) for parameter priors
+        obs_precision: Precision for inlier observations (1/0.05^2 = 400)
+    """
+
+    n_points = len(xs)
+    total_samples = n_samples.value + n_warmup.value
+
+    # Storage for samples
+    curve_samples = jnp.zeros((total_samples, 3))  # (a, b, c)
+    outlier_samples = jnp.zeros((total_samples, n_points), dtype=bool)
+
+    # Initialize outlier indicators randomly
+    key = jrand.key(42)
+    key, subkey = jrand.split(key)
+    current_outliers = jrand.bernoulli(subkey, outlier_rate.value, (n_points,))
+
+    # Initialize curve parameters from prior
+    key, subkey = jrand.split(key)
+    current_curve = jrand.normal(subkey, (3,)) / jnp.sqrt(prior_precision.value)
+
+    def sample_curve_parameters(key, outliers, ys, xs):
+        """Sample curve parameters given outlier indicators."""
+        # Weight observations by inlier/outlier status
+        # Instead of boolean indexing, use weights: 1 for inliers, 0 for outliers
+        inlier_weights = 1.0 - outliers.astype(float)  # 1 for inliers, 0 for outliers
+
+        # Design matrix for polynomial: [1, x, x^2]
+        X = jnp.vstack([jnp.ones(len(xs)), xs, xs**2]).T  # (n_points, 3)
+
+        # Weighted precision matrix: X^T * W * obs_precision * X + prior_precision * I
+        # where W is diagonal weight matrix
+        W = jnp.diag(inlier_weights)
+        precision_matrix = obs_precision.value * (
+            X.T @ W @ X
+        ) + prior_precision.value * jnp.eye(3)
+
+        # Weighted posterior mean: precision_matrix^{-1} * X^T * W * obs_precision * y
+        precision_times_mean = obs_precision.value * (X.T @ (inlier_weights * ys))
+        posterior_mean = jnp.linalg.solve(precision_matrix, precision_times_mean)
+
+        # Sample from multivariate normal
+        chol = jnp.linalg.cholesky(jnp.linalg.inv(precision_matrix))
+        noise = jrand.normal(key, (3,))
+        return posterior_mean + chol @ noise
+
+    def sample_outlier_indicators(key, curve_params, ys, xs):
+        """Sample outlier indicators given curve parameters."""
+        a, b, c = curve_params[0], curve_params[1], curve_params[2]
+
+        # Evaluate curve at all points
+        curve_values = a + b * xs + c * xs**2
+
+        # Log probabilities for each point being outlier vs inlier
+        log_prob_outlier = jnp.where(
+            (ys >= -4.0) & (ys <= 4.0),
+            jnp.log(1.0 / 8.0) + jnp.log(outlier_rate.value),  # uniform[-4,4] + prior
+            -jnp.inf,
+        )
+
+        log_prob_inlier = (
+            -0.5 * jnp.log(2 * jnp.pi / obs_precision.value)
+            - 0.5 * obs_precision.value * (ys - curve_values) ** 2
+            + jnp.log(1.0 - outlier_rate.value)
+        )
+
+        # Convert to probabilities and sample
+        log_odds = log_prob_outlier - log_prob_inlier
+        outlier_probs = jax.nn.sigmoid(log_odds)
+
+        return jrand.bernoulli(key, outlier_probs)
+
+    # Gibbs sampling loop
+    def gibbs_step(i, state):
+        key, curve_params, outliers = state
+
+        # Split key for two sampling steps
+        key, key1, key2 = jrand.split(key, 3)
+
+        # Sample curve parameters | outliers
+        new_curve = sample_curve_parameters(key1, outliers, ys, xs)
+
+        # Sample outliers | curve parameters
+        new_outliers = sample_outlier_indicators(key2, new_curve, ys, xs)
+
+        return key, new_curve, new_outliers
+
+    # Run Gibbs sampler
+    initial_state = (key, current_curve, current_outliers)
+
+    def update_and_store(i, carry):
+        state, samples_curve, samples_outlier = carry
+        new_state = gibbs_step(i, state)
+        key, curve, outliers = new_state
+
+        # Store samples
+        samples_curve = samples_curve.at[i].set(curve)
+        samples_outlier = samples_outlier.at[i].set(outliers)
+
+        return new_state, samples_curve, samples_outlier
+
+    # Initialize storage
+    storage = (curve_samples, outlier_samples)
+
+    # Run the sampling loop
+    final_state, final_curve_samples, final_outlier_samples = jax.lax.fori_loop(
+        0, total_samples, update_and_store, (initial_state, *storage)
+    )
+
+    # Remove burn-in samples
+    curve_samples_clean = final_curve_samples[n_warmup.value :]
+    outlier_samples_clean = final_outlier_samples[n_warmup.value :]
+
+    return {
+        "curve_samples": {
+            "a": curve_samples_clean[:, 0],
+            "b": curve_samples_clean[:, 1],
+            "c": curve_samples_clean[:, 2],
+        },
+        "outlier_samples": outlier_samples_clean,
+        "n_samples": n_samples.value,
+        "n_warmup": n_warmup.value,
+        "acceptance_rate": 1.0,  # Gibbs always accepts
+    }
+
+
+def enumerative_gibbs_infer_latents_with_outliers(
+    xs,
+    ys,
+    n_samples: Const[int],
+    n_warmup: Const[int] = Const(500),
+    outlier_rate: Const[float] = Const(0.1),
+    prior_precision: Const[float] = Const(1.0),
+    obs_precision: Const[float] = Const(400.0),  # 1/0.05^2 = 400
+):
+    """
+    Enumerative Gibbs sampling for outlier curve fitting model.
+
+    For each data point, enumerates over {True, False} outlier possibilities,
+    computes exact conditional probabilities, and samples. This is fully
+    vectorized over data points while maintaining exact Gibbs sampling.
+
+    Alternates between:
+    1. Sampling curve parameters (a,b,c) | outlier_indicators, data
+    2. Enumerative sampling of outlier_indicators | curve_parameters, data
+       - For each point i: enumerate outlier[i] ∈ {True, False}
+       - Compute P(outlier[i] | outlier[-i], curve, data[i])
+       - Sample from exact conditional
+
+    Args:
+        xs: Input points
+        ys: Observed values
+        n_samples: Number of Gibbs samples
+        n_warmup: Number of burn-in samples
+        outlier_rate: Fixed outlier probability
+        prior_precision: Precision (1/variance) for parameter priors
+        obs_precision: Precision for inlier observations (1/0.05^2 = 400)
+    """
+
+    n_points = len(xs)
+    total_samples = n_samples.value + n_warmup.value
+
+    # Storage for samples
+    curve_samples = jnp.zeros((total_samples, 3))  # (a, b, c)
+    outlier_samples = jnp.zeros((total_samples, n_points), dtype=bool)
+
+    # Initialize outlier indicators randomly
+    key = jrand.key(42)
+    key, subkey = jrand.split(key)
+    current_outliers = jrand.bernoulli(subkey, outlier_rate.value, (n_points,))
+
+    # Initialize curve parameters from prior
+    key, subkey = jrand.split(key)
+    current_curve = jrand.normal(subkey, (3,)) / jnp.sqrt(prior_precision.value)
+
+    def sample_curve_parameters(key, outliers, ys, xs):
+        """Sample curve parameters given outlier indicators (same as regular Gibbs)."""
+        # Weight observations by inlier/outlier status
+        inlier_weights = 1.0 - outliers.astype(float)  # 1 for inliers, 0 for outliers
+
+        # Design matrix for polynomial: [1, x, x^2]
+        X = jnp.vstack([jnp.ones(len(xs)), xs, xs**2]).T  # (n_points, 3)
+
+        # Weighted precision matrix
+        W = jnp.diag(inlier_weights)
+        precision_matrix = obs_precision.value * (
+            X.T @ W @ X
+        ) + prior_precision.value * jnp.eye(3)
+
+        # Weighted posterior mean
+        precision_times_mean = obs_precision.value * (X.T @ (inlier_weights * ys))
+        posterior_mean = jnp.linalg.solve(precision_matrix, precision_times_mean)
+
+        # Sample from multivariate normal
+        chol = jnp.linalg.cholesky(jnp.linalg.inv(precision_matrix))
+        noise = jrand.normal(key, (3,))
+        return posterior_mean + chol @ noise
+
+    def enumerative_sample_outlier_indicators(
+        key, curve_params, ys, xs, current_outliers
+    ):
+        """
+        Enumerative Gibbs for outlier indicators.
+
+        For each data point i, enumerate outlier[i] ∈ {True, False},
+        compute exact conditional probabilities, and sample.
+        This is fully vectorized over all data points.
+        """
+        a, b, c = curve_params[0], curve_params[1], curve_params[2]
+
+        # Evaluate curve at all points (vectorized)
+        curve_values = a + b * xs + c * xs**2
+
+        # For each point, compute log P(outlier[i] = k | outlier[-i], curve, y[i])
+        # where k ∈ {True, False}
+
+        # Log likelihood for outlier case: uniform[-4, 4]
+        log_lik_outlier = jnp.where(
+            (ys >= -4.0) & (ys <= 4.0),
+            jnp.log(1.0 / 8.0),  # uniform density on [-4, 4]
+            -jnp.inf,  # impossible outlier
+        )
+
+        # Log likelihood for inlier case: normal(curve_value, 1/sqrt(obs_precision))
+        log_lik_inlier = (
+            -0.5 * jnp.log(2 * jnp.pi / obs_precision.value)
+            - 0.5 * obs_precision.value * (ys - curve_values) ** 2
+        )
+
+        # Prior probabilities
+        log_prior_outlier = jnp.log(outlier_rate.value)
+        log_prior_inlier = jnp.log(1.0 - outlier_rate.value)
+
+        # Log joint probabilities (vectorized over all points)
+        log_joint_outlier = log_lik_outlier + log_prior_outlier
+        log_joint_inlier = log_lik_inlier + log_prior_inlier
+
+        # Convert to probabilities using log-sum-exp trick (vectorized)
+        log_normalizer = jnp.logaddexp(log_joint_outlier, log_joint_inlier)
+        prob_outlier = jnp.exp(log_joint_outlier - log_normalizer)
+
+        # Sample for all points simultaneously (fully vectorized)
+        keys = jrand.split(key, n_points)
+        new_outliers = jax.vmap(lambda k, p: jrand.bernoulli(k, p))(keys, prob_outlier)
+
+        return new_outliers
+
+    # Enumerative Gibbs sampling loop
+    def enumerative_gibbs_step(i, state):
+        key, curve_params, outliers = state
+
+        # Split key for two sampling steps
+        key, key1, key2 = jrand.split(key, 3)
+
+        # Sample curve parameters | outliers (same as regular Gibbs)
+        new_curve = sample_curve_parameters(key1, outliers, ys, xs)
+
+        # Enumerative sample outliers | curve parameters (fully vectorized)
+        new_outliers = enumerative_sample_outlier_indicators(
+            key2, new_curve, ys, xs, outliers
+        )
+
+        return key, new_curve, new_outliers
+
+    # Run enumerative Gibbs sampler
+    initial_state = (key, current_curve, current_outliers)
+
+    def update_and_store(i, carry):
+        state, samples_curve, samples_outlier = carry
+        new_state = enumerative_gibbs_step(i, state)
+        key, curve, outliers = new_state
+
+        # Store samples
+        samples_curve = samples_curve.at[i].set(curve)
+        samples_outlier = samples_outlier.at[i].set(outliers)
+
+        return new_state, samples_curve, samples_outlier
+
+    # Initialize storage
+    storage = (curve_samples, outlier_samples)
+
+    # Run the sampling loop
+    final_state, final_curve_samples, final_outlier_samples = jax.lax.fori_loop(
+        0, total_samples, update_and_store, (initial_state, *storage)
+    )
+
+    # Remove burn-in samples
+    curve_samples_clean = final_curve_samples[n_warmup.value :]
+    outlier_samples_clean = final_outlier_samples[n_warmup.value :]
+
+    return {
+        "curve_samples": {
+            "a": curve_samples_clean[:, 0],
+            "b": curve_samples_clean[:, 1],
+            "c": curve_samples_clean[:, 2],
+        },
+        "outlier_samples": outlier_samples_clean,
+        "n_samples": n_samples.value,
+        "n_warmup": n_warmup.value,
+        "acceptance_rate": 1.0,  # Enumerative Gibbs always accepts
+    }
+
+
 def mixed_infer_latents_with_outliers_beta(
     xs,
     ys,
@@ -682,15 +1070,15 @@ def mixed_infer_latents_with_outliers_beta(
         # First, MH moves on outlier indicators
         for i in range(mh_moves_per_step.value):
             trace = mh(trace, sel({"ys": sel("is_outlier")}))
-        
+
         # Then, HMC on continuous parameters (curve and outlier_rate)
         trace = hmc(
-            trace, 
-            sel("curve") | sel("outlier_rate"), 
-            step_size=hmc_step_size.value, 
-            n_steps=hmc_n_steps.value
+            trace,
+            sel("curve") | sel("outlier_rate"),
+            step_size=hmc_step_size.value,
+            n_steps=hmc_n_steps.value,
         )
-        
+
         return trace
 
     # Create MCMC chain
@@ -718,7 +1106,13 @@ hmc_infer_latents_seeded = seed(hmc_infer_latents)
 hmc_infer_latents_vectorized_seeded = seed(hmc_infer_latents_vectorized)
 infer_latents_with_outliers_seeded = seed(infer_latents_with_outliers)
 hmc_infer_latents_with_outliers_seeded = seed(hmc_infer_latents_with_outliers)
-mixed_infer_latents_with_outliers_beta_seeded = seed(mixed_infer_latents_with_outliers_beta)
+mixed_infer_latents_with_outliers_beta_seeded = seed(
+    mixed_infer_latents_with_outliers_beta
+)
+gibbs_infer_latents_with_outliers_seeded = seed(gibbs_infer_latents_with_outliers)
+enumerative_gibbs_infer_latents_with_outliers_seeded = seed(
+    enumerative_gibbs_infer_latents_with_outliers
+)
 
 infer_latents_jit = jax.jit(
     infer_latents_seeded
@@ -731,7 +1125,15 @@ hmc_infer_latents_vectorized_jit = jax.jit(
 )  # Use Const pattern instead of static_argnums
 infer_latents_with_outliers_jit = jax.jit(infer_latents_with_outliers_seeded)
 hmc_infer_latents_with_outliers_jit = jax.jit(hmc_infer_latents_with_outliers_seeded)
-mixed_infer_latents_with_outliers_beta_jit = jax.jit(mixed_infer_latents_with_outliers_beta_seeded)
+mixed_infer_latents_with_outliers_beta_jit = jax.jit(
+    mixed_infer_latents_with_outliers_beta_seeded
+)
+gibbs_infer_latents_with_outliers_jit = jax.jit(
+    gibbs_infer_latents_with_outliers_seeded
+)
+enumerative_gibbs_infer_latents_with_outliers_jit = jax.jit(
+    enumerative_gibbs_infer_latents_with_outliers_seeded
+)
 
 # NumPyro JIT-compiled functions
 numpyro_run_importance_sampling_jit = jax.jit(

@@ -375,9 +375,7 @@ def plot_figures(args):
     initial_pose = true_poses[0]
 
     # Create parametrized filename prefix
-    param_prefix = (
-        f"localization_r{config['n_rays']}_p{config['n_particles']}_{config['world_type']}"
-    )
+    param_prefix = f"localization_r{config['n_rays']}_p{config['n_particles']}_{config['world_type']}"
 
     print("\nGenerating figures...")
 
@@ -542,7 +540,9 @@ def plot_figures(args):
         print(f"    Saved: {timing_filename}")
 
         # Method comparison
-        comparison_filename = f"{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf"
+        comparison_filename = (
+            f"{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf"
+        )
         comparison_path = os.path.join(figs_dir, comparison_filename)
         plot_smc_method_comparison(
             benchmark_results,
@@ -585,7 +585,9 @@ def plot_figures(args):
 
                 # Save with method-specific filename
                 method_slug = method_key.replace("_", "-")
-                evolution_filename = f"{param_prefix}_{method_slug}_particle_evolution_timeline.pdf"
+                evolution_filename = (
+                    f"{param_prefix}_{method_slug}_particle_evolution_timeline.pdf"
+                )
                 evolution_path = os.path.join(figs_dir, evolution_filename)
                 plt.savefig(evolution_path, dpi=150, bbox_inches="tight")
                 plt.close(fig_evolution)

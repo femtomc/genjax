@@ -98,7 +98,28 @@ from jax.extend.core import ClosedJaxpr, Jaxpr, Literal, Primitive, Var
 from jax.interpreters import ad, batching, mlir
 from jax.interpreters import partial_eval as pe
 from jax.lax import cond_p, scan, scan_p, switch
-from jax.util import safe_map, split_list
+
+# Replace deprecated jax.util imports
+# safe_map is now just map, split_list functionality replaced
+
+
+# Helper function to replace deprecated split_list
+def split_list(lst, split_points):
+    """Split a list at given indices, similar to deprecated jax.util.split_list."""
+    result = []
+    start = 0
+    for split_point in split_points:
+        result.append(lst[start : start + split_point])
+        start += split_point
+    result.append(lst[start:])
+    return result
+
+
+# Helper function to replace deprecated safe_map
+def safe_map(func, *iterables):
+    """Apply function to iterables, similar to deprecated jax.util.safe_map."""
+    return list(map(func, *iterables))
+
 
 # External imports
 import beartype.typing as btyping

@@ -84,10 +84,12 @@ genjax/
 │   ├── distributions.py # Built-in probability distributions
 │   ├── pjax.py          # Probabilistic JAX (PJAX) - probabilistic primitives and interpreters
 │   ├── state.py         # State interpreter for tagged value inspection
-│   ├── mcmc.py          # MCMC algorithms (Metropolis-Hastings, HMC)
-│   ├── smc.py           # Sequential Monte Carlo methods
-│   ├── vi.py            # Variational inference algorithms
-│   └── adev.py          # Automatic differentiation for variational estimates
+│   ├── inference/       # Inference algorithms module
+│   │   ├── mcmc.py      # MCMC algorithms (Metropolis-Hastings, HMC)
+│   │   ├── smc.py       # Sequential Monte Carlo methods
+│   │   └── vi.py        # Variational inference algorithms
+│   └── adev/            # Automatic differentiation for variational estimates
+│       └── __init__.py  # ADEV implementation (moved from adev.py)
 ├── examples/            # Example applications and case studies
 │   ├── faircoin/        # Beta-Bernoulli framework comparison (GenJAX vs NumPyro vs handcoded JAX)
 │   ├── curvefit/        # Curve fitting with multiple frameworks
@@ -98,10 +100,10 @@ genjax/
 │   ├── test_distributions.py # Tests for distributions.py
 │   ├── test_pjax.py     # Tests for pjax.py
 │   ├── test_state.py    # Tests for state.py
-│   ├── test_mcmc.py     # Tests for mcmc.py
-│   ├── test_smc.py      # Tests for smc.py
-│   ├── test_vi.py       # Tests for vi.py
-│   ├── test_adev.py     # Tests for adev.py
+│   ├── test_mcmc.py     # Tests for inference/mcmc.py
+│   ├── test_smc.py      # Tests for inference/smc.py
+│   ├── test_vi.py       # Tests for inference/vi.py
+│   ├── test_adev.py     # Tests for adev/__init__.py
 │   └── discrete_hmm.py  # Discrete HMM test utilities
 ├── docs/                # Generated documentation
 └── quarto/              # Documentation source files
@@ -134,6 +136,7 @@ genjax/
 - Check corresponding test files exist:
   - `src/genjax/*.py` → `tests/test_*.py`
   - `src/genjax/inference/*.py` → `tests/test_*.py`
+  - `src/genjax/adev/__init__.py` → `tests/test_adev.py`
 
 ### 5. Commit
 
@@ -187,6 +190,8 @@ This approach ensures documentation stays in sync with the codebase and reduces 
 ## Development Commands
 
 **Setup**: Run `pixi install` to install dependencies.
+
+**Python Version**: GenJAX requires Python 3.12 (pinned due to Python 3.13 compatibility issues with some dependencies). The project will automatically use Python 3.12 when you run `pixi install`.
 
 **JAX Backend**: GenJAX uses CPU-compatible JAX by default for maximum compatibility across environments. JAX will automatically detect and use GPU acceleration when available without requiring special configuration.
 

@@ -11,7 +11,7 @@ import json
 import numpy as np
 import jax.numpy as jnp
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 
 def _convert_types(obj):
@@ -265,6 +265,20 @@ def load_benchmark_results(data_dir: str) -> Dict[str, Dict[str, Any]]:
                 results["methods"][item] = load_inference_results(data_dir, item)
 
     return results
+
+
+def list_experiments(base_dir: str = "data") -> List[str]:
+    """List all experiment directories in the base directory."""
+    if not os.path.exists(base_dir):
+        return []
+
+    experiments = []
+    for item in os.listdir(base_dir):
+        item_path = os.path.join(base_dir, item)
+        if os.path.isdir(item_path) and item.startswith("experiment_"):
+            experiments.append(item)
+
+    return sorted(experiments)
 
 
 def get_latest_experiment(base_dir: str = "data") -> Optional[str]:

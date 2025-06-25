@@ -626,8 +626,203 @@ class Trace(Generic[X, R], Pytree):
             return gen_fn.update(self, x, *args, **kwargs)
 
     def __getitem__(self, addr):
+        """Access choices by address with automatic trace unwrapping.
+
+        Returns unwrapped choice values for normal use cases.
+        For accessing nested trace objects (e.g., to get scores),
+        use get_subtrace() method instead.
+        """
         choices = self.get_choices()
         return get_choices(choices[addr])  # pyright: ignore
+
+    def get_subtrace(self, addr):
+        """Access nested trace objects at the given address.
+
+        Unlike __getitem__, this returns the actual trace object
+        without unwrapping, allowing access to methods like .get_score().
+
+        Args:
+            addr: Address path (str or tuple) to the nested trace
+
+        Returns:
+            The trace object at the specified address
+
+        Example:
+            # Access nested trace to get its score
+            bit_trace = trace.get_subtrace("step").get_subtrace("cells").get_subtrace("bit")
+            score = bit_trace.get_score()
+        """
+        # Access the raw _choices structure to get the actual trace object
+        if hasattr(self, "_choices"):
+            return self._choices[addr]
+        else:
+            # Fallback for traces that don't have _choices attribute
+            raise AttributeError(f"Cannot access subtrace on {type(self).__name__}")
+
+    def navigate(self, *addrs):
+        """Navigate to nested trace using splatted address arguments.
+
+        A more elegant alternative to chained get_subtrace() calls.
+
+        Args:
+            *addrs: Address components leading to the nested trace
+
+        Returns:
+            The trace object at the specified address path
+
+        Examples:
+            # These are equivalent:
+            trace.navigate("step", "cells", "bit")
+            trace.get_subtrace("step").get_subtrace("cells").get_subtrace("bit")
+
+            # Works with any address names (no separator conflicts):
+            trace.navigate("user/input", "weird.addr", "even:colons")
+
+            # Programmatic construction:
+            parts = ["step", "cells", "bit"]
+            trace.navigate(*parts)
+        """
+        current = self
+        for addr in addrs:
+            current = current.get_subtrace(addr)
+        return current
+
+    def get_score_at(self, *addrs):
+        """Get the score of a nested trace at the given address path.
+
+        Convenience method combining navigation and score access.
+
+        Args:
+            *addrs: Address components leading to the nested trace
+
+        Returns:
+            The score of the trace at the specified address path
+
+        Examples:
+            # These are equivalent:
+            trace.get_score_at("step", "cells", "bit")
+            trace.navigate("step", "cells", "bit").get_score()
+
+            # Programmatic usage:
+            parts = ["step", "cells", "bit"]
+            score = trace.get_score_at(*parts)
+        """
+        return self.navigate(*addrs).get_score()
+
+    def get_choices_at(self, *addrs):
+        """Get the choices of a nested trace at the given address path.
+
+        Convenience method combining navigation and choice access.
+
+        Args:
+            *addrs: Address components leading to the nested trace
+
+        Returns:
+            The choices of the trace at the specified address path
+
+        Examples:
+            # These are equivalent:
+            trace.get_choices_at("step", "cells", "bit")
+            trace.navigate("step", "cells", "bit").get_choices()
+
+            # Works with complex address names:
+            trace.get_choices_at("module/v1.2", "config.json", "setting")
+        """
+        return self.navigate(*addrs).get_choices()
+
+    def has_subtrace(self, addr) -> bool:
+        """Check if a subtrace exists at the given address.
+
+        Args:
+            addr: Address to check
+
+        Returns:
+            True if subtrace exists, False otherwise
+
+        Example:
+            if trace.has_subtrace("step"):
+                step_trace = trace.get_subtrace("step")
+        """
+        try:
+            self.get_subtrace(addr)
+            return True
+        except (KeyError, AttributeError):
+            return False
+
+    def has_trace_at(self, *addrs) -> bool:
+        """Check if a nested trace exists at the given address path.
+
+        Args:
+            *addrs: Address components to check
+
+        Returns:
+            True if trace exists at the address path, False otherwise
+
+        Examples:
+            if trace.has_trace_at("step", "cells", "bit"):
+                bit_score = trace.get_score_at("step", "cells", "bit")
+
+            # Safe navigation pattern:
+            parts = ["step", "cells", "bit"]
+            if trace.has_trace_at(*parts):
+                choices = trace.get_choices_at(*parts)
+        """
+        try:
+            self.navigate(*addrs)
+            return True
+        except (KeyError, AttributeError):
+            return False
+
+    def list_subtraces(self):
+        """List all immediate subtrace addresses.
+
+        Returns:
+            List of addresses that have nested traces
+
+        Example:
+            addresses = trace.list_subtraces()
+            for addr in addresses:
+                subtrace = trace.get_subtrace(addr)
+        """
+        if not hasattr(self, "_choices"):
+            return []
+
+        addresses = []
+        for addr, value in self._choices.items():
+            if isinstance(value, Trace):
+                addresses.append(addr)
+        return addresses
+
+    def walk_traces(self, prefix_addrs: tuple = ()):
+        """Walk all nested traces in the trace tree.
+
+        Yields all trace objects with their address paths from this trace.
+
+        Args:
+            prefix_addrs: Address prefix tuple for recursive calls (internal use)
+
+        Yields:
+            Tuples of (address_tuple, trace) for each nested trace
+
+        Examples:
+            # Basic walking
+            for addrs, subtrace in trace.walk_traces():
+                print(f"Address: {addrs}, Score: {subtrace.get_score()}")
+
+            # Using addresses for navigation
+            for addrs, subtrace in trace.walk_traces():
+                same_trace = trace.navigate(*addrs)
+                assert same_trace is subtrace
+        """
+        # Yield self if we have a prefix (i.e., we're a subtrace)
+        if prefix_addrs:
+            yield (prefix_addrs, self)
+
+        # Recursively walk subtraces
+        for addr in self.list_subtraces():
+            subtrace = self.get_subtrace(addr)
+            new_prefix = prefix_addrs + (addr,)
+            yield from subtrace.walk_traces(new_prefix)
 
 
 @Pytree.dataclass
@@ -810,24 +1005,24 @@ class StrSel(Pytree):
 @Pytree.dataclass
 class TupleSel(Pytree):
     """Selection that matches a hierarchical tuple address.
-    
+
     Tuple addresses represent hierarchical paths like ("outer", "inner", "leaf").
     When matched against a single string address, it checks if that string
     matches the first element of the tuple, and returns a selection for
     the remaining path.
-    
+
     Args:
         t: Tuple of strings representing the hierarchical path.
     """
-    
+
     t: Const[tuple[str, ...]]
-    
+
     def match(self, addr) -> tuple[bool, Union[AllSel, NoneSel, "TupleSel"]]:
         path = self.t.value
         if not path:
             # Empty tuple matches nothing
             return False, NoneSel()
-        
+
         if len(path) == 1:
             # Single element tuple behaves like StrSel
             check = addr == path[0]
@@ -984,7 +1179,7 @@ def sel(*v: tuple[()] | str | tuple[str, ...] | dict[str, Any] | None) -> Select
         ```python
         # Select specific address
         sel("x")                    # Matches address "x"
-        
+
         # Select hierarchical address
         sel(("outer", "inner"))     # Matches hierarchical path outer/inner
 

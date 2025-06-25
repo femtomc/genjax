@@ -128,7 +128,25 @@ from functools import wraps
 import jax.extend as jex
 import jax.tree_util as jtu
 from jax.extend.core import Jaxpr
-from jax.util import safe_map, split_list
+
+
+# Replace deprecated jax.util functions
+def safe_map(func, *iterables):
+    """Apply function to iterables, similar to deprecated jax.util.safe_map."""
+    return list(map(func, *iterables))
+
+
+def split_list(lst, split_points):
+    """Split a list at given indices, similar to deprecated jax.util.split_list."""
+    result = []
+    start = 0
+    for split_point in split_points:
+        result.append(lst[start : start + split_point])
+        start += split_point
+    result.append(lst[start:])
+    return result
+
+
 from jax.lax import scan_p, scan
 
 import beartype.typing as btyping

@@ -215,7 +215,7 @@ pixi run -e cuda python -m examples.localization.main plot-figures \
 - **PJAX primitives**: Apply `seed()` before JAX transformations
 - **Observation format**: Ground truth must match 8-element LIDAR array structure
 
-## Current Status (June 20, 2025)
+## Current Status
 
 ### ✅ Production Ready
 - **Drift-only model**: Simplified dynamics for excellent SMC convergence

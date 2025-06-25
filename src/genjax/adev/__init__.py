@@ -67,7 +67,8 @@ from genjax.pjax import (
     modular_vmap,
     stage,
 )
-from jax import util as jax_util
+
+# Import alternatives for deprecated jax.util functions
 from jax.extend import source_info_util as src_util
 from jax.extend.core import Jaxpr, Var, jaxpr_as_fun
 from jax.interpreters import ad as jax_autodiff
@@ -373,7 +374,11 @@ class ADEV(Pytree):
 
     @staticmethod
     def flat_unzip(duals: list[Any]):
-        primals, tangents = jax_util.unzip2((t.primal, t.tangent) for t in duals)
+        # Replace deprecated jax_util.unzip2 with direct unpacking
+        dual_pairs = [(t.primal, t.tangent) for t in duals]
+        if not dual_pairs:
+            return [], []
+        primals, tangents = zip(*dual_pairs)
         return list(primals), list(tangents)
 
     @staticmethod
@@ -383,14 +388,15 @@ class ADEV(Pytree):
         flat_duals: list[Dual],
     ):
         dual_env = Environment()
-        jax_util.safe_map(dual_env.write, jaxpr.constvars, Dual.tree_pure(consts))
-        jax_util.safe_map(dual_env.write, jaxpr.invars, flat_duals)
+        # Replace deprecated jax_util.safe_map with direct map calls
+        list(map(dual_env.write, jaxpr.constvars, Dual.tree_pure(consts)))
+        list(map(dual_env.write, jaxpr.invars, flat_duals))
 
         # TODO: Pure evaluation.
         def eval_jaxpr_iterate_pure(eqns, pure_env, invars, flat_args):
-            jax_util.safe_map(pure_env.write, invars, flat_args)
+            list(map(pure_env.write, invars, flat_args))
             for eqn in eqns:
-                in_vals = jax_util.safe_map(pure_env.read, eqn.invars)
+                in_vals = list(map(pure_env.read, eqn.invars))
                 subfuns, params = eqn.primitive.get_bind_params(eqn.params)
                 args = subfuns + in_vals
                 if eqn.primitive is sample_p:
@@ -399,9 +405,9 @@ class ADEV(Pytree):
                     outs = eqn.primitive.bind(*args, **params)
                     if not eqn.primitive.multiple_results:
                         outs = [outs]
-                    jax_util.safe_map(pure_env.write, eqn.outvars, outs)
+                    list(map(pure_env.write, eqn.outvars, outs))
 
-            return jax_util.safe_map(pure_env.read, jaxpr.outvars)
+            return list(map(pure_env.read, jaxpr.outvars))
 
         # Dual evaluation.
         def eval_jaxpr_iterate_dual(
@@ -410,11 +416,11 @@ class ADEV(Pytree):
             invars: list[Var],
             flat_duals: list[Dual],
         ):
-            jax_util.safe_map(dual_env.write, invars, flat_duals)
+            list(map(dual_env.write, invars, flat_duals))
 
             for eqn_idx, eqn in enumerate(eqns):
                 with src_util.user_context(eqn.source_info.traceback):
-                    in_vals = jax_util.safe_map(dual_env.read, eqn.invars)
+                    in_vals = list(map(dual_env.read, eqn.invars))
                     subfuns, params = eqn.primitive.get_bind_params(eqn.params)
                     duals = subfuns + in_vals
 
@@ -491,6 +497,11 @@ class ADEV(Pytree):
                             *it.chain(reversed(branch_adev_functions), in_vals[1:]),
                         )
 
+                    # Scan operations are not supported in ADEV
+                    elif eqn.primitive is jax.lax.scan_p:
+                        msg = f"ADEV does not support '{eqn.primitive}' - scan operations with stochastic computations are not currently supported"
+                        raise NotImplementedError(msg)
+
                     # Default JVP rule for other JAX primitives.
                     else:
                         flat_primals, flat_tangents = ADEV.flat_unzip(
@@ -512,12 +523,14 @@ class ADEV(Pytree):
                     primal_outs = [primal_outs]
                     tangent_outs = [tangent_outs]
 
-                jax_util.safe_map(
-                    dual_env.write,
-                    eqn.outvars,
-                    Dual.dual_tree(primal_outs, tangent_outs),
+                list(
+                    map(
+                        dual_env.write,
+                        eqn.outvars,
+                        Dual.dual_tree(primal_outs, tangent_outs),
+                    )
                 )
-            (out_dual,) = jax_util.safe_map(dual_env.read, jaxpr.outvars)
+            (out_dual,) = list(map(dual_env.read, jaxpr.outvars))
             if not isinstance(out_dual, Dual):
                 out_dual = Dual(out_dual, jnp.zeros_like(out_dual))
             return out_dual

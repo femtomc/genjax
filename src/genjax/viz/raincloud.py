@@ -10,13 +10,21 @@ import matplotlib.patches as patches
 import numpy as np
 import jax.numpy as jnp
 from scipy import stats
-from beartype.typing import Optional, List, Any
+from beartype.typing import Optional, List, Any, Union
+from matplotlib.colors import to_hex
 
 
 def _estimate_density(
-    data: np.ndarray, bw: str = "scott", cut: float = 2.0, gridsize: int = 100
+    data: Union[np.ndarray, Any],
+    bw: str = "scott",
+    cut: float = 2.0,
+    gridsize: int = 100,
 ):
     """Estimate kernel density for a data vector."""
+    # Convert to numpy if needed
+    if hasattr(data, "__array__"):
+        data = np.array(data)
+
     if len(data) == 0:
         return np.array([]), np.array([1.0])
 
@@ -43,7 +51,7 @@ def _estimate_density(
     return support, density
 
 
-def _scale_density(density: np.ndarray, scale: str = "area"):
+def _scale_density(density: Union[np.ndarray, Any], scale: str = "area"):
     """Scale density curve."""
     if len(density) <= 1 or density.max() == 0:
         return density
@@ -61,10 +69,10 @@ def _scale_density(density: np.ndarray, scale: str = "area"):
 def _draw_half_violin(
     ax,
     position: float,
-    support: np.ndarray,
-    density: np.ndarray,
+    support: Union[np.ndarray, Any],
+    density: Union[np.ndarray, Any],
     width: float = 0.4,
-    color: str = "lightblue",
+    color: Union[str, tuple, Any] = "lightblue",
     alpha: float = 0.7,
     orient: str = "h",
     offset: float = 0.0,
@@ -72,6 +80,10 @@ def _draw_half_violin(
     """Draw half violin (cloud part of raincloud)."""
     if len(support) == 0 or len(density) == 0:
         return
+
+    # Convert color if needed
+    if isinstance(color, tuple):
+        color = to_hex(color)
 
     # Scale density to width
     scaled_density = density * width
@@ -95,15 +107,23 @@ def _draw_half_violin(
 def _draw_boxplot(
     ax,
     position: float,
-    data: np.ndarray,
+    data: Union[np.ndarray, Any],
     width: float = 0.15,
-    color: str = "black",
+    color: Union[str, tuple, Any] = "black",
     orient: str = "h",
     offset: float = 0.0,
 ):
     """Draw box plot (umbrella part of raincloud)."""
     if len(data) == 0:
         return
+
+    # Convert color if needed
+    if isinstance(color, tuple):
+        color = to_hex(color)
+
+    # Convert data to numpy if needed
+    if hasattr(data, "__array__"):
+        data = np.array(data)
 
     # Calculate quartiles
     q25, q50, q75 = np.percentile(data, [25, 50, 75])
@@ -227,10 +247,10 @@ def _draw_boxplot(
 def _draw_stripplot(
     ax,
     position: float,
-    data: np.ndarray,
+    data: Union[np.ndarray, Any],
     jitter: float = 0.05,
     size: float = 20,
-    color: str = "darkblue",
+    color: Union[str, tuple, Any] = "darkblue",
     alpha: float = 0.6,
     orient: str = "h",
     offset: float = 0.0,
@@ -238,6 +258,14 @@ def _draw_stripplot(
     """Draw strip plot (rain part of raincloud)."""
     if len(data) == 0:
         return
+
+    # Convert color if needed
+    if isinstance(color, tuple):
+        color = to_hex(color)
+
+    # Convert data to numpy if needed
+    if hasattr(data, "__array__"):
+        data = np.array(data)
 
     # Add jitter
     n_points = len(data)
@@ -470,7 +498,7 @@ def diagnostic_raincloud(
 
     # Compute ESS (Effective Sample Size)
     ess = 1.0 / jnp.sum(data**2)
-    
+
     # Compute ESS ratio (ESS / n_particles)
     ess_ratio = ess / n_particles if n_particles is not None else ess
 

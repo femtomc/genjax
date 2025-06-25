@@ -10,6 +10,8 @@ This guide covers the core GenJAX concepts implemented in:
 **For gradient estimation**, see `adev/CLAUDE.md`
 **For testing utilities**, see `extras/CLAUDE.md`
 
+**Note**: The GP (Gaussian Processes) module has been removed. For Gaussian process functionality, use external libraries like GPJax or TensorFlow Probability directly.
+
 ## Core Concepts
 
 ### Generative Functions & Traces
@@ -65,7 +67,7 @@ This guide covers the core GenJAX concepts implemented in:
 - Returns `(merged_choices, discarded_values)`
 - If `check` is provided, uses `jnp.where(check, x, x_)` for conditional selection at leaf level
 - Used internally for compositional generative functions and Cond combinator
-- **Enhanced API (June 2025)**: Added `check` parameter and tuple return for conditional merge support
+- **Enhanced API**: Added `check` parameter and tuple return for conditional merge support
 
 #### filter
 **Method**: `filter(x: X, selection: Selection) -> tuple[X | None, X | None]`
@@ -89,13 +91,54 @@ This guide covers the core GenJAX concepts implemented in:
 
 **Type**: `Trace[X, R]`
 **Location**: `core.py:537-630`
-**Methods**:
+**Core Methods**:
 - `get_retval() -> R`: Return value
 - `get_choices() -> X`: Random choices
 - `get_score() -> Score`: Negative log probability
 - `get_args() -> Any`: Function arguments
 - `get_gen_fn() -> GFI[X, R]`: Source generative function
 - `get_fixed_choices() -> X`: Choices preserving Fixed wrappers
+
+**Enhanced Navigation API** (NEW):
+- `get_subtrace(addr) -> Trace`: Access nested trace object at address
+- `navigate(*addrs) -> Trace`: Navigate using splatted address arguments
+- `get_score_at(*addrs) -> Score`: Get score at nested address path
+- `get_choices_at(*addrs) -> X`: Get choices at nested address path
+- `has_subtrace(addr) -> bool`: Check if subtrace exists at address
+- `has_trace_at(*addrs) -> bool`: Check if nested trace exists at path
+- `list_subtraces() -> List[str]`: List immediate subtrace addresses
+- `walk_traces() -> Iterator[Tuple[Tuple, Trace]]`: Walk all nested traces
+
+**Navigation Examples**:
+```python
+# Traditional chaining (still works)
+bit_trace = trace.get_subtrace("step").get_subtrace("cells").get_subtrace("bit")
+score = bit_trace.get_score()
+
+# ✨ NEW: Elegant splatted navigation
+score = trace.get_score_at("step", "cells", "bit")
+choices = trace.get_choices_at("step", "cells", "bit")
+
+# Safe navigation
+if trace.has_trace_at("step", "cells", "bit"):
+    score = trace.get_score_at("step", "cells", "bit")
+
+# Programmatic construction
+parts = ["step", "cells", "bit"]
+trace.navigate(*parts)
+trace.get_score_at(*parts)
+
+# Tree exploration
+for addrs, subtrace in trace.walk_traces():
+    print(f"Trace at {'/'.join(addrs)}: {subtrace.get_score()}")
+```
+
+**Key Benefits**:
+- **No separator conflicts**: Works with any address names including "user/data", "config.json"
+- **Perfect IDE support**: Clear argument structure for auto-completion
+- **Programmatic friendly**: Natural `*args` expansion from lists
+- **Mental model alignment**: Matches `get_subtrace()` chaining pattern
+- **Type safe**: All methods preserve type information
 
 ### Selection Interface
 
@@ -177,7 +220,7 @@ Higher-order generative functions for composition:
 **Purpose**: Conditional execution with full support for same-address branches
 - First argument to resulting GF must be boolean condition
 - Both branches must have same return type
-- **Enhanced (June 2025)**: Now supports branches with same addresses via conditional merge API
+- **Enhanced**: Now supports branches with same addresses via conditional merge API
 - Uses `merge(x, x_, check=condition)` for efficient conditional selection
 - `CondTr.get_choices()` automatically applies conditional selection using enhanced merge
 - Enables natural mixture models without address conflicts
@@ -275,7 +318,7 @@ Higher-order generative functions for composition:
 - Nested: `namespace(namespace(fn, "inner"), "outer")`
 - See `state.py` for implementation details
 
-### Enhanced Cond Combinator (June 2025)
+### Enhanced Cond Combinator
 
 **Mixture Model Pattern with Same Addresses**:
 ```python

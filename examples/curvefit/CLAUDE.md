@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the curve fitting c
 
 ## Overview
 
-The curvefit case study showcases Bayesian curve fitting using GenJAX, demonstrating polynomial regression (degree 2) with hierarchical modeling and both importance sampling and HMC inference. The case study has been simplified to focus on essential comparisons: IS with 1000 particles vs HMC methods.
+The curvefit case study showcases Bayesian curve fitting using GenJAX, demonstrating polynomial regression (degree 2) with hierarchical modeling and both importance sampling and HMC inference. The case study includes both standard curve fitting and extended outlier models that demonstrate mixture modeling with the GenJAX `Cond` combinator. The focus is on essential comparisons: IS vs HMC methods for standard models, and IS sample size effects for outlier detection.
 
 ## Directory Structure
 
@@ -32,6 +32,13 @@ examples/curvefit/
 - **`npoint_curve(xs)`**: Multi-point curve model taking xs as input
 - **`infer_latents()`**: SMC-based parameter inference using importance sampling
 - **`get_points_for_inference()`**: Test data generation utility
+
+**Outlier Model Extensions:**
+
+- **`point_with_outliers(x, curve, outlier_rate, outlier_std)`**: Point model with outlier handling using Cond combinator
+- **`npoint_curve_with_outliers(xs, outlier_rate, outlier_std)`**: Multi-point outlier model
+- **`infer_latents_with_outliers()`**: SMC inference for outlier model with importance sampling
+- **`infer_latents_with_outliers_jit`**: JIT-compiled version of outlier inference
 
 **NumPyro Implementations (if numpyro available):**
 
@@ -76,12 +83,12 @@ examples/curvefit/
 - **`save_four_multipoint_trace_vizs()`**: 2x2 grid of posterior curves → `curvefit_posterior_traces_grid.pdf`
 
 **Inference and Scaling:**
-- **`save_inference_scaling_viz()`**: 3-panel scaling analysis → `curvefit_scaling_performance.pdf`
+- **`save_inference_scaling_viz()`**: 2-panel scaling analysis → `curvefit_scaling_performance.pdf`
   - Runtime vs N (flat line showing vectorization benefit)
   - Log Marginal Likelihood estimates vs N
-  - Effective Sample Size (ESS) vs N
   - Uses 100 trials per N for Monte Carlo noise reduction
   - Scientific notation on x-axis ($10^2$, $10^3$, $10^4$)
+  - Shared x-axis with bottom panel showing x-axis labels
 - **`save_inference_viz()`**: Posterior uncertainty bands from IS → `curvefit_posterior_curves.pdf`
 
 **Method Comparisons:**
@@ -115,6 +122,15 @@ examples/curvefit/
   - Vertical → `curvefit_legend_is_vert.pdf`
   - Consistent color scheme throughout
 
+**Outlier Model Visualizations:**
+- **`save_outlier_prior_and_inference_demo()`**: Outlier model demonstration → `curvefit_outlier_prior_and_inference_demo.pdf`
+  - Prior sample with outlier indicators
+  - IS inference performance with 1000 particles
+- **`save_outlier_algorithm_comparison()`**: IS sample size comparison → `curvefit_outlier_algorithm_comparison.pdf`
+  - Three-panel layout: inference quality, detection metrics, runtime comparison
+  - Compares IS(N=1000) vs IS(N=50) for outlier detection
+  - Shows precision/recall/F1 scores for outlier detection performance
+
 **Other Visualizations:**
 - **`save_log_density_viz()`**: Log joint density surface → `curvefit_logprob_surface.pdf`
 - **`save_multiple_curves_single_point_viz()`**: Posterior marginal at x → `curvefit_posterior_marginal.pdf`
@@ -127,7 +143,7 @@ examples/curvefit/
 - **`benchmark`**: Framework comparison (IS vs HMC methods)
 - **`is-only`**: IS-only comparison (N=5, 1000, 5000)
 - **`scaling`**: Inference scaling analysis only
-- **`outlier`**: Outlier model analysis (generative conditionals)
+- **`outlier`**: Outlier model analysis with IS sample size comparison
 
 **Key Features:**
 - **Consistent parameters**: Standard defaults for reproducibility
@@ -205,12 +221,20 @@ def infer_latents(xs, ys, n_samples: Const[int]):
 
 ### Noise Modeling
 
-**Simple Gaussian Noise**:
+**Simple Gaussian Noise** (standard model):
 
 - **Observation model**: Polynomial evaluation with Gaussian noise
 - **Noise level**: σ=0.05 for low observation noise
-- **No outlier handling**: Clean data assumption
+- **Clean data assumption**: No outlier handling in base model
 - **Parameter priors**: Hierarchical with decreasing variance for higher-order terms
+
+**Outlier Noise Model** (extended model):
+
+- **Mixture model**: Uses GenJAX `Cond` combinator for outlier handling
+- **Binary indicators**: Per-point outlier/inlier classification
+- **Dual noise levels**: σ=0.2 for inliers, configurable σ for outliers
+- **Prior outlier rate**: Configurable probability (typically 10-25%)
+- **Inference target**: Joint inference over curve parameters and outlier indicators
 
 ### Lambda Utility for Dynamic Functions
 
@@ -314,6 +338,25 @@ trace = npoint_curve.simulate(xs)
 curve, (xs_ret, ys_ret) = trace.get_retval()
 ```
 
+### Outlier Model Usage
+
+**Outlier Model Inference:**
+
+```python
+# Outlier model with 25% outlier rate and large outlier noise
+xs, ys = get_points_for_inference()
+samples, weights = seed(infer_latents_with_outliers)(
+    key, xs, ys, Const(1000), 
+    Const(0.25),  # outlier_rate
+    Const(0.0),   # outlier_loc_shift
+    Const(5.0)    # outlier_scale
+)
+
+# Extract outlier indicators from posterior
+outlier_samples = samples.get_choices()["ys"]["is_outlier"]  # (n_particles, n_points)
+outlier_posterior = jnp.mean(outlier_samples, axis=0)  # posterior outlier probability per point
+```
+
 ### Running Examples
 
 ```bash
@@ -332,6 +375,9 @@ pixi run curvefit-benchmark
 # or:
 python -m examples.curvefit.main benchmark
 
+# Outlier model analysis
+python -m examples.curvefit.main outlier
+
 # With CUDA acceleration
 pixi run cuda-curvefit          # Quick mode
 pixi run cuda-curvefit-full     # Full analysis
@@ -340,6 +386,7 @@ pixi run cuda-curvefit-benchmark # Benchmark
 # Customize parameters
 python -m examples.curvefit.main benchmark --n-points 30 --timing-repeats 20
 python -m examples.curvefit.main full --n-samples-is 2000 --n-samples-hmc 1500
+python -m examples.curvefit.main outlier --outlier-rate 0.3 --n-points 20
 ```
 
 ## Development Guidelines
@@ -530,7 +577,7 @@ def point_with_outliers(x, curve, outlier_rate=0.1, outlier_std=1.0):
 - **NumPy compatibility**: Used alongside JAX for some visualizations
 - **Environment**: Use `pixi run -e curvefit` for proper dependencies
 
-## Recent Updates (June 2025)
+## Recent Updates
 
 ### Enhanced Visualization Suite
 
@@ -571,3 +618,22 @@ The case study has been significantly enhanced with comprehensive visualizations
 - **GPU acceleration**: All timing benchmarks run with CUDA when available
 - **Proper environments**: Use `pixi run -e curvefit-cuda` for GPU support
 - **Vectorization demonstration**: Runtime plots clearly show GPU benefits
+
+### Outlier Model Enhancements
+
+The case study now includes comprehensive outlier model functionality:
+
+**Outlier Model Features**:
+- **Cond combinator usage**: Demonstrates mixture models using GenJAX's Cond combinator
+- **Discrete latent variables**: Binary outlier indicators per data point
+- **Vectorized inference**: Efficient importance sampling for mixture models
+- **Detection metrics**: Precision, recall, and F1 scores for outlier detection
+- **Comparative analysis**: IS sample size effects on detection performance
+
+**Algorithm Comparison**:
+- **IS(N=1000) vs IS(N=50)**: Demonstrates sample size effects on inference quality
+- **Outlier detection performance**: Quantitative evaluation of detection accuracy
+- **Runtime comparison**: Shows computational trade-offs between sample sizes
+- **Visualization suite**: Multi-panel figures showing inference quality and detection metrics
+
+**Implementation Note**: Previous experimental Gibbs sampling code was removed in favor of the clean IS-based approach that properly follows GenJAX patterns and provides reliable inference performance.

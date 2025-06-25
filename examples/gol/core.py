@@ -1,6 +1,5 @@
 from functools import partial
 
-import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import matplotlib.pyplot as plt
@@ -211,12 +210,8 @@ class GibbsSamplerState(Pytree):
         return self.inferred_trace.get_score()
 
     def predictive_posterior_score(self):
-        return (
-            -self.inferred_trace._choices["step"]
-            ._choices["cells"]
-            ._choices["bit"]
-            .get_score()
-        )
+        # Access nested trace score using elegant splatted address navigation
+        return -self.inferred_trace.get_score_at("step", "cells", "bit")
 
     def p_flip(self):
         args = self.inferred_trace.get_args()

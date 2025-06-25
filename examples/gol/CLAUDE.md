@@ -187,6 +187,47 @@ def get_cell_from_window(window, flip_prob):
 - **Modular Vmap**: Use `trace()` function with vectorized operations
 - **Static Arguments**: Grid dimensions must be compile-time constants
 
+### Enhanced Trace Navigation API
+
+The GOL case study showcases the new GenJAX trace navigation API for accessing nested trace structures:
+
+**Original Challenge**: Accessing deeply nested trace scores required private API access:
+```python
+# ❌ PROBLEMATIC: Direct private access
+score = trace._choices["step"]._choices["cells"]._choices["bit"].get_score()
+```
+
+**Enhanced Solution**: Elegant splatted address navigation:
+```python
+# ✅ BEAUTIFUL: New trace navigation API
+score = trace.get_score_at("step", "cells", "bit")
+
+# Alternative approaches:
+# Method chaining (verbose but explicit)
+bit_trace = trace.get_subtrace("step").get_subtrace("cells").get_subtrace("bit")
+score = bit_trace.get_score()
+
+# Direct navigation
+bit_trace = trace.navigate("step", "cells", "bit")
+score = bit_trace.get_score()
+```
+
+**GOL Implementation**:
+```python
+def predictive_posterior_score(self):
+    # Access nested trace score using elegant splatted address navigation
+    return -self.inferred_trace.get_score_at("step", "cells", "bit")
+```
+
+**Key Benefits for Complex Trace Structures**:
+- **Crystal Clear**: No ambiguity about address boundaries
+- **Robust**: Works with any address names (no separator conflicts)
+- **Programmatic**: Easy to construct address paths dynamically
+- **Safe**: Optional existence checking with `has_trace_at()`
+- **Discoverable**: Exploration via `list_subtraces()` and `walk_traces()`
+
+**API Reference**: See `src/genjax/CLAUDE.md` for complete navigation API documentation.
+
 ### Modern Visualization Architecture
 
 **Separate Figure Design**:

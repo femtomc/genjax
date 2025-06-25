@@ -406,62 +406,62 @@ def test_fn_conditional_sampling(standard_tolerance, helpers):
 @pytest.mark.regression
 def test_cond_update_with_vmap_regression(base_key, standard_tolerance, helpers):
     """Regression test for Cond.update bug with vmap (Issue #XXX).
-    
+
     This test verifies that Cond.update works correctly in vectorized contexts.
     The bug was that jnp.select was used incorrectly with scalar conditions.
     """
-    
+
     # Define a simple conditional model
     @gen
     def branch_a(value):
         return normal(value, 0.1) @ "obs"
-    
+
     @gen
     def branch_b(value):
         return normal(value, 1.0) @ "obs"
-    
+
     @gen
     def conditional_point(value, use_branch_a):
         cond_model = Cond(branch_b, branch_a)
         return cond_model(use_branch_a, value) @ "result"
-    
+
     @gen
     def vectorized_model(values, conditions):
         # Vectorize the conditional model
-        results = conditional_point.vmap(in_axes=(0, 0))(
-            values, conditions
-        ) @ "points"
+        results = conditional_point.vmap(in_axes=(0, 0))(values, conditions) @ "points"
         return results
-    
+
     # Test data
     n_points = 3
     values = jnp.array([1.0, 2.0, 3.0])
     conditions = jnp.array([True, False, True])
-    
+
     # Generate initial trace
     trace = seed(vectorized_model.simulate)(base_key, values, conditions)
     helpers.assert_valid_trace(trace)
-    
+
     # Create new observations for update
     new_obs = jnp.array([1.1, 2.2, 2.9])
     constraints = {"points": {"result": {"obs": new_obs}}}
-    
+
     # This should NOT raise TypeError anymore
     new_trace, weight, discard = vectorized_model.update(
         trace, constraints, values, conditions
     )
-    
+
     # Verify the update worked correctly
     assert new_trace is not None
     assert weight.shape == ()  # Should be a scalar
     helpers.assert_valid_density(weight)
-    
+
     # Check that the new observations were incorporated
     new_choices = new_trace.get_choices()
     updated_obs = new_choices["points"]["result"]["obs"]
     helpers.assert_finite_and_close(
-        updated_obs, new_obs, rtol=standard_tolerance,
-        msg="Updated observations should match constraints"
+        updated_obs,
+        new_obs,
+        rtol=standard_tolerance,
+        msg="Updated observations should match constraints",
     )
 
 
@@ -470,54 +470,56 @@ def test_cond_update_with_vmap_regression(base_key, standard_tolerance, helpers)
 @pytest.mark.fast
 def test_cond_with_same_addresses_in_branches(base_key, standard_tolerance, helpers):
     """Test that Cond works correctly with same addresses in both branches.
-    
+
     This is the mixture model pattern that should be supported.
     """
-    
+
     @gen
     def normal_component(x, mean):
         return normal(mean, 0.1) @ "y"  # Same address in both branches!
-    
-    @gen 
+
+    @gen
     def outlier_component(x, mean):
         return normal(mean, 1.0) @ "y"  # Same address in both branches!
-    
+
     @gen
     def mixture_model(x, outlier_prob=0.1):
         mean = normal(0.0, 1.0) @ "mean"
         is_outlier = flip(outlier_prob) @ "is_outlier"
-        
+
         # Conditional with same addresses
         cond = Cond(outlier_component, normal_component)
         observation = cond(is_outlier, x, mean) @ "obs"
-        
+
         return observation
-    
+
     # Test simulate
     trace = seed(mixture_model.simulate)(base_key, 1.0)
     choices = trace.get_choices()
     helpers.assert_valid_trace(trace)
-    
+
     # Verify we have all expected addresses
     assert "mean" in choices
     assert "is_outlier" in choices
     assert "obs" in choices
     assert "y" in choices["obs"]  # The observation from the selected branch
-    
+
     # Test assess - should handle same addresses correctly
     density, retval = mixture_model.assess(choices, 1.0)
     helpers.assert_valid_density(density)
-    
+
     # Test update
     new_choices = {"obs": {"y": 1.5}}
     new_trace, weight, discard = mixture_model.update(trace, new_choices, 1.0)
     helpers.assert_valid_density(weight)
-    
+
     # Verify the observation was updated
     updated_choices = new_trace.get_choices()
     helpers.assert_finite_and_close(
-        updated_choices["obs"]["y"], 1.5, rtol=standard_tolerance,
-        msg="Updated observation should match constraint"
+        updated_choices["obs"]["y"],
+        1.5,
+        rtol=standard_tolerance,
+        msg="Updated observation should match constraint",
     )
 
 
@@ -1972,3 +1974,110 @@ class TestSelection:
         assert "x" in discarded2
         assert "z" in discarded2
         assert jnp.allclose(new_trace2.get_choices()["y"], old_choices["y"], rtol=1e-10)
+
+
+# =============================================================================
+# VMAP GENERATE BUG TESTS
+# =============================================================================
+
+
+@gen
+def two_param_fn(x: float, y: float) -> float:
+    """Simple function with 2 parameters for testing vmap."""
+    z = normal(x, y) @ "sample"
+    return z
+
+
+@gen
+def three_param_fn(a: float, b: float, c: float) -> float:
+    """Function with 3 parameters for testing vmap."""
+    result = normal(a + b, c) @ "output"
+    return result
+
+
+class TestVmapGenerate:
+    """Test vmap generate method bug and fix."""
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_vmap_simulate_works(self):
+        """Verify that vmap simulate works (baseline)."""
+        vmapped_fn = two_param_fn.vmap(in_axes=(0, None))
+
+        x_values = jnp.array([1.0, 2.0, 3.0])
+        y_value = 0.5
+
+        result = vmapped_fn.simulate(x_values, y_value)
+        assert result.get_retval().shape == (3,)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_vmap_generate_two_params(self):
+        """Test that vmap generate works with 2 parameters."""
+        vmapped_fn = two_param_fn.vmap(in_axes=(0, None))
+
+        x_values = jnp.array([1.0, 2.0, 3.0])
+        y_value = 0.5
+        constraints = {"sample": jnp.array([1.5, 2.5, 3.5])}
+
+        # This should work after the bug fix
+        trace, weight = vmapped_fn.generate(constraints, x_values, y_value)
+        assert isinstance(weight, (float, jnp.ndarray))  # JAX returns arrays
+        assert trace.get_retval().shape == (3,)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_vmap_generate_three_params(self):
+        """Test that vmap generate works with 3 parameters."""
+        vmapped_fn = three_param_fn.vmap(in_axes=(0, 0, None))
+
+        a_values = jnp.array([1.0, 2.0])
+        b_values = jnp.array([0.5, 1.5])
+        c_value = 0.1
+        constraints = {"output": jnp.array([1.0, 2.0])}
+
+        # This should work after the bug fix
+        trace, weight = vmapped_fn.generate(constraints, a_values, b_values, c_value)
+        assert isinstance(weight, (float, jnp.ndarray))  # JAX returns arrays
+        assert trace.get_retval().shape == (2,)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_vmap_assess_two_params(self):
+        """Test that vmap assess works with 2 parameters."""
+        vmapped_fn = two_param_fn.vmap(in_axes=(0, None))
+
+        x_values = jnp.array([1.0, 2.0, 3.0])
+        y_value = 0.5
+        choices = {"sample": jnp.array([1.5, 2.5, 3.5])}
+
+        log_prob, retval = vmapped_fn.assess(choices, x_values, y_value)
+        assert isinstance(log_prob, (float, jnp.ndarray))  # JAX returns arrays
+        assert retval.shape == (3,)
+
+    @pytest.mark.core
+    @pytest.mark.unit
+    @pytest.mark.fast
+    def test_vmap_update_two_params(self):
+        """Test that vmap update works with 2 parameters."""
+        vmapped_fn = two_param_fn.vmap(in_axes=(0, None))
+
+        # First create a trace
+        x_values = jnp.array([1.0, 2.0, 3.0])
+        y_value = 0.5
+        trace = vmapped_fn.simulate(x_values, y_value)
+
+        # Update with new constraints
+        new_constraints = {"sample": jnp.array([2.0, 3.0, 4.0])}
+        new_x_values = jnp.array([1.5, 2.5, 3.5])
+        new_y_value = 0.8
+
+        new_trace, weight, discarded = vmapped_fn.update(
+            trace, new_constraints, new_x_values, new_y_value
+        )
+        assert isinstance(weight, (float, jnp.ndarray))  # JAX returns arrays
+        assert new_trace.get_retval().shape == (3,)
