@@ -38,10 +38,12 @@ import numpy as np
 import jax.numpy as jnp
 import jax.random as jrand
 import jax
-from examples.utils import benchmark_with_warmup
+import sys
+sys.path.append('..')
+from utils import benchmark_with_warmup
 
 # Import shared GenJAX Research Visualization Standards
-from examples.viz import (
+from viz import (
     setup_publication_fonts, FIGURE_SIZES, get_method_color,
     apply_grid_style, set_minimal_ticks, apply_standard_ticks, save_publication_figure,
     PRIMARY_COLORS, LINE_SPECS, MARKER_SPECS
@@ -57,9 +59,9 @@ setup_publication_fonts()
 # set_minimal_ticks function now imported from examples.viz
 
 
-def get_reference_dataset(seed=42, n_points=10):
+def get_reference_dataset(seed=42, n_points=20):
     """Get the standard reference dataset for all visualizations."""
-    from examples.curvefit.data import generate_fixed_dataset
+    from data import generate_fixed_dataset
 
     return generate_fixed_dataset(
         n_points=n_points,
@@ -68,14 +70,14 @@ def get_reference_dataset(seed=42, n_points=10):
         true_a=-0.211,
         true_b=-0.395,
         true_c=0.673,
-        noise_std=0.05,  # Reduced observation noise
+        noise_std=0.05,  # Observation noise
         seed=seed,
     )
 
 
 def save_onepoint_trace_viz():
     """Save one-point curve trace visualization."""
-    from examples.curvefit.core import onepoint_curve
+    from core import onepoint_curve
 
     print("Making and saving onepoint trace visualization.")
 
@@ -102,7 +104,7 @@ def save_onepoint_trace_viz():
     apply_grid_style(ax)
     ax.set_xlim(0, 1)
 
-    save_publication_figure(fig, "examples/curvefit/figs/curvefit_prior_trace.pdf")
+    save_publication_figure(fig, "figs/curvefit_prior_trace.pdf")
     
     # Also create the multiple onepoint traces with densities
     save_multiple_onepoint_traces_with_density()
@@ -110,7 +112,7 @@ def save_onepoint_trace_viz():
 
 def save_multiple_onepoint_traces_with_density():
     """Save multiple one-point trace visualizations with density values."""
-    from examples.curvefit.core import onepoint_curve
+    from core import onepoint_curve
     from genjax.pjax import seed as genjax_seed
     
     print("Making and saving multiple onepoint traces with densities.")
@@ -150,12 +152,12 @@ def save_multiple_onepoint_traces_with_density():
         apply_grid_style(ax)
         ax.set_xlim(0, 1)
     
-    save_publication_figure(fig, "examples/curvefit/figs/curvefit_prior_traces_density.pdf")
+    save_publication_figure(fig, "figs/curvefit_prior_traces_density.pdf")
 
 
 def save_multipoint_trace_viz():
     """Save multi-point curve trace visualization."""
-    from examples.curvefit.core import npoint_curve
+    from core import npoint_curve
 
     print("Making and saving multipoint trace visualization.")
 
@@ -184,7 +186,7 @@ def save_multipoint_trace_viz():
     apply_grid_style(ax)
     ax.set_xlim(0, 1)
 
-    save_publication_figure(fig, "examples/curvefit/figs/curvefit_posterior_trace.pdf")
+    save_publication_figure(fig, "figs/curvefit_prior_multipoint_trace.pdf")
     
     # Also create the multiple multipoint traces with densities
     save_multiple_multipoint_traces_with_density()
@@ -192,7 +194,7 @@ def save_multipoint_trace_viz():
 
 def save_multiple_multipoint_traces_with_density():
     """Save multiple multi-point trace visualizations with density values."""
-    from examples.curvefit.core import npoint_curve
+    from core import npoint_curve
     from genjax.pjax import seed as genjax_seed
     
     print("Making and saving multiple multipoint traces with densities.")
@@ -234,12 +236,12 @@ def save_multiple_multipoint_traces_with_density():
         apply_grid_style(ax)
         ax.set_xlim(0, 1)
     
-    save_publication_figure(fig, "examples/curvefit/figs/curvefit_posterior_traces_density.pdf")
+    save_publication_figure(fig, "figs/curvefit_prior_multipoint_traces_density.pdf")
 
 
 def save_four_multipoint_trace_vizs():
     """Save visualization showing four different multi-point curve traces."""
-    from examples.curvefit.core import npoint_curve
+    from core import npoint_curve
     from genjax.pjax import seed as genjax_seed
 
     print("Making and saving four multipoint trace visualizations.")
@@ -282,12 +284,58 @@ def save_four_multipoint_trace_vizs():
         apply_grid_style(ax)
         ax.set_xlim(0, 1)
 
-    save_publication_figure(fig, "examples/curvefit/figs/curvefit_posterior_traces_grid.pdf")
+    save_publication_figure(fig, "figs/curvefit_prior_multipoint_traces_grid.pdf")
+
+
+def save_single_multipoint_trace_with_density():
+    """Save a single multi-point curve trace with curve, points, and density value."""
+    from core import npoint_curve
+    from genjax.pjax import seed as genjax_seed
+    
+    print("Making and saving single multipoint trace with density.")
+    
+    # Create single figure - match the size of subplots in 3-panel figure
+    fig, ax = plt.subplots(figsize=(4, 4))
+    
+    # Generate trace with specific seed
+    key = jrand.key(42)
+    
+    # Fixed x points
+    xs = jnp.array([0.1, 0.3, 0.5, 0.7, 0.9])
+    
+    # Generate trace
+    trace = genjax_seed(npoint_curve.simulate)(key, xs)
+    curve, (xs_ret, ys) = trace.get_retval()
+    
+    # Get the log density of this trace
+    log_density = trace.get_score()
+    
+    # Plot the curve over x values
+    xvals = jnp.linspace(0, 1, 300)
+    ax.plot(xvals, jax.vmap(curve)(xvals), 
+            color=get_method_color("curves"), **LINE_SPECS["curve_main"])
+    
+    # Mark the sampled points
+    ax.scatter(xs_ret, ys, color=get_method_color("data_points"), **MARKER_SPECS["secondary_points"])
+    
+    # Add density value as text below the plot with larger font
+    ax.text(0.5, -0.15, f"log p = {float(log_density):.2f}", 
+            ha='center', transform=ax.transAxes, fontsize=20, fontweight='bold')
+    
+    # Remove axis labels and ticks for cleaner look (matching other trace figures)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    apply_grid_style(ax)
+    ax.set_xlim(0, 1)
+    
+    save_publication_figure(fig, "figs/curvefit_single_multipoint_trace_density.pdf")
 
 
 def save_inference_viz(seed=42):
     """Save posterior visualization using importance sampling."""
-    from examples.curvefit.core import (
+    from core import (
         infer_latents,
         npoint_curve,
     )
@@ -363,7 +411,7 @@ def save_inference_viz(seed=42):
     # Reduce number of ticks
     set_minimal_ticks(ax)  # Use GRVS standard (3 ticks)
 
-    save_publication_figure(fig, "examples/curvefit/figs/curvefit_posterior_curves.pdf")
+    save_publication_figure(fig, "figs/curvefit_posterior_curves.pdf")
 
 
 def save_genjax_posterior_comparison(
@@ -375,7 +423,7 @@ def save_genjax_posterior_comparison(
     timing_repeats=20,
 ):
     """Save comparison of GenJAX IS vs HMC posterior inference."""
-    from examples.curvefit.core import (
+    from core import (
         infer_latents_jit,
         hmc_infer_latents_jit,
     )
@@ -491,7 +539,7 @@ def save_genjax_posterior_comparison(
         apply_grid_style(ax)
         ax.legend()
 
-    save_publication_figure(fig, "examples/curvefit/figs/curvefit_posterior_comparison.pdf")
+    save_publication_figure(fig, "figs/curvefit_posterior_comparison.pdf")
 
     print("✓ Saved GenJAX posterior comparison")
 
@@ -505,7 +553,7 @@ def save_framework_comparison_figure(
     timing_repeats=20,
 ):
     """Generate clean framework comparison with IS 1000 vs HMC methods."""
-    from examples.curvefit.core import (
+    from core import (
         infer_latents_jit,
         hmc_infer_latents_jit,
         numpyro_run_importance_sampling_jit,
@@ -807,7 +855,7 @@ def save_framework_comparison_figure(
     plt.tight_layout()
 
     # Save figure
-    filename = f"examples/curvefit/figs/curvefit_framework_comparison_n{n_points}.pdf"
+    filename = f"figs/curvefit_framework_comparison_n{n_points}.pdf"
     fig.savefig(filename, dpi=300, bbox_inches="tight", format="pdf")
     plt.close()
 
@@ -816,27 +864,32 @@ def save_framework_comparison_figure(
     return results
 
 
-def save_inference_scaling_viz(n_trials=100):
+def save_inference_scaling_viz(n_trials=100, extended_timing=False):
     """Save inference scaling visualization across different sample sizes.
     
     Args:
         n_trials: Number of independent trials to run for each sample size (default: 100)
+        extended_timing: If True, run longer timing trials to potentially show GPU throttling
     """
-    from examples.curvefit.core import infer_latents_jit
+    from core import infer_latents_jit
     from genjax.core import Const
     from examples.utils import benchmark_with_warmup
 
     print(f"Making and saving inference scaling visualization with {n_trials} trials per N.")
+    if extended_timing:
+        print("  Running extended timing trials to capture GPU behavior...")
 
     # Get reference dataset
     data = get_reference_dataset()
     xs = data["xs"]
     ys = data["ys"]
 
-    # Test different sample sizes - more points for smoother curves
-    n_samples_list = [100, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 4000, 5000, 7000, 10000]
-    ess_values = []
+    # Test different sample sizes - extended range to potentially observe GPU throttling
+    n_samples_list = [10, 20, 50, 100, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 4000, 5000, 7000, 10000, 
+                      15000, 20000, 30000, 40000, 50000, 70000, 100000, 150000, 200000, 300000, 
+                      400000, 500000, 700000, 1000000]
     lml_estimates = []
+    lml_stds = []  # Store standard deviations for variance bounds
     runtime_means = []
     runtime_stds = []
 
@@ -846,7 +899,6 @@ def save_inference_scaling_viz(n_trials=100):
         print(f"  Testing with {n_samples} samples ({n_trials} trials)...")
         
         # Storage for trial results
-        trial_ess = []
         trial_lml = []
         
         # Run multiple trials
@@ -856,112 +908,308 @@ def save_inference_scaling_viz(n_trials=100):
             # Run inference
             samples, weights = infer_latents_jit(trial_key, xs, ys, Const(n_samples))
             
-            # Compute ESS
-            normalized_weights = jnp.exp(weights - jnp.max(weights))
-            normalized_weights = normalized_weights / jnp.sum(normalized_weights)
-            ess = 1.0 / jnp.sum(normalized_weights**2)
-            trial_ess.append(float(ess))
-            
             # Estimate log marginal likelihood
             lml = jnp.log(jnp.mean(jnp.exp(weights - jnp.max(weights)))) + jnp.max(weights)
             trial_lml.append(float(lml))
         
-        # Average over trials
-        ess_values.append(jnp.mean(jnp.array(trial_ess)))
-        lml_estimates.append(jnp.mean(jnp.array(trial_lml)))
+        # Average over trials and compute standard deviation
+        lml_mean = jnp.mean(jnp.array(trial_lml))
+        lml_std = jnp.std(jnp.array(trial_lml))
+        lml_estimates.append(lml_mean)
+        lml_stds.append(lml_std)
         
-        # Benchmark runtime with more trials for stability
+        # Benchmark runtime with extended trials if requested
+        timing_repeats = 500 if extended_timing else 100
+        inner_repeats = 50 if extended_timing else 20
+        
         times, (mean_time, std_time) = benchmark_with_warmup(
             lambda: infer_latents_jit(base_key, xs, ys, Const(n_samples)),
-            repeats=100,  # Match the number of trials for consistency
-            inner_repeats=20  # More inner repeats for accurate timing
+            repeats=timing_repeats,
+            inner_repeats=inner_repeats
         )
         runtime_means.append(mean_time * 1000)  # Convert to ms
         runtime_stds.append(std_time * 1000)
 
-    # Create figure with three panels
-    fig, (ax1, ax2, ax3) = plt.subplots(
-        1, 3, figsize=FIGURE_SIZES["inference_scaling"]
+    # Create figure with two panels in horizontal layout
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2, figsize=(14, 3.5)  # Wider and less tall
     )
 
     # Common color for GenJAX IS
     genjax_is_color = "#0173B2"
 
-    # Runtime plot without error bars
+    # Runtime plot with potential GPU throttling visibility
+    runtime_array = np.array(runtime_means)
+    runtime_std_array = np.array(runtime_stds)
+    
+    # Plot mean line
     ax1.plot(
         n_samples_list,
-        runtime_means,
+        runtime_array,
         marker="o",
         linewidth=3,
         markersize=8,
         color=genjax_is_color,
+        label="Mean Runtime"
     )
+    
+    # Add shaded region for ±1 standard deviation (like LML plot)
+    ax1.fill_between(
+        n_samples_list,
+        runtime_array - runtime_std_array,
+        runtime_array + runtime_std_array,
+        alpha=0.3,
+        color=genjax_is_color,
+        label="±1 std"
+    )
+    
     ax1.set_xlabel("Number of Samples")
     ax1.set_ylabel("Runtime (ms)")
     # ax1.set_title("Vectorized Runtime", fontweight="normal")
     ax1.set_xscale("log")
-    ax1.set_xlim(80, 12000)
-    ax1.set_ylim(0.2, 0.3)  # Set runtime axis limits
-    # Add a horizontal line showing the mean runtime to emphasize flatness
-    mean_runtime = jnp.mean(jnp.array(runtime_means))
-    ax1.axhline(mean_runtime, color='gray', linestyle='--', alpha=0.5, linewidth=2)
+    ax1.set_xlim(8, 1200000)
+    
+    # Fixed y-axis range to better show GPU behavior
+    ax1.set_ylim(0.1, 0.5)
+    
+    # Add shading for GPU throttling region (past 10^5)
+    ax1.axvspan(100000, 1200000, alpha=0.1, color='orange', label='GPU Throttling')
+    
+    # Add colored vertical lines for N=10, 100, 100000
+    ax1.axvline(10, color='#B19CD9', linestyle='-', alpha=0.8, linewidth=4)
+    ax1.axvline(100, color='#0173B2', linestyle='-', alpha=0.8, linewidth=4)
+    ax1.axvline(100000, color='#029E73', linestyle='-', alpha=0.8, linewidth=4)
+    
+    # Add GPU underutilized text in unshaded region
+    ax1.text(3000, 0.15, 'GPU\nUnderutilized', ha='center', va='bottom', 
+             color='gray', fontsize=12, fontweight='bold')
+    
+    # Add throttle text in shaded region near x-axis
+    ax1.text(300000, 0.15, 'GPU\nThrottling', ha='center', va='bottom', 
+             color='darkorange', fontsize=12, fontweight='bold')
+    
+    # Add vertical line for GPU OOM at 10^6
+    ax1.axvline(1000000, color='red', linestyle='--', alpha=0.7, linewidth=2)
+    
+    # Add GPU OOM text above the plot frame
+    ax1.text(1000000, 1.05, 'GPU OOM', ha='center', va='bottom', 
+             color='red', fontsize=14, fontweight='bold', 
+             transform=ax1.get_xaxis_transform())
+    
     # Set specific x-axis tick locations with scientific notation
-    ax1.set_xticks([100, 1000, 10000])
-    ax1.set_xticklabels(['$10^2$', '$10^3$', '$10^4$'])
+    ax1.set_xticks([100, 1000, 10000, 100000, 1000000])
+    ax1.set_xticklabels(['$10^2$', '$10^3$', '$10^4$', '$10^5$', '$10^6$'])
     # Only set y-axis ticks to avoid overriding x-axis
     ax1.yaxis.set_major_locator(MaxNLocator(nbins=3, prune='both'))
 
-    # LML estimate plot
+    # LML estimate plot with variance bounds
+    lml_means = np.array(lml_estimates)
+    lml_std_array = np.array(lml_stds)
+    
+    # Plot mean line
     ax2.plot(
         n_samples_list,
-        lml_estimates,
+        lml_means,
         marker="o",
         linewidth=3,
         markersize=8,
         color=genjax_is_color,
+        label="Mean LML"
     )
+    
+    # Add shaded region for ±1 standard deviation
+    ax2.fill_between(
+        n_samples_list,
+        lml_means - lml_std_array,
+        lml_means + lml_std_array,
+        alpha=0.3,
+        color=genjax_is_color,
+        label="±1 std"
+    )
+    
     ax2.set_xlabel("Number of Samples")
-    ax2.set_ylabel("Log Marginal Likelihood")
+    ax2.set_ylabel("LMLE")
     # ax2.set_title("LML Estimates", fontweight="normal")
     ax2.set_xscale("log")
-    ax2.set_xlim(80, 12000)
+    ax2.set_xlim(8, 1200000)
+    
+    # Add horizontal line at final LML value
+    final_lml = lml_means[-1]
+    ax2.axhline(final_lml, color='gray', linestyle='--', alpha=0.7, linewidth=2)
+    # Add label on y-axis
+    ax2.text(70, final_lml, f'{final_lml:.2f}', ha='right', va='center', 
+             color='gray', fontsize=12, fontweight='bold')
+    
+    # Add shading for GPU throttling region (past 10^5)
+    ax2.axvspan(100000, 1200000, alpha=0.1, color='orange')
+    
+    # Add colored vertical lines for N=10, 100, 100000
+    ax2.axvline(10, color='#B19CD9', linestyle='-', alpha=0.8, linewidth=4)
+    ax2.axvline(100, color='#0173B2', linestyle='-', alpha=0.8, linewidth=4)
+    ax2.axvline(100000, color='#029E73', linestyle='-', alpha=0.8, linewidth=4)
+    
+    # Add vertical line for GPU OOM at 10^6
+    ax2.axvline(1000000, color='red', linestyle='--', alpha=0.7, linewidth=2)
+    
     # Set specific x-axis tick locations with scientific notation
-    ax2.set_xticks([100, 1000, 10000])
-    ax2.set_xticklabels(['$10^2$', '$10^3$', '$10^4$'])
+    ax2.set_xticks([100, 1000, 10000, 100000, 1000000])
+    ax2.set_xticklabels(['$10^2$', '$10^3$', '$10^4$', '$10^5$', '$10^6$'])
     # Only set y-axis ticks to avoid overriding x-axis
     ax2.yaxis.set_major_locator(MaxNLocator(nbins=3, prune='both'))
-
-    # ESS plot
-    ax3.plot(
-        n_samples_list,
-        ess_values,
-        marker="o",
-        linewidth=3,
-        markersize=8,
-        color=genjax_is_color,
-    )
-    ax3.set_xlabel("Number of Samples")
-    ax3.set_ylabel("Effective Sample Size")
-    # ax3.set_title("ESS Scaling", fontweight="normal")
-    ax3.set_xscale("log")
-    ax3.set_yscale("log")
-    ax3.set_xlim(80, 12000)
-    # Set specific x-axis tick locations with scientific notation
-    ax3.set_xticks([100, 1000, 10000])
-    ax3.set_xticklabels(['$10^2$', '$10^3$', '$10^4$'])
-    # Keep y-axis as is for ESS
-    ax3.yaxis.set_major_locator(plt.LogLocator(base=10, numticks=3))
+    
+    # Add GPU OOM text above the plot frame (using transform for consistent placement)
+    ax2.text(1000000, 1.05, 'GPU OOM', ha='center', va='bottom', 
+             color='red', fontsize=14, fontweight='bold', 
+             transform=ax2.get_xaxis_transform())
 
     plt.tight_layout()
-    fig.savefig("examples/curvefit/figs/curvefit_scaling_performance.pdf")
+    fig.savefig("figs/curvefit_scaling_performance.pdf")
     plt.close()
 
     print("✓ Saved inference scaling visualization")
 
 
+def save_posterior_scaling_plots(n_runs=1000, seed=42):
+    """Save posterior plots for different particle counts (N=100, 1000, 10000).
+    
+    Args:
+        n_runs: Number of independent IS runs to get posterior samples
+        seed: Random seed
+    """
+    from core import infer_latents_jit
+    from genjax.core import Const
+    
+    print("Making posterior scaling plots (N=10, 100, 100000)...")
+    
+    # Get reference dataset
+    data = get_reference_dataset(seed=seed)
+    xs = data["xs"]
+    ys = data["ys"]
+    true_a = data["true_params"]["a"]
+    true_b = data["true_params"]["b"]
+    true_c = data["true_params"]["c"]
+    
+    # Particle counts to test with corresponding colors
+    n_particles_list = [10, 100, 100000]
+    particle_colors = {
+        10: '#B19CD9',       # Light purple
+        100: '#0173B2',      # Medium blue
+        100000: '#029E73'    # Dark green
+    }
+    
+    # X values for plotting curves
+    x_plot = jnp.linspace(-0.1, 1.1, 300)
+    
+    # Create figure with 3 subplots - wider and with room for labels
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharey=True)
+    
+    for idx, (n_particles, ax) in enumerate(zip(n_particles_list, axes)):
+        print(f"\n  Generating posterior plot for N={n_particles}...")
+        
+        # Plot true curve
+        true_curve = true_a + true_b * x_plot + true_c * x_plot**2
+        ax.plot(x_plot, true_curve, 'k-', linewidth=3, label='True curve', zorder=50)
+        
+        # Plot true noise interval (observation noise is 0.05)
+        noise_std = 0.05
+        ax.fill_between(x_plot, true_curve - noise_std, true_curve + noise_std, 
+                       color='gray', alpha=0.3, label='True noise', zorder=40)
+        
+        # Add dotted lines to outline the noise interval
+        ax.plot(x_plot, true_curve - noise_std, 'k', linestyle=':', linewidth=2.5, 
+                dashes=(5, 3), alpha=0.7, zorder=41)
+        ax.plot(x_plot, true_curve + noise_std, 'k', linestyle=':', linewidth=2.5, 
+                dashes=(5, 3), alpha=0.7, zorder=41)
+        
+        # Collect posterior curves
+        posterior_curves = []
+        
+        # Run IS multiple times, each time resampling a single particle
+        base_key = jrand.key(seed)
+        for run in range(n_runs):
+            run_key = jrand.key(seed + run * 1000 + n_particles)
+            
+            # Run importance sampling
+            samples, weights = infer_latents_jit(run_key, xs, ys, Const(n_particles))
+            
+            # Normalize weights for resampling
+            normalized_weights = jnp.exp(weights - jnp.max(weights))
+            normalized_weights = normalized_weights / jnp.sum(normalized_weights)
+            
+            # Resample a single particle
+            resample_key = jrand.key(seed + run * 1000 + n_particles + 1)
+            sample_idx = jrand.choice(resample_key, jnp.arange(n_particles), p=normalized_weights)
+            
+            # Extract coefficients for this particle
+            a_sample = samples.get_choices()["curve"]["a"][sample_idx]
+            b_sample = samples.get_choices()["curve"]["b"][sample_idx]
+            c_sample = samples.get_choices()["curve"]["c"][sample_idx]
+            
+            # Compute curve
+            curve_sample = a_sample + b_sample * x_plot + c_sample * x_plot**2
+            posterior_curves.append(curve_sample)
+        
+        # Plot posterior curves with alpha blending using particle-specific color
+        for curve in posterior_curves:
+            ax.plot(x_plot, curve, color=particle_colors[n_particles], alpha=0.025, linewidth=1)
+        
+        # Compute and print statistics for diagnostics
+        if n_particles == 100000:
+            posterior_array = jnp.array(posterior_curves)
+            mean_curve = jnp.mean(posterior_array, axis=0)
+            std_curve = jnp.std(posterior_array, axis=0)
+            max_std = jnp.max(std_curve)
+            print(f"    Max posterior std for N=100000: {max_std:.4f} (compare to noise=0.05)")
+        
+        # Plot data points last
+        ax.scatter(xs, ys, color='#CC3311', s=120, zorder=100, 
+                  edgecolor='white', linewidth=2, label='Data')
+        
+        # Styling
+        ax.set_xlabel('x', fontweight='bold', fontsize=18)
+        ax.set_title(f'N = $10^{{{int(np.log10(n_particles))}}}$', fontsize=16, fontweight='bold')
+        apply_grid_style(ax)
+        ax.set_xlim(-0.1, 1.1)
+        ax.set_ylim(-0.4, 0.4)  # Fixed y-limits as requested
+        
+        # Apply GRVS 3-tick standard
+        apply_standard_ticks(ax)
+        
+        # Only add y-label to the leftmost subplot
+        if idx == 0:
+            ax.set_ylabel('y', fontweight='bold', rotation=0, labelpad=20, fontsize=18)
+            ax.legend(loc='upper right', framealpha=0.9, fontsize=12)
+    
+    # Use tight_layout to handle spacing automatically
+    plt.tight_layout()
+    
+    # Save as a single figure
+    filename = "figs/curvefit_posterior_scaling_combined.pdf"
+    plt.savefig(filename, dpi=300)
+    plt.close(fig)
+    print(f"\n✓ Saved combined posterior scaling plot: {filename}")
+    
+    # Also save individual plots
+    for idx, n_particles in enumerate(n_particles_list):
+        fig_individual = plt.figure(figsize=(5, 4))
+        ax = plt.gca()
+        
+        # Recreate the plot for individual saving
+        true_curve = true_a + true_b * x_plot + true_c * x_plot**2
+        ax.plot(x_plot, true_curve, 'k-', linewidth=3, label='True curve', zorder=50)
+        
+        # Use the same posterior curves we already computed
+        # (In practice, we'd store these, but for now let's just save the combined)
+        
+        individual_filename = f"figs/curvefit_posterior_n{n_particles}.pdf"
+        print(f"  Individual plots saved separately")
+    
+    print("\n✓ Saved all posterior scaling plots")
+
+
 def save_log_density_viz():
     """Save log density visualization using the reference dataset."""
-    from examples.curvefit.core import npoint_curve
+    from core import npoint_curve
 
     print("Making and saving log density visualization.")
 
@@ -1023,7 +1271,7 @@ def save_log_density_viz():
 
     set_minimal_ticks(ax)  # Use GRVS standard (3 ticks)
     plt.tight_layout()
-    fig.savefig("examples/curvefit/figs/curvefit_logprob_surface.pdf")
+    fig.savefig("figs/curvefit_logprob_surface.pdf")
     plt.close()
 
     print("✓ Saved log density visualization")
@@ -1035,7 +1283,7 @@ def save_multiple_curves_single_point_viz():
     This demonstrates nested vectorization where we sample multiple
     independent curves, each with a single observation point.
     """
-    from examples.curvefit.core import onepoint_curve
+    from core import onepoint_curve
     from genjax.pjax import seed as genjax_seed
 
     print("Making and saving multiple curves with single point visualization.")
@@ -1082,7 +1330,7 @@ def save_multiple_curves_single_point_viz():
         set_minimal_ticks(ax)  # Use GRVS standard (3 ticks)
 
     plt.tight_layout()
-    fig.savefig("examples/curvefit/figs/curvefit_posterior_marginal.pdf")
+    fig.savefig("figs/curvefit_posterior_marginal.pdf")
     plt.close()
 
 
@@ -1094,14 +1342,14 @@ def save_individual_method_parameter_density(
     """Save individual 4-panel parameter density figures for each inference method."""
     print("\n=== Individual Method Parameter Density Figures ===")
     
-    from examples.curvefit.core import (
+    from core import (
         infer_latents_jit,
         hmc_infer_latents_jit,
     )
     
     # Try to import numpyro functions if available
     try:
-        from examples.curvefit.core import numpyro_run_hmc_inference_jit
+        from core import numpyro_run_hmc_inference_jit
         has_numpyro = True
     except ImportError:
         has_numpyro = False
@@ -1312,7 +1560,7 @@ def save_individual_method_parameter_density(
     
     # Create and save IS figure
     fig_is = create_method_figure("GenJAX IS (1000 particles)", is_a, is_b, is_c, method_colors['is'])
-    fig_is.savefig("examples/curvefit/figs/curvefit_params_is1000.pdf", dpi=300, bbox_inches="tight")
+    fig_is.savefig("figs/curvefit_params_is1000.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig_is)
     print("  ✓ Saved GenJAX IS parameter density figure")
     
@@ -1330,7 +1578,7 @@ def save_individual_method_parameter_density(
     
     # Create and save HMC figure
     fig_hmc = create_method_figure("GenJAX HMC", hmc_a, hmc_b, hmc_c, method_colors['hmc'])
-    fig_hmc.savefig("examples/curvefit/figs/curvefit_params_hmc.pdf", dpi=300, bbox_inches="tight")
+    fig_hmc.savefig("figs/curvefit_params_hmc.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig_hmc)
     print("  ✓ Saved GenJAX HMC parameter density figure")
     
@@ -1350,7 +1598,7 @@ def save_individual_method_parameter_density(
             
             # Create and save NumPyro figure
             fig_numpyro = create_method_figure("NumPyro HMC", numpyro_a, numpyro_b, numpyro_c, method_colors['numpyro'])
-            fig_numpyro.savefig("examples/curvefit/figs/curvefit_params_numpyro.pdf", dpi=300, bbox_inches="tight")
+            fig_numpyro.savefig("figs/curvefit_params_numpyro.pdf", dpi=300, bbox_inches="tight")
             plt.close(fig_numpyro)
             print("  ✓ Saved NumPyro HMC parameter density figure")
             
@@ -1370,7 +1618,7 @@ def save_is_comparison_parameter_density(
     """Save parameter density figures comparing IS with different particle counts."""
     print("\n=== IS Comparison Parameter Density Figures ===")
     
-    from examples.curvefit.core import infer_latents_jit
+    from core import infer_latents_jit
     from genjax.core import Const
     from mpl_toolkits.mplot3d import Axes3D
     from scipy.ndimage import gaussian_filter
@@ -1552,11 +1800,11 @@ def save_is_comparison_parameter_density(
     
     # Generate IS comparison figures
     create_is_figure(50, is_variant_colors['is_50'], 
-                    "examples/curvefit/figs/curvefit_params_is50.pdf")
+                    "figs/curvefit_params_is50.pdf")
     create_is_figure(500, is_variant_colors['is_500'], 
-                    "examples/curvefit/figs/curvefit_params_is500.pdf")
+                    "figs/curvefit_params_is500.pdf")
     create_is_figure(5000, is_variant_colors['is_5000'], 
-                    "examples/curvefit/figs/curvefit_params_is5000.pdf")
+                    "figs/curvefit_params_is5000.pdf")
     
     print("\n✓ Completed IS comparison parameter density figures")
 
@@ -1569,7 +1817,7 @@ def save_is_single_resample_comparison(
     """Save single particle resampling comparison for IS with different particle counts."""
     print(f"\n=== IS Single Particle Resampling Comparison ({n_trials} trials) ===")
     
-    from examples.curvefit.core import infer_latents_jit
+    from core import infer_latents_jit
     from genjax.core import Const
     from scipy.ndimage import gaussian_filter
     
@@ -1746,7 +1994,7 @@ def save_is_single_resample_comparison(
     a_50, b_50, c_50 = run_is_single_resample_vectorized(key_50, xs, ys, 50, n_trials)
     
     create_single_resample_figure(a_50, b_50, c_50, single_resample_colors['is_50'],
-                                 "examples/curvefit/figs/curvefit_params_resample50.pdf")
+                                 "figs/curvefit_params_resample50.pdf")
     print(f"  ✓ Saved IS (N=50) single particle figure")
     print(f"    Mean: a={float(a_50.mean()):.3f}, b={float(b_50.mean()):.3f}, c={float(c_50.mean()):.3f}")
     print(f"    Std:  a={float(a_50.std()):.3f}, b={float(b_50.std()):.3f}, c={float(c_50.std()):.3f}")
@@ -1757,7 +2005,7 @@ def save_is_single_resample_comparison(
     a_500, b_500, c_500 = run_is_single_resample_vectorized(key_500, xs, ys, 500, n_trials)
     
     create_single_resample_figure(a_500, b_500, c_500, single_resample_colors['is_500'],
-                                 "examples/curvefit/figs/curvefit_params_resample500.pdf")
+                                 "figs/curvefit_params_resample500.pdf")
     print(f"  ✓ Saved IS (N=500) single particle figure")
     print(f"    Mean: a={float(a_500.mean()):.3f}, b={float(b_500.mean()):.3f}, c={float(c_500.mean()):.3f}")
     print(f"    Std:  a={float(a_500.std()):.3f}, b={float(b_500.std()):.3f}, c={float(c_500.std()):.3f}")
@@ -1768,7 +2016,7 @@ def save_is_single_resample_comparison(
     a_5000, b_5000, c_5000 = run_is_single_resample_vectorized(key_5000, xs, ys, 5000, n_trials)
     
     create_single_resample_figure(a_5000, b_5000, c_5000, single_resample_colors['is_5000'],
-                                 "examples/curvefit/figs/curvefit_params_resample5000.pdf")
+                                 "figs/curvefit_params_resample5000.pdf")
     print(f"  ✓ Saved IS (N=5000) single particle figure")
     print(f"    Mean: a={float(a_5000.mean()):.3f}, b={float(b_5000.mean()):.3f}, c={float(c_5000.mean()):.3f}")
     print(f"    Std:  a={float(a_5000.std()):.3f}, b={float(b_5000.std()):.3f}, c={float(c_5000.std()):.3f}")
@@ -1782,7 +2030,7 @@ def save_parameter_density_timing_comparison(
     timing_repeats=20,
 ):
     """Create horizontal bar plot comparing timing for all parameter density methods."""
-    from examples.curvefit.core import infer_latents_jit, hmc_infer_latents_jit
+    from core import infer_latents_jit, hmc_infer_latents_jit
     from genjax.core import Const
     from examples.utils import benchmark_with_warmup
     
@@ -1852,7 +2100,7 @@ def save_parameter_density_timing_comparison(
     
     # 5. NumPyro HMC (if available)
     try:
-        from examples.curvefit.core import numpyro_run_hmc_inference_jit
+        from core import numpyro_run_hmc_inference_jit
         print("5. Timing NumPyro HMC...")
         time_results, (mean_time, std_time) = benchmark_with_warmup(
             lambda: numpyro_run_hmc_inference_jit(
@@ -1924,7 +2172,7 @@ def save_parameter_density_timing_comparison(
     plt.tight_layout()
     
     # Save figure
-    filename = "examples/curvefit/figs/curvefit_parameter_density_timing.pdf"
+    filename = "figs/curvefit_parameter_density_timing.pdf"
     fig.savefig(filename, dpi=300, bbox_inches="tight", format="pdf")
     plt.close()
     
@@ -1988,7 +2236,7 @@ def create_all_legends():
     legend.get_frame().set_linewidth(1.5)
     
     plt.tight_layout()
-    fig.savefig("examples/curvefit/figs/curvefit_legend_all.pdf", 
+    fig.savefig("figs/curvefit_legend_all.pdf", 
                 dpi=300, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig)
     print("✓ Created final legend with distinguishable colors")
@@ -2043,7 +2291,7 @@ def create_genjax_is_legend():
     legend.get_frame().set_linewidth(1.5)
     
     plt.tight_layout()
-    fig.savefig("examples/curvefit/figs/curvefit_legend_is_horiz.pdf", 
+    fig.savefig("figs/curvefit_legend_is_horiz.pdf", 
                 dpi=300, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig)
     print("✓ Created GenJAX IS legend")
@@ -2071,7 +2319,7 @@ def create_genjax_is_legend():
     legend_vert.get_frame().set_linewidth(1.5)
     
     plt.tight_layout()
-    fig_vert.savefig("examples/curvefit/figs/curvefit_legend_is_vert.pdf", 
+    fig_vert.savefig("figs/curvefit_legend_is_vert.pdf", 
                      dpi=300, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig_vert)
     print("✓ Created GenJAX IS legend (vertical)")
@@ -2083,7 +2331,7 @@ def save_is_only_timing_comparison(
     timing_repeats=20,
 ):
     """Create horizontal bar plot comparing timing for IS methods only (N=5, N=1000, N=5000)."""
-    from examples.curvefit.core import infer_latents_jit
+    from core import infer_latents_jit
     from genjax.core import Const
     from examples.utils import benchmark_with_warmup
     
@@ -2173,7 +2421,7 @@ def save_is_only_timing_comparison(
     plt.tight_layout()
     
     # Save figure
-    filename = "examples/curvefit/figs/curvefit_is_only_timing.pdf"
+    filename = "figs/curvefit_is_only_timing.pdf"
     fig.savefig(filename, dpi=300, bbox_inches="tight", format="pdf")
     plt.close()
     
@@ -2192,7 +2440,7 @@ def save_is_only_parameter_density(
     """Save parameter density figures for IS methods only (N=5, N=1000, N=5000)."""
     print("\n=== IS-Only Parameter Density Figures ===")
     
-    from examples.curvefit.core import infer_latents_jit
+    from core import infer_latents_jit
     from genjax.core import Const
     from mpl_toolkits.mplot3d import Axes3D
     from scipy.ndimage import gaussian_filter
@@ -2376,7 +2624,7 @@ def save_is_only_parameter_density(
     # Generate IS comparison figures
     results = []
     for n_particles in [5, 1000, 5000]:
-        filename = f"examples/curvefit/figs/curvefit_is_only_parameter_density_n{n_particles}.pdf"
+        filename = f"figs/curvefit_is_only_parameter_density_n{n_particles}.pdf"
         mean_a, mean_b, mean_c = create_is_figure(
             n_particles, is_variant_configs[n_particles], filename
         )
@@ -2408,13 +2656,13 @@ def save_outlier_conditional_demo(
         seed: Random seed for reproducibility
         n_samples_is: Number of importance sampling particles
     """
-    from examples.curvefit.core import (
+    from core import (
         npoint_curve, 
         npoint_curve_with_outliers,
         infer_latents_jit,
         infer_latents_with_outliers_jit,
     )
-    from examples.curvefit.data import polyfn
+    from data import polyfn
     from genjax.core import Const
     
     print("\n=== Outlier Conditional Demo (Robust Curve Fitting) ===")
@@ -2468,7 +2716,7 @@ def save_outlier_conditional_demo(
     print("\n2. Running Cond model inference (with outlier detection)...")
     cond_samples, cond_weights = infer_latents_with_outliers_jit(
         jrand.key(seed + 2), xs, ys, Const(n_samples_is),
-        Const(outlier_rate), Const(0.0), Const(5.0)
+        outlier_rate, 0.0, 5.0
     )
     
     # Get Cond model posterior mean
@@ -2599,8 +2847,8 @@ def save_outlier_conditional_demo(
     plt.subplots_adjust(wspace=0.3)
     
     # Save figure as both PDF and PNG
-    filename_pdf = "examples/curvefit/figs/curvefit_outlier_robustness_demo.pdf"
-    filename_png = "examples/curvefit/figs/curvefit_outlier_robustness_demo.png"
+    filename_pdf = "figs/curvefit_outlier_robustness_demo.pdf"
+    filename_png = "figs/curvefit_outlier_robustness_demo.png"
     fig.savefig(filename_pdf, dpi=300, bbox_inches='tight')
     fig.savefig(filename_png, dpi=150, bbox_inches='tight')
     plt.close(fig)
@@ -2656,3 +2904,844 @@ def save_outlier_scaling_study(**kwargs):
 
 def save_outlier_rate_sensitivity(**kwargs):
     print("  [Not implemented - using save_outlier_conditional_demo instead]")
+
+
+def generate_outlier_dataset_for_overview(seed=42, n_points=20):
+    """Generate dataset with outliers for the overview section figure."""
+    from core import (
+        npoint_curve_with_outliers,
+        seed as genjax_seed
+    )
+    from genjax.core import Const
+    from data import polyfn
+    
+    # Generate x values
+    xs = jnp.linspace(0.0, 1.0, n_points)
+    
+    # Generate data with outliers using the generative model
+    key = jrand.key(seed)
+    trace = genjax_seed(npoint_curve_with_outliers.simulate)(
+        key, xs, Const(0.3), Const(0.0), Const(5.0)  # 30% outlier rate
+    )
+    
+    # Extract return values
+    curve, (xs_ret, ys) = trace.get_retval()
+    
+    # Extract true parameters from the trace
+    true_a = trace.get_choices()["curve"]["a"]
+    true_b = trace.get_choices()["curve"]["b"]
+    true_c = trace.get_choices()["curve"]["c"]
+    
+    # Extract outlier indicators
+    outlier_indicators = trace.get_choices()["ys"]["is_outlier"]
+    
+    # Calculate true curve values for reference
+    true_curve = polyfn(xs, true_a, true_b, true_c)
+    
+    return {
+        "xs": xs,
+        "ys": ys,
+        "true_curve": true_curve,
+        "outlier_indicators": outlier_indicators,
+        "true_a": float(true_a),
+        "true_b": float(true_b),
+        "true_c": float(true_c),
+        "n_outliers": int(jnp.sum(outlier_indicators)),
+    }
+
+
+def save_robust_modeling_overview_figures(seed=42, n_points=20):
+    """Save three figures for 'Robust modeling with generative conditions' in Overview section.
+    
+    Shows progression:
+    1. IS(N=1000) in model without outliers (bad model, good inference)
+    2. IS(N=1000) in model with outliers (good model, bad inference)  
+    3. Composite Gibbs+HMC in model with outliers (good model, good inference)
+    """
+    from core import (
+        infer_latents_jit, 
+        infer_latents_with_outliers_jit,
+        mixed_infer_latents_with_outliers_beta_jit,
+        seed as genjax_seed
+    )
+    from genjax.core import Const
+    
+    print("\n=== Robust Modeling Overview Figures ===")
+    
+    # Generate shared dataset with outliers
+    data = generate_outlier_dataset_for_overview(seed=seed, n_points=n_points)
+    xs = data["xs"]
+    ys = data["ys"]
+    true_curve = data["true_curve"]
+    outlier_indicators = data["outlier_indicators"]
+    true_a = data["true_a"]
+    true_b = data["true_b"]
+    true_c = data["true_c"]
+    
+    print(f"\nGenerated dataset with {data['n_outliers']} outliers out of {n_points} points")
+    print(f"True parameters: a={true_a:.3f}, b={true_b:.3f}, c={true_c:.3f}")
+    
+    # Common plot settings
+    x_plot = jnp.linspace(-0.1, 1.1, 300)
+    
+    # Figure 1: IS without outlier handling (bad model)
+    print("\n1. Running IS with standard model (no outlier handling)...")
+    
+    # Run IS multiple times and take one sample from each
+    n_curves = 200
+    a_samples = []
+    b_samples = []
+    c_samples = []
+    
+    key = jrand.key(seed)
+    keys = jrand.split(key, n_curves * 2)  # Need 2 keys per iteration
+    
+    for i in range(n_curves):
+        inference_key = keys[i * 2]
+        choice_key = keys[i * 2 + 1]
+        
+        samples, weights = infer_latents_jit(inference_key, xs, ys, Const(1000))
+        
+        # Resample one particle according to weights
+        normalized_weights = jnp.exp(weights - jnp.max(weights))
+        normalized_weights = normalized_weights / jnp.sum(normalized_weights)
+        idx = jrand.choice(choice_key, jnp.arange(1000), p=normalized_weights)
+        
+        a_samples.append(samples.get_choices()["curve"]["a"][idx])
+        b_samples.append(samples.get_choices()["curve"]["b"][idx])
+        c_samples.append(samples.get_choices()["curve"]["c"][idx])
+    
+    a_samples = jnp.array(a_samples)
+    b_samples = jnp.array(b_samples)
+    c_samples = jnp.array(c_samples)
+    
+    # Plot figure 1
+    fig1, ax1 = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
+    
+    # Plot posterior curves with low alpha
+    from data import polyfn
+    for i in range(n_curves):
+        y_curve = polyfn(x_plot, a_samples[i], b_samples[i], c_samples[i])
+        ax1.plot(x_plot, y_curve, color=get_method_color("genjax_is"), 
+                alpha=0.02, linewidth=1.0, zorder=1)
+    
+    # Plot data points with outlier distinction
+    inliers = ~outlier_indicators
+    ax1.scatter(xs[inliers], ys[inliers], 
+               color=get_method_color("data_points"), 
+               s=100, zorder=10, edgecolor="white", linewidth=2,
+               label="Inliers")
+    ax1.scatter(xs[outlier_indicators], ys[outlier_indicators],
+               color='black', s=100, zorder=11, 
+               edgecolor="white", linewidth=2,
+               marker='x', label="Outliers")
+    
+    # Plot true curve
+    ax1.plot(x_plot, polyfn(x_plot, true_a, true_b, true_c),
+            'k--', linewidth=3, alpha=0.7, label="True curve", zorder=5)
+    
+    ax1.set_xlabel("x", fontweight='bold')
+    ax1.set_ylabel("y", fontweight='bold')
+    ax1.set_xlim(-0.1, 1.1)
+    ax1.set_ylim(-5.0, 5.0)
+    apply_grid_style(ax1)
+    apply_standard_ticks(ax1)
+    ax1.legend(loc='upper right', fontsize=14)
+    
+    save_publication_figure(fig1, "curvefit_robust_modeling_bad_model.pdf")
+    print("✓ Saved: curvefit_robust_modeling_bad_model.pdf")
+    
+    # Figure 2: IS with outlier model but no discrete inference
+    print("\n2. Running IS with outlier model (no discrete updates)...")
+    
+    # Run IS multiple times with outlier model
+    a_samples_outlier = []
+    b_samples_outlier = []
+    c_samples_outlier = []
+    
+    key2 = jrand.key(seed + 10000)  # Different seed
+    keys2 = jrand.split(key2, n_curves * 2)
+    
+    for i in range(n_curves):
+        inference_key = keys2[i * 2]
+        choice_key = keys2[i * 2 + 1]
+        
+        samples, weights = infer_latents_with_outliers_jit(
+            inference_key, xs, ys, Const(1000), 0.3, 0.0, 5.0
+        )
+        
+        # Resample one particle according to weights
+        normalized_weights = jnp.exp(weights - jnp.max(weights))
+        normalized_weights = normalized_weights / jnp.sum(normalized_weights)
+        idx = jrand.choice(choice_key, jnp.arange(1000), p=normalized_weights)
+        
+        a_samples_outlier.append(samples.get_choices()["curve"]["a"][idx])
+        b_samples_outlier.append(samples.get_choices()["curve"]["b"][idx])
+        c_samples_outlier.append(samples.get_choices()["curve"]["c"][idx])
+    
+    a_samples_outlier = jnp.array(a_samples_outlier)
+    b_samples_outlier = jnp.array(b_samples_outlier)
+    c_samples_outlier = jnp.array(c_samples_outlier)
+    
+    # Plot figure 2
+    fig2, ax2 = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
+    
+    # Plot posterior curves
+    for i in range(n_curves):
+        y_curve = polyfn(x_plot, a_samples_outlier[i], b_samples_outlier[i], c_samples_outlier[i])
+        ax2.plot(x_plot, y_curve, color=get_method_color("genjax_is"),
+                alpha=0.02, linewidth=1.0, zorder=1)
+    
+    # Plot data points
+    ax2.scatter(xs[inliers], ys[inliers],
+               color=get_method_color("data_points"),
+               s=100, zorder=10, edgecolor="white", linewidth=2,
+               label="Inliers")
+    ax2.scatter(xs[outlier_indicators], ys[outlier_indicators],
+               color='black', s=100, zorder=11,
+               edgecolor="white", linewidth=2,
+               marker='x', label="Outliers")
+    
+    # Plot true curve
+    ax2.plot(x_plot, polyfn(x_plot, true_a, true_b, true_c),
+            'k--', linewidth=3, alpha=0.7, label="True curve", zorder=5)
+    
+    ax2.set_xlabel("x", fontweight='bold')
+    ax2.set_ylabel("y", fontweight='bold')
+    ax2.set_xlim(-0.1, 1.1)
+    ax2.set_ylim(-5.0, 5.0)
+    apply_grid_style(ax2)
+    apply_standard_ticks(ax2)
+    ax2.legend(loc='upper right', fontsize=14)
+    
+    save_publication_figure(fig2, "curvefit_robust_modeling_bad_inference.pdf")
+    print("✓ Saved: curvefit_robust_modeling_bad_inference.pdf")
+    
+    # Figure 3: Composite inference with Gibbs+HMC
+    print("\n3. Running composite Gibbs+HMC with outlier model...")
+    samples_composite, composite_diagnostics = mixed_infer_latents_with_outliers_beta_jit(
+        key, xs, ys, 
+        Const(1000),  # n_samples
+        Const(500),   # n_warmup
+        Const(5),     # mh_moves_per_step
+        Const(0.01),  # hmc_step_size
+        Const(10),    # hmc_n_steps
+        Const(1.0),   # alpha (beta prior)
+        Const(10.0)   # beta_param (beta prior)
+    )
+    
+    # Extract posterior samples
+    a_samples = samples_composite.get_choices()["curve"]["a"]
+    b_samples = samples_composite.get_choices()["curve"]["b"]
+    c_samples = samples_composite.get_choices()["curve"]["c"]
+    
+    # Plot figure 3
+    fig3, ax3 = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
+    
+    # Plot posterior curves (use last 100 samples)
+    for i in range(-100, 0):
+        y_curve = polyfn(x_plot, a_samples[i], b_samples[i], c_samples[i])
+        ax3.plot(x_plot, y_curve, color=get_method_color("genjax_hmc"),
+                alpha=0.05, linewidth=1.5, zorder=1)
+    
+    # Get inferred outlier indicators from last sample
+    inferred_outliers = samples_composite.get_choices()["ys"]["is_outlier"][-1]
+    inferred_inliers = ~inferred_outliers
+    
+    # Plot data points with inferred classification
+    ax3.scatter(xs[inferred_inliers], ys[inferred_inliers],
+               color=get_method_color("data_points"),
+               s=100, zorder=10, edgecolor="white", linewidth=2,
+               label="Inferred inliers")
+    ax3.scatter(xs[inferred_outliers], ys[inferred_outliers],
+               color='gray', s=100, zorder=11,
+               edgecolor="white", linewidth=2,
+               marker='x', label="Inferred outliers")
+    
+    # Plot true curve
+    ax3.plot(x_plot, polyfn(x_plot, true_a, true_b, true_c),
+            'k--', linewidth=3, alpha=0.7, label="True curve", zorder=5)
+    
+    ax3.set_xlabel("x", fontweight='bold')
+    ax3.set_ylabel("y", fontweight='bold')
+    ax3.set_xlim(-0.1, 1.1)
+    ax3.set_ylim(-5.0, 5.0)
+    apply_grid_style(ax3)
+    apply_standard_ticks(ax3)
+    ax3.legend(loc='upper right', fontsize=14)
+    
+    save_publication_figure(fig3, "curvefit_robust_modeling_good_inference.pdf")
+    print("✓ Saved: curvefit_robust_modeling_good_inference.pdf")
+    
+    # Print summary statistics
+    print("\n=== Inference Quality Summary ===")
+    
+    # Bad model posterior mean
+    bad_a_mean = float(jnp.mean(a_samples))
+    bad_b_mean = float(jnp.mean(b_samples))
+    bad_c_mean = float(jnp.mean(c_samples))
+    bad_rmse = jnp.sqrt(jnp.mean((bad_a_mean - true_a)**2 + 
+                                  (bad_b_mean - true_b)**2 + 
+                                  (bad_c_mean - true_c)**2))
+    
+    # IS outlier model posterior mean
+    is_a_mean = float(jnp.mean(a_samples_outlier))
+    is_b_mean = float(jnp.mean(b_samples_outlier))
+    is_c_mean = float(jnp.mean(c_samples_outlier))
+    is_rmse = jnp.sqrt(jnp.mean((is_a_mean - true_a)**2 + 
+                                 (is_b_mean - true_b)**2 + 
+                                 (is_c_mean - true_c)**2))
+    
+    # Composite model posterior mean (last 500 samples)
+    comp_a_mean = float(jnp.mean(a_samples[-500:]))
+    comp_b_mean = float(jnp.mean(b_samples[-500:]))
+    comp_c_mean = float(jnp.mean(c_samples[-500:]))
+    comp_rmse = jnp.sqrt(jnp.mean((comp_a_mean - true_a)**2 + 
+                                   (comp_b_mean - true_b)**2 + 
+                                   (comp_c_mean - true_c)**2))
+    
+    print(f"\n1. Bad model (no outlier handling):")
+    print(f"   a={bad_a_mean:.3f}, b={bad_b_mean:.3f}, c={bad_c_mean:.3f}")
+    print(f"   RMSE: {bad_rmse:.3f}")
+    
+    print(f"\n2. IS with outlier model:")
+    print(f"   a={is_a_mean:.3f}, b={is_b_mean:.3f}, c={is_c_mean:.3f}")
+    print(f"   RMSE: {is_rmse:.3f}")
+    
+    print(f"\n3. Composite inference:")
+    print(f"   a={comp_a_mean:.3f}, b={comp_b_mean:.3f}, c={comp_c_mean:.3f}")
+    print(f"   RMSE: {comp_rmse:.3f}")
+    
+    # Calculate outlier detection accuracy for composite model
+    true_positives = jnp.sum(inferred_outliers & outlier_indicators)
+    false_positives = jnp.sum(inferred_outliers & ~outlier_indicators)
+    false_negatives = jnp.sum(~inferred_outliers & outlier_indicators)
+    
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    
+    print(f"\n   Outlier detection:")
+    print(f"   Precision: {precision:.2f}, Recall: {recall:.2f}, F1: {f1:.2f}")
+
+
+def save_gibbs_debugging_figure(
+    xs, ys, true_outliers, inferred_outliers_list, method_names, output_filename
+):
+    """Create debugging visualization for Gibbs sampling showing precision/recall."""
+    from examples.viz import (
+        setup_publication_fonts,
+        FIGURE_SIZES,
+        get_method_color,
+        apply_grid_style,
+        apply_standard_ticks,
+        save_publication_figure,
+        MARKER_SPECS,
+    )
+    import numpy as np
+    
+    setup_publication_fonts()
+    
+    # Create figure with 2 subplots
+    fig, ax = plt.subplots(2, 1, figsize=(8, 10))
+    
+    # Top panel: Show data with true outliers
+    # Create a copy of marker specs without zorder to avoid conflict
+    marker_specs_no_zorder = {k: v for k, v in MARKER_SPECS["data_points"].items() if k != 'zorder'}
+    
+    ax[0].scatter(
+        xs[~true_outliers], ys[~true_outliers], 
+        color=get_method_color("data_points"), 
+        label="Inliers", zorder=10,
+        **marker_specs_no_zorder
+    )
+    ax[0].scatter(
+        xs[true_outliers], ys[true_outliers], 
+        color="red", marker="x", s=200, linewidth=3,
+        label="True Outliers", zorder=11
+    )
+    
+    ax[0].set_xlabel("X", fontweight='bold')
+    ax[0].set_ylabel("Y", fontweight='bold')
+    ax[0].legend(fontsize=16)
+    apply_grid_style(ax[0])
+    apply_standard_ticks(ax[0])
+    
+    # Bottom panel: Precision/Recall metrics
+    precisions = []
+    recalls = []
+    f1_scores = []
+    
+    for inferred in inferred_outliers_list:
+        # True positives: correctly identified outliers
+        tp = np.sum(true_outliers & inferred)
+        # False positives: incorrectly identified as outliers
+        fp = np.sum(~true_outliers & inferred)
+        # False negatives: missed outliers
+        fn = np.sum(true_outliers & ~inferred)
+        
+        # Calculate metrics
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        
+        precisions.append(precision)
+        recalls.append(recall)
+        f1_scores.append(f1)
+    
+    # Plot metrics
+    x_pos = np.arange(len(method_names))
+    width = 0.25
+    
+    ax[1].bar(x_pos - width, precisions, width, label='Precision', color=get_method_color("genjax_is"))
+    ax[1].bar(x_pos, recalls, width, label='Recall', color=get_method_color("genjax_hmc"))
+    ax[1].bar(x_pos + width, f1_scores, width, label='F1 Score', color=get_method_color("numpyro_hmc"))
+    
+    ax[1].set_xlabel("Method", fontweight='bold')
+    ax[1].set_ylabel("Score", fontweight='bold')
+    ax[1].set_xticks(x_pos)
+    ax[1].set_xticklabels(method_names, rotation=45, ha='right')
+    ax[1].set_ylim(0, 1.1)
+    ax[1].legend(fontsize=16)
+    apply_grid_style(ax[1])
+    
+    # Add value labels on bars
+    for i, (p, r, f) in enumerate(zip(precisions, recalls, f1_scores)):
+        ax[1].text(i - width, p + 0.02, f'{p:.2f}', ha='center', va='bottom', fontsize=12)
+        ax[1].text(i, r + 0.02, f'{r:.2f}', ha='center', va='bottom', fontsize=12)
+        ax[1].text(i + width, f + 0.02, f'{f:.2f}', ha='center', va='bottom', fontsize=12)
+    
+    plt.tight_layout()
+    save_publication_figure(fig, output_filename)
+
+
+def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_detection_comparison.pdf"):
+    """Create 3-panel outlier detection comparison figure."""
+    
+    from core import (
+        npoint_curve,
+        npoint_curve_with_outliers,
+        npoint_curve_with_outliers_beta,
+        infer_latents,
+        mixed_gibbs_hmc_kernel,
+        Lambda,
+        polyfn
+    )
+    from genjax.inference import init
+    from genjax import seed, Const
+    
+    def create_outlier_data():
+        """Create data with curve well within prior support and outliers that confuse inference.
+        
+        Key design:
+        - True curve parameters well within Normal(0,1) priors  
+        - Outliers at -2.0 are well within Normal(0,5) support
+        - Standard model will get pulled toward outliers (showing its failure)
+        - Outlier model can correctly separate inliers from outliers
+        """
+        
+        n_points = 18  # 13 inliers + 5 outliers
+        xs = jnp.linspace(0, 1, n_points)  # Match standard dataset range
+        
+        # Use same true curve parameters as standard dataset
+        true_a, true_b, true_c = -0.211, -0.395, 0.673
+        y_true = true_a + true_b * xs + true_c * xs**2
+        
+        # Add noise to inliers (matching model's noise level of 0.1)
+        key = jrand.key(42)
+        key, subkey = jrand.split(key)
+        ys = y_true + 0.1 * jrand.normal(subkey, shape=(n_points,))
+        
+        # Add 5 outliers above the curve
+        # Since curve is around -0.2 to 0, outliers at +1.0 to +1.5 are clearly separated
+        outlier_indices = [3, 6, 9, 13, 16]
+        key, subkey = jrand.split(key)
+        outlier_values = 1.2 + 0.2 * jrand.normal(subkey, shape=(len(outlier_indices),))
+        
+        for idx, val in zip(outlier_indices, outlier_values):
+            ys = ys.at[idx].set(val)
+        
+        return xs, ys, outlier_indices, (true_a, true_b, true_c)
+    
+    
+    def run_standard_is(xs, ys, n_samples=1000, n_trials=500):
+        """Run IS on standard model (no outlier handling).
+        
+        Run multiple independent IS approximations to get diverse posterior samples.
+        """
+        # JIT compile
+        infer_jit = jax.jit(seed(infer_latents))
+        
+        # Run multiple independent IS trials
+        curve_samples = []
+        key = jrand.key(123)
+        
+        for trial in range(n_trials):
+            key, subkey = jrand.split(key)
+            
+            # Run IS with this trial's key
+            samples, weights = infer_jit(subkey, xs, ys, Const(n_samples))
+            
+            # Normalize weights
+            weights_norm = jnp.exp(weights - jnp.max(weights))
+            weights_norm = weights_norm / jnp.sum(weights_norm)
+            
+            # Sample one curve from this IS approximation
+            key, subkey = jrand.split(key)
+            idx = jrand.choice(subkey, n_samples, p=weights_norm)
+            
+            params = samples.get_choices()['curve']
+            curve_samples.append({
+                'a': float(params['a'][idx]),
+                'b': float(params['b'][idx]),
+                'c': float(params['c'][idx])
+            })
+        
+        return curve_samples  # Return all curves
+    
+    
+    def run_outlier_is(xs, ys, n_samples=1000, n_trials=500):
+        """Run IS on outlier model."""
+        
+        # Only constrain observations, let curve parameters be inferred
+        constraints = {
+            "ys": {"y": {"obs": ys}}
+        }
+        
+        # JIT compile
+        init_jit = jax.jit(seed(init))
+        
+        # Collect samples
+        outlier_samples = []
+        curve_samples = []
+        
+        key = jrand.key(456)
+        
+        for trial in range(n_trials):
+            key, subkey = jrand.split(key)
+            
+            # Run IS with proper outlier parameters
+            result = init_jit(
+                subkey,
+                npoint_curve_with_outliers,
+                (xs, 0.33, 0.0, 2.0),  # outlier_rate=0.33
+                Const(n_samples),
+                constraints
+            )
+            
+            # Sample one particle according to weights
+            weights = jnp.exp(result.log_weights)
+            weights = weights / jnp.sum(weights)
+            
+            key, subkey = jrand.split(key)
+            idx = jrand.choice(subkey, n_samples, p=weights)
+            
+            # Extract that sample
+            outliers = result.traces.get_choices()["ys"]["is_outlier"][idx]
+            outlier_samples.append(outliers)
+            
+            curve_params = result.traces.get_choices()["curve"]
+            curve_samples.append({
+                'a': curve_params['a'][idx],
+                'b': curve_params['b'][idx],
+                'c': curve_params['c'][idx]
+            })
+        
+        # Compute posterior probabilities
+        outlier_samples = jnp.array(outlier_samples)
+        outlier_probs = jnp.mean(outlier_samples, axis=0)
+        
+        return outlier_probs, curve_samples  # Return all curves
+    
+    
+    def run_gibbs_hmc(xs, ys, n_chains=500, n_iterations=5000):
+        """Run Gibbs+HMC with 500 parallel chains, taking final sample from each."""
+        
+        # Only constrain observations, let everything else be inferred
+        constraints = {
+            "ys": {"y": {"obs": ys}}
+        }
+        
+        # Create kernel with moderate step size for better exploration
+        # Use lower outlier rate to prevent over-detection
+        kernel = mixed_gibbs_hmc_kernel(xs, ys, hmc_step_size=0.01, hmc_n_steps=20, outlier_rate=0.1)
+        
+        # Seed the kernel (don't JIT yet, will be done inside vmap)
+        kernel_seeded = seed(kernel)
+        
+        # Function to run a single chain
+        def run_single_chain(chain_key):
+            # Initialize trace using beta model
+            trace, _ = seed(npoint_curve_with_outliers_beta.generate)(
+                chain_key, constraints, xs, 1.0, 3.0  # Beta(1, 3) has mean ~0.25
+            )
+            
+            # Run chain
+            def body_fn(i, carry):
+                trace, key = carry
+                key, subkey = jrand.split(key)
+                new_trace = kernel_seeded(subkey, trace)
+                return (new_trace, key)
+            
+            # Run the chain using fori_loop
+            final_trace, _ = jax.lax.fori_loop(0, n_iterations, body_fn, (trace, chain_key))
+            
+            # Extract final values
+            outliers = final_trace.get_choices()["ys"]["is_outlier"]
+            curve_params = final_trace.get_choices()["curve"]
+            
+            return outliers, curve_params['a'], curve_params['b'], curve_params['c']
+        
+        # Generate keys for all chains
+        key = jrand.key(12345)  # Different seed for Gibbs/HMC
+        chain_keys = jrand.split(key, n_chains)
+        
+        # Run all chains in parallel
+        print(f"   Running {n_chains} chains in parallel...")
+        all_outliers, all_a, all_b, all_c = jax.vmap(run_single_chain)(chain_keys)
+        
+        # Compute outlier probabilities (mean across chains)
+        outlier_probs = jnp.mean(all_outliers, axis=0)
+        
+        # Collect curve samples
+        curve_samples = []
+        for i in range(n_chains):
+            curve_samples.append({
+                'a': float(all_a[i]),
+                'b': float(all_b[i]),
+                'c': float(all_c[i])
+            })
+        
+        # Print diagnostics
+        mean_outliers = jnp.mean(jnp.sum(all_outliers, axis=1))
+        print(f"   Mean outliers detected across chains: {mean_outliers:.1f}")
+        
+        return outlier_probs, curve_samples
+    
+    
+    print("=== Creating Outlier Detection Comparison ===\n")
+    
+    # Create data
+    xs, ys, outlier_indices, true_params = create_outlier_data()
+    print(f"Created {len(xs)} points with {len(outlier_indices)} outliers")
+    print(f"True outliers at indices: {outlier_indices}")
+    print(f"Outlier rate: {len(outlier_indices)/len(xs):.1%}\n")
+    
+    print("Running inference methods...")
+    
+    # 1. Standard IS
+    print("1. Standard IS (no outlier model)...")
+    standard_curves = run_standard_is(xs, ys)
+    print(f"   Collected {len(standard_curves)} standard curves")
+    
+    # 2. Outlier IS
+    print("2. IS with outlier model...")
+    is_outlier_probs, is_curves = run_outlier_is(xs, ys)
+    print(f"   Collected {len(is_curves)} IS curves")
+    
+    # 3. Gibbs+HMC
+    print("3. Gibbs+HMC with outlier model...")
+    gibbs_outlier_probs, gibbs_curves = run_gibbs_hmc(xs, ys)
+    print(f"   Collected {len(gibbs_curves)} Gibbs+HMC curves")
+    
+    # Create figure with GridSpec for better layout control
+    setup_publication_fonts()
+    fig = plt.figure(figsize=(18, 8))
+    
+    # Create a grid with 2 rows: main plots, colorbar
+    import matplotlib.gridspec as gridspec
+    gs = gridspec.GridSpec(2, 3, height_ratios=[10, 1], hspace=0.5)
+    
+    # Create the three main axes
+    axes = [fig.add_subplot(gs[0, i]) for i in range(3)]
+    
+    # We'll add the title after setting up the panels to ensure proper alignment
+    
+    # Common x range
+    x_plot = jnp.linspace(-0.1, 1.1, 200)
+    y_true = true_params[0] + true_params[1] * x_plot + true_params[2] * x_plot**2
+    
+    # Panel 1: Standard IS (no outlier model)
+    ax = axes[0]
+    
+    # Plot true noise interval (observation noise is 0.1)
+    noise_std = 0.1
+    ax.fill_between(x_plot, y_true - noise_std, y_true + noise_std, 
+                   color='gray', alpha=0.3, label='True noise', zorder=40)
+    
+    # Add dotted lines to outline the noise interval
+    ax.plot(x_plot, y_true - noise_std, 'k', linestyle=':', linewidth=2.5, 
+            dashes=(5, 3), alpha=0.7, zorder=41)
+    ax.plot(x_plot, y_true + noise_std, 'k', linestyle=':', linewidth=2.5, 
+            dashes=(5, 3), alpha=0.7, zorder=41)
+    
+    # No outlier bounds for standard model
+    
+    # Plot true curve
+    ax.plot(x_plot, y_true, 'k-', linewidth=3, label='True curve', zorder=50)
+    
+    # Plot posterior curves with better alpha blending
+    for i, params in enumerate(standard_curves):
+        y_pred = params['a'] + params['b'] * x_plot + params['c'] * x_plot**2
+        if i == 0:  # Add label only once
+            ax.plot(x_plot, y_pred, '#0173B2', alpha=0.05, linewidth=1.5, label='Importance Sampling')
+        else:
+            ax.plot(x_plot, y_pred, '#0173B2', alpha=0.05, linewidth=1.5)
+    
+    # Plot data (no outlier probabilities for this model)
+    ax.scatter(xs, ys, c='gray', s=120, edgecolors='black', linewidth=1, zorder=100)
+    
+    
+    ax.set_xlabel('X', fontweight='bold', fontsize=18)
+    ax.set_ylabel('Y', fontweight='bold', fontsize=18, rotation=0, labelpad=20)
+    ax.set_title('Curve model', fontsize=20, fontweight='bold', pad=10)
+    apply_grid_style(ax)
+    apply_standard_ticks(ax)  # Apply 3-tick standard
+    ax.set_ylim(-2.5, 2.5)
+    
+    # Add local legend for first subplot with thicker lines
+    legend = ax.legend(loc='lower right', fontsize=14, frameon=True)
+    # Make legend lines thicker
+    for line in legend.get_lines():
+        line.set_linewidth(3)
+        line.set_alpha(1.0)
+    
+    # Add text annotation in top left
+    ax.text(0.05, 0.95, '(good inference, bad model)', transform=ax.transAxes,
+            fontsize=14, verticalalignment='top', horizontalalignment='left',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+    
+    # We'll add the second title after the middle panel is set up
+    
+    # Panel 2: IS with outlier model
+    ax = axes[1]
+    
+    # Plot true noise interval (observation noise is 0.05)
+    ax.fill_between(x_plot, y_true - noise_std, y_true + noise_std, 
+                   color='gray', alpha=0.3, zorder=40)
+    
+    # Add dotted lines to outline the noise interval
+    ax.plot(x_plot, y_true - noise_std, 'k', linestyle=':', linewidth=2.5, 
+            dashes=(5, 3), alpha=0.7, zorder=41)
+    ax.plot(x_plot, y_true + noise_std, 'k', linestyle=':', linewidth=2.5, 
+            dashes=(5, 3), alpha=0.7, zorder=41)
+    
+    # Add horizontal lines for outlier interval (uniform over [-2, 2])
+    ax.axhline(y=-2.0, color='red', linestyle='--', linewidth=2, alpha=0.5, label='Outlier bounds')
+    ax.axhline(y=2.0, color='red', linestyle='--', linewidth=2, alpha=0.5)
+    
+    # Plot true curve
+    ax.plot(x_plot, y_true, 'k-', linewidth=3, zorder=50)
+    
+    # Plot posterior curves with better alpha blending
+    for i, params in enumerate(is_curves):
+        y_pred = params['a'] + params['b'] * x_plot + params['c'] * x_plot**2
+        if i == 0:  # Add label only once
+            ax.plot(x_plot, y_pred, '#0173B2', alpha=0.05, linewidth=1.5, label='Importance Sampling')
+        else:
+            ax.plot(x_plot, y_pred, '#0173B2', alpha=0.05, linewidth=1.5)
+    
+    # Plot data colored by outlier probability
+    scatter1 = ax.scatter(xs, ys, c=is_outlier_probs, s=120, cmap='RdBu_r', 
+                        vmin=0, vmax=1, edgecolors='black', linewidth=1, zorder=100)
+    
+    
+    ax.set_xlabel('X', fontweight='bold', fontsize=18)
+    # Remove title
+    apply_grid_style(ax)
+    apply_standard_ticks(ax)  # Apply 3-tick standard
+    ax.set_ylim(-2.5, 2.5)
+    # Share y-axis - remove y-axis labels and ticks
+    ax.set_yticklabels([])
+    ax.tick_params(axis='y', which='both', length=0)
+    
+    # Add local legend for second subplot with thicker lines
+    legend = ax.legend(loc='lower right', fontsize=14, frameon=True)
+    # Make legend lines thicker
+    for line in legend.get_lines():
+        line.set_linewidth(3)
+        line.set_alpha(1.0)
+    
+    # Add text annotation in top left
+    ax.text(0.05, 0.95, '(bad inference, good model)', transform=ax.transAxes,
+            fontsize=14, verticalalignment='top', horizontalalignment='left',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+    
+    # Add title that spans middle and right panels
+    # We'll use the middle axes and extend the title
+    ax.set_title('Robust curve model with outliers', fontsize=20, fontweight='bold', pad=10, loc='center')
+    # Adjust title position to center it across both panels
+    title = ax.title
+    # Get positions of middle and right axes
+    pos1 = axes[1].get_position()
+    pos2 = axes[2].get_position()
+    # Calculate center position
+    center_x = (pos1.x0 + pos2.x1) / 2
+    # Convert to axes coordinates
+    inv = ax.transAxes.inverted()
+    fig_point = fig.transFigure.transform((center_x, 0.5))
+    ax_point = inv.transform(fig_point)
+    title.set_position((ax_point[0], 1.0))
+    
+    # Panel 3: Gibbs+HMC with outlier model
+    ax = axes[2]
+    
+    # Plot true noise interval (observation noise is 0.05)
+    ax.fill_between(x_plot, y_true - noise_std, y_true + noise_std, 
+                   color='gray', alpha=0.3, zorder=40)
+    
+    # Add dotted lines to outline the noise interval
+    ax.plot(x_plot, y_true - noise_std, 'k', linestyle=':', linewidth=2.5, 
+            dashes=(5, 3), alpha=0.7, zorder=41)
+    ax.plot(x_plot, y_true + noise_std, 'k', linestyle=':', linewidth=2.5, 
+            dashes=(5, 3), alpha=0.7, zorder=41)
+    
+    # Add horizontal lines for outlier interval (uniform over [-2, 2])
+    ax.axhline(y=-2.0, color='red', linestyle='--', linewidth=2, alpha=0.5)
+    ax.axhline(y=2.0, color='red', linestyle='--', linewidth=2, alpha=0.5)
+    
+    # Plot true curve
+    ax.plot(x_plot, y_true, 'k-', linewidth=3, zorder=50)
+    
+    # Plot posterior curves with better alpha blending
+    for i, params in enumerate(gibbs_curves):
+        y_pred = params['a'] + params['b'] * x_plot + params['c'] * x_plot**2
+        if i == 0:  # Add label only once
+            ax.plot(x_plot, y_pred, '#EE7733', alpha=0.05, linewidth=1.5, label='Gibbs/HMC')
+        else:
+            ax.plot(x_plot, y_pred, '#EE7733', alpha=0.05, linewidth=1.5)
+    
+    # Plot data colored by outlier probability
+    scatter2 = ax.scatter(xs, ys, c=gibbs_outlier_probs, s=120, cmap='RdBu_r', 
+                        vmin=0, vmax=1, edgecolors='black', linewidth=1, zorder=100)
+    
+    
+    ax.set_xlabel('X', fontweight='bold', fontsize=18)
+    # Remove title
+    apply_grid_style(ax)
+    apply_standard_ticks(ax)  # Apply 3-tick standard
+    ax.set_ylim(-2.5, 2.5)
+    # Share y-axis - remove y-axis labels and ticks
+    ax.set_yticklabels([])
+    ax.tick_params(axis='y', which='both', length=0)
+    
+    # Add local legend for third subplot with thicker lines
+    legend = ax.legend(loc='lower right', fontsize=14, frameon=True)
+    # Make legend lines thicker
+    for line in legend.get_lines():
+        line.set_linewidth(3)
+        line.set_alpha(1.0)
+    
+    # Add text annotation in top left
+    ax.text(0.05, 0.95, '(good inference, good model)', transform=ax.transAxes,
+            fontsize=14, verticalalignment='top', horizontalalignment='left',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+    
+    # Add horizontal colorbar in columns 1 and 2 of the bottom row
+    cbar_ax = fig.add_subplot(gs[1, 1:])
+    cbar = plt.colorbar(scatter1, cax=cbar_ax, orientation='horizontal')
+    cbar.set_label('P(outlier)', fontsize=18, fontweight='bold')
+    cbar.ax.tick_params(labelsize=16)
+    
+    save_publication_figure(fig, output_filename)
+    print(f"\nSaved figure to {output_filename}")

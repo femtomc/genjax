@@ -1,0 +1,104 @@
+[project]
+name = "timing-benchmarks"
+version = "0.1.0"
+description = "Timing benchmarks for probabilistic programming frameworks"
+authors = [{name = "GenJAX Team"}]
+requires-python = ">=3.10"
+
+[project.scripts]
+timing-benchmarks = "timing_benchmarks.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = ">=3.10"
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+
+[tool.pixi.pypi-dependencies]
+jax = "*"
+jaxlib = "*"
+genjax = { path = "../..", editable = true }
+
+[tool.pixi.feature.pyro.dependencies]
+pytorch = ">=2.0"
+numpy = "*"
+
+[tool.pixi.feature.pyro.pypi-dependencies]
+pyro-ppl = "*"
+
+[tool.pixi.environments]
+default = { features = [], solve-group = "default" }
+pyro = { features = ["pyro"], solve-group = "pyro" }
+
+[tool.pixi.tasks]
+# === Development Setup ===
+install-dev = "echo 'Package available via PYTHONPATH in pixi environment'"
+test = { cmd = "python -m timing_benchmarks.main test", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# === Data Generation ===
+generate-data-small = { cmd = "python -m timing_benchmarks.main generate-data --size small", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+generate-data-medium = { cmd = "python -m timing_benchmarks.main generate-data --size medium", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+generate-data-large = { cmd = "python -m timing_benchmarks.main generate-data --size large", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+generate-data-all = { cmd = "python -m timing_benchmarks.main generate-data --all", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# === GenJAX Benchmarks (default environment) ===
+genjax-is = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks genjax --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+genjax-hmc = { cmd = "python -m timing_benchmarks.main polynomial-hmc --frameworks genjax --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+genjax-all = { cmd = "python -m timing_benchmarks.main polynomial-all --frameworks genjax --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+genjax-quick = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks genjax --repeats 10 --n-particles 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# === Framework Comparisons ===
+# IS comparisons
+compare-is = { depends-on = ["genjax-is", "pyro-is"], cmd = "python -m timing_benchmarks.analysis.combine --method is --plot", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+compare-is-quick = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks genjax --repeats 10 --n-particles 100 1000", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# HMC comparisons
+compare-hmc = { depends-on = ["genjax-hmc", "pyro-hmc"], cmd = "python -m timing_benchmarks.analysis.combine --method hmc --plot", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# Full comparison suite
+compare-all = { depends-on = ["compare-is", "compare-hmc"] }
+
+# === Visualization Tasks ===
+plot-latest = { cmd = "python -m timing_benchmarks.main plot --latest", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+plot-is = { cmd = "python -m timing_benchmarks.main plot --method is --latest", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+plot-hmc = { cmd = "python -m timing_benchmarks.main plot --method hmc --latest", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+plot-scaling = { cmd = "python -m timing_benchmarks.main plot --plot-type scaling --latest", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+plot-speedup = { cmd = "python -m timing_benchmarks.main plot --plot-type speedup --latest", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+plot-all = { depends-on = ["plot-is", "plot-hmc", "plot-scaling", "plot-speedup"] }
+
+# === Combined Workflows ===
+# Quick test workflow
+workflow-test = { depends-on = ["test", "genjax-quick"], cmd = "echo 'Test workflow complete!'" }
+
+# Full benchmark workflow
+workflow-full = { depends-on = ["generate-data-all", "compare-all", "plot-all"], cmd = "echo 'Full benchmark complete! Check figs/ for results.'" }
+
+# Paper figure generation
+paper-figures = { depends-on = ["compare-all"], cmd = "python -m timing_benchmarks.main paper-figures", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# === Cleanup ===
+clean-data = "rm -rf data/benchmark_*"
+clean-figs = "rm -rf figs/*.pdf figs/*.png"
+clean-all = { depends-on = ["clean-data", "clean-figs"] }
+
+# === Pyro Environment Tasks ===
+[tool.pixi.feature.pyro.tasks]
+pyro-is = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-is --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+pyro-hmc = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-hmc --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+pyro-all = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-all --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+pyro-quick = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-is --repeats 10 --particles 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }

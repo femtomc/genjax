@@ -26,10 +26,15 @@ examples/curvefit/
 
 **GenJAX Models:**
 
-- **`point(x, curve)`**: Single data point model with Gaussian noise (σ=0.05)
+- **`point(x, curve)`**: Single data point model with Gaussian noise (σ=0.1)
 - **`polynomial()`**: Polynomial coefficient prior model (degree 2)
 - **`onepoint_curve(x)`**: Single point curve fitting model
 - **`npoint_curve(xs)`**: Multi-point curve model taking xs as input
+- **`point_with_outliers(x, curve, outlier_rate, outlier_std)`**: Mixture model using Cond combinator
+- **`npoint_curve_with_outliers(xs, outlier_rate, low, high)`**: Multi-point outlier model
+- **`npoint_curve_with_outliers_beta(xs, low, high)`**: Outlier model with Beta prior on rate
+- **`enumerative_gibbs_outliers(trace, xs, ys, outlier_rate)`**: Gibbs sampling for discrete outliers
+- **`mixed_gibbs_hmc_kernel(xs, ys, ...)`**: Combined Gibbs/HMC kernel for outlier detection
 - **`infer_latents()`**: SMC-based parameter inference using importance sampling
 - **`get_points_for_inference()`**: Test data generation utility
 
@@ -61,7 +66,7 @@ examples/curvefit/
 - **Consistent Parameters**: Standard polynomial coefficients across all frameworks
 - **Reproducible Seeds**: Fixed random seeds ensure identical datasets for fair comparisons
 - **Framework Compatibility**: JAX-based data generation compatible with NumPyro
-- **Noise Modeling**: Standardized Gaussian noise (σ=0.05) for realistic observations
+- **Noise Modeling**: Standardized Gaussian noise (σ=0.1) for realistic observations
 - **Benchmark Suites**: Pre-configured datasets for performance and accuracy comparisons
 
 ### `figs.py` - Comprehensive Visualization Suite
@@ -119,6 +124,15 @@ examples/curvefit/
 - **`save_log_density_viz()`**: Log joint density surface → `curvefit_logprob_surface.pdf`
 - **`save_multiple_curves_single_point_viz()`**: Posterior marginal at x → `curvefit_posterior_marginal.pdf`
 
+**Outlier Detection:**
+- **`save_outlier_detection_comparison()`**: 3-panel comparison → `curvefit_outlier_detection_comparison.pdf`
+  - Left panel: Standard curve model with IS (N=1000) - shows failure with outliers
+  - Middle panel: Outlier model with IS (N=1000) - improved but not perfect outlier detection
+  - Right panel: Outlier model with Gibbs/HMC - best outlier detection
+  - Demonstrates GenJAX's Cond combinator for natural mixture modeling
+  - Color-coded data points show P(outlier) in middle and right panels
+  - Includes annotations: "(good inference, bad model)", "(bad inference, good model)", "(good inference, good model)"
+
 ### `main.py` - Entry Point with Multiple Modes
 
 **Available Modes:**
@@ -152,7 +166,7 @@ def polynomial():
 @gen
 def point(x, curve):
     y_det = curve(x)                      # Deterministic curve value
-    y_observed = normal(y_det, 0.05) @ "obs"  # Observation noise
+    y_observed = normal(y_det, 0.1) @ "obs"  # Observation noise
     return y_observed
 ```
 
@@ -208,7 +222,7 @@ def infer_latents(xs, ys, n_samples: Const[int]):
 **Simple Gaussian Noise**:
 
 - **Observation model**: Polynomial evaluation with Gaussian noise
-- **Noise level**: σ=0.05 for low observation noise
+- **Noise level**: σ=0.1 for observation noise
 - **No outlier handling**: Clean data assumption
 - **Parameter priors**: Hierarchical with decreasing variance for higher-order terms
 
@@ -558,7 +572,7 @@ The case study has been significantly enhanced with comprehensive visualizations
   - IS N=5000: Dark green (#029E73)
   - HMC: Orange (#DE8F05)
   - NumPyro: Green (#029E73)
-- **Reduced noise**: Observation noise reduced from 0.2 to 0.05 for tighter posteriors
+- **Updated noise**: Observation noise updated to 0.1
 - **Vertical red lines**: Ground truth indicators in 3D parameter density plots
 
 **Figure Naming Update**:
