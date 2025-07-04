@@ -95,7 +95,7 @@ def generate_test_dataset(
 
 
 def generate_easy_inference_dataset(
-    seed=42, n_points=5, noise_std=0.05, param_scale=0.3, key=None  # Reduced noise to match model
+    seed=42, n_points=5, noise_std=0.05, param_scale=0.3, key=None  # Noise to match model
 ):
     """
     Generate an easier dataset for importance sampling.
@@ -108,7 +108,7 @@ def generate_easy_inference_dataset(
     Args:
         seed: Random seed for reproducibility
         n_points: Number of data points (default: 5, fewer than standard)
-        noise_std: Observation noise std (default: 0.2, matches updated model)
+        noise_std: Observation noise std (default: 0.05, matches updated model)
         param_scale: Scale factor for parameters (default: 0.3, keeps them near 0)
         key: Optional JAX PRNG key
 
@@ -158,7 +158,7 @@ def generate_easy_inference_dataset(
 def generate_fixed_dataset(
     n_points=10, x_min=0.0, x_max=1.0,
     true_a=-0.211, true_b=-0.395, true_c=0.673,
-    noise_std=0.05, seed=42  # Reduced noise to match model
+    noise_std=0.05, seed=42  # Noise to match model
 ):
     """
     Generate a fixed dataset with specified parameters for consistent visualization.
@@ -207,7 +207,7 @@ def generate_dataset_with_outliers(
     n_points=20,
     outlier_fraction=0.15,
     outlier_scale=3.0,
-    noise_std=0.05,  # Reduced noise to match model
+    noise_std=0.05,  # Noise to match model
     seed=42,
     true_a=None,
     true_b=None,
@@ -221,7 +221,7 @@ def generate_dataset_with_outliers(
         n_points: Number of data points
         outlier_fraction: Fraction of points to make outliers (default 0.15)
         outlier_scale: How many standard deviations away outliers can be (default 3.0)
-        noise_std: Base noise level for inliers (default 0.2)
+        noise_std: Base noise level for inliers (default 0.05)
         seed: Random seed (used if key is None)
         true_a, true_b, true_c: True polynomial coefficients (sampled if None)
 

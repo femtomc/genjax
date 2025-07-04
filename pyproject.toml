@@ -184,6 +184,28 @@ programmable-mcts-demo = "pixi run python -m examples.programmable_mcts.main --m
 programmable-mcts-visualizations = "pixi run python -m examples.programmable_mcts.main --mode visualizations"  # Visualizations
 programmable-mcts-all = "pixi run python -m examples.programmable_mcts.main --mode all"  # All modes
 
+[tool.pixi.feature.timing_benchmarks.dependencies]
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+
+[tool.pixi.feature.timing_benchmarks.pypi-dependencies]
+numpyro = "*"
+# Note: Pyro and Stan require separate environments due to PyTorch/C++ dependencies
+# Gen.jl requires Julia installation via juliaup
+
+[tool.pixi.feature.timing_benchmarks.tasks]
+cmd = "timing-benchmarks"
+# Timing benchmarks across probabilistic programming systems
+setup = "mkdir -p examples/timing-benchmarks/figs examples/timing-benchmarks/data"  # Create output directories
+timing-benchmarks-test = "pixi run python -m examples.timing-benchmarks.main test --repeats 5"  # Quick test mode
+timing-benchmarks-polynomial-is = "pixi run python -m examples.timing-benchmarks.main polynomial-is"  # Polynomial IS benchmark
+timing-benchmarks-polynomial-hmc = "pixi run python -m examples.timing-benchmarks.main polynomial-hmc"  # Polynomial HMC benchmark
+timing-benchmarks-polynomial-all = "pixi run python -m examples.timing-benchmarks.main polynomial-all"  # All polynomial benchmarks
+timing-benchmarks-plot = "pixi run python -m examples.timing-benchmarks.main plot"  # Plot from saved data
+# Julia setup (requires juliaup installation)
+timing-benchmarks-setup-julia = "cd examples/timing-benchmarks/julia && julia --project=. -e 'using Pkg; Pkg.instantiate()'"  # Setup Gen.jl environment
+
 [tool.pixi.feature.cuda.system-requirements]
 cuda = "12"
 
@@ -232,6 +254,8 @@ intuitive-psych = { features = ["intuitive_physics"], solve-group = "default" }
 intuitive-psych-cuda = { features = ["intuitive_physics", "cuda"], solve-group = "cuda" }
 programmable-mcts = { features = ["programmable_mcts"], solve-group = "default" }
 programmable-mcts-cuda = { features = ["programmable_mcts", "cuda"], solve-group = "cuda" }
+timing-benchmarks = { features = ["timing_benchmarks"], solve-group = "default" }
+timing-benchmarks-cuda = { features = ["timing_benchmarks", "cuda"], solve-group = "cuda" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"

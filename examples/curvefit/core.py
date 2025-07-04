@@ -1,6 +1,8 @@
 from genjax import gen, normal, Cond, flip, uniform, beta
 from genjax.core import Const, sel
 from genjax.pjax import seed
+from genjax.state import save
+from genjax.inference import hmc
 import jax.numpy as jnp
 import jax.random as jrand
 
@@ -14,8 +16,10 @@ try:
     import numpyro
     import numpyro.distributions as numpyro_dist
     from numpyro.handlers import replay, seed as numpyro_seed
+
     # from numpyro.contrib.funsor import log_density  # Moved to function for lazy loading
     from numpyro.infer import HMC, MCMC
+
     HAS_NUMPYRO = True
 except ImportError:
     HAS_NUMPYRO = False
@@ -52,7 +56,7 @@ class Lambda(Pytree):
 @gen
 def point(x, curve):
     y_det = curve(x)
-    y_observed = normal(y_det, 0.05) @ "obs"  # Reduced observation noise
+    y_observed = normal(y_det, 0.05) @ "obs"  # Observation noise
     return y_observed
 
 
@@ -131,9 +135,7 @@ def infer_latents(xs, ys, n_samples: Const[int]):
     return result.traces, result.log_weights
 
 
-def infer_latents_easy(
-    xs, ys, n_samples: Const[int], noise_std: Const[float] = Const(0.2)
-):
+def infer_latents_easy(xs, ys, n_samples: Const[int], noise_std=0.2):
     """
     Infer latent curve parameters using easier model with more noise.
 
@@ -163,7 +165,7 @@ def hmc_infer_latents(
     ys,
     n_samples: Const[int],
     n_warmup: Const[int] = Const(500),
-    step_size: Const[float] = Const(0.05),
+    step_size=0.05,
     n_steps: Const[int] = Const(10),
 ):
     """
@@ -191,7 +193,7 @@ def hmc_infer_latents(
     def hmc_kernel(trace):
         # Select the entire curve (which contains freq and off parameters)
         selection = sel("curve")
-        return hmc(trace, selection, step_size=step_size.value, n_steps=n_steps.value)
+        return hmc(trace, selection, step_size=step_size, n_steps=n_steps)
 
     # Create MCMC chain - seeding applied externally
     hmc_chain = chain(hmc_kernel)
@@ -212,13 +214,13 @@ def hmc_infer_latents_vectorized(
     ys,
     n_samples: Const[int],
     n_warmup: Const[int] = Const(500),
-    step_size: Const[float] = Const(0.05),
+    step_size=0.05,
     n_steps: Const[int] = Const(10),
     n_chains: Const[int] = Const(4),
 ):
     """
     Vectorized HMC inference running multiple chains in parallel.
-    
+
     Args:
         xs: Input points where observations were made
         ys: Observed values at xs
@@ -227,24 +229,27 @@ def hmc_infer_latents_vectorized(
         step_size: HMC step size (wrapped in Const)
         n_steps: Number of leapfrog steps (wrapped in Const)
         n_chains: Number of parallel chains (wrapped in Const)
-        
+
     Returns:
         tuple: (trace with shape (n_chains, n_samples), diagnostics dict)
     """
+
     # Create a function that runs a single chain with key as argument
     def run_single_chain(key, xs, ys):
-        return seed(hmc_infer_latents)(key, xs, ys, n_samples, n_warmup, step_size, n_steps)
-    
+        return seed(hmc_infer_latents)(
+            key, xs, ys, n_samples, n_warmup, step_size, n_steps
+        )
+
     # Generate keys for each chain
     keys = jrand.split(jrand.key(0), n_chains.value)
-    
+
     # Run chains in parallel using vmap
     vectorized_hmc = jax.vmap(run_single_chain, in_axes=(0, None, None))
     traces, diagnostics = vectorized_hmc(keys, xs, ys)
-    
+
     # Update diagnostics to reflect multiple chains
     diagnostics["n_chains"] = n_chains.value
-    
+
     return traces, diagnostics
 
 
@@ -295,7 +300,9 @@ def numpyro_npoint_model(xs, obs_dict=None):
             obs_vals = obs_dict["obs"]
         y_det = numpyro_polyfn(xs, a, b, c)
         y_observed = numpyro.sample(
-            "obs", numpyro_dist.Normal(y_det, 0.05), obs=obs_vals  # Reduced observation noise
+            "obs",
+            numpyro_dist.Normal(y_det, 0.05),
+            obs=obs_vals,  # Observation noise
         )
     return y_observed
 
@@ -437,15 +444,17 @@ def numpyro_hmc_summary_statistics(hmc_result):
     """Extract summary statistics from NumPyro HMC results."""
     diagnostics = hmc_result.get("diagnostics", {})
     accept_probs = diagnostics.get("accept_probs", jnp.array([]))
-    
+
     # Calculate acceptance rate - handle empty arrays
     if accept_probs.size > 0:
         accept_rate = jnp.mean(accept_probs)
     else:
         accept_rate = 0.0
-    
+
     return {
-        "accept_rate": float(accept_rate),  # Convert to Python float to avoid JAX tracer issues
+        "accept_rate": float(
+            accept_rate
+        ),  # Convert to Python float to avoid JAX tracer issues
         "num_samples": hmc_result.get("num_samples", 0),
         "num_warmup": hmc_result.get("num_warmup", 0),
     }
@@ -459,14 +468,15 @@ def numpyro_hmc_summary_statistics(hmc_result):
 def inlier_branch(mean, std):
     """Inlier branch: follows the polynomial regression with small noise."""
     # For inliers, we use the mean (y_det) but ignore std, using fixed 0.05
-    return normal(mean, 0.05) @ "obs"  # Same address in both branches
+    return normal(mean, 0.1) @ "obs"  # Same address in both branches
 
 
 @gen
 def outlier_branch(mean, std):
-    """Outlier branch: samples from a uniform distribution [-4, 4]."""
-    # For outliers, we ignore both mean and std and use uniform[-4, 4]
-    return uniform(-4.0, 4.0) @ "obs"  # Same address in both branches
+    """Outlier branch: samples from a uniform distribution."""
+    # For outliers, we use a uniform distribution over a wide range
+    # This models that outliers can appear anywhere, not following the curve
+    return uniform(-2.0, 2.0) @ "obs"  # Same address in both branches
 
 
 @gen
@@ -474,11 +484,11 @@ def point_with_outliers(x, curve, outlier_rate=0.1, outlier_mean=0.0, outlier_st
     """Point model that can be either inlier or outlier.
 
     This model uses the Cond combinator to naturally express a mixture model where:
-    - Inliers: follow the polynomial regression with small observation noise
-    - Outliers: come from a uniform distribution on [-4, 4] independent of the curve
-    
-    This models realistic scenarios where outliers are measurement errors,
-    sensor failures, or corrupted data unrelated to the true underlying curve.
+    - Inliers: follow the polynomial regression with small observation noise (std=0.05)
+    - Outliers: are drawn from Normal(0, 5), completely independent of the curve
+
+    This models realistic scenarios where outliers are corrupted measurements,
+    sensor failures, or data entry errors unrelated to the true underlying curve.
 
     Args:
         x: Input point
@@ -494,20 +504,18 @@ def point_with_outliers(x, curve, outlier_rate=0.1, outlier_mean=0.0, outlier_st
 
     # Use Cond combinator with proper branches
     cond_model = Cond(outlier_branch, inlier_branch)
-    
+
     # Call Cond with appropriate arguments for each branch
-    # When is_outlier=True: outlier_branch() - ignores parameters, uses uniform[-4,4]
-    # When is_outlier=False: inlier_branch(y_det) - uses polynomial value
-    # Both branches need same signature, so we pass dummy values to outlier branch
-    y_observed = cond_model(is_outlier, jnp.where(is_outlier, 0.0, y_det),
-                           outlier_std) @ "y"
-    
+    # When is_outlier=True: outlier_branch() - ignores y_det, uses Normal(0, 10)
+    # When is_outlier=False: inlier_branch(y_det) - uses curve value with small noise
+    # Pass y_det to both branches for consistent signatures
+    y_observed = cond_model(is_outlier, y_det, outlier_std) @ "y"
+
     return y_observed
 
 
 @gen
-def npoint_curve_with_outliers(xs, outlier_rate=Const(0.1), outlier_mean=Const(0.0), 
-                               outlier_std=Const(5.0)):
+def npoint_curve_with_outliers(xs, outlier_rate=0.1, outlier_mean=0.0, outlier_std=5.0):
     """N-point curve model with outlier detection.
 
     Each point can be classified as inlier or outlier.
@@ -518,7 +526,7 @@ def npoint_curve_with_outliers(xs, outlier_rate=Const(0.1), outlier_mean=Const(0
     # Vectorize the outlier model
     ys = (
         point_with_outliers.vmap(in_axes=(0, None, None, None, None))(
-            xs, curve, outlier_rate.value, outlier_mean.value, outlier_std.value
+            xs, curve, outlier_rate, outlier_mean, outlier_std
         )
         @ "ys"
     )
@@ -527,7 +535,7 @@ def npoint_curve_with_outliers(xs, outlier_rate=Const(0.1), outlier_mean=Const(0
 
 
 @gen
-def npoint_curve_with_outliers_beta(xs, alpha=Const(1.0), beta_param=Const(10.0)):
+def npoint_curve_with_outliers_beta(xs, alpha=1.0, beta_param=10.0):
     """N-point curve model with outlier detection using beta prior.
 
     Uses a beta prior for the outlier probability, allowing inference
@@ -540,15 +548,19 @@ def npoint_curve_with_outliers_beta(xs, alpha=Const(1.0), beta_param=Const(10.0)
     """
     # Sample outlier rate from beta prior
     # Beta(1, 10) has mean 1/11 ≈ 0.09, skewed towards low outlier rates
-    outlier_rate = beta(alpha.value, beta_param.value) @ "outlier_rate"
-    
+    outlier_rate = beta(alpha, beta_param) @ "outlier_rate"
+
     # Sample polynomial coefficients
     curve = polynomial() @ "curve"
 
     # Vectorize the outlier model with sampled outlier rate
     ys = (
         point_with_outliers.vmap(in_axes=(0, None, None, None, None))(
-            xs, curve, outlier_rate, 0.0, 5.0  # outlier_mean and std are ignored
+            xs,
+            curve,
+            outlier_rate,
+            0.0,
+            5.0,  # outlier_mean and std are ignored
         )
         @ "ys"
     )
@@ -560,9 +572,9 @@ def infer_latents_with_outliers(
     xs,
     ys,
     n_samples: Const[int],
-    outlier_rate: Const[float] = Const(0.1),
-    outlier_mean: Const[float] = Const(0.0),
-    outlier_std: Const[float] = Const(5.0),
+    outlier_rate=0.1,
+    outlier_mean=0.0,
+    outlier_std=5.0,
 ):
     """
     Infer latent curve parameters and outlier indicators using GenJAX SMC.
@@ -596,11 +608,11 @@ def hmc_infer_latents_with_outliers(
     ys,
     n_samples: Const[int],
     n_warmup: Const[int] = Const(500),
-    step_size: Const[float] = Const(0.05),
+    step_size=0.05,
     n_steps: Const[int] = Const(10),
-    outlier_rate: Const[float] = Const(0.1),
-    outlier_mean: Const[float] = Const(0.0),
-    outlier_std: Const[float] = Const(5.0),
+    outlier_rate=0.1,
+    outlier_mean=0.0,
+    outlier_std=5.0,
 ):
     """
     Infer latent curve parameters using HMC on continuous parameters only.
@@ -622,9 +634,7 @@ def hmc_infer_latents_with_outliers(
     # Define HMC kernel for continuous parameters only
     def hmc_kernel(trace):
         # Only update curve parameters with HMC
-        return hmc(
-            trace, sel("curve"), step_size=step_size.value, n_steps=n_steps.value
-        )
+        return hmc(trace, sel("curve"), step_size=step_size, n_steps=n_steps)
 
     # Create MCMC chain
     mcmc_chain = chain(hmc_kernel)
@@ -646,10 +656,10 @@ def mixed_infer_latents_with_outliers_beta(
     n_samples: Const[int],
     n_warmup: Const[int] = Const(500),
     mh_moves_per_step: Const[int] = Const(5),
-    hmc_step_size: Const[float] = Const(0.01),
+    hmc_step_size=0.01,
     hmc_n_steps: Const[int] = Const(10),
-    alpha: Const[float] = Const(1.0),
-    beta_param: Const[float] = Const(10.0),
+    alpha=1.0,
+    beta_param=10.0,
 ):
     """
     Infer latent parameters using mixed MCMC:
@@ -677,21 +687,13 @@ def mixed_infer_latents_with_outliers_beta(
         constraints, xs, alpha, beta_param
     )
 
-    # Define mixed kernel
-    def mixed_kernel(trace):
-        # First, MH moves on outlier indicators
-        for i in range(mh_moves_per_step.value):
-            trace = mh(trace, sel({"ys": sel("is_outlier")}))
-        
-        # Then, HMC on continuous parameters (curve and outlier_rate)
-        trace = hmc(
-            trace, 
-            sel("curve") | sel("outlier_rate"), 
-            step_size=hmc_step_size.value, 
-            n_steps=hmc_n_steps.value
-        )
-        
-        return trace
+    # Import the Gibbs kernel
+    from examples.curvefit.gibbs_kernel import mixed_gibbs_hmc_kernel
+
+    # Create mixed kernel with Gibbs + HMC
+    mixed_kernel = mixed_gibbs_hmc_kernel(
+        xs, ys, hmc_step_size=hmc_step_size, hmc_n_steps=hmc_n_steps
+    )
 
     # Create MCMC chain
     mcmc_chain = chain(mixed_kernel)
@@ -718,7 +720,9 @@ hmc_infer_latents_seeded = seed(hmc_infer_latents)
 hmc_infer_latents_vectorized_seeded = seed(hmc_infer_latents_vectorized)
 infer_latents_with_outliers_seeded = seed(infer_latents_with_outliers)
 hmc_infer_latents_with_outliers_seeded = seed(hmc_infer_latents_with_outliers)
-mixed_infer_latents_with_outliers_beta_seeded = seed(mixed_infer_latents_with_outliers_beta)
+mixed_infer_latents_with_outliers_beta_seeded = seed(
+    mixed_infer_latents_with_outliers_beta
+)
 
 infer_latents_jit = jax.jit(
     infer_latents_seeded
@@ -731,7 +735,9 @@ hmc_infer_latents_vectorized_jit = jax.jit(
 )  # Use Const pattern instead of static_argnums
 infer_latents_with_outliers_jit = jax.jit(infer_latents_with_outliers_seeded)
 hmc_infer_latents_with_outliers_jit = jax.jit(hmc_infer_latents_with_outliers_seeded)
-mixed_infer_latents_with_outliers_beta_jit = jax.jit(mixed_infer_latents_with_outliers_beta_seeded)
+mixed_infer_latents_with_outliers_beta_jit = jax.jit(
+    mixed_infer_latents_with_outliers_beta_seeded
+)
 
 # NumPyro JIT-compiled functions
 numpyro_run_importance_sampling_jit = jax.jit(
@@ -946,3 +952,92 @@ def extract_posterior_samples(benchmark_results):
         }
 
     return posterior_samples
+
+
+# Gibbs sampling for outlier models
+def enumerative_gibbs_outliers(trace, xs, ys, outlier_rate=0.1):
+    """
+    Enumerative Gibbs sampling for outlier indicators.
+
+    For each data point, exactly compute P(is_outlier | rest) and sample.
+    """
+    from genjax.distributions import categorical
+    from genjax.pjax import modular_vmap
+
+    curve_params = trace.get_choices()["curve"]
+    curve = Lambda(
+        Const(polyfn),
+        jnp.array([curve_params["a"], curve_params["b"], curve_params["c"]]),
+    )
+    outlier_rate = trace.get_choices()["outlier_rate"]
+
+    def update_single_point(x, y_obs):
+        """Update is_outlier for a single point."""
+        # Build constraint dictionary for assess
+        # For is_outlier = False
+        chm_false = {"is_outlier": False, "y": {"obs": y_obs}}
+        log_prob_false, _ = point_with_outliers.assess(
+            chm_false, x, curve, outlier_rate, 0.0, 2.0
+        )
+
+        # For is_outlier = True
+        chm_true = {"is_outlier": True, "y": {"obs": y_obs}}
+        log_prob_true, _ = point_with_outliers.assess(
+            chm_true, x, curve, outlier_rate, 0.0, 2.0
+        )
+
+        # Convert to probabilities
+
+        # Sample new outlier indicator
+        new_is_outlier = (
+            categorical.sample(logits=jnp.array([log_prob_false, log_prob_true])) == 1
+        )
+
+        return new_is_outlier
+
+    # Vectorize over all points
+    new_outliers = modular_vmap(update_single_point)(xs, ys)
+
+    # Update trace with new outlier indicators
+    # Get the generative function and args
+    gen_fn = trace.get_gen_fn()
+    args = trace.get_args()
+
+    # Use update to create new trace
+    new_trace, weight, _ = gen_fn.update(
+        trace, {"ys": {"is_outlier": new_outliers}}, *args[0], **args[1]
+    )
+
+    # For diagnostics, we always accept Gibbs moves (they're exact)
+    save(accept=True)
+
+    return new_trace
+
+
+def mixed_gibbs_hmc_kernel(
+    xs, ys, hmc_step_size=0.01, hmc_n_steps=10, outlier_rate=0.1
+):
+    """
+    Create a mixed MCMC kernel that combines:
+    - Enumerative Gibbs for discrete outlier indicators
+    - HMC for continuous parameters (curve coefficients only)
+    """
+
+    def kernel(trace):
+        # First do Gibbs sampling on outlier indicators
+        trace = enumerative_gibbs_outliers(trace, xs, ys)
+
+        # Then do HMC on continuous curve parameters only
+        trace = hmc(
+            trace,
+            sel(("curve", "a"))
+            | sel(("curve", "b"))
+            | sel(("curve", "c"))
+            | sel("outlier_rate"),
+            step_size=hmc_step_size,
+            n_steps=hmc_n_steps,
+        )
+
+        return trace
+
+    return kernel
