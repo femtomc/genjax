@@ -1,0 +1,3 @@
+[submodule "genjax"]
+	path = genjax
+	url = https://github.com/femtomc/genjax
