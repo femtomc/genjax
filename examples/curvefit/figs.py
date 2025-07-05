@@ -3527,30 +3527,113 @@ def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_det
     print(f"True outliers at indices: {outlier_indices}")
     print(f"Outlier rate: {len(outlier_indices)/len(xs):.1%}\n")
     
-    print("Running inference methods...")
+    print("Running inference methods and timing...")
     
-    # 1. Standard IS
+    # Import timing utilities
+    from utils import benchmark_with_warmup
+    
+    # 1. Standard IS with timing
     print("1. Standard IS (no outlier model)...")
+    
+    # Time the standard IS
+    def run_standard_is_timed():
+        constraints_standard = {"ys": {"obs": ys}}
+        key = jrand.key(42)
+        result = seed(init)(
+            key,
+            npoint_curve,
+            (xs,),
+            Const(1000),
+            constraints_standard
+        )
+        return result
+    
+    # JIT compile and time
+    run_standard_is_jit = jax.jit(run_standard_is_timed)
+    standard_times, (standard_mean, standard_std) = benchmark_with_warmup(
+        run_standard_is_jit, repeats=20
+    )
+    print(f"   Time: {standard_mean*1000:.1f} ± {standard_std*1000:.1f} ms")
+    
     standard_curves = run_standard_is(xs, ys)
     print(f"   Collected {len(standard_curves)} standard curves")
     
-    # 2. Outlier IS
+    # 2. Outlier IS with timing
     print("2. IS with outlier model...")
+    
+    # Time the outlier IS
+    def run_outlier_is_timed():
+        constraints = {"ys": {"y": {"obs": ys}}}
+        key = jrand.key(42)
+        result = seed(init)(
+            key,
+            npoint_curve_with_outliers,
+            (xs, 0.33, 0.0, 2.0),
+            Const(1000),
+            constraints
+        )
+        return result
+    
+    # JIT compile and time
+    run_outlier_is_jit = jax.jit(run_outlier_is_timed)
+    outlier_is_times, (outlier_is_mean, outlier_is_std) = benchmark_with_warmup(
+        run_outlier_is_jit, repeats=20
+    )
+    print(f"   Time: {outlier_is_mean*1000:.1f} ± {outlier_is_std*1000:.1f} ms")
+    
     is_outlier_probs, is_curves = run_outlier_is(xs, ys)
     print(f"   Collected {len(is_curves)} IS curves")
     
-    # 3. Gibbs+HMC
+    # 3. Gibbs+HMC with timing
     print("3. Gibbs+HMC with outlier model...")
+    
+    # Time Gibbs+HMC with 200 chains, 20 iterations
+    def run_gibbs_hmc_timed():
+        n_chains = 200
+        n_iterations = 20
+        
+        constraints = {"ys": {"y": {"obs": ys}}}
+        kernel = mixed_gibbs_hmc_kernel(xs, ys, hmc_step_size=0.01, hmc_n_steps=20, outlier_rate=0.1)
+        kernel_seeded = seed(kernel)
+        
+        def run_single_chain(chain_key):
+            trace, _ = seed(npoint_curve_with_outliers_beta.generate)(
+                chain_key, constraints, xs, 1.0, 3.0
+            )
+            
+            def body_fn(i, carry):
+                trace, key = carry
+                key, subkey = jrand.split(key)
+                new_trace = kernel_seeded(subkey, trace)
+                return (new_trace, key)
+            
+            final_trace, _ = jax.lax.fori_loop(0, n_iterations, body_fn, (trace, chain_key))
+            outliers = final_trace.get_choices()["ys"]["is_outlier"]
+            curve_params = final_trace.get_choices()["curve"]
+            return outliers, curve_params['a'], curve_params['b'], curve_params['c']
+        
+        key = jrand.key(12345)
+        chain_keys = jrand.split(key, n_chains)
+        all_outliers, all_a, all_b, all_c = jax.vmap(run_single_chain)(chain_keys)
+        return all_outliers, all_a, all_b, all_c
+    
+    # JIT compile and time
+    run_gibbs_hmc_jit = jax.jit(run_gibbs_hmc_timed)
+    gibbs_times, (gibbs_mean, gibbs_std) = benchmark_with_warmup(
+        run_gibbs_hmc_jit, repeats=10  # Fewer repeats since it's slower
+    )
+    print(f"   Time: {gibbs_mean*1000:.1f} ± {gibbs_std*1000:.1f} ms")
+    
     gibbs_outlier_probs, gibbs_curves = run_gibbs_hmc(xs, ys)
     print(f"   Collected {len(gibbs_curves)} Gibbs+HMC curves")
     
     # Create figure with GridSpec for better layout control
     setup_publication_fonts()
-    fig = plt.figure(figsize=(18, 8))
+    fig = plt.figure(figsize=(22, 8))
     
-    # Create a grid with 2 rows: main plots, colorbar
+    # Create a grid with 2 rows, 4 columns: main plots + timing, colorbar
     import matplotlib.gridspec as gridspec
-    gs = gridspec.GridSpec(2, 3, height_ratios=[10, 1], hspace=0.5)
+    gs = gridspec.GridSpec(2, 4, height_ratios=[10, 1], width_ratios=[1, 1, 1, 0.6], hspace=0.5)
     
     # Create the three main axes
     axes = [fig.add_subplot(gs[0, i]) for i in range(3)]
@@ -3737,11 +3820,58 @@ def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_det
             fontsize=14, verticalalignment='top', horizontalalignment='left',
             bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
     
-    # Add horizontal colorbar in columns 1 and 2 of the bottom row
-    cbar_ax = fig.add_subplot(gs[1, 1:])
+    # Add horizontal colorbar in columns 1 and 2 of the second row
+    cbar_ax = fig.add_subplot(gs[1, 1:3])
     cbar = plt.colorbar(scatter1, cax=cbar_ax, orientation='horizontal')
     cbar.set_label('P(outlier)', fontsize=18, fontweight='bold')
     cbar.ax.tick_params(labelsize=16)
+    
+    # Add vertical timing barplot in the 4th column of the first row
+    timing_ax = fig.add_subplot(gs[0, 3])
+    
+    # Prepare timing data (in order of appearance)
+    methods = ['IS\nStandard', 'IS\nOutlier', 'Gibbs/HMC\nOutlier']
+    times = [standard_mean * 1000, outlier_is_mean * 1000, gibbs_mean * 1000]
+    errors = [standard_std * 1000, outlier_is_std * 1000, gibbs_std * 1000]
+    colors = ['#0173B2', '#0173B2', '#EE7733']
+    
+    # Create vertical bar plot
+    x_positions = range(len(methods))
+    bars = timing_ax.bar(x_positions, times, yerr=errors, capsize=5, color=colors, alpha=0.8)
+    
+    # Add timing values on top of bars
+    for i, (bar, time, error) in enumerate(zip(bars, times, errors)):
+        height = bar.get_height()
+        timing_ax.text(
+            bar.get_x() + bar.get_width() / 2.0,
+            height + error + max(times) * 0.02,
+            f"{time:.1f}",
+            ha="center",
+            va="bottom",
+            fontsize=14,
+            fontweight='bold'
+        )
+    
+    # Style the timing plot - remove x-axis ticks and labels only
+    timing_ax.set_xticks([])  # Remove x-axis tick marks
+    timing_ax.set_xticklabels([])  # Remove x-axis labels
+    timing_ax.set_ylabel("")  # Remove y-axis label
+    timing_ax.set_title("Time (ms)", fontsize=18, fontweight='bold', pad=10)  # Place label at top
+    
+    # Remove top and right spines
+    timing_ax.spines['top'].set_visible(False)
+    timing_ax.spines['right'].set_visible(False)
+    
+    # Add grid for y-axis only
+    timing_ax.grid(True, alpha=0.3, axis="y")
+    
+    # Set y-axis limits to accommodate timing labels
+    max_time = max(times)
+    max_error = max(errors)
+    timing_ax.set_ylim(0, max_time + max_error + max_time * 0.3)
+    
+    # Set tick parameters
+    timing_ax.tick_params(axis='both', which='major', labelsize=14, width=2, length=6)
     
     save_publication_figure(fig, output_filename)
     print(f"\nSaved figure to {output_filename}")
