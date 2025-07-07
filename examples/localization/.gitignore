@@ -1,1 +1,19 @@
-figs
+# Pixi environment files
+.pixi/
+pixi.lock
+
+# Generated figures
+figs/*.pdf
+figs/*.png
+
+# Experimental data
+data/experiment_*
+data/localization_*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# MacOS
+.DS_Store

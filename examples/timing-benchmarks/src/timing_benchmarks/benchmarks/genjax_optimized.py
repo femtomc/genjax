@@ -1,6 +1,7 @@
-"""GenJAX benchmark implementation for polynomial regression.
+"""Optimized GenJAX benchmark implementation for polynomial regression.
 
-This implementation uses a flattened model structure for optimal performance.
+This implementation follows the same pattern as the faircoin example
+to minimize overhead and achieve comparable performance.
 """
 
 import time
@@ -20,109 +21,90 @@ from ..data.generation import PolynomialDataset, polyfn
 
 ### Optimized GenJAX Model ###
 
-
 @gen
-def polynomial_flat(xs):
-    """Flattened polynomial model for reduced overhead."""
-    # Sample coefficients
+def polynomial_model(xs):
+    """Polynomial model matching handcoded structure."""
+    # Sample coefficients from prior
     a = normal(0.0, 1.0) @ "a"
     b = normal(0.0, 1.0) @ "b"
     c = normal(0.0, 1.0) @ "c"
-
-    # Compute predictions directly
+    
+    # Compute predictions
     y_pred = a + b * xs + c * xs**2
-
-    # Observe all points at once with normal.vmap
+    
+    # Observe with vectorized normal
     ys = normal.vmap(in_axes=(0, None))(y_pred, 0.05) @ "ys"
-
+    
     return ys
 
 
-### Optimized Inference Function ###
+### Direct Importance Sampling (matching faircoin pattern) ###
 
-
-def make_genjax_infer_is(n_particles: int):
-    """Create optimized GenJAX importance sampling inference function.
-    
-    This follows the faircoin pattern for minimal overhead.
-    """
-    def infer(xs, ys):
-        constraints = {"ys": ys}
-        
-        def importance_(constraints):
-            _, w = polynomial_flat.generate(constraints, xs)
-            return w
-        
-        # Direct vmap without dummy arrays
-        imp = vmap(importance_, axis_size=n_particles, in_axes=None)
-        return imp(constraints)
-    
-    return infer
-
-
-### Timing Functions ###
-
-
-def genjax_polynomial_is_timing(
+def genjax_polynomial_is_direct(
     dataset: PolynomialDataset,
     n_particles: int,
     repeats: int = 100,
     key: Optional[jrand.PRNGKey] = None,
-    use_direct: bool = False,
 ) -> Dict[str, Any]:
-    """Time optimized GenJAX importance sampling on polynomial regression.
-
+    """Direct GenJAX importance sampling following faircoin pattern.
+    
+    This implementation minimizes overhead by:
+    1. Using direct vmap without intermediate functions
+    2. Avoiding unnecessary seed wrapping
+    3. Not creating dummy arrays
+    
     Args:
         dataset: Polynomial dataset
         n_particles: Number of importance sampling particles
         repeats: Number of timing repetitions
         key: Random key (optional)
-        use_direct: Whether to use direct implementation
-
+        
     Returns:
         Dictionary with timing results and samples
     """
     if key is None:
         key = jrand.key(42)
-
-    xs, ys = dataset.xs, dataset.ys
-
-    # Create and JIT the inference function using faircoin pattern
-    genjax_infer_is = make_genjax_infer_is(n_particles)
-    infer_jit = jax.jit(seed(genjax_infer_is))
-
-    def task():
-        log_weights = infer_jit(key, xs, ys)
-        jax.block_until_ready(log_weights)
-        return log_weights
-
-    # Run benchmark with automatic warm-up - more inner repeats for accuracy
-    times, (mean_time, std_time) = benchmark_with_warmup(
-        task, warmup_runs=5, repeats=repeats, inner_repeats=200, auto_sync=False
-    )
-
-    # Get final weights
-    log_weights = task()
-
-    # For compatibility, also get samples - run full version once
-    def get_samples():
-        constraints = {"ys": ys}
-        def sample_particle(_):
-            trace, _ = polynomial_flat.generate(constraints, xs)
-            return trace
-        traces = vmap(sample_particle)(jnp.arange(n_particles))
-        return traces
     
-    jitted_samples = jax.jit(seed(get_samples))
-    traces = jitted_samples(key)
+    xs, ys = dataset.xs, dataset.ys
+    constraints = {"ys": ys}
+    
+    # Direct importance sampling function
+    def importance_sample(constraints):
+        trace, weight = polynomial_model.generate(constraints, xs)
+        return trace, weight
+    
+    # JIT compile with vmap - matching faircoin pattern exactly
+    imp_jit = jax.jit(
+        seed(
+            vmap(
+                importance_sample,
+                axis_size=n_particles,
+                in_axes=None,  # constraints are not vmapped
+            )
+        )
+    )
+    
+    # Task for benchmarking
+    def task():
+        traces, log_weights = imp_jit(key, constraints)
+        jax.block_until_ready(log_weights)  # Only block on weights
+        return traces, log_weights
+    
+    # Run benchmark with automatic warm-up
+    times, (mean_time, std_time) = benchmark_with_warmup(
+        task, warmup_runs=2, repeats=repeats, inner_repeats=50, auto_sync=False
+    )
+    
+    # Get samples for validation
+    traces, log_weights = task()
     
     # Extract samples
     samples_a = traces.get_choices()["a"]
     samples_b = traces.get_choices()["b"]
     samples_c = traces.get_choices()["c"]
-
+    
     return {
-        "framework": "genjax" if not use_direct else "genjax_direct",
+        "framework": "genjax_optimized",
         "method": "importance_sampling",
         "n_particles": n_particles,
         "n_points": dataset.n_points,
@@ -138,39 +120,72 @@ def genjax_polynomial_is_timing(
     }
 
 
-def genjax_polynomial_hmc_timing(
+### Alternative: Match handcoded structure exactly ###
+
+def genjax_polynomial_is_minimal(
     dataset: PolynomialDataset,
-    n_samples: int,
-    n_warmup: int = 500,
+    n_particles: int,
     repeats: int = 100,
-    key: Optional[jax.Array] = None
+    key: Optional[jrand.PRNGKey] = None,
 ) -> Dict[str, Any]:
-    """Time GenJAX HMC on polynomial regression.
+    """Minimal GenJAX implementation that matches handcoded structure.
     
-    Note: GenJAX HMC implementation would go here.
-    For now, this returns a placeholder result.
+    This version only computes weights, not full traces.
     
     Args:
         dataset: Polynomial dataset
-        n_samples: Number of HMC samples
-        n_warmup: Number of warmup samples
+        n_particles: Number of importance sampling particles
         repeats: Number of timing repetitions
         key: Random key (optional)
         
     Returns:
         Dictionary with timing results
     """
-    # Placeholder implementation
+    if key is None:
+        key = jrand.key(42)
+    
+    xs, ys = dataset.xs, dataset.ys
+    constraints = {"ys": ys}
+    
+    # Only compute weights
+    def importance_weight_only(constraints):
+        _, weight = polynomial_model.generate(constraints, xs)
+        return weight
+    
+    # JIT compile with vmap
+    imp_jit = jax.jit(
+        seed(
+            vmap(
+                importance_weight_only,
+                axis_size=n_particles,
+                in_axes=None,
+            )
+        )
+    )
+    
+    # Task for benchmarking
+    def task():
+        log_weights = imp_jit(key, constraints)
+        jax.block_until_ready(log_weights)
+        return log_weights
+    
+    # Run benchmark with automatic warm-up
+    times, (mean_time, std_time) = benchmark_with_warmup(
+        task, warmup_runs=2, repeats=repeats, inner_repeats=50, auto_sync=False
+    )
+    
+    # Get weights for validation
+    log_weights = task()
+    
     return {
-        "framework": "genjax",
-        "method": "hmc",
-        "n_samples": n_samples,
-        "n_warmup": n_warmup,
+        "framework": "genjax_minimal",
+        "method": "importance_sampling",
+        "n_particles": n_particles,
         "n_points": dataset.n_points,
-        "times": [],
-        "mean_time": 0.0,
-        "std_time": 0.0,
-        "error": "HMC not implemented in GenJAX benchmarks"
+        "times": times,
+        "mean_time": mean_time,
+        "std_time": std_time,
+        "log_weights": log_weights,
     }
 
 
@@ -179,10 +194,10 @@ if __name__ == "__main__":
     import json
     from datetime import datetime
     from pathlib import Path
-
+    
     from ..data.generation import generate_polynomial_data
-
-    parser = argparse.ArgumentParser(description="Run GenJAX benchmarks")
+    
+    parser = argparse.ArgumentParser(description="Run optimized GenJAX benchmarks")
     parser.add_argument(
         "--n-particles",
         type=int,
@@ -197,57 +212,57 @@ if __name__ == "__main__":
         "--repeats", type=int, default=100, help="Number of timing repetitions"
     )
     parser.add_argument(
-        "--use-direct", action="store_true", help="Use direct implementation"
+        "--minimal", action="store_true", help="Use minimal implementation (weights only)"
     )
     parser.add_argument(
         "--output-dir", type=str, default=None, help="Output directory for results"
     )
-
+    
     args = parser.parse_args()
-
+    
     # Generate dataset
     dataset = generate_polynomial_data(n_points=args.n_points, seed=42)
-
+    
+    # Choose implementation
+    if args.minimal:
+        timing_fn = genjax_polynomial_is_minimal
+        framework_name = "genjax_minimal"
+    else:
+        timing_fn = genjax_polynomial_is_direct
+        framework_name = "genjax_optimized"
+    
     # Create output directory
     if args.output_dir is None:
-        output_dir = Path("data/genjax_direct" if args.use_direct else "data/genjax")
+        output_dir = Path(f"data/{framework_name}")
     else:
         output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-
+    
     # Run benchmarks
     results = {}
-
-    print(
-        f"Running {'Direct' if args.use_direct else ''} GenJAX Importance Sampling benchmarks..."
-    )
+    
+    print(f"Running {framework_name} Importance Sampling benchmarks...")
     is_results = {}
     for n_particles in args.n_particles:
         print(f"  N = {n_particles:,} particles...")
-        result = genjax_polynomial_is_timing(
-            dataset, n_particles, repeats=args.repeats, use_direct=args.use_direct
-        )
+        result = timing_fn(dataset, n_particles, repeats=args.repeats)
         is_results[f"n{n_particles}"] = result
-
-        # Save individual result (without samples to avoid JAX array serialization)
+        
+        # Save individual result
         result_file = output_dir / f"is_n{n_particles}.json"
         result_to_save = {
             k: v for k, v in result.items() if k not in ["samples", "log_weights"]
         }
-        result_to_save["times"] = [
-            float(t) for t in result["times"]
-        ]  # Convert to Python floats
+        result_to_save["times"] = [float(t) for t in result["times"]]
         with open(result_file, "w") as f:
             json.dump(result_to_save, f, indent=2)
-
+    
     results["is"] = is_results
-
+    
     # Save summary
-    summary_file = (
-        output_dir / f"summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    )
-
-    # Clean up results for JSON serialization
+    summary_file = output_dir / f"summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    
+    # Clean results for JSON
     clean_results = {}
     for method, method_results in results.items():
         if isinstance(method_results, dict):
@@ -255,25 +270,21 @@ if __name__ == "__main__":
             for key, result in method_results.items():
                 if isinstance(result, dict):
                     clean_result = {
-                        k: v
-                        for k, v in result.items()
+                        k: v for k, v in result.items() 
                         if k not in ["samples", "log_weights"]
                     }
-                    # Convert times to Python floats
                     if "times" in clean_result:
-                        clean_result["times"] = [
-                            float(t) for t in clean_result["times"]
-                        ]
+                        clean_result["times"] = [float(t) for t in clean_result["times"]]
                     clean_results[method][key] = clean_result
                 else:
                     clean_results[method] = result
         else:
             clean_results[method] = method_results
-
+    
     with open(summary_file, "w") as f:
         json.dump(
             {
-                "framework": "genjax" if not args.use_direct else "genjax_direct",
+                "framework": framework_name,
                 "dataset": {
                     "n_points": dataset.n_points,
                     "noise_std": float(dataset.noise_std),
@@ -284,5 +295,5 @@ if __name__ == "__main__":
             f,
             indent=2,
         )
-
+    
     print(f"\nResults saved to {output_dir}")

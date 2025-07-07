@@ -65,6 +65,9 @@ function run_polynomial_is_benchmark(
     samples_c = [traces[i][:c] for i in 1:n_particles]
     
     return Dict(
+        "framework" => "gen.jl",
+        "method" => "is",
+        "n_particles" => n_particles,
         "times" => times,
         "mean_time" => mean(times),
         "std_time" => std(times),
@@ -138,6 +141,8 @@ function run_polynomial_hmc_benchmark(
     end
     
     return Dict(
+        "framework" => "gen.jl",
+        "method" => "hmc",
         "times" => times,
         "mean_time" => mean(times),
         "std_time" => std(times),

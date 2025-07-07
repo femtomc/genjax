@@ -3,6 +3,7 @@ from .figs import (
     save_blinker_gibbs_figure,
     save_logo_gibbs_figure,
     save_timing_scaling_figure,
+    save_all_showcase_figures,
 )
 
 
@@ -15,7 +16,7 @@ def main():
     # Mode selection
     parser.add_argument(
         "--mode",
-        choices=["all", "blinker", "logo", "timing"],
+        choices=["all", "blinker", "logo", "timing", "showcase"],
         default="all",
         help="Which figures to generate (default: all)",
     )
@@ -99,6 +100,10 @@ def main():
             flip_prob=args.flip_prob,
             seed=args.seed,
         )
+
+    if args.mode in ["all", "showcase"]:
+        print("\nGenerating showcase figures...")
+        save_all_showcase_figures()
 
     print("\n=== Game of Life case study complete! ===")
 

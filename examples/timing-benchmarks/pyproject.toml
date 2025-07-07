@@ -19,8 +19,8 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.pixi.project]
-channels = ["conda-forge"]
-platforms = ["linux-64", "osx-64", "osx-arm64"]
+channels = ["conda-forge", "pytorch", "nvidia"]
+platforms = ["linux-64"]
 
 [tool.pixi.dependencies]
 python = ">=3.10"
@@ -28,21 +28,53 @@ numpy = "*"
 matplotlib = "*"
 seaborn = "*"
 pandas = "*"
+scipy = "*"
 
 [tool.pixi.pypi-dependencies]
-jax = "*"
-jaxlib = "*"
+jax = ">=0.6.0,<0.7"
+jaxlib = ">=0.6.0,<0.7"
+numpyro = "*"
 genjax = { path = "../..", editable = true }
 
-[tool.pixi.feature.pyro.dependencies]
-pytorch = ">=2.0"
+[tool.pixi.feature.cuda.system-requirements]
+cuda = "12"
+
+[tool.pixi.feature.cuda.target.linux-64.dependencies]
+# CUDA-enabled JAX for GPU acceleration on linux-64
+jaxlib = { version = ">=0.6.0,<0.7", build = "*cuda12*" }
+
+[tool.pixi.feature.cuda.dependencies]
+python = ">=3.10"
 numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.feature.cuda.pypi-dependencies]
+jax = ">=0.6.0,<0.7"
+numpyro = "*"
+genjax = { path = "../..", editable = true }
+tensorflow-probability = "*"
+
+[tool.pixi.feature.pyro.dependencies]
+python = ">=3.10"
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+# Use CUDA-enabled PyTorch
+pytorch = { version = ">=2.0", channel = "pytorch" }
+pytorch-cuda = { version = "12.*", channel = "pytorch" }
+torchvision = { version = "*", channel = "pytorch" }
 
 [tool.pixi.feature.pyro.pypi-dependencies]
 pyro-ppl = "*"
 
 [tool.pixi.environments]
 default = { features = [], solve-group = "default" }
+cuda = { features = ["cuda"], solve-group = "cuda" }
 pyro = { features = ["pyro"], solve-group = "pyro" }
 
 [tool.pixi.tasks]
@@ -62,16 +94,27 @@ genjax-hmc = { cmd = "python -m timing_benchmarks.main polynomial-hmc --framewor
 genjax-all = { cmd = "python -m timing_benchmarks.main polynomial-all --frameworks genjax --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
 genjax-quick = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks genjax --repeats 10 --n-particles 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
 
+# === NumPyro Benchmarks (default environment) ===
+numpyro-is = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks numpyro --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+numpyro-hmc = { cmd = "python -m timing_benchmarks.main polynomial-hmc --frameworks numpyro --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+numpyro-all = { cmd = "python -m timing_benchmarks.main polynomial-all --frameworks numpyro --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+numpyro-quick = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks numpyro --repeats 10 --n-particles 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# === Handcoded JAX Benchmarks (default environment) ===
+handcoded-is = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks handcoded_jax --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+handcoded-quick = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks handcoded_jax --repeats 10 --n-particles 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
 # === Framework Comparisons ===
 # IS comparisons
-compare-is = { depends-on = ["genjax-is", "pyro-is"], cmd = "python -m timing_benchmarks.analysis.combine --method is --plot", env = { PYTHONPATH = "src:$PYTHONPATH" } }
-compare-is-quick = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks genjax --repeats 10 --n-particles 100 1000", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+compare-is = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks genjax numpyro handcoded_jax --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+compare-is-quick = { cmd = "python -m timing_benchmarks.main polynomial-is --frameworks genjax numpyro handcoded_jax --repeats 10 --n-particles 100 1000", env = { PYTHONPATH = "src:$PYTHONPATH" } }
 
 # HMC comparisons
-compare-hmc = { depends-on = ["genjax-hmc", "pyro-hmc"], cmd = "python -m timing_benchmarks.analysis.combine --method hmc --plot", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+compare-hmc = { cmd = "python -m timing_benchmarks.main polynomial-hmc --frameworks genjax numpyro --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+compare-hmc-quick = { cmd = "python -m timing_benchmarks.main polynomial-hmc --frameworks genjax numpyro --repeats 10", env = { PYTHONPATH = "src:$PYTHONPATH" } }
 
 # Full comparison suite
-compare-all = { depends-on = ["compare-is", "compare-hmc"] }
+compare-all = { cmd = "python -m timing_benchmarks.main polynomial-all --frameworks genjax numpyro handcoded_jax --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
 
 # === Visualization Tasks ===
 plot-latest = { cmd = "python -m timing_benchmarks.main plot --latest", env = { PYTHONPATH = "src:$PYTHONPATH" } }
@@ -96,9 +139,32 @@ clean-data = "rm -rf data/benchmark_*"
 clean-figs = "rm -rf figs/*.pdf figs/*.png"
 clean-all = { depends-on = ["clean-data", "clean-figs"] }
 
+# === CUDA Environment Tasks ===
+[tool.pixi.feature.cuda.tasks]
+# Individual framework benchmarks
+cuda-genjax = { cmd = "python -m timing_benchmarks.benchmarks.genjax --repeats 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+cuda-numpyro = { cmd = "python -m timing_benchmarks.benchmarks.numpyro --repeats 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+cuda-handcoded-tfp = { cmd = "python -m timing_benchmarks.benchmarks.handcoded_tfp --repeats 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+cuda-genjl = { cmd = "python -m timing_benchmarks.benchmarks.genjl --method is --repeats 50", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# Quick benchmarks for testing
+cuda-genjax-quick = { cmd = "python -m timing_benchmarks.benchmarks.genjax --repeats 10 --n-particles 100 1000", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+cuda-numpyro-quick = { cmd = "python -m timing_benchmarks.benchmarks.numpyro --repeats 10 --n-particles 100 1000", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+cuda-handcoded-tfp-quick = { cmd = "python -m timing_benchmarks.benchmarks.handcoded_tfp --repeats 10 --n-particles 100 1000", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# Combine results and generate plots
+cuda-combine = { cmd = "python combine_results.py", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+
+# Run all benchmarks sequentially
+cuda-benchmark-all = { depends-on = ["cuda-genjax", "cuda-numpyro", "cuda-handcoded-tfp", "cuda-combine"] }
+
+# Utilities
+cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); print(f\"JAX devices: {jax.devices()}\"); print(f\"Default backend: {jax.default_backend()}\")'"
+cuda-clean-data = "rm -rf data/genjax data/numpyro data/handcoded_jax data/pyro data/genjl"
+
 # === Pyro Environment Tasks ===
 [tool.pixi.feature.pyro.tasks]
-pyro-is = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-is --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
-pyro-hmc = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-hmc --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
-pyro-all = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-all --export-data", env = { PYTHONPATH = "src:$PYTHONPATH" } }
-pyro-quick = { cmd = "python -m timing_benchmarks.benchmarks.pyro polynomial-is --repeats 10 --particles 100", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+# Pyro benchmarks (with CUDA support)
+pyro-benchmark-is = { cmd = "python -m timing_benchmarks.benchmarks.pyro --method is --repeats 50 --device cuda", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+pyro-quick = { cmd = "python -m timing_benchmarks.benchmarks.pyro --method is --repeats 10 --n-particles 100 1000 --device cuda", env = { PYTHONPATH = "src:$PYTHONPATH" } }
+pyro-cpu = { cmd = "python -m timing_benchmarks.benchmarks.pyro --method is --repeats 10 --n-particles 100 1000 --device cpu", env = { PYTHONPATH = "src:$PYTHONPATH" } }

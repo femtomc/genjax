@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 from .core import Pose, World
 
 # Import shared GenJAX Research Visualization Standards
-from examples.viz import (
+from genjax.viz.standard import (
     setup_publication_fonts, FIGURE_SIZES, get_method_color,
     apply_grid_style, set_minimal_ticks, apply_standard_ticks, save_publication_figure,
     SMC_METHOD_COLORS, PRIMARY_COLORS, MARKER_SPECS, LINE_SPECS
@@ -20,7 +20,7 @@ from examples.viz import (
 setup_publication_fonts()
 
 
-def plot_world(world: World, ax=None, room_label_fontsize=14):
+def plot_world(world: World, ax=None, room_label_fontsize=14, show_room_labels=False):
     """Plot the world boundaries and internal walls."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 8))
@@ -42,8 +42,8 @@ def plot_world(world: World, ax=None, room_label_fontsize=14):
                 alpha=0.8,
             )
 
-    # Add room labels for clarity
-    if world.num_walls > 0:
+    # Add room labels for clarity (optional)
+    if world.num_walls > 0 and show_room_labels:
         # Assuming the 3-room layout we designed
         ax.text(
             2,
@@ -1421,35 +1421,43 @@ def plot_smc_method_comparison(
     n_particles=200,
     K=20,
     n_particles_big_grid=5,
+    include_ess_row=False,
+    include_legend=False,
 ):
     """Create comprehensive comparison plot for different SMC methods."""
     # Define colors first
     colors = {
         "smc_basic": "#1f77b4",
         "smc_hmc": "#2ca02c",
-        "smc_locally_optimal": "#d62728",
+        # Removed smc_locally_optimal
         "smc_locally_optimal_big_grid": "#ff7f0e",
     }
 
+    # Filter out smc_locally_optimal from results
+    filtered_results = {k: v for k, v in benchmark_results.items() if k != "smc_locally_optimal"}
+    
     # Only count methods we have colors for
-    valid_methods = [name for name in benchmark_results.keys() if name in colors]
+    valid_methods = [name for name in filtered_results.keys() if name in colors]
     n_methods = len(valid_methods)
 
-    # Create 4-row layout: first timestep, final particles, rainclouds, timing
-    fig = plt.figure(figsize=(6 * n_methods, 20))
-    # Create main gridspec with 4 rows
-    gs_main = fig.add_gridspec(4, 1, height_ratios=[1, 1, 1, 0.8], hspace=0.4)
-    # First row for initial particle distributions
-    gs_first = gs_main[0].subgridspec(1, n_methods, hspace=0.05)
-    # Second row for final particle distributions
-    gs_second = gs_main[1].subgridspec(1, n_methods, hspace=0.05)
-    # Third row for raincloud plots
-    gs_third = gs_main[2].subgridspec(1, n_methods, hspace=0.05)
-    # Bottom section for timing
-    gs_bottom = gs_main[3]
+    # Create layout based on whether ESS row is included
+    if include_ess_row:
+        # 3-row layout: final particles, rainclouds, timing
+        fig = plt.figure(figsize=(6 * n_methods, 15))
+        gs_main = fig.add_gridspec(3, 1, height_ratios=[1, 1, 0.8], hspace=0.4)
+        gs_first = gs_main[0].subgridspec(1, n_methods, hspace=0.05)
+        gs_second = gs_main[1].subgridspec(1, n_methods, hspace=0.05)
+        gs_bottom = gs_main[2]
+    else:
+        # 2-row layout: final particles, timing
+        fig = plt.figure(figsize=(6 * n_methods, 10))
+        gs_main = fig.add_gridspec(2, 1, height_ratios=[1, 0.8], hspace=0.4)
+        gs_first = gs_main[0].subgridspec(1, n_methods, hspace=0.05)
+        gs_bottom = gs_main[1]
+        gs_second = None  # No raincloud row
 
     method_labels = {}
-    for method_name, result in benchmark_results.items():
+    for method_name, result in filtered_results.items():
         if method_name in colors:
             # Use n_particles_big_grid for the big grid variant
             if method_name == "smc_locally_optimal_big_grid":
@@ -1461,8 +1469,6 @@ def plot_smc_method_comparison(
                 method_labels[method_name] = f"Bootstrap filter\n(N={method_n_particles})"
             elif method_name == "smc_hmc":
                 method_labels[method_name] = f"SMC (N={method_n_particles})\n+ HMC (K=25)"
-            elif method_name == "smc_locally_optimal":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
             elif method_name == "smc_locally_optimal_big_grid":
                 method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
 
@@ -1470,13 +1476,23 @@ def plot_smc_method_comparison(
     grayscale_colors = {
         "smc_basic": "#404040",
         "smc_hmc": "#606060",
-        "smc_locally_optimal": "#808080",
+        # Removed smc_locally_optimal
         "smc_locally_optimal_big_grid": "#a0a0a0",
     }
-
-    # Only process methods we have colors for
+    
+    # Extract timing data early to sort methods by speed
+    timing_data = {}
+    for method_name, result in filtered_results.items():
+        if method_name in colors:
+            timing_mean = float(result["timing_stats"][0]) * 1000  # Convert to milliseconds
+            timing_data[method_name] = timing_mean
+    
+    # Sort methods by timing (fastest to slowest)
+    sorted_methods = sorted(timing_data.keys(), key=lambda x: timing_data[x])
+    
+    # Only process methods in sorted order
     method_items = [
-        (name, result) for name, result in benchmark_results.items() if name in colors
+        (name, filtered_results[name]) for name in sorted_methods
     ]
 
     for i, (method_name, result) in enumerate(method_items):
@@ -1484,65 +1500,8 @@ def plot_smc_method_comparison(
         weight_history = result["weight_history"]
         diagnostic_weights = result["diagnostic_weights"]
 
-        # First row: Initial particle distribution (timestep 1)
-        ax_first = fig.add_subplot(gs_first[i])
-        plot_world(world, ax_first)
-
-        # Remove axis frames for clean visualization
-        ax_first.grid(False)
-        for spine in ax_first.spines.values():
-            spine.set_visible(False)
-        ax_first.set_xticks([])
-        ax_first.set_yticks([])
-        ax_first.set_xlabel("")
-        ax_first.set_ylabel("")
-
-        # Plot first timestep particle distribution
-        first_particles = particle_history[0]
-        first_weights = weight_history[0]
-        plot_particles(
-            first_particles, world, first_weights, ax_first, alpha=0.8, size_scale=50
-        )
-
-        # Plot true first pose with medium marker
-        plot_pose(
-            true_poses[0],
-            ax_first,
-            color="red",
-            label="True Pose",
-            arrow_length=0.4,
-            marker="x",
-            show_arrow=False,
-            markersize=70,  # Medium size
-        )
-
-        # Add method title with line breaks before +
-        method_title = method_labels[method_name]
-        ax_first.set_title(method_title, fontsize=16, fontweight="bold", pad=10)
-        ax_first.legend().set_visible(False)
-
-        # Color-code the method with frame
-        for spine in ax_first.spines.values():
-            spine.set_color(colors[method_name])
-            spine.set_linewidth(3)
-            spine.set_visible(True)
-
-        # Add "Start" label on the leftmost plot only
-        if i == 0:
-            ax_first.text(
-                -0.1,
-                0.5,
-                "Start",
-                transform=ax_first.transAxes,
-                fontsize=20,
-                fontweight="bold",
-                ha="center",
-                va="center",
-                rotation=90,
-            )
-
-        # Second row: Blended particle evolution (showing trajectory)
-        ax_particles = fig.add_subplot(gs_second[i])
+        # First row: Blended particle evolution (showing trajectory)
+        ax_particles = fig.add_subplot(gs_first[i])
         plot_world(world, ax_particles)
 
         # Remove axis frames for clean visualization
@@ -1655,7 +1614,9 @@ def plot_smc_method_comparison(
                 markersize=80,  # More prominent
             )
 
-        ax_particles.set_title("", fontsize=20, fontweight="bold")  # Remove title
+        # Add method title
+        method_title = method_labels[method_name]
+        ax_particles.set_title(method_title, fontsize=16, fontweight="bold", pad=10)
         ax_particles.legend().set_visible(False)
 
         # Color-code the method with frame
@@ -1678,122 +1639,116 @@ def plot_smc_method_comparison(
                 rotation=90,
             )
 
-        # Third row: Raincloud plot with ESS (grayscale)
-        ax_weights = fig.add_subplot(gs_third[i])
+        # Second row: Raincloud plot with ESS (grayscale) - only if enabled
+        if include_ess_row:
+            ax_weights = fig.add_subplot(gs_second[i])
 
-        # Remove frames except bottom x-axis
-        ax_weights.grid(False)
-        for spine_name, spine in ax_weights.spines.items():
-            if spine_name == "bottom":
-                spine.set_visible(True)
-                spine.set_color("black")
-                spine.set_linewidth(1)
-            else:
-                spine.set_visible(False)
+            # Remove frames except bottom x-axis
+            ax_weights.grid(False)
+            for spine_name, spine in ax_weights.spines.items():
+                if spine_name == "bottom":
+                    spine.set_visible(True)
+                    spine.set_color("black")
+                    spine.set_linewidth(1)
+                else:
+                    spine.set_visible(False)
 
-        if diagnostic_weights is not None and hasattr(diagnostic_weights, "shape"):
-            from genjax.viz.raincloud import diagnostic_raincloud
+            if diagnostic_weights is not None and hasattr(diagnostic_weights, "shape"):
+                from genjax.viz.raincloud import diagnostic_raincloud
 
-            T, N = diagnostic_weights.shape
-            ess_values = []
-            ess_colors = []
+                T, N = diagnostic_weights.shape
+                ess_values = []
+                ess_colors = []
 
-            # Show selected timesteps with raincloud visualization
-            selected_timesteps = [1, 6, 11, 16]
-            for plot_pos, t in enumerate([t for t in selected_timesteps if t < T]):
-                linear_weights = jnp.exp(diagnostic_weights[t])
-                linear_weights = linear_weights / jnp.sum(linear_weights)
+                # Show selected timesteps with raincloud visualization
+                selected_timesteps = [1, 6, 11, 16]
+                for plot_pos, t in enumerate([t for t in selected_timesteps if t < T]):
+                    linear_weights = jnp.exp(diagnostic_weights[t])
+                    linear_weights = linear_weights / jnp.sum(linear_weights)
 
-                # Use the modular raincloud function with particle count for ESS coloring
-                ess, ess_color = diagnostic_raincloud(
-                    ax_weights,
-                    linear_weights,
-                    position=plot_pos,  # Use plot position instead of timestep
-                    color=grayscale_colors[method_name],
-                    width=0.3,
-                    n_particles=N,  # Pass particle count for ESS quality assessment
-                )
-                ess_values.append(ess)
-                ess_colors.append(ess_color)
+                    # Use the modular raincloud function with particle count for ESS coloring
+                    ess, ess_color = diagnostic_raincloud(
+                        ax_weights,
+                        linear_weights,
+                        position=plot_pos,  # Use plot position instead of timestep
+                        color=grayscale_colors[method_name],
+                        width=0.3,
+                        n_particles=N,  # Pass particle count for ESS quality assessment
+                    )
+                    ess_values.append(ess)
+                    ess_colors.append(ess_color)
 
-            # Add ESS values as color-coded text annotations on the right side
-            # Also add timestep labels on the left
-            selected_timesteps = [1, 6, 11, 16]
-            valid_timesteps = [t for t in selected_timesteps if t < T]
+                # Add ESS values as color-coded text annotations on the right side
+                # Also add timestep labels on the left
+                selected_timesteps = [1, 6, 11, 16]
+                valid_timesteps = [t for t in selected_timesteps if t < T]
 
-            for plot_pos, (timestep, ess, ess_color) in enumerate(
-                zip(valid_timesteps, ess_values, ess_colors)
-            ):
-                # ESS annotation on the right (as percentage)
-                ax_weights.text(
-                    0.98,
-                    plot_pos,
-                    f"ESS: {ess*100:.0f}%",
-                    fontsize=16,
-                    va="center",
-                    ha="right",
-                    fontweight="bold",
-                    color=ess_color,
-                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9),
-                    transform=ax_weights.get_yaxis_transform(),
-                )
+                for plot_pos, (timestep, ess, ess_color) in enumerate(
+                    zip(valid_timesteps, ess_values, ess_colors)
+                ):
+                    # ESS annotation on the right (as percentage)
+                    ax_weights.text(
+                        0.98,
+                        plot_pos,
+                        f"ESS: {ess*100:.0f}%",
+                        fontsize=16,
+                        va="center",
+                        ha="right",
+                        fontweight="bold",
+                        color=ess_color,
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9),
+                        transform=ax_weights.get_yaxis_transform(),
+                    )
 
-            # Update y-axis to show the selected timesteps
-            ax_weights.set_ylim(-0.5, len(valid_timesteps) - 0.5)
-            ax_weights.set_yticks(range(len(valid_timesteps)))
-            if i == 0:
-                # Only show y-axis labels on the leftmost plot
-                ax_weights.set_yticklabels(
-                    [f"{t}" for t in valid_timesteps], fontsize=12
-                )
-            else:
-                # Hide y-axis labels for columns 2 and 3
-                ax_weights.set_yticklabels([])
-                ax_weights.tick_params(left=False)  # Hide tick marks too
+                # Update y-axis to show the selected timesteps
+                ax_weights.set_ylim(-0.5, len(valid_timesteps) - 0.5)
+                ax_weights.set_yticks(range(len(valid_timesteps)))
+                if i == 0:
+                    # Only show y-axis labels on the leftmost plot
+                    ax_weights.set_yticklabels(
+                        [f"{t}" for t in valid_timesteps], fontsize=12
+                    )
+                else:
+                    # Hide y-axis labels for columns 2 and 3
+                    ax_weights.set_yticklabels([])
+                    ax_weights.tick_params(left=False)  # Hide tick marks too
 
-            # Only show x-axis label on the leftmost plot
-            if i == 0:
-                ax_weights.set_xlabel("Particle Weight", fontsize=18, fontweight="bold")
-                ax_weights.set_ylabel("Timestep", fontsize=18, fontweight="bold")
-            else:
-                ax_weights.set_xlabel("")
-                ax_weights.set_ylabel("")
+                # Only show x-axis label on the leftmost plot
+                if i == 0:
+                    ax_weights.set_xlabel("Particle Weight", fontsize=18, fontweight="bold")
+                    ax_weights.set_ylabel("Timestep", fontsize=18, fontweight="bold")
+                else:
+                    ax_weights.set_xlabel("")
+                    ax_weights.set_ylabel("")
 
-            # Set x-axis limits and ticks
-            ax_weights.set_xlim(0, 1)
-            ax_weights.set_xticks([0, 1])
-            ax_weights.set_xticklabels(["0", "1"], fontsize=14)
-            ax_weights.tick_params(labelsize=14)
-        ax_weights.set_title("")  # Remove title to save space
+                # Set x-axis limits and ticks
+                ax_weights.set_xlim(0, 1)
+                ax_weights.set_xticks([0, 1])
+                ax_weights.set_xticklabels(["0", "1"], fontsize=14)
+                ax_weights.tick_params(labelsize=14)
+            ax_weights.set_title("")  # Remove title to save space
 
     # Bottom row: Timing comparison (spans all columns)
     ax_timing = fig.add_subplot(gs_bottom)
 
-    # Extract timing data
+    # Extract timing data (already sorted by speed)
     method_names = []
     timing_means = []
     timing_stds = []
     method_colors = []
 
-    for method_name, result in benchmark_results.items():
-        if method_name in colors:
-            method_names.append(method_labels[method_name])
-            timing_mean = (
-                float(result["timing_stats"][0]) * 1000
-            )  # Convert to milliseconds
-            timing_std = (
-                float(result["timing_stats"][1]) * 1000
-            )  # Convert to milliseconds
-            timing_means.append(timing_mean)
-            timing_stds.append(timing_std)
-            method_colors.append(colors[method_name])
-
-    # Sort by timing (fastest to slowest)
-    sorted_indices = np.argsort(timing_means)
-    method_names = [method_names[i] for i in sorted_indices]
-    timing_means = [timing_means[i] for i in sorted_indices]
-    timing_stds = [timing_stds[i] for i in sorted_indices]
-    method_colors = [method_colors[i] for i in sorted_indices]
+    for method_name in sorted_methods:
+        result = filtered_results[method_name]
+        method_names.append(method_labels[method_name])
+        timing_mean = (
+            float(result["timing_stats"][0]) * 1000
+        )  # Convert to milliseconds
+        timing_std = (
+            float(result["timing_stats"][1]) * 1000
+        )  # Convert to milliseconds
+        timing_means.append(timing_mean)
+        timing_stds.append(timing_std)
+        method_colors.append(colors[method_name])
 
     # Create horizontal bar chart
     y_pos = jnp.arange(len(method_names))
@@ -1802,7 +1757,7 @@ def plot_smc_method_comparison(
     )
 
     ax_timing.set_yticks(y_pos)
-    ax_timing.set_yticklabels([])
+    ax_timing.set_yticklabels(method_names, fontsize=16)
     ax_timing.set_xlabel("Time (milliseconds)", fontsize=20, fontweight="bold")
     ax_timing.set_title("", fontsize=22, fontweight="bold", pad=20)  # Remove title
     ax_timing.tick_params(labelsize=16)
@@ -1823,37 +1778,164 @@ def plot_smc_method_comparison(
             fontweight="bold",
         )
 
-    # Add legend for SMC methods at the bottom
-    from matplotlib.patches import Patch
+    # Add legend for SMC methods at the bottom (if enabled)
+    if include_legend:
+        from matplotlib.patches import Patch
 
-    legend_elements = [
-        Patch(facecolor=colors[method], label=method_labels[method])
-        for method in benchmark_results.keys()
-        if method in colors
-    ]
-    legend = fig.legend(
-        legend_elements,
-        [
-            method_labels[method]
-            for method in benchmark_results.keys()
-            if method in colors
-        ],
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=len(legend_elements),
-        fontsize=18,
-        handlelength=3,  # Make colored squares wider
-        handleheight=2,  # Make colored squares taller
-        columnspacing=2.5,  # Add more space between columns
-    )
-    # Make legend text bold
-    for text in legend.get_texts():
-        text.set_fontweight("bold")
+        legend_elements = [
+            Patch(facecolor=colors[method], label=method_labels[method])
+            for method in sorted_methods
+        ]
+        legend = fig.legend(
+            legend_elements,
+            [
+                method_labels[method]
+                for method in sorted_methods
+            ],
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.02),
+            ncol=len(legend_elements),
+            fontsize=18,
+            handlelength=3,  # Make colored squares wider
+            handleheight=2,  # Make colored squares taller
+            columnspacing=2.5,  # Add more space between columns
+        )
+        # Make legend text bold
+        for text in legend.get_texts():
+            text.set_fontweight("bold")
 
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
     return fig
+
+
+def plot_localization_problem_explanation(
+    true_poses: List[Pose],
+    observations: jnp.ndarray,
+    world: World,
+    save_path: str = None,
+    timesteps: List[int] = None,
+    n_rays: int = 8,
+):
+    """Create a 2x2 grid explaining the localization problem with LIDAR measurements.
+    
+    Shows the robot at different timesteps with LIDAR rays and measurements,
+    illustrating how the robot moves through the environment and senses walls.
+    
+    Args:
+        true_poses: List of true robot poses
+        observations: Array of LIDAR observations (shape: [T, n_rays])
+        world: World object with walls
+        save_path: Optional path to save figure
+        timesteps: Which timesteps to show (default: [0, 5, 10, 15])
+        n_rays: Number of LIDAR rays
+    """
+    if timesteps is None:
+        # Select 4 evenly spaced timesteps
+        n_poses = len(true_poses)
+        timesteps = [0, n_poses // 3, 2 * n_poses // 3, n_poses - 1]
+        # Ensure timesteps are valid
+        timesteps = [min(t, n_poses - 1) for t in timesteps]
+    
+    # Create 2x2 subplot with GRVS styling
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    axes = axes.flatten()
+    
+    for idx, t in enumerate(timesteps):
+        ax = axes[idx]
+        pose = true_poses[t]
+        obs = observations[t]
+        
+        # Plot world
+        plot_world(world, ax)
+        
+        # Remove axis frames for clean visualization
+        ax.grid(False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        
+        # Plot trajectory up to this point with fading effect
+        if t > 0:
+            for i in range(t):
+                alpha = 0.2 + 0.6 * (i / t)  # Fade from 0.2 to 0.8
+                if i > 0:
+                    ax.plot([true_poses[i-1].x, true_poses[i].x],
+                           [true_poses[i-1].y, true_poses[i].y],
+                           color='gray', linewidth=2, alpha=alpha, zorder=2)
+        
+        # Plot LIDAR rays and measurements
+        from .core import distance_to_wall_lidar
+        true_distances = distance_to_wall_lidar(pose, world, n_angles=n_rays)
+        
+        # Plot true LIDAR rays (what the robot actually sees)
+        plot_lidar_rays(
+            pose,
+            world,
+            distances=true_distances,
+            ax=ax,
+            n_angles=n_rays,
+            ray_color="darkgray",
+            measurement_color="black",
+            show_rays=True,
+            ray_alpha=0.3,
+        )
+        
+        # Plot noisy observations as orange dots
+        plot_lidar_rays(
+            pose,
+            world,
+            distances=obs,
+            ax=ax,
+            n_angles=n_rays,
+            ray_color="orange",
+            measurement_color="orange",
+            show_rays=False,  # Don't show rays for noisy observations
+        )
+        
+        # Plot robot pose prominently
+        plot_pose(
+            pose,
+            ax,
+            color="red",
+            arrow_length=0.6,
+            marker="o",
+            show_arrow=True,
+            markersize=150,
+        )
+        
+        # Add timestep label
+        ax.text(0.05, 0.95, f"t = {t}", 
+                transform=ax.transAxes,
+                fontsize=18, fontweight='bold',
+                verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+        
+        # Add simple legend only in first subplot
+        if idx == 0:
+            # Create proxy artists for legend
+            from matplotlib.lines import Line2D
+            legend_elements = [
+                Line2D([0], [0], marker='o', color='w', markerfacecolor='black',
+                       markersize=10, label='True distances'),
+                Line2D([0], [0], marker='o', color='w', markerfacecolor='orange',
+                       markersize=10, label='Noisy observations'),
+                Line2D([0], [0], marker='o', color='w', markerfacecolor='red',
+                       markersize=12, label='Robot'),
+            ]
+            ax.legend(handles=legend_elements, loc='lower right', fontsize=14,
+                     frameon=True, framealpha=0.9)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        save_publication_figure(fig, save_path)
+    
+    return fig, axes
 
 
 def plot_multi_method_estimation_error(

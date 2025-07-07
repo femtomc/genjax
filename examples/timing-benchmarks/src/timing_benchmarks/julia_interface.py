@@ -90,8 +90,12 @@ class GenJLBenchmark:
         
         # Save data to temporary files
         import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
-            np.savetxt(f, np.column_stack([xs, ys]), delimiter=",")
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode='w') as f:
+            # Write header
+            f.write("x,y\n")
+            # Write data
+            for x, y in zip(xs, ys):
+                f.write(f"{x},{y}\n")
             data_file = f.name
         
         # Julia script to run
@@ -101,14 +105,19 @@ class GenJLBenchmark:
         
         include("{self.julia_dir}/src/TimingBenchmarks.jl")
         using .TimingBenchmarks
+        using CSV
+        using DataFrames
         
         # Load data
-        data = readdlm("{data_file}", ',')
-        xs = data[:, 1]
-        ys = data[:, 2]
+        df = CSV.read("{data_file}", DataFrame)
+        xs = Float64.(df.x)
+        ys = Float64.(df.y)
+        
+        # Create polynomial data structure
+        poly_data = PolynomialData(xs, ys, Dict("a" => 1.0, "b" => -2.0, "c" => 3.0), 0.05, length(xs))
         
         # Run benchmark
-        result = benchmark_polynomial_is(xs, ys, {n_particles}, {repeats})
+        result = run_polynomial_is_benchmark(poly_data, {n_particles}; repeats={repeats})
         
         # Save results
         using JSON
@@ -193,8 +202,12 @@ class GenJLBenchmark:
         
         # Save data to temporary files
         import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
-            np.savetxt(f, np.column_stack([xs, ys]), delimiter=",")
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode='w') as f:
+            # Write header
+            f.write("x,y\n")
+            # Write data
+            for x, y in zip(xs, ys):
+                f.write(f"{x},{y}\n")
             data_file = f.name
         
         # Julia script to run
@@ -204,14 +217,19 @@ class GenJLBenchmark:
         
         include("{self.julia_dir}/src/TimingBenchmarks.jl")
         using .TimingBenchmarks
+        using CSV
+        using DataFrames
         
         # Load data
-        data = readdlm("{data_file}", ',')
-        xs = data[:, 1]
-        ys = data[:, 2]
+        df = CSV.read("{data_file}", DataFrame)
+        xs = Float64.(df.x)
+        ys = Float64.(df.y)
+        
+        # Create polynomial data structure
+        poly_data = PolynomialData(xs, ys, Dict("a" => 1.0, "b" => -2.0, "c" => 3.0), 0.05, length(xs))
         
         # Run benchmark
-        result = benchmark_polynomial_hmc(xs, ys, {n_samples}, {n_warmup}, {repeats})
+        result = run_polynomial_hmc_benchmark(poly_data, {n_samples}; n_warmup={n_warmup}, repeats={repeats})
         
         # Save results
         using JSON

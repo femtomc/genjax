@@ -959,7 +959,7 @@ def benchmark_smc_methods(
 ):
     """Benchmark different SMC methods and return timing results."""
     import jax
-    from examples.utils import benchmark_with_warmup
+    from genjax.timing import benchmark_with_warmup
     from genjax.core import const
 
     # Define methods with their specific particle counts

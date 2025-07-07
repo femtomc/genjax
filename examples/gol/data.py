@@ -39,7 +39,7 @@ def get_blinker_n(n: int):
 
 
 def get_popl_logo():
-    img = jnp.array(mpimg.imread("examples/gol/assets/popl.png"))
+    img = jnp.array(mpimg.imread("assets/popl.png"))
 
     # Convert the image to grayscale, considering the alpha channel
     alpha_channel = img[:, :, 3]
@@ -70,7 +70,7 @@ def get_popl_logo():
 
 
 def get_mit_logo():
-    img = mpimg.imread("examples/gol/assets/mit.png")
+    img = mpimg.imread("assets/mit.png")
 
     # Convert the image to grayscale, considering the alpha channel
     alpha_channel = img[:, :, 3]

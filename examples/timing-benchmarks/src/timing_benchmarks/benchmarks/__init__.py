@@ -1,24 +1,15 @@
 """Benchmark implementations for different frameworks."""
 
-from .genjax import (
-    genjax_polynomial_is_timing,
-    genjax_polynomial_hmc_timing,
-    genjax_polynomial_is_timing_simple,
-)
+from .genjax import genjax_polynomial_is_timing, genjax_polynomial_hmc_timing
+from .numpyro import numpyro_polynomial_is_timing
+from .handcoded_tfp import handcoded_tfp_polynomial_is_timing
 
-try:
-    from .pyro import (
-        pyro_polynomial_is_timing,
-        pyro_polynomial_hmc_timing,
-    )
-except ImportError:
-    # Pyro is optional
-    pass
+# Pyro requires separate environment due to PyTorch dependencies
+# Import will be handled at runtime when using pyro-specific tasks
 
 __all__ = [
     "genjax_polynomial_is_timing",
     "genjax_polynomial_hmc_timing",
-    "genjax_polynomial_is_timing_simple",
-    "pyro_polynomial_is_timing",
-    "pyro_polynomial_hmc_timing",
+    "numpyro_polynomial_is_timing",
+    "handcoded_tfp_polynomial_is_timing",
 ]

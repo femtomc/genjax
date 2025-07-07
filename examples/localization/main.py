@@ -40,6 +40,7 @@ from .figs import (
     plot_smc_timing_comparison,
     plot_smc_method_comparison,
     plot_multi_method_estimation_error,
+    plot_localization_problem_explanation,
 )
 
 from .export import (
@@ -436,6 +437,16 @@ def plot_figures(args):
     plt.savefig(os.path.join(figs_dir, filename7), dpi=150, bbox_inches="tight")
     plt.close(fig7)
     print(f"    Saved: {filename7}")
+    
+    # 3b. Localization problem explanation (2x2 grid)
+    print("  - Localization problem explanation (2x2 grid)...")
+    fig_explain, axes_explain = plot_localization_problem_explanation(
+        true_poses, observations, world, n_rays=config["n_rays"]
+    )
+    filename_explain = f"{param_prefix}_localization_problem_2x2_explanation.pdf"
+    plt.savefig(os.path.join(figs_dir, filename_explain), dpi=300, bbox_inches="tight")
+    plt.close(fig_explain)
+    print(f"    Saved: {filename_explain}")
 
     # 4. Basic demo plots (if available)
     basic_demo_dir = os.path.join(experiment_data_dir, "basic_demo")
