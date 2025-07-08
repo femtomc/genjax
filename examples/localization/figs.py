@@ -1619,10 +1619,10 @@ def plot_smc_method_comparison(
         ax_particles.set_title(method_title, fontsize=16, fontweight="bold", pad=10)
         ax_particles.legend().set_visible(False)
 
-        # Color-code the method with frame
+        # Color-code the method with frame (more prominent)
         for spine in ax_particles.spines.values():
             spine.set_color(colors[method_name])
-            spine.set_linewidth(3)
+            spine.set_linewidth(6)  # Increased from 3 for more prominence
             spine.set_visible(True)
 
         # Add "End" label on the leftmost plot only
@@ -1756,11 +1756,11 @@ def plot_smc_method_comparison(
         y_pos, timing_means, xerr=timing_stds, color=method_colors, alpha=0.7, capsize=5
     )
 
-    ax_timing.set_yticks(y_pos)
-    ax_timing.set_yticklabels(method_names, fontsize=16)
+    ax_timing.set_yticks([])
+    ax_timing.set_yticklabels([])
     ax_timing.set_xlabel("Time (milliseconds)", fontsize=20, fontweight="bold")
     ax_timing.set_title("", fontsize=22, fontweight="bold", pad=20)  # Remove title
-    ax_timing.tick_params(labelsize=16)
+    ax_timing.tick_params(labelsize=16, left=False)  # Remove left tick marks
     ax_timing.grid(True, axis="x", alpha=0.3)
 
     # Add timing values as text on bars

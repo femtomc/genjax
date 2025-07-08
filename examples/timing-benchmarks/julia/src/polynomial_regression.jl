@@ -49,6 +49,11 @@ function run_polynomial_is_benchmark(
         polynomial_model, (xs,), observations, n_particles
     )
     
+    # Additional warm-up runs to ensure JIT compilation
+    for _ in 1:5
+        importance_sampling(polynomial_model, (xs,), observations, n_particles)
+    end
+    
     # Timing runs
     times = Float64[]
     for _ in 1:repeats
@@ -65,7 +70,7 @@ function run_polynomial_is_benchmark(
     samples_c = [traces[i][:c] for i in 1:n_particles]
     
     return Dict(
-        "framework" => "gen.jl",
+        "framework" => "genjl",
         "method" => "is",
         "n_particles" => n_particles,
         "times" => times,
@@ -85,7 +90,9 @@ function run_polynomial_hmc_benchmark(
     data::PolynomialData,
     n_samples::Int;
     n_warmup::Int = 500,
-    repeats::Int = 100
+    repeats::Int = 100,
+    step_size::Float64 = 0.01,
+    n_leapfrog::Int = 20
 )
     xs = data.xs
     ys = data.ys
@@ -104,7 +111,7 @@ function run_polynomial_hmc_benchmark(
     
     # Full warm-up chain
     for _ in 1:n_warmup
-        trace, _ = Gen.hmc(trace, selection; L=20, eps=0.01)
+        trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
     end
     
     # Timing runs
@@ -116,7 +123,7 @@ function run_polynomial_hmc_benchmark(
         # Time the full chain
         start_time = time()
         for _ in 1:(n_warmup + n_samples)
-            trace, _ = Gen.hmc(trace, selection; L=20, eps=0.01)
+            trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
         end
         push!(times, time() - start_time)
     end
@@ -129,19 +136,19 @@ function run_polynomial_hmc_benchmark(
     
     # Burn-in
     for _ in 1:n_warmup
-        trace, _ = Gen.hmc(trace, selection; L=20, eps=0.01)
+        trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
     end
     
     # Collect samples
     for _ in 1:n_samples
-        trace, _ = Gen.hmc(trace, selection; L=20, eps=0.01)
+        trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
         push!(samples_a, trace[:a])
         push!(samples_b, trace[:b])
         push!(samples_c, trace[:c])
     end
     
     return Dict(
-        "framework" => "gen.jl",
+        "framework" => "genjl",
         "method" => "hmc",
         "times" => times,
         "mean_time" => mean(times),

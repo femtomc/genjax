@@ -116,7 +116,7 @@ class GenJLBenchmark:
         # Create polynomial data structure
         poly_data = PolynomialData(xs, ys, Dict("a" => 1.0, "b" => -2.0, "c" => 3.0), 0.05, length(xs))
         
-        # Run benchmark
+        # Run benchmark - use regular version
         result = run_polynomial_is_benchmark(poly_data, {n_particles}; repeats={repeats})
         
         # Save results
@@ -174,7 +174,9 @@ class GenJLBenchmark:
         ys: np.ndarray,
         n_samples: int,
         n_warmup: int = 500,
-        repeats: int = 100
+        repeats: int = 100,
+        step_size: float = 0.01,
+        n_leapfrog: int = 20
     ) -> Dict[str, Any]:
         """Run polynomial regression HMC in Gen.jl.
         
@@ -229,7 +231,7 @@ class GenJLBenchmark:
         poly_data = PolynomialData(xs, ys, Dict("a" => 1.0, "b" => -2.0, "c" => 3.0), 0.05, length(xs))
         
         # Run benchmark
-        result = run_polynomial_hmc_benchmark(poly_data, {n_samples}; n_warmup={n_warmup}, repeats={repeats})
+        result = run_polynomial_hmc_benchmark(poly_data, {n_samples}; n_warmup={n_warmup}, repeats={repeats}, step_size={step_size}, n_leapfrog={n_leapfrog})
         
         # Save results
         using JSON

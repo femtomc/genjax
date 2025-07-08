@@ -847,6 +847,214 @@ def save_generative_conditional_figure():
     return fig
 
 
+def create_forward_inverse_schematic(flip_prob=0.03, gibbs_steps=250, seed=42):
+    """
+    Create a schematic diagram illustrating the forward and inverse problems in Game of Life.
+    Shows the probabilistic forward model and uses Gibbs sampling to find multiple preimages.
+    
+    Args:
+        flip_prob: Probability of rule violations in forward model
+        gibbs_steps: Number of Gibbs steps to run for finding preimages
+        seed: Random seed for reproducibility
+        
+    Returns:
+        matplotlib.figure.Figure: The schematic diagram
+    """
+    fig = plt.figure(figsize=(14, 5))
+    
+    # Create main grid for single-row layout
+    gs = gridspec.GridSpec(1, 7, figure=fig, wspace=0.25,
+                          width_ratios=[1.2, 0.8, 1.2, 0.8, 1.2, 0.4, 2.2])
+    
+    # Main row elements
+    ax_initial = fig.add_subplot(gs[0, 0])
+    ax_forward_arrow = fig.add_subplot(gs[0, 1])
+    ax_final = fig.add_subplot(gs[0, 2])
+    ax_inverse_arrow = fig.add_subplot(gs[0, 3])
+    ax_inferred = fig.add_subplot(gs[0, 4])
+    ax_spacer = fig.add_subplot(gs[0, 5])
+    ax_alternatives = fig.add_subplot(gs[0, 6])
+    
+    # Use a more interesting pattern - let's use a 6x6 pattern with more structure
+    # Create a small glider gun or R-pentomino pattern
+    initial_state = jnp.array([
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0],
+        [0, 1, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0]
+    ], dtype=int)
+    
+    # Apply GoL rules with noise to get observed state
+    key = jrand.key(seed)
+    key, subkey = jrand.split(key)
+    from genjax import seed as genjax_seed
+    observed_trace = genjax_seed(core.generate_next_state.simulate)(subkey, initial_state, flip_prob)
+    observed_state = observed_trace.get_retval()
+    
+    # Count flipped bits
+    deterministic_next = core.generate_next_state(initial_state, 0.0)
+    num_flips = jnp.sum(observed_state != deterministic_next)
+    
+    # === INITIAL STATE ===
+    ax_initial.imshow(initial_state, cmap='gray_r', interpolation='nearest', aspect='equal')
+    ax_initial.set_xticks([])
+    ax_initial.set_yticks([])
+    # Add solid black frame
+    for spine in ax_initial.spines.values():
+        spine.set_color('black')
+        spine.set_linewidth(2.5)
+    
+    # === FORWARD ARROW ===
+    ax_forward_arrow.axis('off')
+    ax_forward_arrow.annotate('', xy=(0.85, 0.5), xytext=(0.15, 0.5),
+                             arrowprops=dict(arrowstyle='->', lw=5, color='green'),
+                             xycoords='axes fraction')
+    ax_forward_arrow.text(0.5, 0.25, 'forward', ha='center', va='center',
+                         fontsize=14, fontweight='bold', color='green',
+                         transform=ax_forward_arrow.transAxes)
+    
+    # === OBSERVED STATE ===
+    ax_final.imshow(observed_state, cmap='gray_r', interpolation='nearest', aspect='equal')
+    ax_final.set_xticks([])
+    ax_final.set_yticks([])
+    
+    # Highlight cells that were flipped due to noise
+    if num_flips > 0:
+        flipped_mask = observed_state != deterministic_next
+        for i in range(initial_state.shape[0]):
+            for j in range(initial_state.shape[1]):
+                if flipped_mask[i, j]:
+                    rect = plt.Rectangle((j-0.5, i-0.5), 1, 1, 
+                                       fill=False, edgecolor='orange', 
+                                       linewidth=2.5, linestyle='--')
+                    ax_final.add_patch(rect)
+    
+    # Add thick red frame to highlight this is the observed state
+    for spine in ax_final.spines.values():
+        spine.set_color('red')
+        spine.set_linewidth(3.5)
+    
+    # === INVERSE ARROW ===
+    ax_inverse_arrow.axis('off')
+    ax_inverse_arrow.annotate('', xy=(0.85, 0.5), xytext=(0.15, 0.5),
+                             arrowprops=dict(arrowstyle='->', lw=5, color='red'),
+                             xycoords='axes fraction')
+    ax_inverse_arrow.text(0.5, 0.25, 'inference', ha='center', va='center',
+                         fontsize=14, fontweight='bold', color='red',
+                         transform=ax_inverse_arrow.transAxes)
+    
+    # === RUN GIBBS SAMPLING ===
+    # Use the same approach as in save_blinker_gibbs_figure
+    key, subkey = jrand.split(key)
+    sampler = core.GibbsSampler(observed_state, flip_prob)
+    run_summary = core.run_sampler_and_get_summary(
+        subkey, sampler, gibbs_steps, n_steps_per_summary_frame=1
+    )
+    
+    # Check convergence by evolving the final state forward
+    final_inferred = run_summary.inferred_prev_boards[-1]
+    evolved_state = core.generate_next_state(final_inferred, 0.0)
+    reconstruction_error = jnp.sum(evolved_state != observed_state)
+    
+    # === INFERRED STATE ===
+    ax_inferred.imshow(final_inferred, cmap='gray_r', interpolation='nearest', aspect='equal')
+    ax_inferred.set_xticks([])
+    ax_inferred.set_yticks([])
+    
+    # Add solid frame (matching initial state style)
+    for spine in ax_inferred.spines.values():
+        spine.set_color('darkred')
+        spine.set_linewidth(2.5)
+    
+    # === SPACER ===
+    ax_spacer.axis('off')
+    
+    # === ALTERNATIVE SOLUTIONS FROM GIBBS ===
+    ax_alternatives.axis('off')
+    
+    # Add title in the correct position
+    ax_alternatives.text(0.5, 0.9, 'Many possible\ninitial states', 
+                        ha='center', va='center', fontsize=14,
+                        fontweight='bold', color='red',
+                        transform=ax_alternatives.transAxes)
+    
+    # Create a 2x3 grid of alternative states
+    grid_rows = 2
+    grid_cols = 3
+    cell_size = 0.28
+    spacing = 0.08
+    
+    # Calculate positions to center the grid
+    total_width = grid_cols * cell_size + (grid_cols - 1) * spacing
+    total_height = grid_rows * cell_size + (grid_rows - 1) * spacing
+    start_x = 0.5 - total_width / 2
+    start_y = 0.4 - total_height / 2
+    
+    # Get 6 different states from different points in the Gibbs chain
+    # Make sure they actually lead to the observed state
+    n_samples = len(run_summary.inferred_prev_boards)
+    
+    # Select states from later in the chain (better convergence)
+    # Focus on the last half of the chain where convergence is better
+    start_idx = n_samples // 2
+    end_idx = n_samples
+    
+    # Sample 6 states evenly from the converged portion
+    sample_indices = []
+    for i in range(6):
+        idx = start_idx + int(i * (end_idx - start_idx) / 6)
+        sample_indices.append(min(idx, n_samples - 1))
+    
+    # Verify and display the alternative states
+    for idx in range(6):
+        row = idx // grid_cols
+        col = idx % grid_cols
+        
+        # Position for this cell
+        x = start_x + col * (cell_size + spacing)
+        y = start_y + (grid_rows - 1 - row) * (cell_size + spacing)
+        
+        # Create axes for this alternative
+        mini_ax = fig.add_axes([
+            ax_alternatives.get_position().x0 + ax_alternatives.get_position().width * x,
+            ax_alternatives.get_position().y0 + ax_alternatives.get_position().height * y,
+            ax_alternatives.get_position().width * cell_size,
+            ax_alternatives.get_position().height * cell_size
+        ])
+        
+        # Get the state
+        state = run_summary.inferred_prev_boards[sample_indices[idx]]
+        
+        # Verify it leads to observed state (approximately)
+        evolved = core.generate_next_state(state, 0.0)
+        error = jnp.sum(evolved != observed_state)
+        
+        # Show the state
+        mini_ax.imshow(state, cmap='gray_r', interpolation='nearest')
+        mini_ax.set_xticks([])
+        mini_ax.set_yticks([])
+        
+        # Add border with color indicating quality
+        # Green-ish for good reconstruction, red-ish for poor
+        border_color = 'darkgreen' if error <= 2 else 'darkred'
+        for spine in mini_ax.spines.values():
+            spine.set_linewidth(2)
+            spine.set_color(border_color)
+    
+    return fig
+
+
+def save_forward_inverse_schematic():
+    """Save the forward/inverse problem schematic diagram."""
+    fig = create_forward_inverse_schematic()
+    filename = "figs/gol_forward_inverse_problem_schematic.pdf"
+    save_publication_figure(fig, filename)
+    print(f"Saved forward/inverse schematic: {filename}")
+    return fig
+
+
 def save_all_showcase_figures(
     pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42
 ):
@@ -865,6 +1073,7 @@ def save_all_showcase_figures(
     save_showcase_figure(pattern_type, size, chain_length, flip_prob, seed)
     save_nested_vectorization_figure()
     save_generative_conditional_figure()
+    save_forward_inverse_schematic()
 
     print("\n=== All GOL showcase figures generated successfully! ===")
 

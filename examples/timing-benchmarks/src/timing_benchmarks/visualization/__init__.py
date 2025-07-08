@@ -1,1 +1,0 @@
-# Stub module - functionality moved to combine_results.py

@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code when working with the timing benchmarks case study that comprehensively compares GenJAX performance against other probabilistic programming systems.
 
+## CRITICAL: ALWAYS USE PIXI ENVIRONMENT
+
+**NEVER run Python commands directly. ALWAYS use the pixi environment:**
+```bash
+pixi run python script.py  # CORRECT
+python script.py          # WRONG - NEVER DO THIS
+```
+
+The pixi environment contains all required dependencies (pandas, matplotlib, numpy, etc.).
+
 ## Overview
 
 The timing-benchmarks case study provides systematic performance comparisons between GenJAX and other probabilistic programming frameworks (Pyro, NumPyro, Handcoded JAX, Gen.jl, Stan) across multiple benchmark problems and inference algorithms. This case study focuses on fair, reproducible comparisons with standardized data and algorithm parameters.
