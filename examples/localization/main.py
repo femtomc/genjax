@@ -438,12 +438,12 @@ def plot_figures(args):
     plt.close(fig7)
     print(f"    Saved: {filename7}")
     
-    # 3b. Localization problem explanation (2x2 grid)
-    print("  - Localization problem explanation (2x2 grid)...")
+    # 3b. Localization problem explanation (1x4 row)
+    print("  - Localization problem explanation (1x4 row)...")
     fig_explain, axes_explain = plot_localization_problem_explanation(
         true_poses, observations, world, n_rays=config["n_rays"]
     )
-    filename_explain = f"{param_prefix}_localization_problem_2x2_explanation.pdf"
+    filename_explain = f"{param_prefix}_localization_problem_1x4_explanation.pdf"
     plt.savefig(os.path.join(figs_dir, filename_explain), dpi=300, bbox_inches="tight")
     plt.close(fig_explain)
     print(f"    Saved: {filename_explain}")

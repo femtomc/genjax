@@ -76,6 +76,25 @@ cuda-gol-timing = { cmd = "python -m examples.gol.main --mode timing --device gp
 cuda-gol-all = { cmd = "python -m examples.gol.main --mode all --device gpu", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
 cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); print(f\"JAX devices: {jax.devices()}\"); print(f\"Default backend: {jax.default_backend()}\")'"
 
+# === Data Export/Import ===
+gol-gibbs-experiment = { cmd = "python -m examples.gol.run_gibbs_experiments", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-gibbs-all-patterns = { cmd = "python -m examples.gol.run_gibbs_experiments --all-patterns", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-timing-data = { cmd = "python -m examples.gol.run_gibbs_sweep_timing_simple", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-timing-optimized = { cmd = "python -m examples.gol.run_gibbs_sweep_timing_optimized", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+
+# === Showcase Figure Generation ===
+gol-showcase = { cmd = "python -m examples.gol.generate_showcase --pattern wizards --size 256", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-showcase-1024 = { cmd = "python -m examples.gol.generate_showcase --pattern wizards --size 1024", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-showcase-mit = { cmd = "python -m examples.gol.generate_showcase --pattern mit --size 256", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-showcase-from-data = { cmd = "python -m examples.gol.generate_showcase --load-from", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-schematic = { cmd = "python -m examples.gol.generate_schematic --pattern wizards --size 256", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-schematic-1024 = { cmd = "python -m examples.gol.generate_schematic --pattern wizards --size 1024", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-combined = { cmd = "python -m examples.gol.generate_combined --pattern wizards --size 256", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-combined-1024 = { cmd = "python -m examples.gol.generate_combined --pattern wizards --size 1024", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-integrated = { cmd = "python -m examples.gol.generate_integrated --pattern wizards --size 256", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+gol-integrated-1024 = { cmd = "python -m examples.gol.generate_integrated --pattern wizards --size 1024", env = { PYTHONPATH = "../..:$PYTHONPATH" } }
+
 # === Cleanup ===
 clean-figs = "rm -f figs/*.pdf"
-clean-all = { depends-on = ["clean-figs"] }
+clean-data = "rm -rf data/gibbs_experiments"
+clean-all = { depends-on = ["clean-figs", "clean-data"] }

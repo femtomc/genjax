@@ -1818,7 +1818,7 @@ def plot_localization_problem_explanation(
     timesteps: List[int] = None,
     n_rays: int = 8,
 ):
-    """Create a 2x2 grid explaining the localization problem with LIDAR measurements.
+    """Create a 1x4 row explaining the localization problem with LIDAR measurements.
     
     Shows the robot at different timesteps with LIDAR rays and measurements,
     illustrating how the robot moves through the environment and senses walls.
@@ -1838,8 +1838,8 @@ def plot_localization_problem_explanation(
         # Ensure timesteps are valid
         timesteps = [min(t, n_poses - 1) for t in timesteps]
     
-    # Create 2x2 subplot with GRVS styling
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    # Create 1x4 subplot with GRVS styling (single row)
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     axes = axes.flatten()
     
     for idx, t in enumerate(timesteps):

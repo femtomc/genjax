@@ -24,8 +24,19 @@ data/
 figs/
 examples/**/figs/*.pdf
 examples/**/figs/*.png
-# Keep specific asset directories
-!examples/gol/assets/
-!examples/gol/assets/*.png
+
+# Image files (except in asset directories)
+*.png
+*.jpg
+*.jpeg
+*.PNG
+*.JPG
+*.JPEG
+
+# Keep specific asset directories and their images
+!examples/*/assets/
+!examples/*/assets/*.png
+!examples/*/assets/*.jpg
+!examples/*/assets/*.jpeg
 
 .claude/settings.local.json

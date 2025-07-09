@@ -1,4 +1,5 @@
 import time
+import json
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -17,6 +18,12 @@ from .data import (
     get_popl_logo,
     get_small_mit_logo,
     get_small_popl_logo,
+    get_popl_logo_white_lambda,
+    get_small_popl_logo_white_lambda,
+    get_hermes_logo,
+    get_small_hermes_logo,
+    get_wizards_logo,
+    get_small_wizards_logo,
 )
 from genjax.timing import benchmark_with_warmup
 
@@ -306,54 +313,105 @@ def save_timing_scaling_figure(
 
 
 def create_showcase_figure(
-    pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42
+    pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42,
+    white_lambda=False, load_from_file=None
 ):
     """
-    Create the main 4-panel GOL showcase figure.
+    Create the main 3-panel GOL showcase figure with timing bar plot.
 
     Panel 1: Observed future state (target)
     Panel 2: Multiple inferred past states showing uncertainty
     Panel 3: One-step evolution of final inferred state
-    Panel 4: Performance scaling comparison (CPU vs GPU)
+    Bottom: Horizontal bar plot comparing CPU vs GPU timing
 
     Args:
-        pattern_type: Type of pattern ("mit", "popl", or "blinker")
-        size: Grid size for the pattern
+        pattern_type: Type of pattern ("mit", "popl", "blinker", "hermes", "wizards")
+        size: Grid size for the pattern (default 256x256)
         chain_length: Number of Gibbs sampling steps
         flip_prob: Probability of rule violations
         seed: Random seed for reproducibility
+        white_lambda: Whether to use white lambda version of POPL logo
+        load_from_file: Path to saved experiment data (if None, runs new experiment)
 
     Returns:
-        matplotlib.figure.Figure: The 4-panel showcase figure
+        matplotlib.figure.Figure: The 4-panel showcase figure with timing
     """
 
-    # Set up the figure with custom layout using GRVS sizing
-    fig = plt.figure(figsize=FIGURE_SIZES["three_panel_horizontal"])
+    # Set up the figure with custom layout using GRVS sizing - taller for timing
+    fig = plt.figure(figsize=(14, 7.5))  # Taller to accommodate timing plot
     gs = gridspec.GridSpec(
         2,
-        4,
+        3,
         figure=fig,
-        width_ratios=[1, 2.2, 1, 1.5],  # Even wider performance panel
-        height_ratios=[1, 0.1],
-        hspace=0.3,
-        wspace=0.25,
-    )  # Increased spacing to prevent overlap
+        height_ratios=[2.5, 1.5],  # Make timing plot taller relative to main panels
+        width_ratios=[1, 1, 1],  # Equal proportions
+        wspace=0.15,
+        hspace=0.3,  # Space between rows
+    )  # Good spacing between panels
 
     # Create main axes
     ax_target = fig.add_subplot(gs[0, 0])
     ax_inferred = fig.add_subplot(
         gs[0, 1]
     )  # This will be used for the entire middle section
-    ax_evolution = fig.add_subplot(gs[0, 2])  # New panel for evolution
-    ax_performance = fig.add_subplot(gs[0, 3])
+    ax_evolution = fig.add_subplot(gs[0, 2])  # Panel for evolution
+    
+    # Create timing plot axis spanning all three columns
+    ax_timing = fig.add_subplot(gs[1, :])
 
-    # === LEFT PANEL: Target State ===
-    if pattern_type == "mit":
-        target = get_small_mit_logo(size)
-    elif pattern_type == "popl":
-        target = get_small_popl_logo(size)
+    # Load data from file or run new experiment
+    import json
+    
+    if load_from_file:
+        print(f"Loading experiment data from: {load_from_file}")
+        with open(load_from_file, 'r') as f:
+            exp_data = json.load(f)
+        
+        # Extract data from saved experiment
+        target = jnp.array(exp_data["target"])
+        chain_length = exp_data["metadata"]["chain_length"]
+        
+        # Create a mock run_summary object with the loaded data
+        class MockRunSummary:
+            def __init__(self, data):
+                self.predictive_posterior_scores = jnp.array(data["predictive_posterior_scores"])
+                self.inferred_prev_boards = jnp.array(data["inferred_prev_boards"])
+                self.inferred_reconstructed_targets = jnp.array(data["inferred_reconstructed_targets"])
+                self._final_n_bit_flips = data["metadata"]["final_n_bit_flips"]
+            
+            def n_incorrect_bits_in_reconstructed_image(self, target):
+                return self._final_n_bit_flips
+        
+        run_summary = MockRunSummary(exp_data)
+        final_pred_post = exp_data["metadata"]["final_pred_post"]
+        accuracy = exp_data["metadata"]["final_accuracy"]
+        
     else:
-        target = get_blinker_n(size)
+        # === LEFT PANEL: Target State ===
+        if pattern_type == "mit":
+            target = get_small_mit_logo(size)
+        elif pattern_type == "popl":
+            if white_lambda:
+                target = get_small_popl_logo_white_lambda(size)
+            else:
+                target = get_small_popl_logo(size)
+        elif pattern_type == "hermes":
+            target = get_small_hermes_logo(size)
+        elif pattern_type == "wizards":
+            target = get_small_wizards_logo(size)
+        else:
+            target = get_blinker_n(size)
+            
+        # Run new experiment
+        print(f"Running Gibbs sampler for {pattern_type} pattern...")
+        key = jrand.key(seed)
+        sampler = core.GibbsSampler(target, flip_prob)
+        run_summary = core.run_sampler_and_get_summary(key, sampler, chain_length, 1)
+        
+        # Calculate metrics
+        final_pred_post = run_summary.predictive_posterior_scores[-1]
+        final_n_bit_flips = run_summary.n_incorrect_bits_in_reconstructed_image(target)
+        accuracy = (1 - final_n_bit_flips / target.size) * 100
 
     ax_target.imshow(
         target, cmap="gray_r", interpolation="nearest"
@@ -361,43 +419,42 @@ def create_showcase_figure(
     # Remove xlabel for cleaner integration
     ax_target.set_xticks([])
     ax_target.set_yticks([])
+    ax_target.set_aspect('equal', 'box')
 
-    # Add a fancy box around target using GRVS colors
-    fancy_box = FancyBboxPatch(
-        (0, 0),
-        size - 1,
-        size - 1,
-        boxstyle="round,pad=2",
-        facecolor="none",
-        edgecolor=get_method_color("data_points"),
-        linewidth=3,
-        transform=ax_target.transData,
-    )
-    ax_target.add_patch(fancy_box)
+    # Add thick red border to highlight this is the observed state (like in schematic)
+    for spine in ax_target.spines.values():
+        spine.set_color(get_method_color("data_points"))
+        spine.set_linewidth(4)
 
     # === MIDDLE PANEL: Inferred Past States ===
-    print(f"Running Gibbs sampler for {pattern_type} pattern...")
-    key = jrand.key(seed)
-    sampler = core.GibbsSampler(target, flip_prob)
-    run_summary = core.run_sampler_and_get_summary(key, sampler, chain_length, 1)
 
-    # Create a 2x4 grid of inferred samples over entire chain
-    n_samples = 8
+    # Create a 2x2 grid of inferred samples over entire chain
+    n_samples = 4
     sample_indices = jnp.linspace(0, chain_length - 1, n_samples, dtype=int)
 
-    # Create subgrid for samples
+    # Create subgrid for samples with padding
     inner_grid = gridspec.GridSpecFromSubplotSpec(
-        2, 4, subplot_spec=gs[0, 1], wspace=0.02, hspace=0.03
+        2, 2, 
+        subplot_spec=gs[0, 1], 
+        wspace=0.08, hspace=0.08  # Tighter spacing for 2x2 grid
     )
 
     for i in range(n_samples):
-        ax = fig.add_subplot(inner_grid[i // 4, i % 4])
+        ax = fig.add_subplot(inner_grid[i // 2, i % 2])
         sample_idx = sample_indices[i]
         inferred_state = run_summary.inferred_prev_boards[sample_idx]
 
         ax.imshow(
             inferred_state, cmap="gray_r", interpolation="nearest"
         )  # Show black version
+        
+        # Shrink the cells by adding padding
+        padding = 0.08  # Fraction of image size to pad
+        img_size = inferred_state.shape[0]
+        pad_size = img_size * padding
+        ax.set_xlim(-pad_size, img_size + pad_size)
+        ax.set_ylim(img_size + pad_size, -pad_size)  # Inverted for image coordinates
+        
         ax.set_xticks([])
         ax.set_yticks([])
         ax.axis("off")  # Remove all axes for cleaner look
@@ -412,11 +469,21 @@ def create_showcase_figure(
             verticalalignment="top",
             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
         )
+        
+        # Add green border to the final state (t=499)
+        if i == n_samples - 1:  # Last sample in the 2x2 grid
+            # Create a rectangle patch for the border with dashed line
+            from matplotlib.patches import Rectangle
+            rect = Rectangle((0, 0), 1, 1, transform=ax.transAxes,
+                           fill=False, edgecolor='green', linewidth=4,
+                           linestyle='--')
+            ax.add_patch(rect)
 
     # Remove axes from the middle panel container
     ax_inferred.set_xticks([])
     ax_inferred.set_yticks([])
     ax_inferred.axis("off")
+    ax_inferred.set_aspect('equal', 'box')
 
     # === NEW PANEL: Evolution ===
     # The inferred_reconstructed_targets already contains the one-step evolution
@@ -433,6 +500,7 @@ def create_showcase_figure(
     )
     ax_evolution.set_xticks([])
     ax_evolution.set_yticks([])
+    ax_evolution.set_aspect('equal', 'box')
 
     # Add annotation showing this is the evolution
     ax_evolution.text(
@@ -445,113 +513,14 @@ def create_showcase_figure(
         style="italic",
     )
 
-    # === RIGHT PANEL: Performance Scaling ===
-    # Run quick benchmarks for different grid sizes
-    grid_sizes = [10, 32, 64, 96]
-    cpu_times = []
-    gpu_times = []
-
-    print("\nRunning performance benchmarks...")
-
-    # CPU benchmarks
-    with jax.default_device(jax.devices("cpu")[0]):
-        for n in grid_sizes:
-            print(f"  CPU {n}x{n}...", end=" ")
-            _, (mean_time, _) = benchmark_with_warmup(
-                lambda: _gibbs_task(n, chain_length=10, flip_prob=flip_prob, seed=seed),
-                warmup_runs=1,
-                repeats=3,
-                inner_repeats=1,
-                auto_sync=True,
-            )
-            cpu_times.append(mean_time)
-            print(f"{mean_time:.3f}s")
-
-    # GPU benchmarks (if available)
-    try:
-        gpu_devices = jax.devices("gpu")
-        has_gpu = len(gpu_devices) > 0
-    except RuntimeError:
-        has_gpu = False
-
-    if has_gpu:
-        with jax.default_device(jax.devices("gpu")[0]):
-            for n in grid_sizes:
-                print(f"  GPU {n}x{n}...", end=" ")
-                _, (mean_time, _) = benchmark_with_warmup(
-                    lambda: _gibbs_task(
-                        n, chain_length=10, flip_prob=flip_prob, seed=seed
-                    ),
-                    warmup_runs=1,
-                    repeats=3,
-                    inner_repeats=1,
-                    auto_sync=True,
-                )
-                gpu_times.append(mean_time)
-                print(f"{mean_time:.3f}s")
-    else:
-        # For paper figure: simulate realistic GPU times with increasing speedup for larger grids
-        print("  GPU (simulated for paper)...")
-        speedup_factors = [
-            1.5,
-            3.5,
-            8.0,
-            12.0,
-        ]  # Realistic speedups: more benefit for larger grids
-        for cpu_t, speedup in zip(cpu_times, speedup_factors):
-            gpu_times.append(cpu_t / speedup)
-
-    # Plot performance comparison
-    x_pos = np.arange(len(grid_sizes))
-    width = 0.35
-
-    cpu_bars = ax_performance.bar(
-        x_pos - width / 2,
-        cpu_times,
-        width,
-        label="CPU",
-        color=get_method_color("genjax_is"),
-        alpha=0.8,
-    )
-
-    if gpu_times:
-        gpu_bars = ax_performance.bar(
-            x_pos + width / 2,
-            gpu_times,
-            width,
-            label="GPU",
-            color=get_method_color("genjax_hmc"),
-            alpha=0.8,
-        )
-
-        # Add speedup annotations
-        for i, (cpu_t, gpu_t) in enumerate(zip(cpu_times, gpu_times)):
-            speedup = cpu_t / gpu_t
-            ax_performance.text(
-                i,
-                max(cpu_t, gpu_t) * 1.02,
-                f"{speedup:.1f}×",
-                ha="center",
-                fontsize=12,
-                fontweight="bold",
-            )
-
-    ax_performance.set_xlabel("Grid Size", fontweight="bold")
-    ax_performance.set_ylabel("Time (s)", fontweight="bold")
-    ax_performance.set_xticks(x_pos)
-    ax_performance.set_xticklabels([f"{n}×{n}" for n in grid_sizes])
-    ax_performance.legend(fontsize=16, loc="upper left")
-    apply_grid_style(ax_performance)
-
-    # Set y-axis limits to prevent bars from hitting the top
-    max_time = max(max(cpu_times), max(gpu_times) if gpu_times else 0)
-    ax_performance.set_ylim(
-        0, max_time * 1.08
-    )  # Very tight padding for compact display matching Gibbs panel height
+    # Print summary statistics (already calculated above)
+    print(f"\nFinal predictive posterior: {final_pred_post:.6f}")
+    print(f"Final reconstruction errors: {final_n_bit_flips} bits ({accuracy:.1f}% accuracy)")
+    final_n_bit_flips = run_summary.n_incorrect_bits_in_reconstructed_image(target)
 
     # Add aligned titles using figure coordinates
     # Calculate positions based on axes locations
-    title_y = 0.95  # Consistent height for all titles
+    title_y = 0.93  # Tighter to subplots for better integration
 
     # Get the x-center of each axis in figure coordinates
     left_center = (ax_target.get_position().x0 + ax_target.get_position().x1) / 2
@@ -559,27 +528,24 @@ def create_showcase_figure(
     evolution_center = (
         ax_evolution.get_position().x0 + ax_evolution.get_position().x1
     ) / 2
-    right_center = (
-        ax_performance.get_position().x0 + ax_performance.get_position().x1
-    ) / 2
 
     # Add titles at exact positions
     fig.text(
         left_center,
         title_y,
-        "Observed Future State",
+        "Observed State",
         ha="center",
         va="top",
-        fontsize=18,
+        fontsize=20,
         fontweight="bold",
     )
     fig.text(
         middle_center,
         title_y,
-        "Vectorized Gibbs Chain",
+        "Inversion via Gibbs",
         ha="center",
         va="top",
-        fontsize=18,
+        fontsize=20,
         fontweight="bold",
     )
     fig.text(
@@ -588,19 +554,170 @@ def create_showcase_figure(
         "One-Step Evolution",
         ha="center",
         va="top",
-        fontsize=18,
-        fontweight="bold",
-    )
-    fig.text(
-        right_center,
-        title_y,
-        "Performance Scaling",
-        ha="center",
-        va="top",
-        fontsize=18,
+        fontsize=20,
         fontweight="bold",
     )
 
+    # === TIMING BAR PLOT ===
+    # Load timing data
+    timing_data_path = "data/gibbs_sweep_timing.json"
+    
+    try:
+        with open(timing_data_path, 'r') as f:
+            timing_data = json.load(f)
+        
+        # Extract data for plotting and convert to milliseconds
+        sizes = timing_data['sizes']
+        cpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['cpu_results']]
+        gpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['gpu_results']]
+        
+        # Reverse the order - smallest at top, largest at bottom
+        sizes = list(reversed(sizes))
+        cpu_times_ms = list(reversed(cpu_times_ms))
+        gpu_times_ms = list(reversed(gpu_times_ms))
+        
+        # Create horizontal bar plot with wider bars - GPU first, then CPU
+        y_pos = np.arange(len(sizes))
+        bar_height = 0.5  # Wider bars
+        
+        bars_gpu = ax_timing.barh(y_pos + bar_height/2, gpu_times_ms, bar_height,
+                                  label='GPU', color=get_method_color("genjax_hmc"), alpha=0.8)
+        bars_cpu = ax_timing.barh(y_pos - bar_height/2, cpu_times_ms, bar_height,
+                                  label='CPU', color=get_method_color("genjax_is"), alpha=0.8)
+        
+        # Add only speedup annotations - placed at the end of CPU bars
+        for i, (bar_cpu, bar_gpu) in enumerate(zip(bars_cpu, bars_gpu)):
+            speedup = cpu_times_ms[i] / gpu_times_ms[i]
+            ax_timing.text(bar_cpu.get_width() + 2, bar_cpu.get_y() + bar_cpu.get_height()/2,
+                          f'{speedup:.1f}×', ha='left', va='center',
+                          fontsize=14, fontweight='bold', color=get_method_color("data_points"))
+        
+        # Remove frame and spines
+        ax_timing.spines['top'].set_visible(False)
+        ax_timing.spines['right'].set_visible(False)
+        ax_timing.spines['left'].set_visible(False)
+        ax_timing.spines['bottom'].set_linewidth(1.5)
+        
+        # Format axes - restore y-axis labels
+        ax_timing.set_yticks(y_pos)
+        ax_timing.set_yticklabels([f'{s}×{s}' for s in sizes], fontsize=12)
+        ax_timing.set_xlabel('Time per Gibbs sweep (ms)', fontsize=14, fontweight='bold')
+        ax_timing.set_xlim(0, max(cpu_times_ms) * 1.2)
+        
+        # Add legend - centered at top with horizontal layout
+        ax_timing.legend(loc='upper center', fontsize=12, ncol=2, frameon=True, 
+                        bbox_to_anchor=(0.5, 0.98), columnspacing=1.5)
+        
+        # Apply grid style but only for x-axis
+        ax_timing.grid(True, axis='x', alpha=0.3)
+        ax_timing.set_axisbelow(True)
+        
+    except FileNotFoundError:
+        # If timing data not available, show placeholder
+        ax_timing.text(0.5, 0.5, 'Timing data not available\nRun: pixi run gol-timing-optimized',
+                      ha='center', va='center', fontsize=16, transform=ax_timing.transAxes)
+        ax_timing.set_xticks([])
+        ax_timing.set_yticks([])
+        ax_timing.spines['top'].set_visible(False)
+        ax_timing.spines['right'].set_visible(False)
+        ax_timing.spines['left'].set_visible(False)
+        ax_timing.spines['bottom'].set_visible(False)
+
+    return fig
+
+
+def create_timing_bar_plot(timing_data_path="data/gibbs_sweep_timing.json"):
+    """
+    Create a standalone timing bar plot showing GOL performance across grid sizes.
+    
+    Args:
+        timing_data_path: Path to JSON file containing timing data
+        
+    Returns:
+        matplotlib.figure.Figure: The timing bar plot figure
+    """
+    setup_publication_fonts()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    try:
+        with open(timing_data_path, 'r') as f:
+            timing_data = json.load(f)
+        
+        # Extract data for plotting and convert to milliseconds
+        sizes = timing_data['sizes']
+        cpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['cpu_results']]
+        gpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['gpu_results']]
+        
+        # Reverse the order - smallest at top, largest at bottom
+        sizes = list(reversed(sizes))
+        cpu_times_ms = list(reversed(cpu_times_ms))
+        gpu_times_ms = list(reversed(gpu_times_ms))
+        
+        # Create horizontal bar plot with wider bars - GPU first, then CPU
+        y_pos = np.arange(len(sizes))
+        bar_height = 0.35  # Slightly smaller for standalone
+        
+        bars_gpu = ax.barh(y_pos + bar_height/2, gpu_times_ms, bar_height,
+                          label='GPU', color=get_method_color("genjax_hmc"), alpha=0.8)
+        bars_cpu = ax.barh(y_pos - bar_height/2, cpu_times_ms, bar_height,
+                          label='CPU', color=get_method_color("genjax_is"), alpha=0.8)
+        
+        # Add speedup annotations - placed at the end of CPU bars
+        for i, (bar_cpu, bar_gpu) in enumerate(zip(bars_cpu, bars_gpu)):
+            speedup = cpu_times_ms[i] / gpu_times_ms[i]
+            ax.text(bar_cpu.get_width() + 2, bar_cpu.get_y() + bar_cpu.get_height()/2,
+                   f'{speedup:.1f}×', ha='left', va='center',
+                   fontsize=16, fontweight='bold', color=get_method_color("data_points"))
+        
+        # Remove frame and spines
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_linewidth(2)
+        
+        # Format axes
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels([f'{s}×{s}' for s in sizes], fontsize=16)
+        ax.set_xlabel('Time per Gibbs sweep (ms)', fontsize=18, fontweight='bold')
+        ax.set_xlim(0, max(cpu_times_ms) * 1.25)
+        
+        # Add legend - horizontal layout at top
+        ax.legend(loc='upper center', fontsize=16, ncol=2, frameon=True, 
+                 bbox_to_anchor=(0.5, 1.05), columnspacing=2)
+        
+        # Apply grid style but only for x-axis
+        ax.grid(True, axis='x', alpha=0.3)
+        ax.set_axisbelow(True)
+        
+        # Add title
+        fig.text(0.5, 0.95, "Game of Life Gibbs Sampling Performance", 
+                ha='center', fontsize=20, fontweight='bold')
+        
+    except FileNotFoundError:
+        # If timing data not available, show placeholder
+        ax.text(0.5, 0.5, 'Timing data not available\nRun: pixi run gol-timing-optimized',
+               ha='center', va='center', fontsize=18, transform=ax.transAxes)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+    
+    plt.tight_layout()
+    return fig
+
+
+def save_timing_bar_plot(timing_data_path="data/gibbs_sweep_timing.json"):
+    """
+    Generate and save the standalone timing bar plot.
+    
+    Args:
+        timing_data_path: Path to JSON file containing timing data
+    """
+    print("Generating timing bar plot...")
+    fig = create_timing_bar_plot(timing_data_path)
+    filename = "gol_gibbs_timing_bar_plot.pdf"
+    save_publication_figure(fig, filename)
+    print(f"Saved: {filename}")
     return fig
 
 
@@ -803,21 +920,24 @@ def create_generative_conditional_figure():
 
 
 def save_showcase_figure(
-    pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42
+    pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42,
+    load_from_file=None
 ):
     """
     Generate and save the main Game of Life showcase figure.
 
     Args:
-        pattern_type: Type of pattern ("mit", "popl", or "blinker")
+        pattern_type: Type of pattern ("mit", "popl", "blinker", "hermes", "wizards")
         size: Grid size for the pattern
         chain_length: Number of Gibbs sampling steps
         flip_prob: Probability of rule violations
         seed: Random seed for reproducibility
+        load_from_file: Path to saved experiment data (if None, runs new experiment)
     """
     print("Generating Game of Life showcase figure...")
-    fig = create_showcase_figure(pattern_type, size, chain_length, flip_prob, seed)
-    filename = "figs/gol_showcase_inverse_dynamics.pdf"
+    fig = create_showcase_figure(pattern_type, size, chain_length, flip_prob, seed, 
+                                load_from_file=load_from_file)
+    filename = f"figs/gol_showcase_inverse_dynamics_{pattern_type}_{size}.pdf"
     save_publication_figure(fig, filename)
     print(f"Saved: {filename}")
     return fig
@@ -1055,6 +1175,469 @@ def save_forward_inverse_schematic():
     return fig
 
 
+def create_simple_inference_schematic(pattern=None, pattern_size=256):
+    """
+    Create a simple schematic diagram showing the inference problem:
+    ? ⇄ observed state (with straight arrows for GoL forward and inference backward)
+    
+    Args:
+        pattern: The observed pattern to show (if None, uses a simple example)
+        pattern_size: Size of the pattern if loading from data
+        
+    Returns:
+        matplotlib.figure.Figure: The schematic diagram
+    """
+    # Match showcase figure size and layout
+    fig = plt.figure(figsize=(14, 4))  # Same width as showcase, single row height
+    
+    # Create grid with 3 equal columns to match showcase
+    gs = gridspec.GridSpec(1, 3, figure=fig, wspace=0.15,
+                          width_ratios=[1, 1, 1])  # Equal widths like showcase
+    
+    ax_unknown = fig.add_subplot(gs[0, 0])
+    ax_arrows = fig.add_subplot(gs[0, 1])
+    ax_observed = fig.add_subplot(gs[0, 2])
+    
+    # === UNKNOWN STATE (?) ===
+    ax_unknown.set_xlim(0, 1)
+    ax_unknown.set_ylim(0, 1)
+    ax_unknown.text(0.5, 0.5, '?', fontsize=80, ha='center', va='center',
+                    fontweight='bold', color='darkgray')
+    ax_unknown.set_xticks([])
+    ax_unknown.set_yticks([])
+    ax_unknown.set_aspect('equal')
+    
+    # Add green dashed border to indicate unknown (will be inferred)
+    for spine in ax_unknown.spines.values():
+        spine.set_color('green')
+        spine.set_linewidth(3)
+        spine.set_linestyle('--')
+    
+    # === STRAIGHT ARROWS ===
+    ax_arrows.axis('off')
+    ax_arrows.set_xlim(0, 1)
+    ax_arrows.set_ylim(0, 1)
+    
+    # Top arrow (inference - from observed to initial)
+    ax_arrows.annotate('', xy=(0.15, 0.65), xytext=(0.85, 0.65),
+                      arrowprops=dict(arrowstyle='->', lw=4, color='green'),
+                      xycoords='axes fraction')
+    
+    # Bottom arrow (GoL forward - from initial to observed)
+    ax_arrows.annotate('', xy=(0.85, 0.35), xytext=(0.15, 0.35),
+                      arrowprops=dict(arrowstyle='->', lw=4, color='black'),
+                      xycoords='axes fraction')
+    
+    # Add labels for arrows
+    ax_arrows.text(0.5, 0.75, 'inference', ha='center', va='center',
+                  fontsize=16, fontweight='bold', color='green',
+                  transform=ax_arrows.transAxes)
+    ax_arrows.text(0.5, 0.25, '@gen GoL', ha='center', va='center',
+                  fontsize=16, fontweight='bold', color='black',
+                  transform=ax_arrows.transAxes)
+    
+    # === OBSERVED STATE ===
+    if pattern is None:
+        # Use a simple example pattern if none provided
+        pattern = jnp.array([
+            [0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 0],
+            [1, 1, 1, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0]
+        ], dtype=int)
+    elif isinstance(pattern, str):
+        # Load pattern by name
+        if pattern == "wizards":
+            pattern = get_wizards_logo() if pattern_size > 256 else get_small_wizards_logo(pattern_size)
+        elif pattern == "mit":
+            pattern = get_mit_logo() if pattern_size > 256 else get_small_mit_logo(pattern_size)
+        elif pattern == "popl":
+            pattern = get_popl_logo() if pattern_size > 256 else get_small_popl_logo(pattern_size)
+        elif pattern == "hermes":
+            pattern = get_hermes_logo() if pattern_size > 256 else get_small_hermes_logo(pattern_size)
+        else:
+            pattern = get_blinker_n(pattern_size)
+    
+    ax_observed.imshow(pattern, cmap='gray_r', interpolation='nearest', aspect='equal')
+    ax_observed.set_xticks([])
+    ax_observed.set_yticks([])
+    
+    # Add thick red border to highlight this is the observed state
+    for spine in ax_observed.spines.values():
+        spine.set_color(get_method_color("data_points"))
+        spine.set_linewidth(4)
+    
+    # Add titles at top to match showcase figure style
+    title_y = 0.93  # Match showcase title position
+    
+    # Get x-center of each axis in figure coordinates
+    left_center = (ax_unknown.get_position().x0 + ax_unknown.get_position().x1) / 2
+    middle_center = (ax_arrows.get_position().x0 + ax_arrows.get_position().x1) / 2
+    right_center = (ax_observed.get_position().x0 + ax_observed.get_position().x1) / 2
+    
+    # Add titles using figure text like showcase
+    fig.text(left_center, title_y, "Previous State", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    fig.text(middle_center, title_y, "Game of Life", ha="center", va="top", 
+             fontsize=20, fontweight="bold")
+    fig.text(right_center, title_y, "Observed State", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    
+    return fig
+
+
+def save_simple_inference_schematic(pattern="wizards", pattern_size=256):
+    """
+    Generate and save the simple inference schematic diagram.
+    
+    Args:
+        pattern: Pattern type or array to use as observed state
+        pattern_size: Size of the pattern
+    """
+    print("Generating simple inference schematic...")
+    fig = create_simple_inference_schematic(pattern, pattern_size)
+    filename = f"figs/gol_inference_schematic_{pattern}_{pattern_size}.pdf"
+    save_publication_figure(fig, filename)
+    print(f"Saved: {filename}")
+    return fig
+
+
+def create_integrated_showcase_figure(
+    pattern_type="wizards", size=256, chain_length=500, flip_prob=0.03, seed=42
+):
+    """
+    Create an integrated single-row showcase figure with question mark, arrows, observed state, and Gibbs results.
+    
+    Args:
+        pattern_type: Type of pattern to use
+        size: Grid size for the pattern
+        chain_length: Number of Gibbs sampling steps
+        flip_prob: Probability of rule violations
+        seed: Random seed for reproducibility
+        
+    Returns:
+        matplotlib.figure.Figure: The integrated showcase figure
+    """
+    # Create figure with single row, 5 panels
+    fig = plt.figure(figsize=(20, 4))  # Wider to accommodate 5 panels
+    
+    # Create grid with 1 row and 5 columns
+    gs = gridspec.GridSpec(
+        1, 5, figure=fig,
+        width_ratios=[1, 0.4, 1, 1, 1],  # Question mark, arrows (much smaller), observed, Gibbs grid, evolution
+        wspace=0.15,  # Horizontal spacing
+    )
+    
+    # Create axes
+    ax_unknown = fig.add_subplot(gs[0, 0])      # Previous state (?)
+    ax_arrows = fig.add_subplot(gs[0, 1])       # Arrows
+    ax_observed = fig.add_subplot(gs[0, 2])     # Observed state
+    ax_gibbs = fig.add_subplot(gs[0, 3])        # Gibbs results
+    ax_evolution = fig.add_subplot(gs[0, 4])    # One-step evolution
+    
+    # Load pattern
+    if pattern_type == "wizards":
+        pattern = get_wizards_logo() if size > 256 else get_small_wizards_logo(size)
+    elif pattern_type == "mit":
+        pattern = get_mit_logo() if size > 256 else get_small_mit_logo(size)
+    elif pattern_type == "popl":
+        pattern = get_popl_logo() if size > 256 else get_small_popl_logo(size)
+    elif pattern_type == "hermes":
+        pattern = get_hermes_logo() if size > 256 else get_small_hermes_logo(size)
+    elif pattern_type == "blinker":
+        pattern = get_blinker_n(size)
+    else:
+        pattern = jnp.array(np.random.randint(0, 2, (size, size)))
+    
+    # === PANEL 1: UNKNOWN STATE (?) ===
+    ax_unknown.set_xlim(0, 1)
+    ax_unknown.set_ylim(0, 1)
+    ax_unknown.text(0.5, 0.5, '?', fontsize=80, ha='center', va='center',
+                    fontweight='bold', color='darkgray')
+    ax_unknown.set_xticks([])
+    ax_unknown.set_yticks([])
+    ax_unknown.set_aspect('equal')
+    
+    # Add green dashed border
+    for spine in ax_unknown.spines.values():
+        spine.set_color('green')
+        spine.set_linewidth(3)
+        spine.set_linestyle('--')
+    
+    # === PANEL 2: ARROWS ===
+    ax_arrows.axis('off')
+    ax_arrows.set_xlim(0, 1)
+    ax_arrows.set_ylim(0, 1)
+    
+    # Top arrow (inference - from observed to initial)
+    ax_arrows.annotate('', xy=(0.15, 0.55), xytext=(0.85, 0.55),
+                      arrowprops=dict(arrowstyle='->', lw=4, color='green'),
+                      xycoords='axes fraction')
+    
+    # Bottom arrow (GoL forward - from initial to observed)
+    ax_arrows.annotate('', xy=(0.85, 0.45), xytext=(0.15, 0.45),
+                      arrowprops=dict(arrowstyle='->', lw=4, color='black'),
+                      xycoords='axes fraction')
+    
+    # Arrow labels
+    ax_arrows.text(0.5, 0.65, 'inference', ha='center', va='center',
+                  fontsize=16, fontweight='bold', color='green',
+                  transform=ax_arrows.transAxes)
+    ax_arrows.text(0.5, 0.35, '@gen GoL', ha='center', va='center',
+                  fontsize=16, fontweight='bold', color='black',
+                  transform=ax_arrows.transAxes)
+    
+    # === PANEL 3: OBSERVED STATE ===
+    ax_observed.imshow(pattern, cmap='gray_r', interpolation='nearest', aspect='equal')
+    ax_observed.set_xticks([])
+    ax_observed.set_yticks([])
+    
+    # Red border for observed state
+    for spine in ax_observed.spines.values():
+        spine.set_color(get_method_color("data_points"))
+        spine.set_linewidth(4)
+    
+    # === PANEL 4: GIBBS SAMPLING RESULTS ===
+    # Run Gibbs sampling
+    print(f"Running Gibbs sampler for {pattern_type} pattern...")
+    sampler = core.GibbsSampler(pattern, p_flip=flip_prob)
+    key = jrand.key(seed)
+    run_summary = core.run_sampler_and_get_summary(key, sampler, chain_length, 1)
+    
+    print(f"\nFinal predictive posterior: {run_summary.predictive_posterior_scores[-1]:.6f}")
+    final_n_bit_flips = run_summary.n_incorrect_bits_in_reconstructed_image(pattern)
+    accuracy = (1 - final_n_bit_flips / pattern.size) * 100
+    print(f"Final reconstruction errors: {final_n_bit_flips} bits ({accuracy:.1f}% accuracy)")
+    
+    # Create 2x2 grid within the Gibbs panel
+    n_samples = 4
+    sample_indices = np.linspace(0, chain_length - 1, n_samples, dtype=int)
+    
+    from mpl_toolkits.axes_grid1 import ImageGrid
+    grid = ImageGrid(fig, ax_gibbs.get_position().bounds,
+                    nrows_ncols=(2, 2), axes_pad=0.12, share_all=True)
+    
+    # Remove the original axis
+    ax_gibbs.remove()
+    
+    for i, (ax, idx) in enumerate(zip(grid, sample_indices)):
+        ax.imshow(run_summary.inferred_prev_boards[idx], cmap='gray_r', interpolation='nearest')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        # Add time label
+        ax.text(0.02, 0.98, f't={idx}', transform=ax.transAxes,
+                ha='left', va='top', fontsize=10, fontweight='bold',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        
+        # Highlight final sample
+        if i == len(sample_indices) - 1:
+            for spine in ax.spines.values():
+                spine.set_color('green')
+                spine.set_linewidth(3)
+                spine.set_linestyle('--')
+    
+    # === PANEL 5: ONE-STEP EVOLUTION ===
+    # Get the final inferred state and evolve it one step
+    final_state = run_summary.inferred_prev_boards[-1]
+    evolved_state = run_summary.inferred_reconstructed_targets[-1].astype(int)
+    
+    ax_evolution.imshow(evolved_state, cmap='gray_r', interpolation='nearest', aspect='equal')
+    ax_evolution.set_xticks([])
+    ax_evolution.set_yticks([])
+    
+    # Add annotation below (moved up)
+    ax_evolution.text(0.5, -0.08, 'Final Gibbs state → Next step',
+                     ha='center', va='top', fontsize=14, fontweight='bold',
+                     transform=ax_evolution.transAxes)
+    
+    # === ADD TITLES ===
+    title_y = 0.95  # Position for titles (lifted higher)
+    
+    # Get actual x-center positions of each axis
+    left_pos = (ax_unknown.get_position().x0 + ax_unknown.get_position().x1) / 2
+    arrow_pos = (ax_arrows.get_position().x0 + ax_arrows.get_position().x1) / 2
+    obs_pos = (ax_observed.get_position().x0 + ax_observed.get_position().x1) / 2
+    gibbs_pos = (ax_gibbs.get_position().x0 + ax_gibbs.get_position().x1) / 2
+    evol_pos = (ax_evolution.get_position().x0 + ax_evolution.get_position().x1) / 2
+    
+    # Add properly centered titles (no title for arrows column)
+    fig.text(left_pos, title_y, "Previous State", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    # Skip title for arrows column
+    fig.text(obs_pos, title_y, "Observed State", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    fig.text(gibbs_pos, title_y, "Inversion via Gibbs", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    fig.text(evol_pos, title_y, "One-Step Evolution", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    
+    return fig
+
+
+def save_integrated_showcase_figure(
+    pattern_type="wizards", size=256, chain_length=500, flip_prob=0.03, seed=42
+):
+    """Save the integrated showcase figure."""
+    fig = create_integrated_showcase_figure(
+        pattern_type, size, chain_length, flip_prob, seed
+    )
+    filename = f"figs/gol_integrated_showcase_{pattern_type}_{size}.pdf"
+    save_publication_figure(fig, filename)
+    print(f"Saved integrated showcase figure: {filename}")
+    return fig
+    
+    # === SCHEMATIC ROW ===
+    # Unknown state (?)
+    ax_schematic_unknown.set_xlim(0, 1)
+    ax_schematic_unknown.set_ylim(0, 1)
+    ax_schematic_unknown.text(0.5, 0.5, '?', fontsize=80, ha='center', va='center',
+                              fontweight='bold', color='darkgray')
+    ax_schematic_unknown.set_xticks([])
+    ax_schematic_unknown.set_yticks([])
+    ax_schematic_unknown.set_aspect('equal')
+    
+    # Add green dashed border
+    for spine in ax_schematic_unknown.spines.values():
+        spine.set_color('green')
+        spine.set_linewidth(3)
+        spine.set_linestyle('--')
+    
+    # Arrows panel
+    ax_schematic_arrows.axis('off')
+    ax_schematic_arrows.set_xlim(0, 1)
+    ax_schematic_arrows.set_ylim(0, 1)
+    
+    # Top arrow (inference)
+    ax_schematic_arrows.annotate('', xy=(0.15, 0.65), xytext=(0.85, 0.65),
+                                arrowprops=dict(arrowstyle='->', lw=4, color='green'),
+                                xycoords='axes fraction')
+    
+    # Bottom arrow (GoL forward)
+    ax_schematic_arrows.annotate('', xy=(0.85, 0.35), xytext=(0.15, 0.35),
+                                arrowprops=dict(arrowstyle='->', lw=4, color='black'),
+                                xycoords='axes fraction')
+    
+    # Arrow labels
+    ax_schematic_arrows.text(0.5, 0.75, 'inference', ha='center', va='center',
+                            fontsize=16, fontweight='bold', color='green',
+                            transform=ax_schematic_arrows.transAxes)
+    ax_schematic_arrows.text(0.5, 0.25, '@gen GoL', ha='center', va='center',
+                            fontsize=16, fontweight='bold', color='black',
+                            transform=ax_schematic_arrows.transAxes)
+    
+    # Observed state in schematic
+    ax_schematic_observed.imshow(pattern, cmap='gray_r', interpolation='nearest', aspect='equal')
+    ax_schematic_observed.set_xticks([])
+    ax_schematic_observed.set_yticks([])
+    
+    # Red border for observed state
+    for spine in ax_schematic_observed.spines.values():
+        spine.set_color(get_method_color("data_points"))
+        spine.set_linewidth(4)
+    
+    # === SHOWCASE ROW ===
+    # Run Gibbs sampling
+    print(f"Running Gibbs sampler for {pattern_type} pattern...")
+    sampler = core.GibbsSampler(pattern, p_flip=flip_prob)
+    key = jrand.key(seed)
+    run_summary = core.run_sampler_and_get_summary(key, sampler, chain_length, 1)
+    
+    print(f"\nFinal predictive posterior: {run_summary.predictive_posterior_scores[-1]:.6f}")
+    final_n_bit_flips = run_summary.n_incorrect_bits_in_reconstructed_image(pattern)
+    accuracy = (1 - final_n_bit_flips / pattern.size) * 100
+    print(f"Final reconstruction errors: {final_n_bit_flips} bits ({accuracy:.1f}% accuracy)")
+    
+    # Observed state in showcase (same as schematic)
+    ax_showcase_observed.imshow(pattern, cmap='gray_r', interpolation='nearest')
+    ax_showcase_observed.set_xticks([])
+    ax_showcase_observed.set_yticks([])
+    ax_showcase_observed.set_aspect('equal', 'box')
+    
+    # Red border
+    for spine in ax_showcase_observed.spines.values():
+        spine.set_color(get_method_color("data_points"))
+        spine.set_linewidth(4)
+    
+    # Gibbs sampling progression
+    n_samples = 4
+    sample_indices = np.linspace(0, chain_length - 1, n_samples, dtype=int)
+    
+    # Create 2x2 grid within the middle panel
+    from mpl_toolkits.axes_grid1 import ImageGrid
+    grid = ImageGrid(fig, ax_showcase_gibbs.get_position().bounds,
+                    nrows_ncols=(2, 2), axes_pad=0.05, share_all=True)
+    
+    # Remove the original axis
+    ax_showcase_gibbs.remove()
+    
+    for i, (ax, idx) in enumerate(zip(grid, sample_indices)):
+        ax.imshow(run_summary.inferred_prev_boards[idx], cmap='gray_r', interpolation='nearest')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        # Add time label
+        ax.text(0.02, 0.98, f't={idx}', transform=ax.transAxes,
+                ha='left', va='top', fontsize=10, fontweight='bold',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        
+        # Highlight final sample
+        if i == len(sample_indices) - 1:
+            for spine in ax.spines.values():
+                spine.set_color('green')
+                spine.set_linewidth(3)
+                spine.set_linestyle('--')
+    
+    # One-step evolution
+    final_state = run_summary.inferred_prev_boards[-1]
+    evolved_state = run_summary.inferred_reconstructed_targets[-1].astype(int)
+    
+    ax_showcase_evolution.imshow(evolved_state, cmap='gray_r', interpolation='nearest')
+    ax_showcase_evolution.set_xticks([])
+    ax_showcase_evolution.set_yticks([])
+    ax_showcase_evolution.set_aspect('equal', 'box')
+    
+    # Add annotation below
+    ax_showcase_evolution.text(0.5, -0.12, 'Final state → Next step',
+                              ha='center', va='top', fontsize=14, fontweight='bold',
+                              transform=ax_showcase_evolution.transAxes)
+    
+    # === ADD TITLES ===
+    title_y = 0.95  # High position for titles
+    
+    # Top row titles
+    fig.text(0.2, title_y, "Previous State", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    fig.text(0.5, title_y, "Game of Life", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    fig.text(0.8, title_y, "Observed State", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    
+    # Bottom row titles
+    fig.text(0.2, 0.48, "Observed State", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    fig.text(0.5, 0.48, "Inversion via Gibbs", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    fig.text(0.8, 0.48, "One-Step Evolution", ha="center", va="top",
+             fontsize=20, fontweight="bold")
+    
+    return fig
+
+
+def save_combined_schematic_showcase_figure(
+    pattern_type="wizards", size=256, chain_length=500, flip_prob=0.03, seed=42
+):
+    """Save the combined schematic and showcase figure."""
+    fig = create_combined_schematic_showcase_figure(
+        pattern_type, size, chain_length, flip_prob, seed
+    )
+    filename = f"figs/gol_combined_schematic_showcase_{pattern_type}_{size}.pdf"
+    save_publication_figure(fig, filename)
+    print(f"Saved combined figure: {filename}")
+    return fig
+
+
 def save_all_showcase_figures(
     pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42
 ):
@@ -1071,6 +1654,8 @@ def save_all_showcase_figures(
     print("=== Generating all Game of Life showcase figures ===")
 
     save_showcase_figure(pattern_type, size, chain_length, flip_prob, seed)
+    save_simple_inference_schematic(pattern_type, size)
+    save_combined_schematic_showcase_figure(pattern_type, size, chain_length, flip_prob, seed)
     save_nested_vectorization_figure()
     save_generative_conditional_figure()
     save_forward_inverse_schematic()
