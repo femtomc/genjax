@@ -1444,14 +1444,14 @@ def plot_smc_method_comparison(
     if include_ess_row:
         # 3-row layout: final particles, rainclouds, timing
         fig = plt.figure(figsize=(6 * n_methods, 15))
-        gs_main = fig.add_gridspec(3, 1, height_ratios=[1, 1, 0.8], hspace=0.4)
+        gs_main = fig.add_gridspec(3, 1, height_ratios=[1, 1, 0.3], hspace=-0.2)
         gs_first = gs_main[0].subgridspec(1, n_methods, hspace=0.05)
         gs_second = gs_main[1].subgridspec(1, n_methods, hspace=0.05)
         gs_bottom = gs_main[2]
     else:
         # 2-row layout: final particles, timing
         fig = plt.figure(figsize=(6 * n_methods, 10))
-        gs_main = fig.add_gridspec(2, 1, height_ratios=[1, 0.8], hspace=0.4)
+        gs_main = fig.add_gridspec(2, 1, height_ratios=[1, 0.3], hspace=-0.2)
         gs_first = gs_main[0].subgridspec(1, n_methods, hspace=0.05)
         gs_bottom = gs_main[1]
         gs_second = None  # No raincloud row
@@ -1487,12 +1487,15 @@ def plot_smc_method_comparison(
             timing_mean = float(result["timing_stats"][0]) * 1000  # Convert to milliseconds
             timing_data[method_name] = timing_mean
     
-    # Sort methods by timing (fastest to slowest)
-    sorted_methods = sorted(timing_data.keys(), key=lambda x: timing_data[x])
+    # Sort methods by timing (fastest to slowest) - but only use this for timing bars
+    sorted_methods_by_speed = sorted(timing_data.keys(), key=lambda x: timing_data[x])
     
-    # Only process methods in sorted order
+    # Keep original order for particle plots (as they appear in colors dict)
+    original_order = [name for name in colors.keys() if name in filtered_results]
+    
+    # Process methods in original order for particle plots
     method_items = [
-        (name, filtered_results[name]) for name in sorted_methods
+        (name, filtered_results[name]) for name in original_order
     ]
 
     for i, (method_name, result) in enumerate(method_items):
@@ -1626,18 +1629,19 @@ def plot_smc_method_comparison(
             spine.set_visible(True)
 
         # Add "End" label on the leftmost plot only
-        if i == 0:
-            ax_particles.text(
-                -0.1,
-                0.5,
-                "End",
-                transform=ax_particles.transAxes,
-                fontsize=20,
-                fontweight="bold",
-                ha="center",
-                va="center",
-                rotation=90,
-            )
+        # Commented out to reduce clutter
+        # if i == 0:
+        #     ax_particles.text(
+        #         -0.1,
+        #         0.5,
+        #         "End",
+        #         transform=ax_particles.transAxes,
+        #         fontsize=20,
+        #         fontweight="bold",
+        #         ha="center",
+        #         va="center",
+        #         rotation=90,
+        #     )
 
         # Second row: Raincloud plot with ESS (grayscale) - only if enabled
         if include_ess_row:
@@ -1737,7 +1741,8 @@ def plot_smc_method_comparison(
     timing_stds = []
     method_colors = []
 
-    for method_name in sorted_methods:
+    # Use the speed-sorted order for timing bars
+    for method_name in sorted_methods_by_speed:
         result = filtered_results[method_name]
         method_names.append(method_labels[method_name])
         timing_mean = (
@@ -1750,10 +1755,16 @@ def plot_smc_method_comparison(
         timing_stds.append(timing_std)
         method_colors.append(colors[method_name])
 
+    # Reverse the order for the timing bars only (smallest to largest from top to bottom)
+    method_names_reversed = list(reversed(method_names))
+    timing_means_reversed = list(reversed(timing_means))
+    timing_stds_reversed = list(reversed(timing_stds))
+    method_colors_reversed = list(reversed(method_colors))
+    
     # Create horizontal bar chart
-    y_pos = jnp.arange(len(method_names))
+    y_pos = jnp.arange(len(method_names_reversed))
     bars = ax_timing.barh(
-        y_pos, timing_means, xerr=timing_stds, color=method_colors, alpha=0.7, capsize=5
+        y_pos, timing_means_reversed, xerr=timing_stds_reversed, color=method_colors_reversed, alpha=0.7, capsize=5
     )
 
     ax_timing.set_yticks([])
@@ -1764,12 +1775,12 @@ def plot_smc_method_comparison(
     ax_timing.grid(True, axis="x", alpha=0.3)
 
     # Add timing values as text on bars
-    for i, (bar, mean, std) in enumerate(zip(bars, timing_means, timing_stds)):
+    for i, (bar, mean, std) in enumerate(zip(bars, timing_means_reversed, timing_stds_reversed)):
         width = bar.get_width()
         mean_val = float(mean)
         std_val = float(std)
         ax_timing.text(
-            width + std_val + max(timing_means) * 0.01,  # Position after error bar
+            width + std_val + max(timing_means_reversed) * 0.01,  # Position after error bar
             bar.get_y() + bar.get_height() / 2,  # Center vertically
             f"{mean_val:.1f}±{std_val:.1f}ms",  # Format as mean±std in milliseconds
             ha="left",

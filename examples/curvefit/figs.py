@@ -40,10 +40,10 @@ import jax.random as jrand
 import jax
 import sys
 sys.path.append('..')
-from utils import benchmark_with_warmup
+from genjax.timing import benchmark_with_warmup
 
 # Import shared GenJAX Research Visualization Standards
-from viz import (
+from genjax.viz.standard import (
     setup_publication_fonts, FIGURE_SIZES, get_method_color,
     apply_grid_style, set_minimal_ticks, apply_standard_ticks, save_publication_figure,
     PRIMARY_COLORS, LINE_SPECS, MARKER_SPECS
@@ -3530,7 +3530,7 @@ def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_det
     print("Running inference methods and timing...")
     
     # Import timing utilities
-    from utils import benchmark_with_warmup
+    from genjax.timing import benchmark_with_warmup
     
     # 1. Standard IS with timing
     print("1. Standard IS (no outlier model)...")
@@ -3629,11 +3629,11 @@ def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_det
     
     # Create figure with GridSpec for better layout control
     setup_publication_fonts()
-    fig = plt.figure(figsize=(22, 8))
+    fig = plt.figure(figsize=(18, 8))
     
-    # Create a grid with 2 rows, 4 columns: main plots + timing, colorbar
+    # Create a grid with 2 rows, 3 columns: main plots only, colorbar below
     import matplotlib.gridspec as gridspec
-    gs = gridspec.GridSpec(2, 4, height_ratios=[10, 1], width_ratios=[1, 1, 1, 0.6], hspace=0.5)
+    gs = gridspec.GridSpec(2, 3, height_ratios=[10, 1], width_ratios=[1, 1, 1], hspace=0.35)
     
     # Create the three main axes
     axes = [fig.add_subplot(gs[0, i]) for i in range(3)]
@@ -3825,53 +3825,6 @@ def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_det
     cbar = plt.colorbar(scatter1, cax=cbar_ax, orientation='horizontal')
     cbar.set_label('P(outlier)', fontsize=18, fontweight='bold')
     cbar.ax.tick_params(labelsize=16)
-    
-    # Add vertical timing barplot in the 4th column of the first row
-    timing_ax = fig.add_subplot(gs[0, 3])
-    
-    # Prepare timing data (in order of appearance)
-    methods = ['IS\nStandard', 'IS\nOutlier', 'Gibbs/HMC\nOutlier']
-    times = [standard_mean * 1000, outlier_is_mean * 1000, gibbs_mean * 1000]
-    errors = [standard_std * 1000, outlier_is_std * 1000, gibbs_std * 1000]
-    colors = ['#0173B2', '#0173B2', '#EE7733']
-    
-    # Create vertical bar plot
-    x_positions = range(len(methods))
-    bars = timing_ax.bar(x_positions, times, yerr=errors, capsize=5, color=colors, alpha=0.8)
-    
-    # Add timing values on top of bars
-    for i, (bar, time, error) in enumerate(zip(bars, times, errors)):
-        height = bar.get_height()
-        timing_ax.text(
-            bar.get_x() + bar.get_width() / 2.0,
-            height + error + max(times) * 0.02,
-            f"{time:.1f}",
-            ha="center",
-            va="bottom",
-            fontsize=14,
-            fontweight='bold'
-        )
-    
-    # Style the timing plot - remove x-axis ticks and labels only
-    timing_ax.set_xticks([])  # Remove x-axis tick marks
-    timing_ax.set_xticklabels([])  # Remove x-axis labels
-    timing_ax.set_ylabel("")  # Remove y-axis label
-    timing_ax.set_title("Time (ms)", fontsize=18, fontweight='bold', pad=10)  # Place label at top
-    
-    # Remove top and right spines
-    timing_ax.spines['top'].set_visible(False)
-    timing_ax.spines['right'].set_visible(False)
-    
-    # Add grid for y-axis only
-    timing_ax.grid(True, alpha=0.3, axis="y")
-    
-    # Set y-axis limits to accommodate timing labels
-    max_time = max(times)
-    max_error = max(errors)
-    timing_ax.set_ylim(0, max_time + max_error + max_time * 0.3)
-    
-    # Set tick parameters
-    timing_ax.tick_params(axis='both', which='major', labelsize=14, width=2, length=6)
     
     save_publication_figure(fig, output_filename)
     print(f"\nSaved figure to {output_filename}")

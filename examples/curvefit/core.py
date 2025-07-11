@@ -957,32 +957,62 @@ def extract_posterior_samples(benchmark_results):
 
 
 # Gibbs sampling for outlier models
-# TODO: fixed this, but may not run quite yet.
-# Please fix any errors!
-def enumerative_gibbs_outliers(trace):
-    xs, ys = trace.get_args()
-    curve, _ = trace.get_retval()
+def enumerative_gibbs_outliers(trace, xs, ys, outlier_rate=0.1):
+    """
+    Enumerative Gibbs sampling for outlier indicators.
+
+    For each data point, exactly compute P(is_outlier | rest) and sample.
+    """
+    from genjax.distributions import categorical
+    from genjax.pjax import modular_vmap
+
+    curve_params = trace.get_choices()["curve"]
+    curve = Lambda(
+        Const(polyfn),
+        jnp.array([curve_params["a"], curve_params["b"], curve_params["c"]]),
+    )
     outlier_rate = trace.get_choices()["outlier_rate"]
 
     def update_single_point(x, y_obs):
-        def _assess(v):
-            chm = {"is_outlier": v, "y": {"obs": y_obs}}
-            # Use the submodel.
-            log_prob, _ = point_with_outliers.assess(
-                chm, x, curve, outlier_rate, 0.0, 2.0
-            )
-            return log_prob
+        """Update is_outlier for a single point."""
+        # Build constraint dictionary for assess
+        # For is_outlier = False
+        chm_false = {"is_outlier": False, "y": {"obs": y_obs}}
+        log_prob_false, _ = point_with_outliers.assess(
+            chm_false, x, curve, outlier_rate, 0.0, 2.0
+        )
 
-        log_probs = modular_vmap(_assess)(jnp.array([False, True]))
-        new_is_outlier = categorical.sample(logits=log_probs) == 1
+        # For is_outlier = True
+        chm_true = {"is_outlier": True, "y": {"obs": y_obs}}
+        log_prob_true, _ = point_with_outliers.assess(
+            chm_true, x, curve, outlier_rate, 0.0, 2.0
+        )
+
+        # Convert to probabilities
+
+        # Sample new outlier indicator
+        new_is_outlier = (
+            categorical.sample(logits=jnp.array([log_prob_false, log_prob_true])) == 1
+        )
+
         return new_is_outlier
 
+    # Vectorize over all points
     new_outliers = modular_vmap(update_single_point)(xs, ys)
+
+    # Update trace with new outlier indicators
+    # Get the generative function and args
     gen_fn = trace.get_gen_fn()
     args = trace.get_args()
+
+    # Use update to create new trace
     new_trace, weight, _ = gen_fn.update(
         trace, {"ys": {"is_outlier": new_outliers}}, *args[0], **args[1]
     )
+
+    # For diagnostics, we always accept Gibbs moves (they're exact)
+    save(accept=True)
+
     return new_trace
 
 
@@ -997,7 +1027,7 @@ def mixed_gibbs_hmc_kernel(
 
     def kernel(trace):
         # First do Gibbs sampling on outlier indicators
-        trace = enumerative_gibbs_outliers(trace, xs, ys)
+        trace = enumerative_gibbs_outliers(trace, xs, ys, outlier_rate)
 
         # Then do HMC on continuous curve parameters only
         trace = hmc(

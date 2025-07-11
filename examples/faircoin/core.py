@@ -6,7 +6,7 @@ import jax.random as jrand
 from genjax import seed
 from genjax import modular_vmap as vmap
 from genjax import beta, flip, gen, Const, const
-from examples.utils import timing
+from genjax.timing import timing
 
 
 @gen
@@ -27,6 +27,7 @@ def genjax_timing(
     num_obs=50,
     repeats=50,
     num_samples=1000,
+    inner_repeats=20,
 ):
     """Time GenJAX importance sampling implementation."""
     data = {"obs": jnp.ones(num_obs)}  # Multiple observations to match other frameworks
@@ -50,6 +51,7 @@ def genjax_timing(
     times, (time_mu, time_std) = timing(
         lambda: imp_jit(key, data).block_until_ready(),
         repeats=repeats,
+        inner_repeats=inner_repeats,
         auto_sync=False,  # Using manual block_until_ready()
     )
     return times, (time_mu, time_std)
@@ -59,6 +61,7 @@ def numpyro_timing(
     num_obs=50,
     repeats=200,
     num_samples=1000,
+    inner_repeats=20,
 ):
     """Time NumPyro importance sampling implementation."""
     import numpyro
@@ -120,6 +123,7 @@ def numpyro_timing(
     times, (time_mu, time_std) = timing(
         lambda: vectorized_importance_weights(sub_keys, data).block_until_ready(),
         repeats=repeats,
+        inner_repeats=inner_repeats,
         auto_sync=False,  # Using manual block_until_ready()
     )
     return times, (time_mu, time_std)
@@ -129,6 +133,7 @@ def handcoded_timing(
     num_obs=50,
     repeats=50,
     num_samples=1000,
+    inner_repeats=20,
 ):
     """Time handcoded JAX importance sampling implementation."""
     data = jnp.ones(num_obs)  # Multiple observations to match other frameworks
@@ -156,6 +161,7 @@ def handcoded_timing(
     times, (time_mu, time_std) = timing(
         lambda: imp_jit(key, data).block_until_ready(),
         repeats=repeats,
+        inner_repeats=inner_repeats,
         auto_sync=False,  # Using manual block_until_ready()
     )
     return times, (time_mu, time_std)

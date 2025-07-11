@@ -29,7 +29,7 @@ def timing_comparison_fig(
     """
     sns.set_style("white")
 
-    print("Running GenJAX timing...")
+    print("Running Ours timing...")
     gj_times, (gj_mu, gj_std) = genjax_timing(
         repeats=repeats,
         num_obs=num_obs,
@@ -50,10 +50,10 @@ def timing_comparison_fig(
         num_samples=num_samples,
     )
 
-    print(f"GenJAX: {gj_mu:.6f}s, Handcoded: {hc_mu:.6f}s, NumPyro: {np_mu:.6f}s")
+    print(f"Ours: {gj_mu:.6f}s, Handcoded: {hc_mu:.6f}s, NumPyro: {np_mu:.6f}s")
 
     # Calculate relative performance compared to handcoded (baseline)
-    frameworks = ["Handcoded", "GenJAX", "NumPyro"]
+    frameworks = ["Handcoded", "Ours", "NumPyro"]
     times = [hc_mu, gj_mu, np_mu]
     colors = ["gold", "deepskyblue", "coral"]
 
@@ -74,18 +74,7 @@ def timing_comparison_fig(
     ax.set_yticklabels(frameworks, fontsize=22)
     ax.set_xlabel("Relative Performance (% of Handcoded JAX time)", fontsize=22)
 
-    # Add clarification in center of plot
-    ax.text(
-        0.50,
-        0.85,
-        "Smaller bar is better",
-        transform=ax.transAxes,
-        ha="center",
-        va="center",
-        fontsize=16,
-        style="italic",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
-    )
+    # Removed 'Smaller bar is better' text
 
     # Customize tick labels
     ax.tick_params(axis="x", labelsize=20)
@@ -163,7 +152,7 @@ def posterior_comparison_fig(
     plt.rcParams.update({"font.size": 18})  # Increased font size
 
     # Collect posterior samples from all methods
-    print("Generating GenJAX posterior samples...")
+    print("Generating Ours posterior samples...")
     genjax_samples, genjax_weights = genjax_posterior_samples(num_obs, num_samples)
 
     print("Generating handcoded posterior samples...")
@@ -190,7 +179,7 @@ def posterior_comparison_fig(
 
     # Colors and labels for each method
     methods = [
-        ("GenJAX", genjax_samples, genjax_weights, "deepskyblue"),
+        ("Ours", genjax_samples, genjax_weights, "deepskyblue"),
         ("Handcoded JAX", handcoded_samples, handcoded_weights, "gold"),
         ("NumPyro", numpyro_samples, numpyro_weights, "coral"),
     ]
@@ -291,6 +280,7 @@ def combined_comparison_fig(
     timing_repeats=50,  # Reduced from 100
     timing_samples=500,  # Reduced from 1000
     num_bins=50,
+    inner_repeats=20,  # Inner timing repeats
 ):
     """Generate combined figure with posterior comparison (left) and timing comparison (right).
 
@@ -300,6 +290,7 @@ def combined_comparison_fig(
         timing_repeats: Number of timing repetitions
         timing_samples: Number of importance samples for timing
         num_bins: Number of histogram bins
+        inner_repeats: Number of inner timing repeats per outer repeat
     """
     # Set up plot style
     sns.set_style("white")
@@ -316,7 +307,7 @@ def combined_comparison_fig(
     ### TOP ROW: POSTERIOR COMPARISON ###
 
     # Collect posterior samples from all methods (skip Pyro for 3x2 layout)
-    print("Generating GenJAX posterior samples...")
+    print("Generating Ours posterior samples...")
     genjax_samples, genjax_weights = genjax_posterior_samples(num_obs, num_samples)
 
     print("Generating handcoded posterior samples...")
@@ -338,14 +329,16 @@ def combined_comparison_fig(
 
     # Colors and labels for each method (3 methods only)
     methods = [
-        ("GenJAX", genjax_samples, genjax_weights, "deepskyblue"),
+        ("Ours", genjax_samples, genjax_weights, "deepskyblue"),
         ("Handcoded JAX", handcoded_samples, handcoded_weights, "gold"),
         ("NumPyro", numpyro_samples, numpyro_weights, "coral"),
     ]
 
     # Create posterior histograms in top row (row 0, cols 0, 1, 2)
+    axes_top = []
     for i, (method_name, samples, weights, color) in enumerate(methods):
         ax = fig.add_subplot(gs[0, i])  # Top row, column i
+        axes_top.append(ax)
 
         # Create weighted histogram
         counts, bins, patches = ax.hist(
@@ -390,6 +383,12 @@ def combined_comparison_fig(
         # Calculate sample statistics (for numerical comparison)
         sample_mean = np.average(samples, weights=weights)
         sample_std = np.sqrt(np.average((samples - sample_mean) ** 2, weights=weights))
+    
+    # Get y-limits from all axes and set them to be the same
+    y_min = min(ax.get_ylim()[0] for ax in axes_top)
+    y_max = max(ax.get_ylim()[1] for ax in axes_top)
+    for ax in axes_top:
+        ax.set_ylim(y_min, y_max)
 
     ### BOTTOM ROW: TIMING COMPARISON ###
 
@@ -397,11 +396,12 @@ def combined_comparison_fig(
     ax_timing = fig.add_subplot(gs[1, :])
 
     # Run timing comparisons
-    print("Running GenJAX timing...")
+    print("Running Ours timing...")
     gj_times, (gj_mu, gj_std) = genjax_timing(
         repeats=timing_repeats,
         num_obs=num_obs,
         num_samples=timing_samples,
+        inner_repeats=inner_repeats,
     )
 
     print("Running NumPyro timing...")
@@ -409,6 +409,7 @@ def combined_comparison_fig(
         repeats=timing_repeats,
         num_obs=num_obs,
         num_samples=timing_samples,
+        inner_repeats=inner_repeats,
     )
 
     print("Running Handcoded timing...")
@@ -416,10 +417,11 @@ def combined_comparison_fig(
         repeats=timing_repeats,
         num_obs=num_obs,
         num_samples=timing_samples,
+        inner_repeats=inner_repeats,
     )
 
     # Calculate relative performance compared to handcoded (baseline) - 3 frameworks only
-    frameworks = ["Handcoded", "GenJAX", "NumPyro"]
+    frameworks = ["Handcoded", "Ours", "NumPyro"]
     times = [hc_mu, gj_mu, np_mu]
     colors = ["gold", "deepskyblue", "coral"]
 
@@ -451,18 +453,7 @@ def combined_comparison_fig(
     ax_timing.set_yticks([])  # Remove y-axis ticks
     ax_timing.set_xlabel("Relative Performance (% of Handcoded JAX time)", fontsize=22)
 
-    # Add clarification on right side of plot
-    ax_timing.text(
-        0.85,
-        0.85,
-        "Smaller bar is better",
-        transform=ax_timing.transAxes,
-        ha="center",
-        va="center",
-        fontsize=16,
-        style="italic",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
-    )
+    # Removed 'Smaller bar is better' text
 
     # Customize tick labels
     ax_timing.tick_params(axis="x", labelsize=20)
@@ -534,7 +525,7 @@ def combined_comparison_fig(
     ax_timing.spines["left"].set_visible(False)
 
     # Print timing results (3 frameworks only)
-    print(f"GenJAX: {gj_mu:.6f}s, Handcoded: {hc_mu:.6f}s, NumPyro: {np_mu:.6f}s")
+    print(f"Ours: {gj_mu:.6f}s, Handcoded: {hc_mu:.6f}s, NumPyro: {np_mu:.6f}s")
 
     # Save with parametrized filename (3x2 layout without Pyro)
     filename = (
