@@ -485,48 +485,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Key Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#generative-function-interface-gfi" class="md-nav__link">
-    <span class="md-ellipsis">
-      🎯 Generative Function Interface (GFI)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#built-in-inference-algorithms" class="md-nav__link">
-    <span class="md-ellipsis">
-      🔧 Built-in Inference Algorithms
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#jax-integration" class="md-nav__link">
-    <span class="md-ellipsis">
-      🚀 JAX Integration
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation
-    </span>
-  </a>
-  
 </li>
       
         <li class="md-nav__item">
@@ -539,9 +497,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
+  <a href="#learn-more" class="md-nav__link">
     <span class="md-ellipsis">
-      License
+      Learn More
     </span>
   </a>
   
@@ -1293,48 +1251,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Key Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#generative-function-interface-gfi" class="md-nav__link">
-    <span class="md-ellipsis">
-      🎯 Generative Function Interface (GFI)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#built-in-inference-algorithms" class="md-nav__link">
-    <span class="md-ellipsis">
-      🔧 Built-in Inference Algorithms
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#jax-integration" class="md-nav__link">
-    <span class="md-ellipsis">
-      🚀 JAX Integration
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation
-    </span>
-  </a>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1347,9 +1263,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
+  <a href="#learn-more" class="md-nav__link">
     <span class="md-ellipsis">
-      License
+      Learn More
     </span>
   </a>
   
@@ -1375,92 +1291,43 @@
 
 
 <h1 id="genjax">GenJAX<a class="headerlink" href="#genjax" title="Permanent link">&para;</a></h1>
-<p><strong>A JAX-based probabilistic programming language with programmable inference</strong></p>
-<div class="grid cards">
-<ul>
-<li>
-<p>:material-rocket-launch-outline: <strong>Fast &amp; Scalable</strong><br />
-  Built on JAX for automatic differentiation, JIT compilation, and hardware acceleration</p>
-</li>
-<li>
-<p>:material-code-braces: <strong>Pythonic API</strong><br />
-  Write probabilistic models using familiar Python syntax with the <code>@gen</code> decorator</p>
-</li>
-<li>
-<p>:material-tune: <strong>Programmable Inference</strong><br />
-  Customize inference algorithms or use built-in MCMC, SMC, and variational methods</p>
-</li>
-<li>
-<p>:material-vector-combine: <strong>Composable Models</strong><br />
-  Build complex models from simple components using combinators</p>
-</li>
-</ul>
-</div>
+<p>GenJAX is a JAX-based probabilistic programming language that provides a <strong>Generative Function Interface (GFI)</strong> for writing and composing probabilistic models with programmable inference.</p>
 <h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">genjax</span><span class="w"> </span><span class="kn">import</span> <span class="n">gen</span><span class="p">,</span> <span class="n">normal</span><span class="p">,</span> <span class="n">bernoulli</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nd">@gen</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">coin_flipping_model</span><span class="p">(</span><span class="n">n_flips</span><span class="p">):</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="c1"># Prior on coin bias</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">bias</span> <span class="o">=</span> <span class="n">normal</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span> <span class="o">@</span> <span class="s2">&quot;bias&quot;</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="c1"># Generate flips</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">flips</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_flips</span><span class="p">):</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="n">flip</span> <span class="o">=</span> <span class="n">bernoulli</span><span class="p">(</span><span class="n">bias</span><span class="p">)</span> <span class="o">@</span> <span class="sa">f</span><span class="s2">&quot;flip_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="n">flips</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">flip</span><span class="p">)</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">flips</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">genjax</span><span class="w"> </span><span class="kn">import</span> <span class="n">gen</span><span class="p">,</span> <span class="n">distributions</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nd">@gen</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">coin_flips</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">p</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">beta</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">@</span> <span class="s2">&quot;bias&quot;</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">distributions</span><span class="o">.</span><span class="n">bernoulli</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="o">@</span> <span class="sa">f</span><span class="s2">&quot;flip_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="k">return</span> <span class="n">p</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># Run inference</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">trace</span> <span class="o">=</span> <span class="n">coin_flips</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">(</span><span class="mi">10</span><span class="p">,))</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Inferred bias: </span><span class="si">{</span><span class="n">trace</span><span class="o">.</span><span class="n">retval</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
-<h3 id="generative-function-interface-gfi">🎯 <strong>Generative Function Interface (GFI)</strong><a class="headerlink" href="#generative-function-interface-gfi" title="Permanent link">&para;</a></h3>
-<p>GenJAX implements the Generative Function Interface, providing a unified API for:</p>
 <ul>
-<li><strong>Forward sampling</strong> (<code>simulate</code>)</li>
-<li><strong>Density evaluation</strong> (<code>assess</code>)</li>
-<li><strong>Constrained generation</strong> (<code>generate</code>)</li>
-<li><strong>Trace updates</strong> (<code>update</code>)</li>
-<li><strong>Selective regeneration</strong> (<code>regenerate</code>)</li>
+<li><strong>Composable Models</strong>: Build complex models from simple components</li>
+<li><strong>JAX Integration</strong>: Leverage JAX's JIT compilation and automatic differentiation</li>
+<li><strong>Programmable Inference</strong>: Combine different inference algorithms seamlessly</li>
+<li><strong>Pytree Compatible</strong>: All GenJAX types work with JAX transformations</li>
 </ul>
-<h3 id="built-in-inference-algorithms">🔧 <strong>Built-in Inference Algorithms</strong><a class="headerlink" href="#built-in-inference-algorithms" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>MCMC</strong>: Metropolis-Hastings, HMC, MALA</li>
-<li><strong>Sequential Monte Carlo</strong>: Particle filtering, SMC samplers</li>
-<li><strong>Variational Inference</strong>: Black-box VI with gradient estimators</li>
-</ul>
-<h3 id="jax-integration">🚀 <strong>JAX Integration</strong><a class="headerlink" href="#jax-integration" title="Permanent link">&para;</a></h3>
-<ul>
-<li>JIT compilation for performance</li>
-<li>Automatic differentiation for gradient-based inference</li>
-<li>Hardware acceleration (GPU/TPU)</li>
-<li>Functional programming paradigm</li>
-</ul>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>genjax
-</span></code></pre></div>
-<p>Or with conda/mamba:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>genjax
-</span></code></pre></div>
 <h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h2>
-<div class="grid cards">
 <ul>
-<li>
-<p>:material-school: <a href="getting-started/tutorial/"><strong>Tutorial</strong></a><br />
-  Learn the basics of GenJAX with hands-on examples</p>
-</li>
-<li>
-<p>:material-api: <a href="api/overview/"><strong>API Reference</strong></a><br />
-  Detailed documentation of all GenJAX components</p>
-</li>
-<li>
-<p>:material-flask: <a href="examples/overview/"><strong>Examples</strong></a><br />
-  Explore real-world applications and case studies</p>
-</li>
+<li><a href="getting-started/installation/">Installation</a> - Install GenJAX and its dependencies</li>
+<li><a href="getting-started/quickstart/">Quick Start</a> - Dive into your first GenJAX program</li>
+<li><a href="getting-started/tutorial/">Tutorial</a> - Learn GenJAX concepts step by step</li>
 </ul>
-</div>
-<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
-<p>GenJAX is released under the MIT License. See the <a href="https://github.com/femtomc/genjax/blob/main/LICENSE">LICENSE</a> file for details.</p>
+<h2 id="learn-more">Learn More<a class="headerlink" href="#learn-more" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="api/overview/">Core API</a> - Understand the Generative Function Interface</li>
+<li><a href="inference/overview/">Inference Algorithms</a> - Explore MCMC, SMC, and VI</li>
+<li><a href="examples/overview/">Examples</a> - See GenJAX in action</li>
+</ul>
 
 
 
