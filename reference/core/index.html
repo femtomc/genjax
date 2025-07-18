@@ -5916,12 +5916,6 @@ We delegate to the first callee's filter method.</p>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1">#     for i in range(n.value):  # This works in JAX transforms!</span>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="c1">#         ...</span>
 </span></code></pre></div>
-<div class="result">
-Value: 10
-Type: <class 'genjax.core.Const'>
-Doubled: 20
-
-</div>
 </details>
 
             <details class="quote">
@@ -5966,7 +5960,7 @@ Doubled: 20
 </span><span id="__span-0-426"><a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        A Const wrapper that keeps the value static in JAX transformations.</span>
 </span><span id="__span-0-427"><a id="__codelineno-0-427" name="__codelineno-0-427"></a>
 </span><span id="__span-0-428"><a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-429"><a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        ```python exec=&quot;yes&quot; html=&quot;true&quot; source=&quot;material-block&quot; session=&quot;const&quot;</span>
+</span><span id="__span-0-429"><a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        ```python</span>
 </span><span id="__span-0-430"><a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">        from genjax import const, Const</span>
 </span><span id="__span-0-431"><a id="__codelineno-0-431" name="__codelineno-0-431"></a>
 </span><span id="__span-0-432"><a id="__codelineno-0-432" name="__codelineno-0-432"></a><span class="sd">        # Create a static value</span>
@@ -6378,15 +6372,6 @@ inference operations like MCMC.</p>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="n">s6</span> <span class="o">=</span> <span class="o">~</span><span class="n">sel</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
 </span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;~sel(&#39;x&#39;): </span><span class="si">{</span><span class="n">s6</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<div class="result">
-sel('x'): Selection(s=StrSel(s=Const(value='x')))
-sel(('outer', 'inner')): Selection(s=TupleSel(t=Const(value=('outer', 'inner'))))
-sel(()): Selection(s=AllSel())
-sel(): Selection(s=NoneSel())
-sel('x') | sel('y'): Selection(s=OrSel(s1=Selection(s=StrSel(s=Const(value='x'))), s2=Selection(s=StrSel(s=Const(value='y')))))
-~sel('x'): Selection(s=ComplSel(s=Selection(s=StrSel(s=Const(value='x')))))
-
-</div>
 
 
             <details class="quote">
@@ -6472,7 +6457,7 @@ sel('x') | sel('y'): Selection(s=OrSel(s1=Selection(s=StrSel(s=Const(value='x'))
 </span><span id="__span-0-992"><a id="__codelineno-0-992" name="__codelineno-0-992"></a><span class="sd">        Selection object that can be used with regenerate methods</span>
 </span><span id="__span-0-993"><a id="__codelineno-0-993" name="__codelineno-0-993"></a>
 </span><span id="__span-0-994"><a id="__codelineno-0-994" name="__codelineno-0-994"></a><span class="sd">    Examples:</span>
-</span><span id="__span-0-995"><a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">        ```python exec=&quot;yes&quot; html=&quot;true&quot; source=&quot;material-block&quot; session=&quot;selection&quot;</span>
+</span><span id="__span-0-995"><a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">        ```python</span>
 </span><span id="__span-0-996"><a id="__codelineno-0-996" name="__codelineno-0-996"></a><span class="sd">        from genjax import sel</span>
 </span><span id="__span-0-997"><a id="__codelineno-0-997" name="__codelineno-0-997"></a>
 </span><span id="__span-0-998"><a id="__codelineno-0-998" name="__codelineno-0-998"></a><span class="sd">        # Select specific address</span>
