@@ -1,0 +1,3194 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A JAX-based probabilistic programming language with programmable inference">
+      
+      
+        <meta name="author" content="GenJAX Contributors">
+      
+      
+        <link rel="canonical" href="https://femtomc.github.io/genjax/reference/distributions/">
+      
+      
+        <link rel="prev" href="../core/">
+      
+      
+        <link rel="next" href="../mcmc/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
+    
+    
+      
+        <title>Distributions - GenJAX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#genjaxdistributions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GenJAX" class="md-header__button md-logo" aria-label="GenJAX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GenJAX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Distributions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/femtomc/genjax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    femtomc/genjax
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/overview/" class="md-tabs__link">
+          
+  
+  
+  Core API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../inference/overview/" class="md-tabs__link">
+          
+  
+  
+  Inference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../advanced/pjax/" class="md-tabs__link">
+          
+  
+  
+  Advanced
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/overview/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GenJAX" class="md-nav__button md-logo" aria-label="GenJAX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GenJAX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/femtomc/genjax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    femtomc/genjax
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Best Practices
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorial
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Core API
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Core API
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/generative-functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Generative Functions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/distributions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Distributions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/traces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Traces
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/combinators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Combinators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Inference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Inference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../inference/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../inference/mcmc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    MCMC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../inference/smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SMC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../inference/vi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Variational Inference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Advanced
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Advanced
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/pjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PJAX
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/gradient-estimators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Gradient Estimators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/state-interpreter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    State Interpreter
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Examples
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/simple-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Simple Models
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/hierarchical-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Hierarchical Models
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Distributions
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Distributions
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#genjax.distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;distributions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" distributions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.bernoulli" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;bernoulli
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.flip" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;flip
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.beta" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;beta
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;categorical
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.geometric" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;geometric
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.uniform" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;uniform
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.exponential" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;exponential
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.poisson" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;poisson
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.multivariate_normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;multivariate_normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.dirichlet" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;dirichlet
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.binomial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;binomial
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.gamma" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;gamma
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.log_normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;log_normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.student_t" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;student_t
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.laplace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;laplace
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.half_normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;half_normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.inverse_gamma" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;inverse_gamma
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.weibull" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;weibull
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.cauchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;cauchy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.chi2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;chi2
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.multinomial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;multinomial
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.negative_binomial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;negative_binomial
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.zipf" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;zipf
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available Distributions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Distributions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuous-distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Continuous Distributions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discrete-distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Discrete Distributions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Examples
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vectorized-sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vectorized Sampling
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcmc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    MCMC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SMC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#genjax.distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;distributions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" distributions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.bernoulli" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;bernoulli
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.flip" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;flip
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.beta" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;beta
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;categorical
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.geometric" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;geometric
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.uniform" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;uniform
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.exponential" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;exponential
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.poisson" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;poisson
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.multivariate_normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;multivariate_normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.dirichlet" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;dirichlet
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.binomial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;binomial
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.gamma" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;gamma
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.log_normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;log_normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.student_t" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;student_t
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.laplace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;laplace
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.half_normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;half_normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.inverse_gamma" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;inverse_gamma
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.weibull" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;weibull
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.cauchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;cauchy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.chi2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;chi2
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.multinomial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;multinomial
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.negative_binomial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;negative_binomial
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genjax.distributions.zipf" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;zipf
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available Distributions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Distributions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuous-distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Continuous Distributions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discrete-distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Discrete Distributions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Examples
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vectorized-sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vectorized Sampling
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="genjaxdistributions">genjax.distributions<a class="headerlink" href="#genjaxdistributions" title="Permanent link">&para;</a></h1>
+<p>Built-in probability distributions that implement the Generative Function Interface.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="genjax.distributions" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-module"></code>            <span class="doc doc-object-name doc-module-name">distributions</span>
+
+
+<a href="#genjax.distributions" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Standard probability distributions for GenJAX.</p>
+<p>This module provides a collection of common probability distributions
+wrapped as GenJAX Distribution objects. All distributions are built
+using TensorFlow Probability as the backend.</p>
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.bernoulli" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">bernoulli</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.bernoulli" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">bernoulli</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Bernoulli</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Bernoulli&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Bernoulli distribution for binary outcomes.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PMF: P(X = k) = p^k × (1-p)^(1-k) for k ∈ {0, 1}</p>
+<p>Where p is the probability of success.</p>
+<p>Mean: 𝔼[X] = p
+Variance: Var[X] = p(1-p)
+Support: {0, 1}</p>
+</details>
+
+<details class="parameterization" open>
+  <summary>Parameterization</summary>
+  <p>Can be specified via:
+- probs: p ∈ [0, 1] (probability of success)
+- logits: log(p/(1-p)) ∈ ℝ (log-odds)</p>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Johnson, N. L., Kotz, S., &amp; Kemp, A. W. (1992). "Univariate
+       Discrete Distributions". Wiley, Chapter 3.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.flip" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">flip</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.flip" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">flip</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">Bernoulli</span><span class="p">(</span><span class="n">probs</span><span class="o">=</span><span class="n">p</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">bool_</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Flip&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Flip distribution (Bernoulli with boolean output).</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.beta" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">beta</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.beta" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">beta</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Beta</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Beta&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Beta distribution on the interval [0, 1].</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; α, β) = Γ(α+β)/(Γ(α)Γ(β)) × x^(α-1) × (1-x)^(β-1)</p>
+<p>Where Γ is the gamma function, α &gt; 0, β &gt; 0.</p>
+<p>Mean: 𝔼[X] = α/(α+β)
+Variance: Var[X] = αβ/((α+β)²(α+β+1))
+Mode: (α-1)/(α+β-2) for α,β &gt; 1
+Support: [0, 1]</p>
+</details>
+
+<details class="special-cases" open>
+  <summary>Special Cases</summary>
+  <ul>
+<li>Beta(1, 1) = Uniform(0, 1)</li>
+<li>Beta(α, α) is symmetric about 0.5</li>
+<li>As α,β → ∞ with α/(α+β) fixed, approaches Normal</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Gupta, A. K., &amp; Nadarajah, S. (2004). "Handbook of Beta
+       Distribution and Its Applications". CRC Press.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.categorical" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">categorical</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.categorical" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">categorical</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="k">lambda</span> <span class="n">logits</span><span class="p">:</span> <span class="n">Categorical</span><span class="p">(</span><span class="n">logits</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Categorical&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Categorical distribution over discrete outcomes.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PMF: P(X = k) = p_k for k ∈ {0, 1, ..., K-1}</p>
+<p>Where ∑_k p_k = 1 and p_k ≥ 0.</p>
+<p>Mean: 𝔼[X] = ∑_k k × p_k
+Variance: Var[X] = ∑_k k² × p_k - (𝔼[X])²
+Entropy: H[X] = -∑_k p_k log(p_k)
+Support: {0, 1, ..., K-1}</p>
+</details>
+
+<details class="parameterization" open>
+  <summary>Parameterization</summary>
+  <ul>
+<li>logits: θ_k ∈ ℝ, where p_k = exp(θ_k) / ∑_j exp(θ_j)</li>
+<li>Softmax transformation ensures valid probabilities</li>
+</ul>
+</details>
+
+<details class="connection-to-other-distributions" open>
+  <summary>Connection to Other Distributions</summary>
+  <ul>
+<li>K=2: Equivalent to Bernoulli</li>
+<li>Generalization of multinomial for single trial</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Bishop, C. M. (2006). "Pattern Recognition and Machine Learning".
+       Springer, Section 2.2.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.geometric" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">geometric</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.geometric" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">geometric</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Geometric</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Geometric&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Geometric distribution (number of trials until first success).</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PMF: P(X = k) = (1-p)^(k-1) × p for k ∈ {1, 2, 3, ...}</p>
+<p>Where p ∈ (0, 1] is the probability of success.</p>
+<p>Mean: 𝔼[X] = 1/p
+Variance: Var[X] = (1-p)/p²
+CDF: F(k) = 1 - (1-p)^k
+Support: {1, 2, 3, ...}</p>
+</details>
+
+<details class="memoryless-property" open>
+  <summary>Memoryless Property</summary>
+  <p>P(X &gt; m + n | X &gt; m) = P(X &gt; n)</p>
+<p>The only discrete distribution with this property.</p>
+</details>
+
+<details class="alternative-parameterization" open>
+  <summary>Alternative Parameterization</summary>
+  <p>Some define X as failures before first success:
+P(X = k) = (1-p)^k × p for k ∈ {0, 1, 2, ...}</p>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Johnson, N. L., Kotz, S., &amp; Kemp, A. W. (1992). "Univariate
+       Discrete Distributions". Wiley, Chapter 5.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.normal" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">normal</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.normal" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">normal</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Normal</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Normal&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Normal (Gaussian) distribution.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; μ, σ) = (1/√(2πσ²)) × exp(-(x-μ)²/(2σ²))</p>
+<p>Where μ ∈ ℝ is the mean, σ &gt; 0 is the standard deviation.</p>
+<p>Mean: 𝔼[X] = μ
+Variance: Var[X] = σ²
+MGF: M(t) = exp(μt + σ²t²/2)
+Support: ℝ</p>
+</details>
+
+<details class="standard-normal" open>
+  <summary>Standard Normal</summary>
+  <p>Z = (X - μ)/σ ~ N(0, 1)</p>
+<p>Φ(z) = P(Z ≤ z) = ∫_{-∞}^z (1/√(2π)) exp(-t²/2) dt</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Maximum entropy distribution for fixed mean and variance</li>
+<li>Stable under convolution: X₁ + X₂ ~ N(μ₁+μ₂, σ₁²+σ₂²)</li>
+<li>Central Limit Theorem: Sample means converge to Normal</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Patel, J. K., &amp; Read, C. B. (1996). "Handbook of the Normal
+       Distribution". Marcel Dekker, 2nd edition.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.uniform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">uniform</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.uniform" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">uniform</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Uniform</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Uniform&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Uniform distribution on an interval.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; a, b) = 1/(b-a) for x ∈ [a, b], 0 otherwise</p>
+<p>Where a &lt; b define the support interval.</p>
+<p>Mean: 𝔼[X] = (a + b)/2
+Variance: Var[X] = (b - a)²/12
+CDF: F(x) = (x - a)/(b - a) for x ∈ [a, b]
+Support: [a, b]</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Maximum entropy distribution on bounded interval</li>
+<li>All moments exist: 𝔼[X^n] = (b^(n+1) - a^(n+1))/((n+1)(b-a))</li>
+<li>Order statistics have Beta distributions</li>
+</ul>
+</details>
+
+<details class="connection-to-other-distributions" open>
+  <summary>Connection to Other Distributions</summary>
+  <ul>
+<li>Standard uniform U(0,1) generates other distributions</li>
+<li>-log(U) ~ Exponential(1)</li>
+<li>U^(1/α) ~ Power distribution</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Johnson, N. L., Kotz, S., &amp; Balakrishnan, N. (1995).
+       "Continuous Univariate Distributions". Wiley, Vol. 2, Chapter 26.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.exponential" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">exponential</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.exponential" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exponential</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Exponential</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Exponential&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Exponential distribution for positive continuous values.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; λ) = λ exp(-λx) for x ≥ 0</p>
+<p>Where λ &gt; 0 is the rate parameter.</p>
+<p>Mean: 𝔼[X] = 1/λ
+Variance: Var[X] = 1/λ²
+CDF: F(x) = 1 - exp(-λx)
+Support: [0, ∞)</p>
+</details>
+
+<details class="memoryless-property" open>
+  <summary>Memoryless Property</summary>
+  <p>P(X &gt; s + t | X &gt; s) = P(X &gt; t)</p>
+<p>The only continuous distribution with this property.</p>
+</details>
+
+<details class="connection-to-other-distributions" open>
+  <summary>Connection to Other Distributions</summary>
+  <ul>
+<li>Special case of Gamma(1, λ)</li>
+<li>-log(U) ~ Exponential(1) where U ~ Uniform(0,1)</li>
+<li>Minimum of n Exponential(λ) ~ Exponential(nλ)</li>
+<li>Sum of n Exponential(λ) ~ Gamma(n, λ)</li>
+</ul>
+</details>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.poisson" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">poisson</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.poisson" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">poisson</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Poisson</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Poisson&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Poisson distribution for count data.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PMF: P(X = k) = (λ^k / k!) × exp(-λ) for k ∈ {0, 1, 2, ...}</p>
+<p>Where λ &gt; 0 is the rate parameter (expected count).</p>
+<p>Mean: 𝔼[X] = λ
+Variance: Var[X] = λ
+MGF: M(t) = exp(λ(e^t - 1))
+Support: {0, 1, 2, ...}</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Mean equals variance (equidispersion)</li>
+<li>Sum of Poissons: X₁ ~ Pois(λ₁), X₂ ~ Pois(λ₂) ⇒ X₁+X₂ ~ Pois(λ₁+λ₂)</li>
+<li>Limit of Binomial: Bin(n,p) → Pois(np) as n→∞, p→0, np=λ</li>
+</ul>
+</details>
+
+<details class="connection-to-other-distributions" open>
+  <summary>Connection to Other Distributions</summary>
+  <ul>
+<li>Poisson process: Inter-arrival times ~ Exponential(λ)</li>
+<li>Large λ: Approximately Normal(λ, λ)</li>
+<li>Conditional on rate: If λ ~ Gamma(α,β), then X ~ NegBin(α, β/(1+β))</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Johnson, N. L., Kotz, S., &amp; Kemp, A. W. (1992). "Univariate
+       Discrete Distributions". Wiley, Chapter 4.
+.. [2] Haight, F. A. (1967). "Handbook of the Poisson Distribution".
+       Wiley.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.multivariate_normal" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">multivariate_normal</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.multivariate_normal" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">multivariate_normal</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">MultivariateNormalFullCovariance</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;MultivariateNormal&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Multivariate normal distribution.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; μ, Σ) = (2π)^(-k/2) |det(Σ)|^(-1/2) exp(-½(x-μ)^T Σ^(-1) (x-μ))</p>
+<p>Where μ ∈ ℝ^k is the mean vector, Σ is k×k positive definite covariance.</p>
+<p>Mean: 𝔼[X] = μ
+Covariance: Cov[X] = Σ
+MGF: M(t) = exp(t^Tμ + ½t^TΣt)
+Support: ℝ^k</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Linear transformations: If Y = AX + b, then Y ~ N(Aμ + b, AΣA^T)</li>
+<li>Marginals are Normal: X_i ~ N(μ_i, Σ_{ii})</li>
+<li>Conditional distributions are Normal with closed-form parameters</li>
+<li>Maximum entropy for fixed mean and covariance</li>
+</ul>
+</details>
+
+<details class="special-cases" open>
+  <summary>Special Cases</summary>
+  <ul>
+<li>Σ = σ²I: Spherical/isotropic Gaussian</li>
+<li>Σ diagonal: Independent components</li>
+<li>k = 1: Univariate normal</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Mardia, K. V., Kent, J. T., &amp; Bibby, J. M. (1979). "Multivariate
+       Analysis". Academic Press, Chapter 3.
+.. [2] Tong, Y. L. (1990). "The Multivariate Normal Distribution".
+       Springer-Verlag.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.dirichlet" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">dirichlet</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.dirichlet" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">dirichlet</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Dirichlet</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Dirichlet&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Dirichlet distribution for probability vectors.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; α) = [Γ(∑ᵢαᵢ)/∏ᵢΓ(αᵢ)] × ∏ᵢ xᵢ^(αᵢ-1)</p>
+<p>Where x ∈ δ_{k-1} (probability simplex), αᵢ &gt; 0 are concentrations.</p>
+<p>Mean: 𝔼[Xᵢ] = αᵢ / ∑ⱼαⱼ
+Variance: Var[Xᵢ] = [αᵢ(α₀-αᵢ)] / [α₀²(α₀+1)], where α₀ = ∑ⱼαⱼ
+Support: δ_{k-1} = {x ∈ ℝ^k : xᵢ ≥ 0, ∑ᵢxᵢ = 1}</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Conjugate prior for categorical/multinomial</li>
+<li>Marginals: Xᵢ ~ Beta(αᵢ, ∑ⱼ≠ᵢαⱼ)</li>
+<li>Aggregation property: (Xᵢ + Xⱼ, X_rest) follows lower-dim Dirichlet</li>
+<li>Neutral element: Dir(1, 1, ..., 1) = Uniform on simplex</li>
+</ul>
+</details>
+
+<details class="connection-to-other-distributions" open>
+  <summary>Connection to Other Distributions</summary>
+  <ul>
+<li>k=2: Dir(α₁, α₂) equivalent to Beta(α₁, α₂)</li>
+<li>Gamma construction: If Yᵢ ~ Gamma(αᵢ, 1), then Y/∑Y ~ Dir(α)</li>
+<li>Log-normal approximation for large α</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Kotz, S., Balakrishnan, N., &amp; Johnson, N. L. (2000). "Continuous
+       Multivariate Distributions". Wiley, Vol. 1, Chapter 49.
+.. [2] Ng, K. W., Tian, G. L., &amp; Tang, M. L. (2011). "Dirichlet and
+       Related Distributions". Wiley.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.binomial" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">binomial</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.binomial" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">binomial</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Binomial</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Binomial&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Binomial distribution for count data with fixed number of trials.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PMF: P(X = k) = C(n,k) × p^k × (1-p)^(n-k) for k ∈ {0, 1, ..., n}</p>
+<p>Where n is the number of trials, p is success probability,
+and C(n,k) = n!/(k!(n-k)!) is the binomial coefficient.</p>
+<p>Mean: 𝔼[X] = np
+Variance: Var[X] = np(1-p)
+MGF: M(t) = (1 - p + pe<sup>t)</sup>n
+Support: {0, 1, 2, ..., n}</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Sum of Bernoulli: X = ∑ᵢ Yᵢ where Yᵢ ~ Bernoulli(p)</li>
+<li>Additivity: Bin(n₁,p) + Bin(n₂,p) = Bin(n₁+n₂,p)</li>
+<li>Symmetry: If p = 0.5, then P(X = k) = P(X = n-k)</li>
+</ul>
+</details>
+
+<details class="approximations" open>
+  <summary>Approximations</summary>
+  <ul>
+<li>Normal: For large n, np(1-p) &gt; 10, approximately N(np, np(1-p))</li>
+<li>Poisson: For large n, small p, np = λ moderate, approximately Pois(λ)</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Johnson, N. L., Kotz, S., &amp; Kemp, A. W. (1992). "Univariate
+       Discrete Distributions". Wiley, Chapter 3.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.gamma" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">gamma</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.gamma" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">gamma</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Gamma</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Gamma&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gamma distribution for positive continuous values.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; α, β) = (β^α / Γ(α)) × x^(α-1) × exp(-βx) for x &gt; 0</p>
+<p>Where α &gt; 0 is the shape, β &gt; 0 is the rate (or θ = 1/β is scale).</p>
+<p>Mean: 𝔼[X] = α/β = αθ
+Variance: Var[X] = α/β² = αθ²
+Mode: (α-1)/β for α ≥ 1
+Support: (0, ∞)</p>
+</details>
+
+<details class="special-cases" open>
+  <summary>Special Cases</summary>
+  <ul>
+<li>α = 1: Exponential(β)</li>
+<li>α = k/2, β = 1/2: Chi-squared(k)</li>
+<li>Integer α: Erlang distribution</li>
+</ul>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Additivity: Gamma(α₁,β) + Gamma(α₂,β) = Gamma(α₁+α₂,β)</li>
+<li>Scaling: cX ~ Gamma(α, β/c) for c &gt; 0</li>
+<li>Conjugate prior for Poisson rate, exponential rate</li>
+</ul>
+</details>
+
+<details class="connection-to-other-distributions" open>
+  <summary>Connection to Other Distributions</summary>
+  <ul>
+<li>If Xᵢ ~ Gamma(αᵢ, 1), then Xᵢ/∑Xⱼ ~ Dirichlet(α)</li>
+<li>Inverse: 1/X ~ InverseGamma(α, β)</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Johnson, N. L., Kotz, S., &amp; Balakrishnan, N. (1994). "Continuous
+       Univariate Distributions". Wiley, Vol. 1, Chapter 17.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.log_normal" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">log_normal</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.log_normal" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">log_normal</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">LogNormal</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;LogNormal&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Log-normal distribution (exponential of normal random variable).</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>If Y ~ N(μ, σ²), then X = exp(Y) ~ LogNormal(μ, σ²)</p>
+<p>PDF: f(x; μ, σ) = (1/(xσ√(2π))) × exp(-(ln(x)-μ)²/(2σ²)) for x &gt; 0</p>
+<p>Mean: 𝔼[X] = exp(μ + σ²/2)
+Variance: Var[X] = (exp(σ²) - 1) × exp(2μ + σ²)
+Mode: exp(μ - σ²)
+Support: (0, ∞)</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Multiplicative: If Xᵢ ~ LogN(μᵢ, σᵢ²) independent, then ∏Xᵢ is log-normal</li>
+<li>Not closed under addition (sum of log-normals is not log-normal)</li>
+<li>Heavy right tail: all moments exist but grow rapidly</li>
+<li>Median: exp(μ)</li>
+</ul>
+</details>
+
+<details class="applications" open>
+  <summary>Applications</summary>
+  <ul>
+<li>Income distributions</li>
+<li>Stock prices (geometric Brownian motion)</li>
+<li>Particle sizes</li>
+<li>Species abundance</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Crow, E. L., &amp; Shimizu, K. (Eds.). (1988). "Lognormal Distributions:
+       Theory and Applications". Marcel Dekker.
+.. [2] Limpert, E., Stahel, W. A., &amp; Abbt, M. (2001). "Log-normal
+       distributions across the sciences". BioScience, 51(5), 341-352.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.student_t" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">student_t</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.student_t" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">student_t</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">StudentT</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;StudentT&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Student's t-distribution with specified degrees of freedom.</p>
+
+
+<details class="mathematical-formulation" open>
+  <summary>Mathematical Formulation</summary>
+  <p>PDF: f(x; ν, μ, σ) = Γ((ν+1)/2)/(Γ(ν/2)√(νπ)σ) × [1 + ((x-μ)/σ)²/ν]^(-(ν+1)/2)</p>
+<p>Where ν &gt; 0 is degrees of freedom, μ is location, σ &gt; 0 is scale.</p>
+<p>Mean: 𝔼[X] = μ for ν &gt; 1 (undefined for ν ≤ 1)
+Variance: Var[X] = σ²ν/(ν-2) for ν &gt; 2 (infinite for 1 &lt; ν ≤ 2)
+Support: ℝ</p>
+</details>
+
+<details class="properties" open>
+  <summary>Properties</summary>
+  <ul>
+<li>Heavier tails than normal (polynomial vs exponential decay)</li>
+<li>ν → ∞: Converges to Normal(μ, σ²)</li>
+<li>ν = 1: Cauchy distribution (no mean)</li>
+<li>ν = 2: Finite mean but infinite variance</li>
+<li>Symmetric about μ</li>
+</ul>
+</details>
+
+<details class="standardized-form" open>
+  <summary>Standardized Form</summary>
+  <p>If T ~ t(ν), then X = μ + σT ~ t(ν, μ, σ)</p>
+</details>
+
+<details class="connection-to-other-distributions" open>
+  <summary>Connection to Other Distributions</summary>
+  <ul>
+<li>Ratio of normal to chi: If Z ~ N(0,1), V ~ χ²(ν), then Z/√(V/ν) ~ t(ν)</li>
+<li>F-distribution: T² ~ F(1, ν) if T ~ t(ν)</li>
+</ul>
+</details>
+
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>.. [1] Lange, K. L., Little, R. J., &amp; Taylor, J. M. (1989). "Robust
+       statistical modeling using the t distribution". JASA, 84(408), 881-896.
+.. [2] Kotz, S., &amp; Nadarajah, S. (2004). "Multivariate t-distributions
+       and their applications". Cambridge University Press.</p>
+</details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.laplace" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">laplace</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.laplace" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">laplace</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Laplace</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Laplace&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Laplace (double exponential) distribution.</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.half_normal" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">half_normal</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.half_normal" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">half_normal</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">HalfNormal</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;HalfNormal&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Half-normal distribution (positive half of normal distribution).</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.inverse_gamma" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">inverse_gamma</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.inverse_gamma" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">inverse_gamma</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">InverseGamma</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;InverseGamma&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Inverse gamma distribution for positive continuous values.</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.weibull" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">weibull</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.weibull" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">weibull</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Weibull</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Weibull&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Weibull distribution for modeling survival times and reliability.</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.cauchy" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">cauchy</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.cauchy" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">cauchy</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Cauchy</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Cauchy&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Cauchy distribution with heavy tails.</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.chi2" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">chi2</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.chi2" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">chi2</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Chi2</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Chi2&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Chi-squared distribution.</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.multinomial" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">multinomial</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.multinomial" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">multinomial</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Multinomial</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Multinomial&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Multinomial distribution over count vectors.</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.negative_binomial" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">negative_binomial</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.negative_binomial" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">negative_binomial</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">NegativeBinomial</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;NegativeBinomial&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Negative binomial distribution for overdispersed count data.</p>
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="genjax.distributions.zipf" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">zipf</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#genjax.distributions.zipf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">zipf</span> <span class="o">=</span> <span class="n">tfp_distribution</span><span class="p">(</span><span class="n">Zipf</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Zipf&#39;</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Zipf distribution for power-law distributed discrete data.</p>
+
+
+
+    </div>
+
+</div>
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="available-distributions">Available Distributions<a class="headerlink" href="#available-distributions" title="Permanent link">&para;</a></h2>
+<h3 id="continuous-distributions">Continuous Distributions<a class="headerlink" href="#continuous-distributions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>normal</strong>: Normal (Gaussian) distribution</li>
+<li><strong>uniform</strong>: Uniform distribution over an interval</li>
+<li><strong>beta</strong>: Beta distribution</li>
+<li><strong>gamma</strong>: Gamma distribution</li>
+<li><strong>exponential</strong>: Exponential distribution</li>
+<li><strong>cauchy</strong>: Cauchy distribution</li>
+<li><strong>student_t</strong>: Student's t-distribution</li>
+</ul>
+<h3 id="discrete-distributions">Discrete Distributions<a class="headerlink" href="#discrete-distributions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>bernoulli</strong>: Bernoulli distribution (binary outcomes)</li>
+<li><strong>categorical</strong>: Categorical distribution over finite outcomes</li>
+<li><strong>poisson</strong>: Poisson distribution</li>
+<li><strong>binomial</strong>: Binomial distribution</li>
+<li><strong>geometric</strong>: Geometric distribution</li>
+</ul>
+<h2 id="usage-examples">Usage Examples<a class="headerlink" href="#usage-examples" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">genjax</span><span class="w"> </span><span class="kn">import</span> <span class="n">distributions</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Continuous distributions</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">x</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">@</span> <span class="s2">&quot;x&quot;</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">p</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">beta</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">)</span> <span class="o">@</span> <span class="s2">&quot;p&quot;</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">rate</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">gamma</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">@</span> <span class="s2">&quot;rate&quot;</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># Discrete distributions</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">coin</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">bernoulli</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span> <span class="o">@</span> <span class="s2">&quot;coin&quot;</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">category</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">categorical</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span> <span class="o">@</span> <span class="s2">&quot;category&quot;</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">count</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">poisson</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">@</span> <span class="s2">&quot;count&quot;</span>
+</span></code></pre></div>
+<h2 id="vectorized-sampling">Vectorized Sampling<a class="headerlink" href="#vectorized-sampling" title="Permanent link">&para;</a></h2>
+<p>All distributions support vectorization via <code>vmap()</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Sample 100 values from a normal distribution</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">samples</span> <span class="o">=</span> <span class="n">distributions</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">vmap</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span>
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
