@@ -1,0 +1,39 @@
+/* Custom styles for GenJAX documentation */
+
+/* Code block styling */
+.highlight pre {
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+/* API reference styling */
+.doc-symbol {
+    border-left: 3px solid var(--md-primary-fg-color);
+    padding-left: 1rem;
+    margin: 1rem 0;
+}
+
+/* Math rendering */
+.arithmatex {
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+/* Admonition styling */
+.admonition {
+    margin: 1.5rem 0;
+}
+
+/* Table of contents */
+.md-nav__link--active {
+    font-weight: bold;
+}
+
+/* Signature highlighting */
+.doc-signature {
+    background-color: var(--md-code-bg-color);
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    margin: 0.5rem 0;
+    font-family: var(--md-code-font-family);
+}
