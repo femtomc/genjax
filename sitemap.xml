@@ -85,6 +85,10 @@
          <lastmod>2025-07-18</lastmod>
     </url>
     <url>
+         <loc>https://femtomc.github.io/genjax/reference/adev/</loc>
+         <lastmod>2025-07-18</lastmod>
+    </url>
+    <url>
          <loc>https://femtomc.github.io/genjax/reference/core/</loc>
          <lastmod>2025-07-18</lastmod>
     </url>
@@ -97,7 +101,19 @@
          <lastmod>2025-07-18</lastmod>
     </url>
     <url>
+         <loc>https://femtomc.github.io/genjax/reference/pjax/</loc>
+         <lastmod>2025-07-18</lastmod>
+    </url>
+    <url>
          <loc>https://femtomc.github.io/genjax/reference/smc/</loc>
+         <lastmod>2025-07-18</lastmod>
+    </url>
+    <url>
+         <loc>https://femtomc.github.io/genjax/reference/sp/</loc>
+         <lastmod>2025-07-18</lastmod>
+    </url>
+    <url>
+         <loc>https://femtomc.github.io/genjax/reference/state/</loc>
          <lastmod>2025-07-18</lastmod>
     </url>
 </urlset>
