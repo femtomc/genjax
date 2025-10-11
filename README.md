@@ -23,56 +23,74 @@ This research branch powers the POPL'26 artifact submitted alongside the paper *
 
 ## Quick Example
 
-Here's a simple curve fitting model in GenJAX demonstrating key features:
+Here's a simple curve fitting model showing how to write importance sampling using GenJAX's generative function interface:
 
 ```python
 from genjax import gen, normal, Const
+from genjax.pjax import seed
 import jax.numpy as jnp
+import jax.random as jrand
+import jax
 
 # Define a generative model for polynomial curve fitting
 @gen
 def polynomial():
-    a = normal(0.0, 1.0) @ "a"  # Constant term
-    b = normal(0.0, 1.0) @ "b"  # Linear coefficient
-    c = normal(0.0, 1.0) @ "c"  # Quadratic coefficient
+    a = normal(0.0, 1.0) @ "a"
+    b = normal(0.0, 1.0) @ "b"
+    c = normal(0.0, 1.0) @ "c"
     return jnp.array([a, b, c])
 
 @gen
 def point(x, coeffs):
     y_det = coeffs[0] + coeffs[1]*x + coeffs[2]*x**2
-    y_obs = normal(y_det, 0.05) @ "obs"  # Observation noise
+    y_obs = normal(y_det, 0.05) @ "obs"
     return y_obs
 
 @gen
 def npoint_curve(xs):
     coeffs = polynomial() @ "curve"
-    # Vectorize over multiple points
     ys = point.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
     return coeffs, (xs, ys)
 
-# Run importance sampling inference
-from genjax.inference import init
-
-xs = jnp.linspace(0, 1, 10)
-
 # Generate test data
+xs = jnp.linspace(0, 1, 10)
 trace = npoint_curve.simulate(xs)
 coeffs, (xs_ret, ys_test) = trace.get_retval()
 
+# Write importance sampling using the generative function interface
+def importance_sampling(key, model, args, observations, n_particles):
+    """Importance sampling: sample from prior, compute weights."""
+
+    def single_particle(key):
+        # Sample from prior (proposal)
+        prior_trace = seed(model.simulate)(key, *args)
+
+        # Update trace with observations to get constrained trace and weight
+        constrained_trace, weight, _ = model.update(
+            prior_trace, observations, *args
+        )
+
+        return constrained_trace, weight
+
+    # Vectorize over particles
+    keys = jrand.split(key, n_particles)
+    traces, log_weights = jax.vmap(single_particle)(keys)
+
+    return traces, log_weights
+
 # Run inference
 observations = {"ys": {"obs": ys_test}}
-result = init(npoint_curve, (xs,), Const(1000), observations)
-
-# Extract samples and weights
-samples = result.traces
-log_weights = result.log_weights
+traces, log_weights = importance_sampling(
+    jrand.key(0), npoint_curve, (xs,), observations, 1000
+)
 ```
 
 This example shows:
 - **Generative functions** with `@gen` decorator
-- **Named random choices** with `@` operator
+- **Named random choices** with `@` operator (e.g., `@ "a"`)
 - **Automatic vectorization** with `.vmap()`
-- **Programmable inference** with `init` (importance sampling)
+- **Programmable inference** using trace operations (`simulate`, `update`)
+- **Direct control** over inference algorithms via the generative function interface
 
 ---
 
