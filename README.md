@@ -94,10 +94,10 @@ print(f"Posterior mean for 'a': {jnp.mean(curve_a):.3f}")
 ```
 
 Key things to pay attention to:
-- **Generative functions** with `@gen` decorator
-- **Named random choices** with `@` operator (e.g., `@ "a"`)
+- **Define generative functions** with `@gen` decorator
+- **Syntactical abstraction for named random choices** with `@` operator (e.g., `@ "a"`)
 - **Composable vectorization** with `.vmap()` on generative functions, and `genjax.vmap` on probabilistic computations.
-- **Programmable inference** write inference using generative function interface (here, the `generate()` interface)
+- **Each of the above supports vectorized programmable inference** write inference using generative function interface (here, the `generate()` interface)
 
 ## Getting Started
 
