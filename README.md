@@ -6,9 +6,253 @@
 
 > **Note**: This is the research version of GenJAX. A [(more stable) community version can be found here](https://github.com/genjax-community/genjax).
 
-## What is GenJAX?
+## POPL 2026 Artifact
 
-This research branch powers the POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*.
+This research branch powers the POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*. It contains the GenJAX implementation and all case studies used in the empirical evaluation.
+
+**Contents:**
+- [Quick Example](#quick-example)
+- [Getting Started](#getting-started)
+- [Reproducing All Paper Figures](#reproducing-all-paper-figures)
+- [Case Study Details](#case-study-details)
+- [CPU vs GPU Execution](#cpu-vs-gpu-execution)
+- [Generated Figures](#generated-figures)
+- [About GenJAX](#about-genjax)
+
+---
+
+## Quick Example
+
+Here's a simple curve fitting model in GenJAX demonstrating key features:
+
+```python
+from genjax import gen, normal, Const
+import jax.numpy as jnp
+
+# Define a generative model for polynomial curve fitting
+@gen
+def polynomial():
+    a = normal(0.0, 1.0) @ "a"  # Constant term
+    b = normal(0.0, 1.0) @ "b"  # Linear coefficient
+    c = normal(0.0, 1.0) @ "c"  # Quadratic coefficient
+    return jnp.array([a, b, c])
+
+@gen
+def point(x, coeffs):
+    y_det = coeffs[0] + coeffs[1]*x + coeffs[2]*x**2
+    y_obs = normal(y_det, 0.05) @ "obs"  # Observation noise
+    return y_obs
+
+@gen
+def npoint_curve(xs):
+    coeffs = polynomial() @ "curve"
+    # Vectorize over multiple points
+    ys = point.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
+    return coeffs, (xs, ys)
+
+# Run importance sampling inference
+from genjax.inference import init
+
+xs = jnp.linspace(0, 1, 10)
+
+# Generate test data
+trace = npoint_curve.simulate(xs)
+coeffs, (xs_ret, ys_test) = trace.get_retval()
+
+# Run inference
+observations = {"ys": {"obs": ys_test}}
+result = init(npoint_curve, (xs,), Const(1000), observations)
+
+# Extract samples and weights
+samples = result.traces
+log_weights = result.log_weights
+```
+
+This example shows:
+- **Generative functions** with `@gen` decorator
+- **Named random choices** with `@` operator
+- **Automatic vectorization** with `.vmap()`
+- **Programmable inference** with `init` (importance sampling)
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+Install [pixi](https://pixi.sh/) (package manager). That's it.
+
+### Setup
+
+```bash
+cd genjax
+pixi install
+```
+
+This creates isolated conda environments for each case study.
+
+### Quick Smoke Test
+
+Verify setup with the simplest case study:
+
+```bash
+pixi run -e faircoin python -m examples.faircoin.main \
+  --combined --num-obs 20 --num-samples 200 --repeats 5
+```
+
+Expected output: `figs/combined_3x2_obs20_samples200.pdf`
+
+---
+
+## Reproducing All Paper Figures
+
+Generate all 10 paper figures with a single command:
+
+```bash
+# CPU execution
+pixi run paper-figures
+
+# GPU execution (requires CUDA 12)
+pixi run paper-figures-gpu
+```
+
+All figures are saved to `genjax/figs/`:
+- 1 faircoin figure
+- 5 curvefit figures
+- 2 GOL figures
+- 2 localization figures
+
+**Note**: One additional figure (`curvefit_vectorization_illustration.pdf`) is a static diagram already included in the repository.
+
+---
+
+## Case Study Details
+
+### 1. Fair Coin (Beta-Bernoulli)
+
+**What it does**: Compares GenJAX, handcoded JAX, and NumPyro on a simple conjugate inference problem.
+
+**Command**:
+```bash
+pixi run -e faircoin python -m examples.faircoin.main \
+  --combined --num-obs 50 --num-samples 2000 --repeats 10
+```
+
+**Outputs**: `figs/combined_3x2_obs50_samples2000.pdf`
+
+---
+
+### 2. Curve Fitting with Outlier Detection
+
+**What it does**: Polynomial regression with robust outlier detection, demonstrating:
+- Importance sampling with varying particle counts
+- Gibbs sampling with HMC for mixture models
+- Performance scaling analysis
+
+**Command**:
+```bash
+pixi run -e curvefit python -m examples.curvefit.main paper
+```
+
+**Outputs**: 5 figures in `figs/`:
+- `curvefit_prior_multipoint_traces_density.pdf`
+- `curvefit_single_multipoint_trace_density.pdf`
+- `curvefit_scaling_performance.pdf`
+- `curvefit_posterior_scaling_combined.pdf`
+- `curvefit_outlier_detection_comparison.pdf`
+
+---
+
+### 3. Game of Life Inverse Dynamics
+
+**What it does**: Infers past Game of Life states from observed future states using Gibbs sampling on a 512×512 grid with 250 Gibbs steps.
+
+**Command**:
+```bash
+pixi run -e gol gol-paper
+```
+
+**Outputs**: 2 figures in `figs/`:
+- `gol_integrated_showcase_wizards_512.pdf` (3-panel inference showcase)
+- `gol_gibbs_timing_bar_plot.pdf` (performance across grid sizes)
+
+**Note**: Timing bar plot runs benchmarks at 64×64, 128×128, 256×256, and 512×512 grid sizes.
+
+---
+
+### 4. Robot Localization with SMC
+
+**What it does**: Particle filter localization comparing bootstrap filter, SMC+HMC, and locally optimal proposals using 200 particles and 8-ray LIDAR.
+
+**Command**:
+```bash
+pixi run -e localization python -m examples.localization.main paper \
+  --include-basic-demo --include-smc-comparison \
+  --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs
+```
+
+**Outputs**: 2 figures in `figs/`:
+- `localization_r8_p200_basic_localization_problem_1x4_explanation.pdf`
+- `localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf`
+
+**Note**: Also generates experimental data in `examples/localization/data/` (regenerated each run).
+
+---
+
+## CPU vs GPU Execution
+
+### Which Case Studies Benefit from GPU?
+
+| Case Study | GPU Benefit | Notes |
+|------------|-------------|-------|
+| Faircoin | Minimal | Problem too small to amortize GPU overhead |
+| Curvefit | Moderate | Vectorized importance sampling parallelizes well |
+| GOL | Significant | Large grid operations (512×512) parallelize well |
+| Localization | Significant | Particle filter (200 particles) vectorizes efficiently |
+
+### Memory Requirements
+
+- **CPU**: 8GB RAM sufficient for all case studies
+- **GPU**: 8GB VRAM sufficient (tested on NVIDIA A100, RTX 3090)
+
+### GPU Setup
+
+For GPU execution, use `-cuda` environments:
+```bash
+pixi run -e faircoin-cuda python -m examples.faircoin.main ...
+pixi run -e curvefit-cuda python -m examples.curvefit.main paper
+pixi run -e gol-cuda gol-paper
+pixi run -e localization-cuda python -m examples.localization.main paper ...
+```
+
+---
+
+## Generated Figures
+
+All figures are saved to `genjax/figs/`:
+
+### Faircoin
+- `combined_3x2_obs50_samples2000.pdf` - Framework comparison (timing + posterior accuracy)
+
+### Curvefit
+- `curvefit_prior_multipoint_traces_density.pdf` - Prior samples from generative model
+- `curvefit_single_multipoint_trace_density.pdf` - Single trace with log density
+- `curvefit_scaling_performance.pdf` - Inference scaling with particle count
+- `curvefit_posterior_scaling_combined.pdf` - Posterior quality at different scales
+- `curvefit_outlier_detection_comparison.pdf` - Robust inference with mixture model
+- `curvefit_vectorization_illustration.pdf` - Static diagram (already in repo)
+
+### Game of Life
+- `gol_integrated_showcase_wizards_512.pdf` - Inverse dynamics inference (3 panels)
+- `gol_gibbs_timing_bar_plot.pdf` - Performance scaling across grid sizes
+
+### Localization
+- `localization_r8_p200_basic_localization_problem_1x4_explanation.pdf` - Problem setup
+- `localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf` - SMC method comparison
+
+---
+
+## About GenJAX
 
 ### **Probabilistic Programming Language**
 
@@ -33,61 +277,20 @@ GenJAX provides:
 
 All of GenJAX's automation is fully compatible with JAX, implying that any program written in GenJAX can be `vmap`'d and `jit` compiled.
 
-## Environment Setup
-
-1. Install [pixi](https://pixi.sh/) (only prerequisite).
-2. From the artifact root run:
-   ```bash
-   pixi install
-   pixi run genjax-setup
-   ```
-   The second command installs this submodule's dependencies and prepares the case-study environments.
-
-## Quick Validation
-
-Run these commands from the artifact root to confirm the toolchain works end-to-end:
-
-```bash
-# Compile the POPL paper (checks LaTeX toolchain)
-pixi run paper-figures
-```
-
-Both commands should finish without errors. The smoke test writes PDFs to `genjax/examples/faircoin/figs/`.
-
-## Case Study Commands
-
-Invoke the following from the artifact root. Append `-e <env>-cuda` if you have a CUDA-capable GPU and want the timings reported in the paper.
-
-| Case study (paper section) | Command | Outputs |
-| --- | --- | --- |
-| Beta–Bernoulli performance survey (§7) | `pixi run --manifest-path genjax/pyproject.toml -e faircoin python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 200` | PDFs in `genjax/examples/faircoin/figs/` |
-| Game of Life inversion showcase (§7) | `pixi run --manifest-path genjax/pyproject.toml -e gol gol-paper` | PDFs in `genjax/examples/gol/figs/` |
-| Curve fitting + outliers (§2) | `pixi run --manifest-path genjax/pyproject.toml -e curvefit python -m examples.curvefit.main paper` | PDFs in `genjax/examples/curvefit/figs/` |
-| Robot localization SMC comparison (§7) | `pixi run --manifest-path genjax/pyproject.toml -e localization python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8` | PDFs in `genjax/examples/localization/figs/` plus CSV/JSON data in `genjax/examples/localization/data/` |
-
-Each CLI provides additional flags (see the per-case `AGENTS.md` files) so you can run exploratory or accelerated configurations before reproducing the full paper setup.
-
-## Regenerating All Paper Figures
-
-The artifact root exposes aggregate helpers:
-
-```bash
-# CPU-only regeneration of every paper figure
-pixi run paper-figures
-
-# GPU-accelerated regeneration (requires CUDA)
-pixi run paper-figures-gpu
-```
-
-Rebuild the paper with `pixi run paper` afterwards to incorporate refreshed figures.
-
-## Directory Map (genjax/)
+### System Architecture
 
 ```
-examples/        # Case studies used in the evaluation
-figs/            # Staging area for generated PDFs copied into ../figs/
-src/genjax/      # Library implementation
-tests/           # Test suite
-pyproject.toml   # pixi environments/tasks for this submodule
-README.md        # (this file)
+src/genjax/          # Core library implementation
+├── core/            # Generative functions, traces, combinators
+├── inference/       # Inference algorithms (IS, MCMC, SMC)
+├── distributions/   # Probability distributions
+└── viz/             # Visualization utilities
+
+examples/            # Case studies
+├── faircoin/        # Beta-Bernoulli conjugate inference
+├── curvefit/        # Polynomial regression with outliers
+├── gol/             # Game of Life inverse dynamics
+└── localization/    # Robot particle filter localization
+
+tests/               # Test suite
 ```
