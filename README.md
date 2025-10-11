@@ -25,7 +25,9 @@ GenJAX provides:
 
 ## As a POPL 2026 Artifact
 
-This repository is also a POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*. It contains the GenJAX implementation and all case studies used in the empirical evaluation.
+This repository is also a POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*.
+
+It contains the GenJAX implementation (including source code and tests), extensive documentation, curated agentic context (see the `AGENTS.md` throughout the codebase) to allow users of Claude Code and Codex (or others) to quickly use the system, and several of the case studies used in the empirical evaluation.
 
 **Contents:**
 - [Quick Example](#quick-example)
