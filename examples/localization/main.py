@@ -65,8 +65,8 @@ def parse_args():
     # Main command
     parser.add_argument(
         "command",
-        choices=["generate-data", "plot-figures"],
-        help="Main command: generate-data or plot-figures",
+        choices=["generate-data", "plot-figures", "paper"],
+        help="Main command: generate-data, plot-figures, or paper (generate only paper figures)",
     )
 
     # Data experiment name (for both commands)
@@ -310,12 +310,14 @@ def generate_data(args):
         save_benchmark_results(experiment_data_dir, benchmark_results, config)
         print("SMC comparison experiment completed!")
 
-    print("\n✅ Data generation complete!")
+    print("\nOK Data generation complete!")
     print(f"All data saved to: {experiment_data_dir}")
     print("\nTo generate figures from this data, run:")
     print(
         f"  python -m examples.localization.main plot-figures --experiment-name {experiment_name}"
     )
+
+    return experiment_data_dir
 
 
 def plot_figures(args):
@@ -361,11 +363,13 @@ def plot_figures(args):
         print(f"  {key}: {value}")
     print("=" * 50)
 
-    # Create output directory
+    # Create output directory (relative to genjax root, not module dir)
     if os.path.isabs(args.output_dir):
         figs_dir = args.output_dir
     else:
-        figs_dir = os.path.join(os.path.dirname(__file__), args.output_dir)
+        # Use path relative to genjax root (2 levels up from examples/localization/)
+        genjax_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        figs_dir = os.path.join(genjax_root, args.output_dir)
     os.makedirs(figs_dir, exist_ok=True)
 
     # Create world
@@ -611,7 +615,7 @@ def plot_figures(args):
         )
         print(f"    Saved: {error_filename}")
 
-    print("\n✅ Figure generation complete!")
+    print("\nOK Figure generation complete!")
     print(f"All figures saved to: {figs_dir}")
     print("\nGenerated figures:")
     print("  - Ground truth trajectory (detailed and simple)")
@@ -628,6 +632,62 @@ def plot_figures(args):
         print("  - SMC method comprehensive comparison")
 
 
+def paper_mode(args):
+    """Generate only the paper figures (1x4 explanation + 4panel SMC comparison)."""
+    # Generate data and get the experiment directory
+    experiment_data_dir = generate_data(args)
+
+    # Load config
+    config = load_experiment_metadata(experiment_data_dir)
+
+    # Setup output directory
+    if os.path.isabs(args.output_dir):
+        figs_dir = args.output_dir
+    else:
+        genjax_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        figs_dir = os.path.join(genjax_root, args.output_dir)
+    os.makedirs(figs_dir, exist_ok=True)
+
+    # Load ground truth
+    world = create_multi_room_world(world_type=config["world_type"])
+    true_poses, observations = load_ground_truth_data(experiment_data_dir)
+
+    param_prefix = f"localization_r{config['n_rays']}_p{config['n_particles']}_{config['world_type']}"
+
+    print("\n=== Paper Mode: Generating only paper figures ===")
+
+    # 1. Localization problem explanation (1x4)
+    print("  Generating localization problem explanation (1x4)...")
+    fig_explain, axes_explain = plot_localization_problem_explanation(
+        true_poses, observations, world, n_rays=config["n_rays"]
+    )
+    filename_explain = f"{param_prefix}_localization_problem_1x4_explanation.pdf"
+    plt.savefig(os.path.join(figs_dir, filename_explain), dpi=300, bbox_inches="tight")
+    plt.close(fig_explain)
+    print(f"    Saved: {filename_explain}")
+
+    # 2. SMC method comparison (4panel)
+    if config.get("include_smc_comparison", False):
+        print("  Generating SMC method comparison (4panel)...")
+        benchmark_results = load_benchmark_results(experiment_data_dir)
+        comparison_filename = f"{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf"
+        comparison_path = os.path.join(figs_dir, comparison_filename)
+        plot_smc_method_comparison(
+            benchmark_results,
+            true_poses,
+            world,
+            save_path=comparison_path,
+            n_rays=config["n_rays"],
+            n_particles=config["n_particles"],
+            K=config["k_rejuv"],
+            n_particles_big_grid=config.get("n_particles_big_grid", 5),
+        )
+        print(f"    Saved: {comparison_filename}")
+
+    print("\n=== Paper mode complete! ===")
+    print(f"Generated 2 paper figures in: {figs_dir}")
+
+
 def main():
     """Main entry point."""
     args = parse_args()
@@ -636,6 +696,8 @@ def main():
         generate_data(args)
     elif args.command == "plot-figures":
         plot_figures(args)
+    elif args.command == "paper":
+        paper_mode(args)
     else:
         print(f"Unknown command: {args.command}")
 

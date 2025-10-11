@@ -30,16 +30,16 @@ GenJAX uses JAX extensively. **ALWAYS enforce good JAX idioms**:
 
 ### Control Flow Rules
 - **NEVER use Python control flow** in JAX-compiled functions:
-  - ❌ `if`, `elif`, `else` statements
-  - ❌ `for`, `while` loops
-  - ❌ `break`, `continue` statements
+  - FAIL `if`, `elif`, `else` statements
+  - FAIL `for`, `while` loops
+  - FAIL `break`, `continue` statements
 
 - **ALWAYS use JAX control flow** instead:
-  - ✅ `jax.lax.cond` for conditionals
-  - ✅ `jax.lax.scan` for loops with carry
-  - ✅ `jax.lax.fori_loop` for simple iteration
-  - ✅ `jax.lax.while_loop` for conditional loops
-  - ✅ `jax.lax.switch` for multiple branches
+  - OK `jax.lax.cond` for conditionals
+  - OK `jax.lax.scan` for loops with carry
+  - OK `jax.lax.fori_loop` for simple iteration
+  - OK `jax.lax.while_loop` for conditional loops
+  - OK `jax.lax.switch` for multiple branches
 
 ### Exceptions
 - Only use Python control flow if explicitly told "it's okay to use Python control flow"
@@ -48,22 +48,22 @@ GenJAX uses JAX extensively. **ALWAYS enforce good JAX idioms**:
 
 ### Common Patterns
 ```python
-# ❌ WRONG - Python control flow
+# FAIL WRONG - Python control flow
 if condition:
     x = computation_a()
 else:
     x = computation_b()
 
-# ✅ CORRECT - JAX control flow
+# OK CORRECT - JAX control flow
 x = jax.lax.cond(condition,
                   lambda: computation_a(),
                   lambda: computation_b())
 
-# ❌ WRONG - Python loop
+# FAIL WRONG - Python loop
 for i in range(n):
     x = update(x, i)
 
-# ✅ CORRECT - JAX loop
+# OK CORRECT - JAX loop
 def body(i, x):
     return update(x, i)
 x = jax.lax.fori_loop(0, n, body, x)

@@ -313,16 +313,15 @@ def save_timing_scaling_figure(
 
 
 def create_showcase_figure(
-    pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42,
+    pattern_type="mit", size=256, chain_length=150, flip_prob=0.03, seed=42,
     white_lambda=False, load_from_file=None
 ):
     """
-    Create the main 3-panel GOL showcase figure with timing bar plot.
+    Create the main 3-panel GOL showcase figure.
 
     Panel 1: Observed future state (target)
     Panel 2: Multiple inferred past states showing uncertainty
     Panel 3: One-step evolution of final inferred state
-    Bottom: Horizontal bar plot comparing CPU vs GPU timing
 
     Args:
         pattern_type: Type of pattern ("mit", "popl", "blinker", "hermes", "wizards")
@@ -334,30 +333,23 @@ def create_showcase_figure(
         load_from_file: Path to saved experiment data (if None, runs new experiment)
 
     Returns:
-        matplotlib.figure.Figure: The 4-panel showcase figure with timing
+        matplotlib.figure.Figure: The 3-panel showcase figure
     """
 
-    # Set up the figure with custom layout using GRVS sizing - taller for timing
-    fig = plt.figure(figsize=(14, 7.5))  # Taller to accommodate timing plot
+    # Set up the figure with 3 panels in a single row
+    fig = plt.figure(figsize=(14, 4.5))
     gs = gridspec.GridSpec(
-        2,
+        1,
         3,
         figure=fig,
-        height_ratios=[2.5, 1.5],  # Make timing plot taller relative to main panels
-        width_ratios=[1, 1, 1],  # Equal proportions
+        width_ratios=[1, 1, 1],
         wspace=0.15,
-        hspace=0.3,  # Space between rows
-    )  # Good spacing between panels
+    )
 
     # Create main axes
     ax_target = fig.add_subplot(gs[0, 0])
-    ax_inferred = fig.add_subplot(
-        gs[0, 1]
-    )  # This will be used for the entire middle section
-    ax_evolution = fig.add_subplot(gs[0, 2])  # Panel for evolution
-    
-    # Create timing plot axis spanning all three columns
-    ax_timing = fig.add_subplot(gs[1, :])
+    ax_inferred = fig.add_subplot(gs[0, 1])
+    ax_evolution = fig.add_subplot(gs[0, 2])
 
     # Load data from file or run new experiment
     import json
@@ -558,167 +550,121 @@ def create_showcase_figure(
         fontweight="bold",
     )
 
-    # === TIMING BAR PLOT ===
-    # Load timing data
-    timing_data_path = "data/gibbs_sweep_timing.json"
-    
-    try:
-        with open(timing_data_path, 'r') as f:
-            timing_data = json.load(f)
-        
-        # Extract data for plotting and convert to milliseconds
-        sizes = timing_data['sizes']
-        cpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['cpu_results']]
-        gpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['gpu_results']]
-        
-        # Reverse the order - smallest at top, largest at bottom
-        sizes = list(reversed(sizes))
-        cpu_times_ms = list(reversed(cpu_times_ms))
-        gpu_times_ms = list(reversed(gpu_times_ms))
-        
-        # Create horizontal bar plot with wider bars - GPU first, then CPU
-        y_pos = np.arange(len(sizes))
-        bar_height = 0.5  # Wider bars
-        
-        bars_gpu = ax_timing.barh(y_pos + bar_height/2, gpu_times_ms, bar_height,
-                                  label='GPU', color=get_method_color("genjax_hmc"), alpha=0.8)
-        bars_cpu = ax_timing.barh(y_pos - bar_height/2, cpu_times_ms, bar_height,
-                                  label='CPU', color=get_method_color("genjax_is"), alpha=0.8)
-        
-        # Add only speedup annotations - placed at the end of CPU bars
-        for i, (bar_cpu, bar_gpu) in enumerate(zip(bars_cpu, bars_gpu)):
-            speedup = cpu_times_ms[i] / gpu_times_ms[i]
-            ax_timing.text(bar_cpu.get_width() + 2, bar_cpu.get_y() + bar_cpu.get_height()/2,
-                          f'{speedup:.1f}×', ha='left', va='center',
-                          fontsize=14, fontweight='bold', color=get_method_color("data_points"))
-        
-        # Remove frame and spines
-        ax_timing.spines['top'].set_visible(False)
-        ax_timing.spines['right'].set_visible(False)
-        ax_timing.spines['left'].set_visible(False)
-        ax_timing.spines['bottom'].set_linewidth(1.5)
-        
-        # Format axes - restore y-axis labels
-        ax_timing.set_yticks(y_pos)
-        ax_timing.set_yticklabels([f'{s}×{s}' for s in sizes], fontsize=12)
-        ax_timing.set_xlabel('Time per Gibbs sweep (ms)', fontsize=14, fontweight='bold')
-        ax_timing.set_xlim(0, max(cpu_times_ms) * 1.2)
-        
-        # Add legend - centered at top with horizontal layout
-        ax_timing.legend(loc='upper center', fontsize=12, ncol=2, frameon=True, 
-                        bbox_to_anchor=(0.5, 0.98), columnspacing=1.5)
-        
-        # Apply grid style but only for x-axis
-        ax_timing.grid(True, axis='x', alpha=0.3)
-        ax_timing.set_axisbelow(True)
-        
-    except FileNotFoundError:
-        # If timing data not available, show placeholder
-        ax_timing.text(0.5, 0.5, 'Timing data not available\nRun: pixi run gol-timing-optimized',
-                      ha='center', va='center', fontsize=16, transform=ax_timing.transAxes)
-        ax_timing.set_xticks([])
-        ax_timing.set_yticks([])
-        ax_timing.spines['top'].set_visible(False)
-        ax_timing.spines['right'].set_visible(False)
-        ax_timing.spines['left'].set_visible(False)
-        ax_timing.spines['bottom'].set_visible(False)
-
     return fig
 
 
-def create_timing_bar_plot(timing_data_path="data/gibbs_sweep_timing.json"):
+
+
+def save_timing_bar_plot(grid_sizes=[64, 128, 256, 512], chain_length=10, flip_prob=0.03, repeats=3):
     """
-    Create a standalone timing bar plot showing GOL performance across grid sizes.
-    
+    Generate timing data and save the standalone timing bar plot.
+
     Args:
-        timing_data_path: Path to JSON file containing timing data
-        
-    Returns:
-        matplotlib.figure.Figure: The timing bar plot figure
+        grid_sizes: List of grid sizes to benchmark
+        chain_length: Number of Gibbs steps (use fewer for timing)
+        flip_prob: Probability of rule violations
+        repeats: Number of timing repetitions
     """
+    print("Generating timing bar plot...")
+
     setup_publication_fonts()
     fig, ax = plt.subplots(figsize=(8, 5))
-    
+
+    # Run actual timing benchmarks
+    print(f"  Benchmarking CPU at grid sizes: {grid_sizes}")
+    cpu_times_ms = []
+
+    for n in grid_sizes:
+        def task_fn():
+            return _gibbs_task(n, chain_length, flip_prob, seed=1)
+
+        _, (mean_time, std_time) = benchmark_with_warmup(
+            task_fn,
+            warmup_runs=2,
+            repeats=repeats,
+            inner_repeats=1,
+            auto_sync=True,
+        )
+        cpu_times_ms.append(mean_time * 1000)  # Convert to ms
+        print(f"    {n}×{n}: {mean_time*1000:.1f} ms")
+
+    # Check if GPU available
     try:
-        with open(timing_data_path, 'r') as f:
-            timing_data = json.load(f)
-        
-        # Extract data for plotting and convert to milliseconds
-        sizes = timing_data['sizes']
-        cpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['cpu_results']]
-        gpu_times_ms = [r['mean_time'] * 1000 for r in timing_data['gpu_results']]
-        
-        # Reverse the order - smallest at top, largest at bottom
-        sizes = list(reversed(sizes))
-        cpu_times_ms = list(reversed(cpu_times_ms))
+        gpu_available = len(jax.devices("gpu")) > 0
+    except RuntimeError:
+        gpu_available = False
+    gpu_times_ms = []
+
+    if gpu_available:
+        print(f"  Benchmarking GPU at grid sizes: {grid_sizes}")
+        with jax.default_device(jax.devices("gpu")[0]):
+            for n in grid_sizes:
+                def task_fn():
+                    return _gibbs_task(n, chain_length, flip_prob, seed=1)
+
+                _, (mean_time, std_time) = benchmark_with_warmup(
+                    task_fn,
+                    warmup_runs=2,
+                    repeats=repeats,
+                    inner_repeats=1,
+                    auto_sync=True,
+                )
+                gpu_times_ms.append(mean_time * 1000)
+                print(f"    {n}×{n}: {mean_time*1000:.1f} ms")
+
+    # Reverse order - smallest at top, largest at bottom
+    sizes = list(reversed(grid_sizes))
+    cpu_times_ms = list(reversed(cpu_times_ms))
+    if gpu_available:
         gpu_times_ms = list(reversed(gpu_times_ms))
-        
-        # Create horizontal bar plot with wider bars - GPU first, then CPU
-        y_pos = np.arange(len(sizes))
-        bar_height = 0.35  # Slightly smaller for standalone
-        
+
+    # Create horizontal bar plot
+    y_pos = np.arange(len(sizes))
+    bar_height = 0.35
+
+    if gpu_available:
         bars_gpu = ax.barh(y_pos + bar_height/2, gpu_times_ms, bar_height,
                           label='GPU', color=get_method_color("genjax_hmc"), alpha=0.8)
         bars_cpu = ax.barh(y_pos - bar_height/2, cpu_times_ms, bar_height,
                           label='CPU', color=get_method_color("genjax_is"), alpha=0.8)
-        
-        # Add speedup annotations - placed at the end of CPU bars
+
+        # Add speedup annotations
         for i, (bar_cpu, bar_gpu) in enumerate(zip(bars_cpu, bars_gpu)):
             speedup = cpu_times_ms[i] / gpu_times_ms[i]
-            ax.text(bar_cpu.get_width() + 2, bar_cpu.get_y() + bar_cpu.get_height()/2,
+            ax.text(bar_cpu.get_width() + max(cpu_times_ms)*0.02, bar_cpu.get_y() + bar_cpu.get_height()/2,
                    f'{speedup:.1f}×', ha='left', va='center',
                    fontsize=16, fontweight='bold', color=get_method_color("data_points"))
-        
-        # Remove frame and spines
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.spines['bottom'].set_linewidth(2)
-        
-        # Format axes
-        ax.set_yticks(y_pos)
-        ax.set_yticklabels([f'{s}×{s}' for s in sizes], fontsize=16)
-        ax.set_xlabel('Time per Gibbs sweep (ms)', fontsize=18, fontweight='bold')
-        ax.set_xlim(0, max(cpu_times_ms) * 1.25)
-        
-        # Add legend - horizontal layout at top
-        ax.legend(loc='upper center', fontsize=16, ncol=2, frameon=True, 
+    else:
+        bars_cpu = ax.barh(y_pos, cpu_times_ms, bar_height,
+                          label='CPU', color=get_method_color("genjax_is"), alpha=0.8)
+
+    # Format axes
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(2)
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels([f'{s}×{s}' for s in sizes], fontsize=16)
+    ax.set_xlabel('Time per Gibbs sweep (ms)', fontsize=18, fontweight='bold')
+    ax.set_xlim(0, max(cpu_times_ms) * (1.25 if gpu_available else 1.15))
+
+    if gpu_available:
+        ax.legend(loc='upper center', fontsize=16, ncol=2, frameon=True,
                  bbox_to_anchor=(0.5, 1.05), columnspacing=2)
-        
-        # Apply grid style but only for x-axis
-        ax.grid(True, axis='x', alpha=0.3)
-        ax.set_axisbelow(True)
-        
-        # Add title
-        fig.text(0.5, 0.95, "Game of Life Gibbs Sampling Performance", 
-                ha='center', fontsize=20, fontweight='bold')
-        
-    except FileNotFoundError:
-        # If timing data not available, show placeholder
-        ax.text(0.5, 0.5, 'Timing data not available\nRun: pixi run gol-timing-optimized',
-               ha='center', va='center', fontsize=18, transform=ax.transAxes)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-    
+
+    ax.grid(True, axis='x', alpha=0.3)
+    ax.set_axisbelow(True)
+
+    fig.text(0.5, 0.95, "Game of Life Gibbs Sampling Performance",
+            ha='center', fontsize=20, fontweight='bold')
+
     plt.tight_layout()
-    return fig
 
-
-def save_timing_bar_plot(timing_data_path="data/gibbs_sweep_timing.json"):
-    """
-    Generate and save the standalone timing bar plot.
-    
-    Args:
-        timing_data_path: Path to JSON file containing timing data
-    """
-    print("Generating timing bar plot...")
-    fig = create_timing_bar_plot(timing_data_path)
-    filename = "gol_gibbs_timing_bar_plot.pdf"
+    filename = "figs/gol_gibbs_timing_bar_plot.pdf"
     save_publication_figure(fig, filename)
     print(f"Saved: {filename}")
-    return fig
+    return filename
 
 
 def create_nested_vectorization_figure():
@@ -920,8 +866,13 @@ def create_generative_conditional_figure():
 
 
 def save_showcase_figure(
-    pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42,
-    load_from_file=None
+    pattern_type="mit",
+    size=256,
+    chain_length=150,
+    flip_prob=0.03,
+    seed=42,
+    load_from_file=None,
+    output_label=None,
 ):
     """
     Generate and save the main Game of Life showcase figure.
@@ -933,11 +884,14 @@ def save_showcase_figure(
         flip_prob: Probability of rule violations
         seed: Random seed for reproducibility
         load_from_file: Path to saved experiment data (if None, runs new experiment)
+        output_label: Optional label to use in the output filename
     """
     print("Generating Game of Life showcase figure...")
-    fig = create_showcase_figure(pattern_type, size, chain_length, flip_prob, seed, 
-                                load_from_file=load_from_file)
-    filename = f"figs/gol_showcase_inverse_dynamics_{pattern_type}_{size}.pdf"
+    fig = create_showcase_figure(
+        pattern_type, size, chain_length, flip_prob, seed, load_from_file=load_from_file
+    )
+    label = output_label if output_label is not None else size
+    filename = f"figs/gol_integrated_showcase_{pattern_type}_{label}.pdf"
     save_publication_figure(fig, filename)
     print(f"Saved: {filename}")
     return fig
@@ -1304,7 +1258,7 @@ def save_simple_inference_schematic(pattern="wizards", pattern_size=256):
 
 
 def create_integrated_showcase_figure(
-    pattern_type="wizards", size=256, chain_length=500, flip_prob=0.03, seed=42
+    pattern_type="wizards", size=256, chain_length=150, flip_prob=0.03, seed=42
 ):
     """
     Create an integrated single-row showcase figure with question mark, arrows, observed state, and Gibbs results.
@@ -1477,13 +1431,19 @@ def create_integrated_showcase_figure(
 
 
 def save_integrated_showcase_figure(
-    pattern_type="wizards", size=256, chain_length=500, flip_prob=0.03, seed=42
+    pattern_type="wizards",
+    size=256,
+    chain_length=150,
+    flip_prob=0.03,
+    seed=42,
+    output_label=None,
 ):
     """Save the integrated showcase figure."""
     fig = create_integrated_showcase_figure(
         pattern_type, size, chain_length, flip_prob, seed
     )
-    filename = f"figs/gol_integrated_showcase_{pattern_type}_{size}.pdf"
+    label = output_label if output_label is not None else size
+    filename = f"figs/gol_integrated_showcase_{pattern_type}_{label}.pdf"
     save_publication_figure(fig, filename)
     print(f"Saved integrated showcase figure: {filename}")
     return fig
@@ -1626,41 +1586,45 @@ def save_integrated_showcase_figure(
 
 
 def save_combined_schematic_showcase_figure(
-    pattern_type="wizards", size=256, chain_length=500, flip_prob=0.03, seed=42
+    pattern_type="wizards",
+    size=256,
+    chain_length=150,
+    flip_prob=0.03,
+    seed=42,
+    output_label=None,
 ):
     """Save the combined schematic and showcase figure."""
-    fig = create_combined_schematic_showcase_figure(
-        pattern_type, size, chain_length, flip_prob, seed
+    return save_integrated_showcase_figure(
+        pattern_type,
+        size=size,
+        chain_length=chain_length,
+        flip_prob=flip_prob,
+        seed=seed,
+        output_label=output_label,
     )
-    filename = f"figs/gol_combined_schematic_showcase_{pattern_type}_{size}.pdf"
-    save_publication_figure(fig, filename)
-    print(f"Saved combined figure: {filename}")
-    return fig
 
 
 def save_all_showcase_figures(
-    pattern_type="mit", size=512, chain_length=500, flip_prob=0.03, seed=42
+    pattern_type="wizards",
+    size=512,
+    chain_length=150,
+    flip_prob=0.03,
+    seed=42,
+    output_label=None,
 ):
-    """
-    Generate and save all showcase figures.
+    """Generate the showcase and timing figures used in the paper."""
+    print("=== Generating Game of Life showcase figures ===")
+    save_showcase_figure(
+        pattern_type,
+        size,
+        chain_length,
+        flip_prob,
+        seed,
+        output_label=output_label,
+    )
+    save_timing_bar_plot()
+    print("\n=== Game of Life showcase figures generated successfully! ===")
 
-    Args:
-        pattern_type: Type of pattern ("mit", "popl", or "blinker")
-        size: Grid size for the pattern
-        chain_length: Number of Gibbs sampling steps
-        flip_prob: Probability of rule violations
-        seed: Random seed for reproducibility
-    """
-    print("=== Generating all Game of Life showcase figures ===")
-
-    save_showcase_figure(pattern_type, size, chain_length, flip_prob, seed)
-    save_simple_inference_schematic(pattern_type, size)
-    save_combined_schematic_showcase_figure(pattern_type, size, chain_length, flip_prob, seed)
-    save_nested_vectorization_figure()
-    save_generative_conditional_figure()
-    save_forward_inverse_schematic()
-
-    print("\n=== All GOL showcase figures generated successfully! ===")
 
 
 if __name__ == "__main__":

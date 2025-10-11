@@ -18,7 +18,7 @@ def parse_args():
 
     parser.add_argument(
         "mode",
-        choices=["quick", "full", "benchmark", "generative", "vectorization", "outlier", "is-only", "scaling"],
+        choices=["quick", "full", "benchmark", "generative", "vectorization", "outlier", "is-only", "scaling", "paper"],
         nargs="?",
         default="quick",
         help="Analysis mode: quick (fast viz), full (complete), benchmark (compare frameworks), generative (programming figure), vectorization (patterns figure), outlier (generative conditionals), is-only (IS comparison only), scaling (inference scaling analysis)",
@@ -76,7 +76,7 @@ def parse_args():
 
 def run_quick_mode(args):
     """Run quick demonstration mode."""
-    from figs import (
+    from examples.curvefit.figs import (
         save_onepoint_trace_viz,
         save_multipoint_trace_viz,
         save_four_multipoint_trace_vizs,
@@ -93,13 +93,13 @@ def run_quick_mode(args):
     print("\n2. Generating inference visualization...")
     save_inference_viz(seed=args.seed)
 
-    print("\n✓ Quick mode complete!")
+    print("\nQuick mode complete!")
     print("Generated figures in examples/curvefit/figs/")
 
 
 def run_full_mode(args):
     """Run full analysis mode."""
-    from figs import (
+    from examples.curvefit.figs import (
         save_onepoint_trace_viz,
         save_multipoint_trace_viz,
         save_four_multipoint_trace_vizs,
@@ -192,7 +192,7 @@ def run_full_mode(args):
     print("\n12. Creating all legends...")
     create_all_legends()
 
-    print("\n✓ Full mode complete!")
+    print("\nFull mode complete!")
     print("Generated figures in examples/curvefit/figs/")
 
 
@@ -226,27 +226,27 @@ def run_benchmark_mode(args):
         if "accept_rate" in result:
             print(f"  Accept rate: {result['accept_rate']:.3f}")
 
-    print("\n✓ Benchmark complete!")
+    print("\nOK Benchmark complete!")
     print("Generated comparison figure in examples/curvefit/figs/")
 
 
 def run_generative_mode(args):
     """Run generative programming figure mode."""
     print("=== Generative Mode: Programming with Generative Functions Figure ===")
-    print("\n⚠️  This mode has been removed during cleanup.")
+    print("\nWarning  This mode has been removed during cleanup.")
     print("The 'programming with generative functions' plotting code was removed as requested.")
 
 
 def run_vectorization_mode(args):
     """Run vectorization patterns figure mode."""
     print("=== Vectorization Mode: Two Natural Vectorization Patterns Figure ===")
-    print("\n⚠️  This mode has been removed during cleanup.")
+    print("\nWarning  This mode has been removed during cleanup.")
     print("The 'vectorization patterns' plotting code was removed as requested.")
 
 
 def run_outlier_mode(args):
     """Run outlier model experiments for generative conditionals validation."""
-    from figs import (
+    from examples.curvefit.figs import (
         # Outlier-specific visualizations
         save_outlier_conditional_demo,
         save_outlier_trace_viz,
@@ -287,7 +287,7 @@ def run_outlier_mode(args):
     print("\nGenerating outlier detection comparison (IS vs Gibbs+HMC)...")
     save_outlier_detection_comparison()
     
-    print("\n✓ Outlier mode complete!")
+    print("\nOutlier mode complete!")
     print("Generated figure demonstrates:")
     print("  - GenJAX's Cond combinator for natural mixture modeling")
     print("  - Improved robustness with automatic outlier detection")
@@ -297,7 +297,7 @@ def run_outlier_mode(args):
 
 def run_is_only_mode(args):
     """Run IS-only comparison mode."""
-    from figs import (
+    from examples.curvefit.figs import (
         save_is_only_timing_comparison,
         save_is_only_parameter_density,
     )
@@ -322,7 +322,7 @@ def run_is_only_mode(args):
         seed=args.seed,
     )
 
-    print("\n✓ IS-only mode complete!")
+    print("\nIS-only mode complete!")
     print("Generated figures in examples/curvefit/figs/")
 
 
@@ -339,18 +339,48 @@ def run_scaling_mode(args):
     print("  - GPU OOM at 10^6 particles")
     
     print("\nGenerating inference scaling visualization...")
-    # Use extended timing for better GPU behavior capture
-    save_inference_scaling_viz(n_trials=30, extended_timing=True)
+    save_inference_scaling_viz(n_trials=10, extended_timing=False, particle_counts=[50, 200, 1000])
     
-    print("\n✓ Scaling mode complete!")
+    print("\nScaling mode complete!")
     print("Generated figure in examples/curvefit/figs/")
+
+
+def run_paper_mode(args):
+    """Generate only the figures used in the POPL paper."""
+    from examples.curvefit.figs import (
+        save_multiple_multipoint_traces_with_density,
+        save_single_multipoint_trace_with_density,
+        save_inference_scaling_viz,
+        save_posterior_scaling_plots,
+        save_outlier_detection_comparison,
+    )
+
+    print("=== Paper Mode: POPL Figure Generation ===")
+
+    save_multiple_multipoint_traces_with_density()
+    save_single_multipoint_trace_with_density()
+    save_inference_scaling_viz(
+        n_trials=5,
+        particle_counts=[50, 200, 1000],
+    )
+    save_posterior_scaling_plots()
+    save_outlier_detection_comparison()
+
+    print("\nPaper mode complete!")
+    print("Generated figures:")
+    print("  - curvefit_prior_multipoint_traces_density.pdf")
+    print("  - curvefit_single_multipoint_trace_density.pdf")
+    print("  - curvefit_scaling_performance.pdf")
+    print("  - curvefit_posterior_scaling_combined.pdf")
+    print("  - curvefit_outlier_detection_comparison.pdf")
+    print("\nNote: curvefit_vectorization_illustration.pdf is a static diagram (not generated by code)")
 
 
 def main():
     """Main entry point."""
     args = parse_args()
 
-    print("\n🚀 GenJAX Curvefit Case Study")
+    print("\nGenJAX Curvefit Case Study")
     print(f"Mode: {args.mode}")
 
     if args.mode == "quick":
@@ -369,8 +399,10 @@ def main():
         run_is_only_mode(args)
     elif args.mode == "scaling":
         run_scaling_mode(args)
+    elif args.mode == "paper":
+        run_paper_mode(args)
 
-    print("\n✨ Done!")
+    print("\nDone!")
 
 
 if __name__ == "__main__":

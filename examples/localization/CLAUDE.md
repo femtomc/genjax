@@ -217,7 +217,7 @@ pixi run -e cuda python -m examples.localization.main plot-figures \
 
 ## Current Status (June 20, 2025)
 
-### ✅ Production Ready
+### OK Production Ready
 - **Drift-only model**: Simplified dynamics for excellent SMC convergence
 - **Enhanced visualization**: 4-row SMC comparison with particle blending
 - **Complete data export**: CSV system with metadata preservation
@@ -237,7 +237,7 @@ pixi run -e cuda python -m examples.localization.main plot-figures \
 - **Sharing**: CSV format enables external analysis (R, MATLAB, pandas)
 - **Comparison**: Easy parameter studies across experimental conditions
 
-### 🚀 Ready for Research
+###  Ready for Research
 - **Four SMC methods** fully implemented and benchmarked
 - **Drift-only dynamics** provide stable, interpretable results
 - **Complete experimental pipeline** with data export/import

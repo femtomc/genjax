@@ -25,6 +25,31 @@ genjax = { path = ".", editable = true }
 # Clean all generated figures from examples
 clean-figs = "find examples -name '*.pdf' -o -name '*.png' -o -name '*.jpg' -o -name '*.svg' | grep '/figs/' | xargs rm -f"
 
+# =====================================================================
+# PAPER FIGURE GENERATION - Centralized to genjax/figs/
+# =====================================================================
+# All figures for the POPL 2026 paper are generated to genjax/figs/
+# Works on CPU (osx-arm64) and GPU (linux-64 with CUDA)
+
+# Setup: Create central figs directory
+paper-setup = "mkdir -p figs"
+
+
+# Individual case study tasks (run within their environments)
+paper-faircoin-gen = "pixi run -e faircoin python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
+paper-curvefit-gen = "pixi run -e curvefit python -m examples.curvefit.main paper"
+paper-gol-gen = "pixi run -e gol gol-paper"
+paper-localization-gen = "pixi run -e localization python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
+
+paper-faircoin-gpu-gen = "pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
+paper-curvefit-gpu-gen = "pixi run -e curvefit-cuda python -m examples.curvefit.main paper"
+paper-gol-gpu-gen = "pixi run -e gol-cuda gol-paper-gpu"
+paper-localization-gpu-gen = "pixi run -e localization-cuda python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
+
+# Main paper figures generation tasks
+paper-figures = { depends-on = ["paper-setup", "paper-faircoin-gen", "paper-curvefit-gen", "paper-gol-gen", "paper-localization-gen"] }
+paper-figures-gpu = { depends-on = ["paper-setup", "paper-faircoin-gpu-gen", "paper-curvefit-gpu-gen", "paper-gol-gpu-gen", "paper-localization-gpu-gen"] }
+
 [tool.vulture]
 make_whitelist = true
 min_confidence = 80
@@ -42,10 +67,11 @@ numpyro = "*"
 [tool.pixi.feature.faircoin.tasks]
 cmd = "faircoin"
 # Beta-Bernoulli framework comparison (GenJAX vs NumPyro vs handcoded JAX)
-setup = "mkdir -p examples/faircoin/figs"  # Create output directory
-faircoin = "pixi run python -m examples.faircoin.main --combined"  # Main command (combined timing + posterior)
-faircoin-timing = "pixi run python -m examples.faircoin.main"  # Timing comparison only
-faircoin-combined = "pixi run python -m examples.faircoin.main --combined"  # Combined timing + posterior figure (recommended)
+faircoin = "python -m examples.faircoin.main --combined"  # Main command (combined timing + posterior)
+faircoin-timing = "python -m examples.faircoin.main"  # Timing comparison only
+faircoin-combined = "python -m examples.faircoin.main --combined"  # Combined timing + posterior figure (recommended)
+# Paper-specific task: generates combined_3x2_obs50_samples2000.pdf to figs/
+faircoin-paper = "python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000"
 
 [tool.pixi.feature.curvefit.dependencies]
 matplotlib = "*"
@@ -60,10 +86,11 @@ funsor = "*"
 [tool.pixi.feature.curvefit.tasks]
 cmd = "curvefit"
 # Curve fitting with GenJAX and NumPyro
-setup = "mkdir -p examples/curvefit/figs"  # Create output directory
-curvefit = "pixi run python -m examples.curvefit.main quick"  # Quick demonstration
-curvefit-full = "pixi run python -m examples.curvefit.main full"  # Complete analysis
-curvefit-benchmark = "pixi run python -m examples.curvefit.main benchmark"  # Framework comparison
+curvefit = "python -m examples.curvefit.main quick"  # Quick demonstration
+curvefit-full = "python -m examples.curvefit.main full"  # Complete analysis
+curvefit-benchmark = "python -m examples.curvefit.main benchmark"  # Framework comparison
+# Paper-specific task: generates the five POPL figures via paper mode
+curvefit-paper = "python -m examples.curvefit.main paper"
 
 [tool.pixi.feature.format.tasks]
 # Code formatting and linting
@@ -91,9 +118,6 @@ benchmark-compare = "pytest tests/ --benchmark-compare=0001 --benchmark-compare-
 benchmark-save = "pytest tests/ --benchmark-save=current --benchmark-disable-gc -v"  # Save benchmark results
 benchmark-slowest = "pytest tests/ --durations=20 --benchmark-disable -v"  # Show 20 slowest tests without benchmarking
 
-[tool.pixi.feature.examples.tasks]
-# Run all case studies
-examples-setup = "mkdir -p examples/faircoin/figs examples/curvefit/figs examples/gol/figs examples/localization/figs examples/state_space/figs examples/gen2d/figs examples/intuitive_physics/figs examples/programmable_mcts/figs"  # Create all output directories
 
 [tool.pixi.feature.gol.dependencies]
 matplotlib = "*"
@@ -101,11 +125,14 @@ matplotlib = "*"
 [tool.pixi.feature.gol.tasks]
 cmd = "gol"
 # Game of Life inference
-gol = "pixi run python -m examples.gol.main"  # Generate all figures
-gol-blinker = "pixi run python -m examples.gol.main --mode blinker"  # Blinker reconstruction
-gol-logo = "pixi run python -m examples.gol.main --mode logo"  # Logo reconstruction
-gol-timing = "pixi run python -m examples.gol.main --mode timing"  # Timing analysis
-gol-quick = "pixi run python -m examples.gol.main --chain-length 10 --grid-sizes 10 20"  # Quick run
+gol = "python -m examples.gol.main"  # Generate all figures
+gol-blinker = "python -m examples.gol.main --mode blinker"  # Blinker reconstruction
+gol-logo = "python -m examples.gol.main --mode logo"  # Logo reconstruction
+gol-timing = "python -m examples.gol.main --mode timing"  # Timing analysis
+gol-quick = "python -m examples.gol.main --chain-length 10 --grid-sizes 10 20"  # Quick run
+# Paper-specific task: generates showcase figures only (includes timing bar plot)
+gol-paper = "python -m examples.gol.main --mode showcase"
+gol-paper-gpu = "python -m examples.gol.main --mode showcase && python -m examples.gol.main --mode timing --device both --grid-sizes 64 128 256 512 --timing-repeats 3"
 
 [tool.pixi.feature.localization.dependencies]
 matplotlib = "*"
@@ -117,94 +144,13 @@ ptitprince = "*"
 [tool.pixi.feature.localization.tasks]
 cmd = "localization"
 # Particle filter localization - New two-step workflow
-localization-generate-data = "pixi run python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison"  # Generate all experimental data
-localization-plot-figures = "pixi run python -m examples.localization.main plot-figures"  # Plot all figures from saved data
+localization-generate-data = "python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison"  # Generate all experimental data
+localization-plot-figures = "python -m examples.localization.main plot-figures"  # Plot all figures from saved data
 # Legacy command for backward compatibility
-localization = "pixi run python -m examples.localization.main generate-data --include-basic-demo && pixi run python -m examples.localization.main plot-figures"  # Run full pipeline
+localization = "python -m examples.localization.main generate-data --include-basic-demo && python -m examples.localization.main plot-figures"  # Run full pipeline
+# Paper-specific task: generates both localization figures
+localization-paper = { depends-on = ["localization-generate-data", "localization-plot-figures"] }
 
-[tool.pixi.feature.state_space.dependencies]
-matplotlib = "*"
-seaborn = "*"
-
-[tool.pixi.feature.state_space.tasks]
-cmd = "state-space"
-# State space models
-state-space = "pixi run python -m examples.state_space.main"  # Basic state space example
-state-space-all = "pixi run python -m examples.state_space.main --all"  # All analyses
-state-space-convergence = "pixi run python -m examples.state_space.main --convergence"  # Convergence analysis
-state-space-quick = "pixi run python -m examples.state_space.main --time-steps 10 --particles 100,500"  # Quick run (reduced params)
-state-space-comparison = "pixi run python -m examples.state_space.main --rejuvenation-comparison"  # Rejuvenation comparison
-state-space-challenging = "pixi run python -m examples.state_space.main --rejuvenation-comparison --challenging"  # Challenging + rejuvenation
-state-space-extreme = "pixi run python -m examples.state_space.main --rejuvenation-comparison --extreme"  # Extreme + rejuvenation
-state-space-difficulty = "pixi run python -m examples.state_space.main --difficulty-comparison"  # Difficulty comparison
-state-space-comprehensive = "pixi run python -m examples.state_space.main --rejuvenation-comparison --difficulty-comparison"  # All comparisons
-
-[tool.pixi.feature.gen2d.dependencies]
-matplotlib = "*"
-seaborn = "*"
-
-[tool.pixi.feature.gen2d.tasks]
-cmd = "gen2d"
-# 2D generative models
-gen2d = "pixi run python -m examples.gen2d.main"  # Basic gen2d example
-gen2d-all = "pixi run python -m examples.gen2d.main --all"  # All analyses
-gen2d-quick = "pixi run python -m examples.gen2d.main --n-frames 10 --n-particles 50"  # Quick run (reduced params)
-
-[tool.pixi.feature.intuitive_physics.dependencies]
-matplotlib = "*"
-seaborn = "*"
-
-[tool.pixi.feature.intuitive_physics.tasks]
-cmd = "intuitive-psych"
-# Physics simulation inference
-setup = "mkdir -p examples/intuitive_physics/figs"  # Create output directory
-intuitive-psych = "pixi run python -m examples.intuitive_physics.main"  # Main command (basic run)
-intuitive-psych-env = "pixi run python -m examples.intuitive_physics.main --environment"  # Environment analysis
-intuitive-psych-trajectory = "pixi run python -m examples.intuitive_physics.main --trajectory"  # Trajectory analysis
-intuitive-psych-action-space = "pixi run python -m examples.intuitive_physics.main --action-space"  # Action space analysis
-intuitive-psych-samples = "pixi run python -m examples.intuitive_physics.main --samples"  # Sample analysis
-intuitive-psych-timing = "pixi run python -m examples.intuitive_physics.main --timing"  # Timing analysis
-intuitive-psych-inference = "pixi run python -m examples.intuitive_physics.main --inference"  # Inference analysis
-intuitive-psych-all = "pixi run python -m examples.intuitive_physics.main --all"  # All analyses
-
-[tool.pixi.feature.programmable_mcts.dependencies]
-matplotlib = "*"
-seaborn = "*"
-
-[tool.pixi.feature.programmable_mcts.tasks]
-cmd = "programmable-mcts"
-# Monte Carlo Tree Search
-setup = "mkdir -p examples/programmable_mcts/figs"  # Create output directory
-programmable-mcts = "pixi run python -m examples.programmable_mcts.main"  # Basic run
-programmable-mcts-basic = "pixi run python -m examples.programmable_mcts.main --mode basic"  # Basic mode
-programmable-mcts-positions = "pixi run python -m examples.programmable_mcts.main --mode positions"  # Position analysis
-programmable-mcts-uncertainty = "pixi run python -m examples.programmable_mcts.main --mode uncertainty"  # Uncertainty analysis
-programmable-mcts-exact = "pixi run python -m examples.programmable_mcts.main --mode exact"  # Exact solver comparison
-programmable-mcts-demo = "pixi run python -m examples.programmable_mcts.main --mode demo"  # Demo mode
-programmable-mcts-visualizations = "pixi run python -m examples.programmable_mcts.main --mode visualizations"  # Visualizations
-programmable-mcts-all = "pixi run python -m examples.programmable_mcts.main --mode all"  # All modes
-
-[tool.pixi.feature.timing_benchmarks.dependencies]
-matplotlib = "*"
-seaborn = "*"
-pandas = "*"
-
-[tool.pixi.feature.timing_benchmarks.pypi-dependencies]
-numpyro = "*"
-# Note: Pyro and Stan require separate environments due to PyTorch/C++ dependencies
-# Gen.jl requires Julia installation via juliaup
-
-[tool.pixi.feature.timing_benchmarks.tasks]
-cmd = "timing-benchmarks"
-# Timing benchmarks across probabilistic programming systems
-setup = "mkdir -p examples/timing-benchmarks/figs examples/timing-benchmarks/data"  # Create output directories
-timing-benchmarks-test = "pixi run python -m examples.timing-benchmarks.main test --repeats 5"  # Quick test mode
-timing-benchmarks-polynomial-is = "pixi run python -m examples.timing-benchmarks.main polynomial-is"  # Polynomial IS benchmark
-timing-benchmarks-polynomial-hmc = "pixi run python -m examples.timing-benchmarks.main polynomial-hmc"  # Polynomial HMC benchmark
-timing-benchmarks-polynomial-all = "pixi run python -m examples.timing-benchmarks.main polynomial-all"  # All polynomial benchmarks
-timing-benchmarks-plot = "pixi run python -m examples.timing-benchmarks.main plot"  # Plot from saved data
-# Julia setup (requires juliaup installation)
-timing-benchmarks-setup-julia = "cd examples/timing-benchmarks/julia && julia --project=. -e 'using Pkg; Pkg.instantiate()'"  # Setup Gen.jl environment
 
 [tool.pixi.feature.cuda.system-requirements]
 cuda = "12"
@@ -217,26 +163,11 @@ jaxlib = { version = ">=0.6.0,<0.7", build = "*cuda12*" }
 # CUDA GPU acceleration tasks
 cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); print(f\"JAX devices: {jax.devices()}\"); print(f\"Default backend: {jax.default_backend()}\")'"  # Check CUDA availability
 cuda-test = "pixi run test -k 'not slow'"  # Run tests with CUDA backend
-# CUDA-accelerated case studies
-cuda-faircoin = "pixi run -e faircoin-cuda setup && pixi run -e faircoin-cuda faircoin"  # Run faircoin with CUDA (setup figs dir first)
-cuda-curvefit = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit"  # Quick curvefit with CUDA
-cuda-curvefit-full = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit-full"  # Full curvefit with CUDA
-cuda-curvefit-benchmark = "pixi run -e curvefit-cuda setup && pixi run -e curvefit-cuda curvefit-benchmark"  # Benchmark with CUDA
-cuda-gol = "pixi run -e gol-cuda gol"  # Run Game of Life with CUDA
-cuda-localization-generate-data = "pixi run -e localization-cuda python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison"  # Generate localization data with CUDA
-cuda-localization-plot-figures = "pixi run -e localization-cuda python -m examples.localization.main plot-figures"  # Plot localization figures
-cuda-localization = "pixi run -e localization-cuda python -m examples.localization.main generate-data --include-basic-demo --include-smc-comparison && pixi run -e localization-cuda python -m examples.localization.main plot-figures"  # Full localization pipeline with CUDA
-cuda-state-space = "pixi run -e state-space-cuda state-space"  # Run state space with CUDA
-cuda-gen2d = "pixi run -e gen2d-cuda gen2d"  # Run gen2d with CUDA
-cuda-intuitive-psych = "pixi run -e intuitive-psych-cuda intuitive-psych"  # Run intuitive physics with CUDA
-cuda-programmable-mcts = "pixi run -e programmable-mcts-cuda programmable-mcts"  # Run MCTS with CUDA
-cuda-examples-all = "pixi run cuda-faircoin && pixi run cuda-curvefit && pixi run cuda-gol && pixi run cuda-localization"  # Run core examples with CUDA (fast modes)
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
 format = { features = ["format"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
-examples = { features = ["examples"], solve-group = "default" }
 cuda = { features = ["cuda"], solve-group = "cuda" }
 faircoin = { features = ["faircoin"], solve-group = "default" }
 faircoin-cuda = { features = ["faircoin", "cuda"], solve-group = "cuda" }
@@ -246,16 +177,6 @@ gol = { features = ["gol"], solve-group = "default" }
 gol-cuda = { features = ["gol", "cuda"], solve-group = "cuda" }
 localization = { features = ["localization"], solve-group = "default" }
 localization-cuda = { features = ["localization", "cuda"], solve-group = "cuda" }
-state-space = { features = ["state_space"], solve-group = "default" }
-state-space-cuda = { features = ["state_space", "cuda"], solve-group = "cuda" }
-gen2d = { features = ["gen2d"], solve-group = "default" }
-gen2d-cuda = { features = ["gen2d", "cuda"], solve-group = "cuda" }
-intuitive-psych = { features = ["intuitive_physics"], solve-group = "default" }
-intuitive-psych-cuda = { features = ["intuitive_physics", "cuda"], solve-group = "cuda" }
-programmable-mcts = { features = ["programmable_mcts"], solve-group = "default" }
-programmable-mcts-cuda = { features = ["programmable_mcts", "cuda"], solve-group = "cuda" }
-timing-benchmarks = { features = ["timing_benchmarks"], solve-group = "default" }
-timing-benchmarks-cuda = { features = ["timing_benchmarks", "cuda"], solve-group = "cuda" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"

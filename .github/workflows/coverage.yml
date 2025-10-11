@@ -26,9 +26,9 @@ jobs:
       run: |
         if [ -f "codecov.yml" ]; then
           echo "📋 Codecov configuration found"
-          echo "✅ Configuration file present and ready for Codecov"
+          echo "OK Configuration file present and ready for Codecov"
         else
-          echo "⚠️  No codecov.yml found, using Codecov defaults"
+          echo "Warning  No codecov.yml found, using Codecov defaults"
         fi
 
     - name: Run comprehensive test suite

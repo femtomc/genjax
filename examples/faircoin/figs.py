@@ -129,7 +129,7 @@ def timing_comparison_fig(
     plt.tight_layout()
 
     # Save with parametrized filename and research paper quality settings
-    filename = f"examples/faircoin/figs/faircoin_timing_performance_comparison_obs{num_obs}_samples{num_samples}_repeats{repeats}.pdf"
+    filename = f"figs/faircoin_timing_performance_comparison_obs{num_obs}_samples{num_samples}_repeats{repeats}.pdf"
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved comparison plot to {filename}")
@@ -253,7 +253,7 @@ def posterior_comparison_fig(
     # plt.subplots_adjust(top=0.90, bottom=0.12)  # No longer need room for title
 
     # Save with parametrized filename
-    filename = f"examples/faircoin/figs/faircoin_posterior_accuracy_comparison_obs{num_obs}_samples{num_samples}.pdf"
+    filename = f"figs/faircoin_posterior_accuracy_comparison_obs{num_obs}_samples{num_samples}.pdf"
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved posterior comparison plot to {filename}")
@@ -528,9 +528,8 @@ def combined_comparison_fig(
     print(f"Ours: {gj_mu:.6f}s, Handcoded: {hc_mu:.6f}s, NumPyro: {np_mu:.6f}s")
 
     # Save with parametrized filename (3x2 layout without Pyro)
-    filename = (
-        f"examples/faircoin/figs/faircoin_combined_posterior_and_timing_obs{num_obs}_samples{num_samples}.pdf"
-    )
+    # Use simplified paper-expected name
+    filename = f"figs/combined_3x2_obs{num_obs}_samples{num_samples}.pdf"
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved combined comparison plot to {filename}")

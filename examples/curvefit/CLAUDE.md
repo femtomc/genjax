@@ -381,7 +381,7 @@ python -m examples.curvefit.main full --n-samples-is 2000 --n-samples-hmc 1500
 ### Input Parameter Pattern
 
 ```python
-# ✅ CORRECT - Pass data as input arguments
+# OK CORRECT - Pass data as input arguments
 @gen
 def model(xs):
     # xs is passed as input, avoiding static issues
@@ -398,7 +398,7 @@ def model(n: Const[int]):
 ### SMC with Const Pattern
 
 ```python
-# ✅ CORRECT - Use Const wrapper for static parameters
+# OK CORRECT - Use Const wrapper for static parameters
 def infer(xs, ys, n_samples: Const[int]):
     result = init(model, (xs,), n_samples, constraints)
     return result
@@ -496,10 +496,10 @@ This case study serves as:
 
 **Example Fix**:
 ```python
-# ❌ WRONG - JAX tracer formatting fails
+# FAIL WRONG - JAX tracer formatting fails
 f"Value: {jax_array:.2f}"
 
-# ✅ CORRECT - Convert to Python float first
+# OK CORRECT - Convert to Python float first
 f"Value: {float(jax_array):.2f}"
 ```
 
@@ -508,7 +508,7 @@ f"Value: {float(jax_array):.2f}"
 The `Cond` combinator now fully supports mixture models with same addresses in both branches. The outlier model in this case study demonstrates this capability:
 
 ```python
-# ✅ Mixture model with outliers using Cond combinator
+# OK Mixture model with outliers using Cond combinator
 # Define branch functions outside to avoid JAX local function comparison issues
 @gen
 def inlier_branch(y_det, outlier_std):

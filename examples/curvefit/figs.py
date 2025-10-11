@@ -38,6 +38,7 @@ import numpy as np
 import jax.numpy as jnp
 import jax.random as jrand
 import jax
+from genjax import seed as gf_seed
 import sys
 sys.path.append('..')
 from genjax.timing import benchmark_with_warmup
@@ -61,7 +62,7 @@ setup_publication_fonts()
 
 def get_reference_dataset(seed=42, n_points=20):
     """Get the standard reference dataset for all visualizations."""
-    from data import generate_fixed_dataset
+    from examples.curvefit.data import generate_fixed_dataset
 
     return generate_fixed_dataset(
         n_points=n_points,
@@ -77,7 +78,7 @@ def get_reference_dataset(seed=42, n_points=20):
 
 def save_onepoint_trace_viz():
     """Save one-point curve trace visualization."""
-    from core import onepoint_curve
+    from examples.curvefit.core import onepoint_curve
 
     print("Making and saving onepoint trace visualization.")
 
@@ -112,7 +113,7 @@ def save_onepoint_trace_viz():
 
 def save_multiple_onepoint_traces_with_density():
     """Save multiple one-point trace visualizations with density values."""
-    from core import onepoint_curve
+    from examples.curvefit.core import onepoint_curve
     from genjax.pjax import seed as genjax_seed
     
     print("Making and saving multiple onepoint traces with densities.")
@@ -157,7 +158,7 @@ def save_multiple_onepoint_traces_with_density():
 
 def save_multipoint_trace_viz():
     """Save multi-point curve trace visualization."""
-    from core import npoint_curve
+    from examples.curvefit.core import npoint_curve
 
     print("Making and saving multipoint trace visualization.")
 
@@ -194,7 +195,7 @@ def save_multipoint_trace_viz():
 
 def save_multiple_multipoint_traces_with_density():
     """Save multiple multi-point trace visualizations with density values."""
-    from core import npoint_curve
+    from examples.curvefit.core import npoint_curve
     from genjax.pjax import seed as genjax_seed
     
     print("Making and saving multiple multipoint traces with densities.")
@@ -241,7 +242,7 @@ def save_multiple_multipoint_traces_with_density():
 
 def save_four_multipoint_trace_vizs():
     """Save visualization showing four different multi-point curve traces."""
-    from core import npoint_curve
+    from examples.curvefit.core import npoint_curve
     from genjax.pjax import seed as genjax_seed
 
     print("Making and saving four multipoint trace visualizations.")
@@ -289,7 +290,7 @@ def save_four_multipoint_trace_vizs():
 
 def save_single_multipoint_trace_with_density():
     """Save a single multi-point curve trace with curve, points, and density value."""
-    from core import npoint_curve
+    from examples.curvefit.core import npoint_curve
     from genjax.pjax import seed as genjax_seed
     
     print("Making and saving single multipoint trace with density.")
@@ -335,7 +336,7 @@ def save_single_multipoint_trace_with_density():
 
 def save_inference_viz(seed=42):
     """Save posterior visualization using importance sampling."""
-    from core import (
+    from examples.curvefit.core import (
         infer_latents,
         npoint_curve,
     )
@@ -423,7 +424,7 @@ def save_genjax_posterior_comparison(
     timing_repeats=20,
 ):
     """Save comparison of GenJAX IS vs HMC posterior inference."""
-    from core import (
+    from examples.curvefit.core import (
         infer_latents_jit,
         hmc_infer_latents_jit,
     )
@@ -541,7 +542,7 @@ def save_genjax_posterior_comparison(
 
     save_publication_figure(fig, "figs/curvefit_posterior_comparison.pdf")
 
-    print("✓ Saved GenJAX posterior comparison")
+    print("OK Saved GenJAX posterior comparison")
 
 
 def save_framework_comparison_figure(
@@ -553,7 +554,7 @@ def save_framework_comparison_figure(
     timing_repeats=20,
 ):
     """Generate clean framework comparison with IS 1000 vs HMC methods."""
-    from core import (
+    from examples.curvefit.core import (
         infer_latents_jit,
         hmc_infer_latents_jit,
         numpyro_run_importance_sampling_jit,
@@ -859,215 +860,118 @@ def save_framework_comparison_figure(
     fig.savefig(filename, dpi=300, bbox_inches="tight", format="pdf")
     plt.close()
 
-    print(f"\n✓ Saved framework comparison: {filename}")
+    print(f"\nOK Saved framework comparison: {filename}")
 
     return results
 
 
-def save_inference_scaling_viz(n_trials=100, extended_timing=False):
-    """Save inference scaling visualization across different sample sizes.
-    
-    Args:
-        n_trials: Number of independent trials to run for each sample size (default: 100)
-        extended_timing: If True, run longer timing trials to potentially show GPU throttling
-    """
-    from core import infer_latents_jit
-    from genjax.core import Const
-    from examples.utils import benchmark_with_warmup
+def save_inference_scaling_viz(
+    n_trials: int = 10,
+    extended_timing: bool = False,
+    particle_counts: list[int] | None = None,
+    max_large_trials: int = 3,
+):
+    """Save the runtime/accuracy scaling analysis."""
+    from examples.curvefit.core import infer_latents, get_points_for_inference
+    from genjax import Const, seed as gf_seed
 
-    print(f"Making and saving inference scaling visualization with {n_trials} trials per N.")
-    if extended_timing:
-        print("  Running extended timing trials to capture GPU behavior...")
+    seed = gf_seed
+    key = jrand.key(0)
+    xs, ys = get_points_for_inference()
 
-    # Get reference dataset
-    data = get_reference_dataset()
-    xs = data["xs"]
-    ys = data["ys"]
+    if particle_counts is None:
+        particle_counts = [50, 200, 1000]
+        if extended_timing:
+            particle_counts = particle_counts + [5000]
 
-    # Test different sample sizes - extended range to potentially observe GPU throttling
-    n_samples_list = [10, 20, 50, 100, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 4000, 5000, 7000, 10000, 
-                      15000, 20000, 30000, 40000, 50000, 70000, 100000, 150000, 200000, 300000, 
-                      400000, 500000, 700000, 1000000]
-    lml_estimates = []
-    lml_stds = []  # Store standard deviations for variance bounds
-    runtime_means = []
-    runtime_stds = []
+    runtimes: list[tuple[float, float]] = []
+    lml_estimates: list[tuple[float, float]] = []
+    ess_values: list[tuple[float, float]] = []
 
-    base_key = jrand.key(42)
+    print("Running inference scaling analysis...")
+    for n_particles in particle_counts:
+        trials = max(1, n_trials)
+        if n_particles > 100_000:
+            trials = min(max_large_trials, trials)
+        print(f"  Testing N={n_particles:,} particles with {trials} trials...")
 
-    for n_samples in n_samples_list:
-        print(f"  Testing with {n_samples} samples ({n_trials} trials)...")
-        
-        # Storage for trial results
-        trial_lml = []
-        
-        # Run multiple trials
-        for trial in range(n_trials):
-            trial_key = jrand.key(42 + trial)  # Different key for each trial
-            
-            # Run inference
-            samples, weights = infer_latents_jit(trial_key, xs, ys, Const(n_samples))
-            
-            # Estimate log marginal likelihood
-            lml = jnp.log(jnp.mean(jnp.exp(weights - jnp.max(weights)))) + jnp.max(weights)
-            trial_lml.append(float(lml))
-        
-        # Average over trials and compute standard deviation
-        lml_mean = jnp.mean(jnp.array(trial_lml))
-        lml_std = jnp.std(jnp.array(trial_lml))
-        lml_estimates.append(lml_mean)
-        lml_stds.append(lml_std)
-        
-        # Benchmark runtime with extended trials if requested
-        timing_repeats = 500 if extended_timing else 100
-        inner_repeats = 50 if extended_timing else 20
-        
-        times, (mean_time, std_time) = benchmark_with_warmup(
-            lambda: infer_latents_jit(base_key, xs, ys, Const(n_samples)),
-            repeats=timing_repeats,
-            inner_repeats=inner_repeats
-        )
-        runtime_means.append(mean_time * 1000)  # Convert to ms
-        runtime_stds.append(std_time * 1000)
+        times = []
+        lmls = []
+        ess_list = []
 
-    # Create figure with two panels in horizontal layout
-    fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(14, 3.5)  # Wider and less tall
-    )
+        for _ in range(trials):
+            key, subkey = jrand.split(key)
+            import time
 
-    # Common color for GenJAX IS
-    genjax_is_color = "#0173B2"
+            start_time = time.time()
+            _, log_weights = seed(infer_latents)(
+                subkey, xs, ys, Const(n_particles)
+            )
+            elapsed = (time.time() - start_time) * 1000.0
+            times.append(elapsed)
 
-    # Runtime plot with potential GPU throttling visibility
-    runtime_array = np.array(runtime_means)
-    runtime_std_array = np.array(runtime_stds)
-    
-    # Plot mean line
+            log_weights = jnp.asarray(log_weights)
+            log_max = jnp.max(log_weights)
+            lml = jnp.log(jnp.sum(jnp.exp(log_weights - log_max))) + log_max - jnp.log(
+                n_particles
+            )
+            lmls.append(float(lml))
+
+            weights = jnp.exp(log_weights - log_max)
+            weights = weights / jnp.sum(weights)
+            ess = float(1.0 / jnp.sum(weights**2))
+            ess_list.append(ess)
+
+        runtimes.append((float(np.mean(times)), float(np.std(times)) if len(times) > 1 else 0.0))
+        lml_estimates.append((float(np.mean(lmls)), float(np.std(lmls)) if len(lmls) > 1 else 0.0))
+        ess_values.append((float(np.mean(ess_list)), float(np.std(ess_list)) if len(ess_list) > 1 else 0.0))
+
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4.5))
+
+    runtime_means = [mean for mean, _ in runtimes]
     ax1.plot(
-        n_samples_list,
-        runtime_array,
-        marker="o",
-        linewidth=3,
-        markersize=8,
-        color=genjax_is_color,
-        label="Mean Runtime"
+        particle_counts,
+        runtime_means,
+        color=get_method_color('genjax_is'),
+        marker='o',
+        linewidth=2.0,
     )
-    
-    # Add shaded region for ±1 standard deviation (like LML plot)
-    ax1.fill_between(
-        n_samples_list,
-        runtime_array - runtime_std_array,
-        runtime_array + runtime_std_array,
-        alpha=0.3,
-        color=genjax_is_color,
-        label="±1 std"
-    )
-    
-    ax1.set_xlabel("Number of Samples")
-    ax1.set_ylabel("Runtime (ms)")
-    # ax1.set_title("Vectorized Runtime", fontweight="normal")
-    ax1.set_xscale("log")
-    ax1.set_xlim(8, 1200000)
-    
-    # Fixed y-axis range to better show GPU behavior
-    ax1.set_ylim(0.1, 0.5)
-    
-    # Add shading for GPU throttling region (past 10^5)
-    ax1.axvspan(100000, 1200000, alpha=0.1, color='orange', label='GPU Throttling')
-    
-    # Add colored vertical lines for N=10, 100, 100000
-    ax1.axvline(10, color='#B19CD9', linestyle='-', alpha=0.8, linewidth=4)
-    ax1.axvline(100, color='#0173B2', linestyle='-', alpha=0.8, linewidth=4)
-    ax1.axvline(100000, color='#029E73', linestyle='-', alpha=0.8, linewidth=4)
-    
-    # Add GPU underutilized text in unshaded region
-    ax1.text(3000, 0.15, 'GPU\nUnderutilized', ha='center', va='bottom', 
-             color='gray', fontsize=12, fontweight='bold')
-    
-    # Add throttle text in shaded region near x-axis
-    ax1.text(300000, 0.15, 'GPU\nThrottling', ha='center', va='bottom', 
-             color='darkorange', fontsize=12, fontweight='bold')
-    
-    # Add vertical line for GPU OOM at 10^6
-    ax1.axvline(1000000, color='red', linestyle='--', alpha=0.7, linewidth=2)
-    
-    # Add GPU OOM text above the plot frame
-    ax1.text(1000000, 1.05, 'GPU OOM', ha='center', va='bottom', 
-             color='red', fontsize=14, fontweight='bold', 
-             transform=ax1.get_xaxis_transform())
-    
-    # Set specific x-axis tick locations with scientific notation
-    ax1.set_xticks([100, 1000, 10000, 100000, 1000000])
-    ax1.set_xticklabels(['$10^2$', '$10^3$', '$10^4$', '$10^5$', '$10^6$'])
-    # Only set y-axis ticks to avoid overriding x-axis
-    ax1.yaxis.set_major_locator(MaxNLocator(nbins=3, prune='both'))
+    ax1.set_xlabel('Number of Particles', fontweight='bold')
+    ax1.set_ylabel('Runtime (ms)', fontweight='bold')
+    ax1.set_xscale('log')
+    apply_grid_style(ax1)
 
-    # LML estimate plot with variance bounds
-    lml_means = np.array(lml_estimates)
-    lml_std_array = np.array(lml_stds)
-    
-    # Plot mean line
+    lml_means = [mean for mean, _ in lml_estimates]
     ax2.plot(
-        n_samples_list,
+        particle_counts,
         lml_means,
-        marker="o",
-        linewidth=3,
-        markersize=8,
-        color=genjax_is_color,
-        label="Mean LML"
+        color=get_method_color('genjax_is'),
+        marker='o',
+        linewidth=2.0,
     )
-    
-    # Add shaded region for ±1 standard deviation
-    ax2.fill_between(
-        n_samples_list,
-        lml_means - lml_std_array,
-        lml_means + lml_std_array,
-        alpha=0.3,
-        color=genjax_is_color,
-        label="±1 std"
+    ax2.set_xlabel('Number of Particles', fontweight='bold')
+    ax2.set_ylabel('Log Marginal Likelihood', fontweight='bold')
+    ax2.set_xscale('log')
+    apply_grid_style(ax2)
+
+    ess_means = [mean for mean, _ in ess_values]
+    ax3.plot(
+        particle_counts,
+        ess_means,
+        color=get_method_color('genjax_is'),
+        marker='o',
+        linewidth=2.0,
     )
-    
-    ax2.set_xlabel("Number of Samples")
-    ax2.set_ylabel("LMLE")
-    # ax2.set_title("LML Estimates", fontweight="normal")
-    ax2.set_xscale("log")
-    ax2.set_xlim(8, 1200000)
-    
-    # Add horizontal line at final LML value
-    final_lml = lml_means[-1]
-    ax2.axhline(final_lml, color='gray', linestyle='--', alpha=0.7, linewidth=2)
-    # Add label on y-axis
-    ax2.text(70, final_lml, f'{final_lml:.2f}', ha='right', va='center', 
-             color='gray', fontsize=12, fontweight='bold')
-    
-    # Add shading for GPU throttling region (past 10^5)
-    ax2.axvspan(100000, 1200000, alpha=0.1, color='orange')
-    
-    # Add colored vertical lines for N=10, 100, 100000
-    ax2.axvline(10, color='#B19CD9', linestyle='-', alpha=0.8, linewidth=4)
-    ax2.axvline(100, color='#0173B2', linestyle='-', alpha=0.8, linewidth=4)
-    ax2.axvline(100000, color='#029E73', linestyle='-', alpha=0.8, linewidth=4)
-    
-    # Add vertical line for GPU OOM at 10^6
-    ax2.axvline(1000000, color='red', linestyle='--', alpha=0.7, linewidth=2)
-    
-    # Set specific x-axis tick locations with scientific notation
-    ax2.set_xticks([100, 1000, 10000, 100000, 1000000])
-    ax2.set_xticklabels(['$10^2$', '$10^3$', '$10^4$', '$10^5$', '$10^6$'])
-    # Only set y-axis ticks to avoid overriding x-axis
-    ax2.yaxis.set_major_locator(MaxNLocator(nbins=3, prune='both'))
-    
-    # Add GPU OOM text above the plot frame (using transform for consistent placement)
-    ax2.text(1000000, 1.05, 'GPU OOM', ha='center', va='bottom', 
-             color='red', fontsize=14, fontweight='bold', 
-             transform=ax2.get_xaxis_transform())
+    ax3.set_xlabel('Number of Particles', fontweight='bold')
+    ax3.set_ylabel('Effective Sample Size', fontweight='bold')
+    ax3.set_xscale('log')
+    apply_grid_style(ax3)
 
     plt.tight_layout()
-    fig.savefig("figs/curvefit_scaling_performance.pdf")
-    plt.close()
 
-    print("✓ Saved inference scaling visualization")
+    save_publication_figure(fig, "figs/curvefit_scaling_performance.pdf")
 
+    print('Saved inference scaling visualization')
 
 def save_posterior_scaling_plots(n_runs=1000, seed=42):
     """Save posterior plots for different particle counts (N=100, 1000, 10000).
@@ -1076,7 +980,7 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
         n_runs: Number of independent IS runs to get posterior samples
         seed: Random seed
     """
-    from core import infer_latents_jit
+    from examples.curvefit.core import infer_latents_jit
     from genjax.core import Const
     
     print("Making posterior scaling plots (N=10, 100, 100000)...")
@@ -1187,7 +1091,7 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
     filename = "figs/curvefit_posterior_scaling_combined.pdf"
     plt.savefig(filename, dpi=300)
     plt.close(fig)
-    print(f"\n✓ Saved combined posterior scaling plot: {filename}")
+    print(f"\nOK Saved combined posterior scaling plot: {filename}")
     
     # Also save individual plots
     for idx, n_particles in enumerate(n_particles_list):
@@ -1204,12 +1108,12 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
         individual_filename = f"figs/curvefit_posterior_n{n_particles}.pdf"
         print(f"  Individual plots saved separately")
     
-    print("\n✓ Saved all posterior scaling plots")
+    print("\nOK Saved all posterior scaling plots")
 
 
 def save_log_density_viz():
     """Save log density visualization using the reference dataset."""
-    from core import npoint_curve
+    from examples.curvefit.core import npoint_curve
 
     print("Making and saving log density visualization.")
 
@@ -1274,7 +1178,7 @@ def save_log_density_viz():
     fig.savefig("figs/curvefit_logprob_surface.pdf")
     plt.close()
 
-    print("✓ Saved log density visualization")
+    print("OK Saved log density visualization")
 
 
 def save_multiple_curves_single_point_viz():
@@ -1283,7 +1187,7 @@ def save_multiple_curves_single_point_viz():
     This demonstrates nested vectorization where we sample multiple
     independent curves, each with a single observation point.
     """
-    from core import onepoint_curve
+    from examples.curvefit.core import onepoint_curve
     from genjax.pjax import seed as genjax_seed
 
     print("Making and saving multiple curves with single point visualization.")
@@ -1342,14 +1246,14 @@ def save_individual_method_parameter_density(
     """Save individual 4-panel parameter density figures for each inference method."""
     print("\n=== Individual Method Parameter Density Figures ===")
     
-    from core import (
+    from examples.curvefit.core import (
         infer_latents_jit,
         hmc_infer_latents_jit,
     )
     
     # Try to import numpyro functions if available
     try:
-        from core import numpyro_run_hmc_inference_jit
+        from examples.curvefit.core import numpyro_run_hmc_inference_jit
         has_numpyro = True
     except ImportError:
         has_numpyro = False
@@ -1562,7 +1466,7 @@ def save_individual_method_parameter_density(
     fig_is = create_method_figure("GenJAX IS (1000 particles)", is_a, is_b, is_c, method_colors['is'])
     fig_is.savefig("figs/curvefit_params_is1000.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig_is)
-    print("  ✓ Saved GenJAX IS parameter density figure")
+    print("  OK Saved GenJAX IS parameter density figure")
     
     # 2. GenJAX HMC
     print("  Running GenJAX HMC...")
@@ -1580,7 +1484,7 @@ def save_individual_method_parameter_density(
     fig_hmc = create_method_figure("GenJAX HMC", hmc_a, hmc_b, hmc_c, method_colors['hmc'])
     fig_hmc.savefig("figs/curvefit_params_hmc.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig_hmc)
-    print("  ✓ Saved GenJAX HMC parameter density figure")
+    print("  OK Saved GenJAX HMC parameter density figure")
     
     # 3. NumPyro HMC (if available)
     if has_numpyro:
@@ -1600,7 +1504,7 @@ def save_individual_method_parameter_density(
             fig_numpyro = create_method_figure("NumPyro HMC", numpyro_a, numpyro_b, numpyro_c, method_colors['numpyro'])
             fig_numpyro.savefig("figs/curvefit_params_numpyro.pdf", dpi=300, bbox_inches="tight")
             plt.close(fig_numpyro)
-            print("  ✓ Saved NumPyro HMC parameter density figure")
+            print("  OK Saved NumPyro HMC parameter density figure")
             
         except Exception as e:
             print(f"  NumPyro HMC failed: {e}")
@@ -1608,7 +1512,7 @@ def save_individual_method_parameter_density(
     else:
         print("  Skipping NumPyro HMC (NumPyro not available)")
     
-    print("\n✓ Completed individual method parameter density figures")
+    print("\nOK Completed individual method parameter density figures")
 
 
 def save_is_comparison_parameter_density(
@@ -1618,7 +1522,7 @@ def save_is_comparison_parameter_density(
     """Save parameter density figures comparing IS with different particle counts."""
     print("\n=== IS Comparison Parameter Density Figures ===")
     
-    from core import infer_latents_jit
+    from examples.curvefit.core import infer_latents_jit
     from genjax.core import Const
     from mpl_toolkits.mplot3d import Axes3D
     from scipy.ndimage import gaussian_filter
@@ -1794,7 +1698,7 @@ def save_is_comparison_parameter_density(
         plt.tight_layout()
         fig.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close(fig)
-        print(f"  ✓ Saved IS (N={n_particles}) figure")
+        print(f"  OK Saved IS (N={n_particles}) figure")
         
         return a_vals.mean(), b_vals.mean(), c_vals.mean()
     
@@ -1806,7 +1710,7 @@ def save_is_comparison_parameter_density(
     create_is_figure(5000, is_variant_colors['is_5000'], 
                     "figs/curvefit_params_is5000.pdf")
     
-    print("\n✓ Completed IS comparison parameter density figures")
+    print("\nOK Completed IS comparison parameter density figures")
 
 
 def save_is_single_resample_comparison(
@@ -1817,7 +1721,7 @@ def save_is_single_resample_comparison(
     """Save single particle resampling comparison for IS with different particle counts."""
     print(f"\n=== IS Single Particle Resampling Comparison ({n_trials} trials) ===")
     
-    from core import infer_latents_jit
+    from examples.curvefit.core import infer_latents_jit
     from genjax.core import Const
     from scipy.ndimage import gaussian_filter
     
@@ -1995,7 +1899,7 @@ def save_is_single_resample_comparison(
     
     create_single_resample_figure(a_50, b_50, c_50, single_resample_colors['is_50'],
                                  "figs/curvefit_params_resample50.pdf")
-    print(f"  ✓ Saved IS (N=50) single particle figure")
+    print(f"  OK Saved IS (N=50) single particle figure")
     print(f"    Mean: a={float(a_50.mean()):.3f}, b={float(b_50.mean()):.3f}, c={float(c_50.mean()):.3f}")
     print(f"    Std:  a={float(a_50.std()):.3f}, b={float(b_50.std()):.3f}, c={float(c_50.std()):.3f}")
     
@@ -2006,7 +1910,7 @@ def save_is_single_resample_comparison(
     
     create_single_resample_figure(a_500, b_500, c_500, single_resample_colors['is_500'],
                                  "figs/curvefit_params_resample500.pdf")
-    print(f"  ✓ Saved IS (N=500) single particle figure")
+    print(f"  OK Saved IS (N=500) single particle figure")
     print(f"    Mean: a={float(a_500.mean()):.3f}, b={float(b_500.mean()):.3f}, c={float(c_500.mean()):.3f}")
     print(f"    Std:  a={float(a_500.std()):.3f}, b={float(b_500.std()):.3f}, c={float(c_500.std()):.3f}")
     
@@ -2017,11 +1921,11 @@ def save_is_single_resample_comparison(
     
     create_single_resample_figure(a_5000, b_5000, c_5000, single_resample_colors['is_5000'],
                                  "figs/curvefit_params_resample5000.pdf")
-    print(f"  ✓ Saved IS (N=5000) single particle figure")
+    print(f"  OK Saved IS (N=5000) single particle figure")
     print(f"    Mean: a={float(a_5000.mean()):.3f}, b={float(b_5000.mean()):.3f}, c={float(c_5000.mean()):.3f}")
     print(f"    Std:  a={float(a_5000.std()):.3f}, b={float(b_5000.std()):.3f}, c={float(c_5000.std()):.3f}")
     
-    print("\n✓ Completed IS single particle resampling comparison")
+    print("\nOK Completed IS single particle resampling comparison")
 
 
 def save_parameter_density_timing_comparison(
@@ -2030,9 +1934,9 @@ def save_parameter_density_timing_comparison(
     timing_repeats=20,
 ):
     """Create horizontal bar plot comparing timing for all parameter density methods."""
-    from core import infer_latents_jit, hmc_infer_latents_jit
+    from examples.curvefit.core import infer_latents_jit, hmc_infer_latents_jit
     from genjax.core import Const
-    from examples.utils import benchmark_with_warmup
+    from genjax.timing import benchmark_with_warmup
     
     print("\n=== Parameter Density Methods Timing Comparison ===")
     
@@ -2087,7 +1991,7 @@ def save_parameter_density_timing_comparison(
     time_results, (mean_time, std_time) = benchmark_with_warmup(
         lambda: hmc_infer_latents_jit(
             jrand.key(seed), xs, ys,
-            Const(1000), Const(500),
+            Const(300), Const(500),
             Const(0.001), Const(50)
         ),
         repeats=timing_repeats,
@@ -2100,7 +2004,7 @@ def save_parameter_density_timing_comparison(
     
     # 5. NumPyro HMC (if available)
     try:
-        from core import numpyro_run_hmc_inference_jit
+        from examples.curvefit.core import numpyro_run_hmc_inference_jit
         print("5. Timing NumPyro HMC...")
         time_results, (mean_time, std_time) = benchmark_with_warmup(
             lambda: numpyro_run_hmc_inference_jit(
@@ -2176,7 +2080,7 @@ def save_parameter_density_timing_comparison(
     fig.savefig(filename, dpi=300, bbox_inches="tight", format="pdf")
     plt.close()
     
-    print(f"\n✓ Saved parameter density timing comparison: {filename}")
+    print(f"\nOK Saved parameter density timing comparison: {filename}")
     
     # Print summary
     print("\n=== Timing Summary ===")
@@ -2239,7 +2143,7 @@ def create_all_legends():
     fig.savefig("figs/curvefit_legend_all.pdf", 
                 dpi=300, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig)
-    print("✓ Created final legend with distinguishable colors")
+    print("OK Created final legend with distinguishable colors")
     
     # Create GenJAX IS-only legend
     create_genjax_is_legend()
@@ -2294,7 +2198,7 @@ def create_genjax_is_legend():
     fig.savefig("figs/curvefit_legend_is_horiz.pdf", 
                 dpi=300, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig)
-    print("✓ Created GenJAX IS legend")
+    print("OK Created GenJAX IS legend")
     
     # Also create a vertical version
     fig_vert = plt.figure(figsize=(3, 2.5))
@@ -2322,7 +2226,7 @@ def create_genjax_is_legend():
     fig_vert.savefig("figs/curvefit_legend_is_vert.pdf", 
                      dpi=300, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig_vert)
-    print("✓ Created GenJAX IS legend (vertical)")
+    print("OK Created GenJAX IS legend (vertical)")
 
 
 def save_is_only_timing_comparison(
@@ -2331,9 +2235,9 @@ def save_is_only_timing_comparison(
     timing_repeats=20,
 ):
     """Create horizontal bar plot comparing timing for IS methods only (N=5, N=1000, N=5000)."""
-    from core import infer_latents_jit
+    from examples.curvefit.core import infer_latents_jit
     from genjax.core import Const
-    from examples.utils import benchmark_with_warmup
+    from genjax.timing import benchmark_with_warmup
     
     print("\n=== IS-Only Timing Comparison ===")
     
@@ -2425,7 +2329,7 @@ def save_is_only_timing_comparison(
     fig.savefig(filename, dpi=300, bbox_inches="tight", format="pdf")
     plt.close()
     
-    print(f"\n✓ Saved IS-only timing comparison: {filename}")
+    print(f"\nOK Saved IS-only timing comparison: {filename}")
     
     # Print summary
     print("\n=== IS Timing Summary ===")
@@ -2440,7 +2344,7 @@ def save_is_only_parameter_density(
     """Save parameter density figures for IS methods only (N=5, N=1000, N=5000)."""
     print("\n=== IS-Only Parameter Density Figures ===")
     
-    from core import infer_latents_jit
+    from examples.curvefit.core import infer_latents_jit
     from genjax.core import Const
     from mpl_toolkits.mplot3d import Axes3D
     from scipy.ndimage import gaussian_filter
@@ -2616,7 +2520,7 @@ def save_is_only_parameter_density(
         plt.tight_layout()
         fig.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close(fig)
-        print(f"  ✓ Saved IS (N={n_particles}) figure")
+        print(f"  OK Saved IS (N={n_particles}) figure")
         
         # Return mean estimates
         return a_vals.mean(), b_vals.mean(), c_vals.mean()
@@ -2636,7 +2540,7 @@ def save_is_only_parameter_density(
     for n_particles, mean_a, mean_b, mean_c in results:
         print(f"IS (N={n_particles:4d}): a={mean_a:.3f}, b={mean_b:.3f}, c={mean_c:.3f}")
     
-    print("\n✓ Completed IS-only parameter density figures")
+    print("\nOK Completed IS-only parameter density figures")
 
 
 def save_outlier_conditional_demo(
@@ -2656,13 +2560,13 @@ def save_outlier_conditional_demo(
         seed: Random seed for reproducibility
         n_samples_is: Number of importance sampling particles
     """
-    from core import (
+    from examples.curvefit.core import (
         npoint_curve, 
         npoint_curve_with_outliers,
         infer_latents_jit,
         infer_latents_with_outliers_jit,
     )
-    from data import polyfn
+    from examples.curvefit.data import polyfn
     from genjax.core import Const
     
     print("\n=== Outlier Conditional Demo (Robust Curve Fitting) ===")
@@ -2853,7 +2757,7 @@ def save_outlier_conditional_demo(
     fig.savefig(filename_png, dpi=150, bbox_inches='tight')
     plt.close(fig)
     
-    print(f"\n✓ Saved outlier conditional demo: {filename_pdf}")
+    print(f"\nOK Saved outlier conditional demo: {filename_pdf}")
     
     # Print summary
     print("\n=== Results Summary ===")
@@ -2908,12 +2812,12 @@ def save_outlier_rate_sensitivity(**kwargs):
 
 def generate_outlier_dataset_for_overview(seed=42, n_points=20):
     """Generate dataset with outliers for the overview section figure."""
-    from core import (
+    from examples.curvefit.core import (
         npoint_curve_with_outliers,
         seed as genjax_seed
     )
     from genjax.core import Const
-    from data import polyfn
+    from examples.curvefit.data import polyfn
     
     # Generate x values
     xs = jnp.linspace(0.0, 1.0, n_points)
@@ -2958,7 +2862,7 @@ def save_robust_modeling_overview_figures(seed=42, n_points=20):
     2. IS(N=1000) in model with outliers (good model, bad inference)  
     3. Composite Gibbs+HMC in model with outliers (good model, good inference)
     """
-    from core import (
+    from examples.curvefit.core import (
         infer_latents_jit, 
         infer_latents_with_outliers_jit,
         mixed_infer_latents_with_outliers_beta_jit,
@@ -3000,7 +2904,7 @@ def save_robust_modeling_overview_figures(seed=42, n_points=20):
         inference_key = keys[i * 2]
         choice_key = keys[i * 2 + 1]
         
-        samples, weights = infer_latents_jit(inference_key, xs, ys, Const(1000))
+        samples, weights = infer_latents_jit(inference_key, xs, ys, Const(300))
         
         # Resample one particle according to weights
         normalized_weights = jnp.exp(weights - jnp.max(weights))
@@ -3019,7 +2923,7 @@ def save_robust_modeling_overview_figures(seed=42, n_points=20):
     fig1, ax1 = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
     
     # Plot posterior curves with low alpha
-    from data import polyfn
+    from examples.curvefit.data import polyfn
     for i in range(n_curves):
         y_curve = polyfn(x_plot, a_samples[i], b_samples[i], c_samples[i])
         ax1.plot(x_plot, y_curve, color=get_method_color("genjax_is"), 
@@ -3049,7 +2953,7 @@ def save_robust_modeling_overview_figures(seed=42, n_points=20):
     ax1.legend(loc='upper right', fontsize=14)
     
     save_publication_figure(fig1, "curvefit_robust_modeling_bad_model.pdf")
-    print("✓ Saved: curvefit_robust_modeling_bad_model.pdf")
+    print("OK Saved: curvefit_robust_modeling_bad_model.pdf")
     
     # Figure 2: IS with outlier model but no discrete inference
     print("\n2. Running IS with outlier model (no discrete updates)...")
@@ -3067,7 +2971,7 @@ def save_robust_modeling_overview_figures(seed=42, n_points=20):
         choice_key = keys2[i * 2 + 1]
         
         samples, weights = infer_latents_with_outliers_jit(
-            inference_key, xs, ys, Const(1000), 0.3, 0.0, 5.0
+            inference_key, xs, ys, Const(300), 0.3, 0.0, 5.0
         )
         
         # Resample one particle according to weights
@@ -3115,13 +3019,13 @@ def save_robust_modeling_overview_figures(seed=42, n_points=20):
     ax2.legend(loc='upper right', fontsize=14)
     
     save_publication_figure(fig2, "curvefit_robust_modeling_bad_inference.pdf")
-    print("✓ Saved: curvefit_robust_modeling_bad_inference.pdf")
+    print("OK Saved: curvefit_robust_modeling_bad_inference.pdf")
     
     # Figure 3: Composite inference with Gibbs+HMC
     print("\n3. Running composite Gibbs+HMC with outlier model...")
     samples_composite, composite_diagnostics = mixed_infer_latents_with_outliers_beta_jit(
         key, xs, ys, 
-        Const(1000),  # n_samples
+        Const(300),  # n_samples
         Const(500),   # n_warmup
         Const(5),     # mh_moves_per_step
         Const(0.01),  # hmc_step_size
@@ -3171,7 +3075,7 @@ def save_robust_modeling_overview_figures(seed=42, n_points=20):
     ax3.legend(loc='upper right', fontsize=14)
     
     save_publication_figure(fig3, "curvefit_robust_modeling_good_inference.pdf")
-    print("✓ Saved: curvefit_robust_modeling_good_inference.pdf")
+    print("OK Saved: curvefit_robust_modeling_good_inference.pdf")
     
     # Print summary statistics
     print("\n=== Inference Quality Summary ===")
@@ -3318,7 +3222,7 @@ def save_gibbs_debugging_figure(
 def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_detection_comparison.pdf"):
     """Create 3-panel outlier detection comparison figure."""
     
-    from core import (
+    from examples.curvefit.core import (
         npoint_curve,
         npoint_curve_with_outliers,
         npoint_curve_with_outliers_beta,
@@ -3543,7 +3447,7 @@ def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_det
             key,
             npoint_curve,
             (xs,),
-            Const(1000),
+            Const(300),
             constraints_standard
         )
         return result
@@ -3569,7 +3473,7 @@ def save_outlier_detection_comparison(output_filename="figs/curvefit_outlier_det
             key,
             npoint_curve_with_outliers,
             (xs, 0.33, 0.0, 2.0),
-            Const(1000),
+            Const(300),
             constraints
         )
         return result
