@@ -2,11 +2,7 @@
 <img width="450" src="./logo.png"/>
 </p>
 
-[![codecov](https://codecov.io/gh/femtomc/genjax/graph/badge.svg?token=V5W1YIYC5P)](https://codecov.io/gh/femtomc/genjax)
-
-> **Note**: This is the research version of GenJAX. A [(more stable) community version can be found here](https://github.com/genjax-community/genjax).
-
-## About GenJAX
+## What is it?
 
 ### **Probabilistic Programming Language**
 
@@ -27,9 +23,9 @@ GenJAX provides:
 - **Modeling language automation** for constructing complex probability distributions from pieces
 - **Inference automation** for constructing Monte Carlo samplers using convenient idioms (programs expressed by creating and editing traces), and [variational inference automation](https://dl.acm.org/doi/10.1145/3656463) using [new extensions to automatic differentation for expected values](https://dl.acm.org/doi/10.1145/3571198)
 
-## POPL 2026 Artifact
+## As a POPL 2026 Artifact
 
-This research branch powers the POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*. It contains the GenJAX implementation and all case studies used in the empirical evaluation.
+This repository is also a POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*. It contains the GenJAX implementation and all case studies used in the empirical evaluation.
 
 **Contents:**
 - [Quick Example](#quick-example)
@@ -98,12 +94,11 @@ curve_a = traces.get_choices()["curve"]["a"]
 print(f"Posterior mean for 'a': {jnp.mean(curve_a):.3f}")
 ```
 
-This example shows:
+Key things to pay attention to:
 - **Generative functions** with `@gen` decorator
 - **Named random choices** with `@` operator (e.g., `@ "a"`)
-- **Composable vectorization** with `.vmap()` on generative functions
+- **Composable vectorization** with `.vmap()` on generative functions, and `genjax.vmap` on probabilistic computations.
 - **Programmable inference** write inference using generative function interface (here, the `generate()` interface)
-- **modular_vmap** for vectorizing inference (handles seeding automatically)
 
 ## Getting Started
 
@@ -120,22 +115,10 @@ pixi install
 
 This creates isolated conda environments for each case study.
 
-### Quick Smoke Test
+## Reproducing Paper Figures
 
-Verify setup with the simplest case study:
-
-```bash
-pixi run -e faircoin python -m examples.faircoin.main \
-  --combined --num-obs 20 --num-samples 200 --repeats 5
-```
-
-Expected output: `figs/combined_3x2_obs20_samples200.pdf`
-
----
-
-## Reproducing All Paper Figures
-
-Generate all 10 paper figures with a single command:
+All the figures except for the multi-system benchmarking figure are provided by the commands below.
+Generate several of the case study paper figures with a single command:
 
 ```bash
 # CPU execution
@@ -151,11 +134,9 @@ All figures are saved to `genjax/figs/`:
 - 2 GOL figures
 - 2 localization figures
 
-**Note**: One additional figure (`curvefit_vectorization_illustration.pdf`) is a static diagram already included in the repository.
-
----
-
 ## Case Study Details
+
+Here, we provide more details on the case studies. Each case study directory also contains a `README.md` file with more information.
 
 ### 1. Fair Coin (Beta-Bernoulli)
 
@@ -169,14 +150,11 @@ pixi run -e faircoin python -m examples.faircoin.main \
 
 **Outputs**: `figs/combined_3x2_obs50_samples2000.pdf`
 
----
-
 ### 2. Curve Fitting with Outlier Detection
 
 **What it does**: Polynomial regression with robust outlier detection, demonstrating:
 - Importance sampling with varying particle counts
-- Gibbs sampling with HMC for mixture models
-- Performance scaling analysis
+- Gibbs sampling with HMC for an outlier mixture model
 
 **Command**:
 ```bash
@@ -189,8 +167,6 @@ pixi run -e curvefit python -m examples.curvefit.main paper
 - `curvefit_scaling_performance.pdf`
 - `curvefit_posterior_scaling_combined.pdf`
 - `curvefit_outlier_detection_comparison.pdf`
-
----
 
 ### 3. Game of Life Inverse Dynamics
 
@@ -206,8 +182,6 @@ pixi run -e gol gol-paper
 - `gol_gibbs_timing_bar_plot.pdf` (performance across grid sizes)
 
 **Note**: Timing bar plot runs benchmarks at 64×64, 128×128, 256×256, and 512×512 grid sizes.
-
----
 
 ### 4. Robot Localization with SMC
 
@@ -226,35 +200,6 @@ pixi run -e localization python -m examples.localization.main paper \
 
 **Note**: Also generates experimental data in `examples/localization/data/` (regenerated each run).
 
----
-
-## CPU vs GPU Execution
-
-### Which Case Studies Benefit from GPU?
-
-| Case Study | GPU Benefit | Notes |
-|------------|-------------|-------|
-| Faircoin | Minimal | Problem too small to amortize GPU overhead |
-| Curvefit | Moderate | Vectorized importance sampling parallelizes well |
-| GOL | Significant | Large grid operations (512×512) parallelize well |
-| Localization | Significant | Particle filter (200 particles) vectorizes efficiently |
-
-### Memory Requirements
-
-- **CPU**: 8GB RAM sufficient for all case studies
-- **GPU**: 8GB VRAM sufficient (tested on NVIDIA A100, RTX 3090)
-
-### GPU Setup
-
-For GPU execution, use `-cuda` environments:
-```bash
-pixi run -e faircoin-cuda python -m examples.faircoin.main ...
-pixi run -e curvefit-cuda python -m examples.curvefit.main paper
-pixi run -e gol-cuda gol-paper
-pixi run -e localization-cuda python -m examples.localization.main paper ...
-```
-
----
 
 ## Generated Figures
 
