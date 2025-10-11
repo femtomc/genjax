@@ -8,7 +8,7 @@
 
 ## What is GenJAX?
 
-This research branch powers the POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*. Throughout the paper we use the anonymized name **VPPL**, but VPPL and GenJAX refer to the same system.
+This research branch powers the POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*.
 
 ### **Probabilistic Programming Language**
 
@@ -33,15 +33,6 @@ GenJAX provides:
 
 All of GenJAX's automation is fully compatible with JAX, implying that any program written in GenJAX can be `vmap`'d and `jit` compiled.
 
-## 🤖 Working with AI Coding Agents
-
-This repository is optimized for collaboration with AI coding agents. The codebase includes comprehensive `AGENTS.md` files that provide the contextual grounding these tools need to operate safely and effectively within GenJAX.
-
-## POPL'26 Artifact Overview
-
-- **Terminology**  GenJAX ≡ VPPL (the paper name). Whenever you see VPPL in the POPL submission, read it as GenJAX in this repository.
-- **Placement**  This directory lives inside the artifact root (`..`). Consult `../README.md` for paper build commands; use the instructions below when you are working directly with GenJAX.
-
 ## Environment Setup
 
 1. Install [pixi](https://pixi.sh/) (only prerequisite).
@@ -58,11 +49,7 @@ Run these commands from the artifact root to confirm the toolchain works end-to-
 
 ```bash
 # Compile the POPL paper (checks LaTeX toolchain)
-pixi run paper
-
-# Lightweight fair-coin benchmark smoke test
-pixi run --manifest-path genjax/pyproject.toml -e faircoin \
-  python -m examples.faircoin.main --combined --num-obs 20 --num-samples 200 --repeats 10
+pixi run paper-figures
 ```
 
 Both commands should finish without errors. The smoke test writes PDFs to `genjax/examples/faircoin/figs/`.
