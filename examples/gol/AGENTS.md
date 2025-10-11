@@ -1,6 +1,6 @@
-# CLAUDE.md - Game of Life Case Study
+# AGENTS.md - Game of Life Case Study
 
-This file provides guidance to Claude Code when working with the Game of Life (GoL) inference case study.
+This file provides guidance to AI coding agents when working with the Game of Life (GoL) inference case study.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The Game of Life case study demonstrates probabilistic inference for Conway's Ga
 
 ```
 examples/gol/
-├── CLAUDE.md           # This file - guidance for Claude Code
+├── AGENTS.md           # This file - guidance for AI coding agents
 ├── core.py             # Game of Life model, Gibbs sampler, and animation utilities
 ├── data.py             # Test patterns and image loading utilities
 ├── figs.py             # Timing benchmarks and figure generation

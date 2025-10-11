@@ -1,4 +1,4 @@
-# CLAUDE.md - GenJAX Visualization Module
+# AGENTS.md - GenJAX Visualization Module
 
 This module provides visualization utilities for GenJAX, focusing on statistical visualizations for probabilistic programming applications.
 

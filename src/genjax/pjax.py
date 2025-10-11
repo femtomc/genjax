@@ -74,7 +74,7 @@ Technical Details:
 
 References:
     - JAX Primitives: https://jax.readthedocs.io/en/latest/notebooks/How_JAX_primitives_work.html
-    - GenJAX Documentation: See src/genjax/CLAUDE.md for PJAX usage patterns
+    - GenJAX Documentation: See src/genjax/AGENTS.md for PJAX usage patterns
 """
 
 import itertools as it

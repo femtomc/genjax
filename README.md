@@ -31,6 +31,6 @@ GenJAX provides:
 
 All of GenJAX's automation is fully compatible with JAX, implying that any program written in GenJAX can be `vmap`'d and `jit` compiled.
 
-## 🤖 Using Claude Code with GenJAX
+## 🤖 Working with AI Coding Agents
 
-This repository is optimized for development with [Claude Code](https://claude.ai/code), Anthropic's AI coding assistant. The codebase includes comprehensive `CLAUDE.md` files that provide context and guidance for Claude Code to work effectively with GenJAX.
+This repository is optimized for collaboration with AI coding agents. The codebase includes comprehensive `AGENTS.md` files that provide the contextual grounding these tools need to operate safely and effectively within GenJAX.

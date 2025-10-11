@@ -6,9 +6,9 @@ This guide covers the core GenJAX concepts implemented in:
 - `pjax.py`: Probabilistic JAX (PJAX) primitives and interpreters
 - `state.py`: State inspection interpreter
 
-**For inference algorithms**, see `inference/CLAUDE.md`
-**For gradient estimation**, see `adev/CLAUDE.md`
-**For testing utilities**, see `extras/CLAUDE.md`
+**For inference algorithms**, see `inference/AGENTS.md`
+**For gradient estimation**, see `adev/AGENTS.md`
+**For testing utilities**, see `extras/AGENTS.md`
 
 ## Core Concepts
 

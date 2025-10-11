@@ -1,14 +1,16 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This note briefs AI coding agents that assist with the POPL 2026 paper artifact “Probabilistic Programming with Vectorized Programmable Inference.” Use it as the starting point before touching any files so the documentation, figures, and experiments stay aligned with the submission package.
+
+Terminology: within the POPL submission the system is called VPPL; inside this repository we continue to use the GenJAX name. They refer to the same implementation.
 
 ## 🔥 CRITICAL: Initial Context Loading
 
-When starting work in this codebase, ALWAYS read the relevant CLAUDE.md files first:
-1. **Core concepts**: Read `src/genjax/CLAUDE.md` for GenJAX fundamentals
-2. **Inference algorithms**: Read `src/genjax/inference/CLAUDE.md` for MCMC, SMC, VI
-3. **ADEV**: Read `src/genjax/adev/CLAUDE.md` for unbiased gradient estimation
-4. **Module-specific**: Check for CLAUDE.md in any directory you're working in
+When starting work in this codebase, ALWAYS read the relevant AGENTS.md files first:
+1. **Core concepts**: Read `src/genjax/AGENTS.md` for GenJAX fundamentals
+2. **Inference algorithms**: Read `src/genjax/inference/AGENTS.md` for MCMC, SMC, VI
+3. **ADEV**: Read `src/genjax/adev/AGENTS.md` for unbiased gradient estimation
+4. **Module-specific**: Check for AGENTS.md in any directory you're working in
 
 ## Overview
 
@@ -20,7 +22,7 @@ GenJAX is a probabilistic programming language embedded in Python centered on pr
 - **Optional Parameters**: `transition_proposal` and `mcmc_kernel` are now optional in `rejuvenation_smc`
 - **Simplified Usage**: Can use model's internal proposal without custom proposals
 - **Backwards Compatible**: All existing code continues to work unchanged
-- **Improved Documentation**: See `src/genjax/inference/CLAUDE.md` for updated API examples
+- **Improved Documentation**: See `src/genjax/inference/AGENTS.md` for updated API examples
 - **Case Study Update**: Localization example now demonstrates simplified usage pattern
 - **Simplified SMC**: Removed diagnostic weights to focus on core SMC functionality
 
@@ -110,7 +112,7 @@ genjax/
 ## Development Workflow
 
 ### 1. Explore
-- Read relevant CLAUDE.md files first (see Initial Context Loading above)
+- Read relevant AGENTS.md files first (see Initial Context Loading above)
 - **HIGH PRIORITY**: Check existing tests and examples for usage patterns
   - `tests/` for API usage and edge cases
   - `examples/` for implementation patterns
@@ -152,8 +154,8 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 ### Documentation
 - **NEVER create documentation files** unless explicitly requested
 - Add paper/website references to `REFERENCES.md` in module directory
-- Keep CLAUDE.md files focused on their specific module
-- Cross-reference related CLAUDE.md files explicitly
+- Keep AGENTS.md files focused on their specific module
+- Cross-reference related AGENTS.md files explicitly
 
 ### Communication
 - Be concise - avoid unnecessary elaboration
@@ -161,13 +163,13 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 - Don't commit partial/broken solutions
 
 ### Examples and Case Studies
-- Follow standardized structure in `examples/CLAUDE.md`
+- Follow standardized structure in `examples/AGENTS.md`
 - Use `examples.utils` for shared functionality
 - See existing examples for patterns before implementing
 
-### Documentation Style for CLAUDE.md Files
+### Documentation Style for AGENTS.md Files
 
-When working with CLAUDE.md files in the codebase:
+When working with AGENTS.md files in the codebase:
 
 - **Use method signatures and file references** instead of raw code blocks
 - **Format**: `**Function**: name(params) -> return_type`
@@ -182,7 +184,7 @@ This approach ensures documentation stays in sync with the codebase and reduces 
 
 - Before any commit: `pixi run format` → `pixi run precommit-run` → `git add .` → commit
 - Use `pixi run test-all` for comprehensive validation (tests + doctests)
-- Each module has a CLAUDE.md file - always read it before working in that module
+- Each module has a AGENTS.md file - always read it before working in that module
 
 ## Development Commands
 

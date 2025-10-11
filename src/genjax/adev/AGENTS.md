@@ -1,9 +1,9 @@
-# adev/CLAUDE.md
+# adev/AGENTS.md
 
-This file provides guidance for Claude Code when working with GenJAX's Automatic Differentiation of Expected Values (ADEV) module.
+This file provides guidance for AI coding agents when working with GenJAX's Automatic Differentiation of Expected Values (ADEV) module.
 
-**For core GenJAX concepts**, see `../CLAUDE.md`
-**For inference algorithms using ADEV**, see `../inference/CLAUDE.md`
+**For core GenJAX concepts**, see `../AGENTS.md`
+**For inference algorithms using ADEV**, see `../inference/AGENTS.md`
 **For academic references**, see `REFERENCES.md`
 
 ## Overview
@@ -15,7 +15,7 @@ The `adev` module provides automatic differentiation capabilities specifically d
 ```
 src/genjax/adev/
 ├── __init__.py          # Main ADEV implementation (moved from adev.py)
-├── CLAUDE.md           # This file
+├── AGENTS.md           # This file
 └── REFERENCES.md       # Academic references
 ```
 

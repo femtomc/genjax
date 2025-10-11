@@ -1,6 +1,6 @@
-# CLAUDE.md - Examples Directory Standards
+# AGENTS.md - Examples Directory Standards
 
-This file provides guidance to Claude Code when working with case studies in the `examples/` directory.
+This file provides guidance to AI coding agents when working with case studies in the `examples/` directory.
 
 ## HIGH PRIORITY: Usage Pattern Reference
 
@@ -41,7 +41,7 @@ Every case study MUST follow this exact directory structure:
 
 ```
 examples/{case_study_name}/
-├── CLAUDE.md           # Case study guidance for Claude Code (REQUIRED)
+├── AGENTS.md           # Case study guidance for AI coding agents (REQUIRED)
 ├── README.md           # User documentation (optional, create only if requested)
 ├── __init__.py         # Python package marker (optional)
 ├── main.py             # CLI entry point (REQUIRED)
@@ -58,9 +58,9 @@ examples/{case_study_name}/
 
 ## File Responsibilities
 
-### `CLAUDE.md` (REQUIRED)
+### `AGENTS.md` (REQUIRED)
 
-- **Purpose**: Provides Claude Code with case study-specific guidance
+- **Purpose**: Provides AI coding agents with case study-specific guidance
 - **Template**: Follow the pattern established in existing case studies
 - **Sections**: Overview, Directory Structure, Code Organization, Key Implementation Details, Usage Patterns, Development Guidelines
 - **Critical**: Must document model specifications, data patterns, and performance expectations
@@ -478,7 +478,7 @@ data/experiment_YYYYMMDD_HHMMSS/
 
 When creating or modifying case studies:
 
-### 1. **Read existing CLAUDE.md**
+### 1. **Read existing AGENTS.md**
 
 - Understand case study-specific patterns and constraints
 - Follow established model specifications and data patterns
@@ -488,7 +488,7 @@ When creating or modifying case studies:
 - Create all required files (`main.py`, `core.py`, `data.py`, `figs.py`)
 - Create `figs/` directory for outputs
 - Consider adding `export.py` and `data/` for complex experiments
-- Write comprehensive `CLAUDE.md` with case study guidance
+- Write comprehensive `AGENTS.md` with case study guidance
 
 ### 3. **Implement consistent patterns**
 
@@ -506,7 +506,7 @@ When creating or modifying case studies:
 
 ### 5. **Document properly**
 
-- Update case study `CLAUDE.md` with implementation details
+- Update case study `AGENTS.md` with implementation details
 - Document data export format in `data/README.md` if applicable
 - Document any special requirements or dependencies
 
@@ -545,12 +545,12 @@ When creating or modifying case studies:
 1. Create directory structure following the standard format
 2. Implement all required files with proper patterns
 3. Add pixi task integration to top-level `pyproject.toml`
-4. Write comprehensive `CLAUDE.md` following existing examples
+4. Write comprehensive `AGENTS.md` following existing examples
 5. Test thoroughly across all supported modes
 
 ### Modifying Existing Case Studies
 
-1. Read the case study's `CLAUDE.md` for specific guidance
+1. Read the case study's `AGENTS.md` for specific guidance
 2. Maintain backward compatibility with existing CLI arguments
 3. Follow established model specifications and data patterns
 4. Update documentation to reflect any changes

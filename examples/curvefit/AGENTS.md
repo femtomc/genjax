@@ -1,6 +1,6 @@
-# CLAUDE.md - Curve Fitting Case Study
+# AGENTS.md - Curve Fitting Case Study
 
-This file provides guidance to Claude Code when working with the curve fitting case study that demonstrates Bayesian inference for polynomial regression.
+This file provides guidance to AI coding agents when working with the curve fitting case study that demonstrates Bayesian inference for polynomial regression.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The curvefit case study showcases Bayesian curve fitting using GenJAX, demonstra
 
 ```
 examples/curvefit/
-├── CLAUDE.md           # This file - guidance for Claude Code
+├── AGENTS.md           # This file - guidance for AI coding agents
 ├── README.md           # User documentation (if present)
 ├── main.py             # Main script to generate all figures
 ├── core.py             # Model definitions and inference functions

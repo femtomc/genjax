@@ -1,4 +1,4 @@
-# CLAUDE.md - Localization Case Study
+# AGENTS.md - Localization Case Study
 
 Probabilistic robot localization using particle filtering with GenJAX. Demonstrates SMC with MCMC rejuvenation, vectorized LIDAR sensing, and drift-only dynamics for improved convergence.
 

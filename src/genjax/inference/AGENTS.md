@@ -1,6 +1,6 @@
-# inference/CLAUDE.md
+# inference/AGENTS.md
 
-This file provides guidance for Claude Code when working with the GenJAX inference algorithms module.
+This file provides guidance for AI coding agents when working with the GenJAX inference algorithms module.
 
 ## Overview
 
@@ -14,7 +14,7 @@ src/genjax/inference/
 ├── mcmc.py             # Markov Chain Monte Carlo algorithms
 ├── smc.py              # Sequential Monte Carlo algorithms
 ├── vi.py               # Variational Inference algorithms
-└── CLAUDE.md           # This file
+└── AGENTS.md           # This file
 ```
 
 ## MCMC Algorithms (`mcmc.py`)
@@ -492,7 +492,7 @@ See `examples/localization/core.py` for a complete implementation using 15×15×
 
 **API Contract**:
 - Returns function: `(variational_params, target_args, constraints, n_samples) -> float`
-- `estimator_mapping` specifies gradient estimators (see `adev/CLAUDE.md`)
+- `estimator_mapping` specifies gradient estimators (see `adev/AGENTS.md`)
 - Computes variational lower bound on log marginal likelihood
 - Result is differentiable w.r.t. variational parameters
 

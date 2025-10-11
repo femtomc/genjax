@@ -1,9 +1,9 @@
-# extras/CLAUDE.md
+# extras/AGENTS.md
 
-This file provides guidance for Claude Code when working with the GenJAX extras module.
+This file provides guidance for AI coding agents when working with the GenJAX extras module.
 
-**For core GenJAX concepts**, see `../CLAUDE.md`
-**For inference algorithms to test**, see `../inference/CLAUDE.md`
+**For core GenJAX concepts**, see `../AGENTS.md`
+**For inference algorithms to test**, see `../inference/AGENTS.md`
 
 ## Overview
 
@@ -15,7 +15,7 @@ The `extras` module contains additional functionality that builds on GenJAX core
 src/genjax/extras/
 ├── __init__.py          # Module exports
 ├── state_space.py       # State space models with exact inference
-└── CLAUDE.md           # This file
+└── AGENTS.md           # This file
 ```
 
 ## State Space Models (`state_space.py`)

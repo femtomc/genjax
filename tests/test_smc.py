@@ -1391,7 +1391,7 @@ class TestRejuvenationSMC:
             f"Final error {final_error:.6f} should be reasonable for continuous state space"
         )
 
-        # Test convergence properties following CLAUDE.md guidelines
+        # Test convergence properties following AGENTS.md guidelines
         print("\nLinear Gaussian SMC convergence test:")
         print(f"Exact log marginal (Kalman): {exact_log_marginal:.6f}")
         for i, (n, error) in enumerate(zip(sample_sizes, errors)):

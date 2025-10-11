@@ -1,6 +1,6 @@
-# tests/CLAUDE.md
+# tests/AGENTS.md
 
-This file provides guidance for Claude Code when working with the GenJAX test suite.
+This file provides guidance for AI coding agents when working with the GenJAX test suite.
 
 ## Test Structure
 

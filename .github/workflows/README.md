@@ -13,7 +13,7 @@ Automatically reviews PRs when they are opened or updated, or when explicitly tr
 - Manual trigger: Comment `/claude review` on any PR
 
 **Features:**
-- Reads CLAUDE.md files for context
+- Reads AGENTS.md files for context
 - Reviews code changes for correctness, performance, and style
 - Checks JAX best practices
 - Adds labels based on review findings

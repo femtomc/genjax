@@ -1,6 +1,6 @@
-# CLAUDE.md - Fair Coin Case Study
+# AGENTS.md - Fair Coin Case Study
 
-This file provides guidance to Claude Code when working with the fair coin (Beta-Bernoulli) timing comparison case study.
+This file provides guidance to AI coding agents when working with the fair coin (Beta-Bernoulli) timing comparison case study.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The fair coin case study demonstrates probabilistic programming framework perfor
 
 ```
 examples/faircoin/
-├── CLAUDE.md           # This file - guidance for Claude Code
+├── AGENTS.md           # This file - guidance for AI coding agents
 ├── README.md           # User documentation
 ├── __init__.py         # Python package marker
 ├── core.py             # Model definitions and timing functions
