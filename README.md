@@ -6,6 +6,27 @@
 
 > **Note**: This is the research version of GenJAX. A [(more stable) community version can be found here](https://github.com/genjax-community/genjax).
 
+## About GenJAX
+
+### **Probabilistic Programming Language**
+
+GenJAX is a probabilistic programming language (PPL): a system which provides automation for writing programs which perform computations on probability distributions, including sampling, variational approximation, gradient estimation for expected values, and more.
+
+### **With Programmable Inference**
+
+The design of GenJAX is centered on _programmable inference_: automation which allows users to express and customize Bayesian inference algorithms (algorithms for computing with posterior distributions: "_x_ affects _y_, and I observe _y_, what are my new beliefs about _x_?"). Programmable inference includes advanced forms of Monte Carlo and variational inference methods.
+
+### **Core Concepts**
+
+GenJAX's automation is based on two key concepts:
+- **_Generative functions_** – GenJAX's version of probabilistic programs
+- **_Traces_** – samples from probabilistic programs
+
+GenJAX provides:
+
+- **Modeling language automation** for constructing complex probability distributions from pieces
+- **Inference automation** for constructing Monte Carlo samplers using convenient idioms (programs expressed by creating and editing traces), and [variational inference automation](https://dl.acm.org/doi/10.1145/3656463) using [new extensions to automatic differentation for expected values](https://dl.acm.org/doi/10.1145/3571198)
+
 ## POPL 2026 Artifact
 
 This research branch powers the POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*. It contains the GenJAX implementation and all case studies used in the empirical evaluation.
@@ -17,9 +38,6 @@ This research branch powers the POPL'26 artifact submitted alongside the paper *
 - [Case Study Details](#case-study-details)
 - [CPU vs GPU Execution](#cpu-vs-gpu-execution)
 - [Generated Figures](#generated-figures)
-- [About GenJAX](#about-genjax)
-
----
 
 ## Quick Example
 
@@ -27,7 +45,7 @@ Here's a simple curve fitting model showing how to write importance sampling usi
 
 ```python
 from genjax import gen, normal
-from genjax.pjax import modular_vmap
+from genjax.pjax import modular_vmap as vmap
 import jax.numpy as jnp
 
 # Define a generative model for polynomial curve fitting
@@ -65,8 +83,9 @@ def importance_sampling(model, args, observations, n_particles):
         trace, log_weight = model.generate(observations, *args)
         return trace, log_weight
 
-    # Vectorize over particles - modular_vmap handles seeding automatically
-    vectorized = modular_vmap(single_particle, in_axes=(), axis_size=n_particles)
+    # Vectorize over particles - our vmap handles probabilistic sampling correctly
+    # automatically
+    vectorized = vmap(single_particle, in_axes=(), axis_size=n_particles)
 
     return vectorized()
 
@@ -83,10 +102,8 @@ This example shows:
 - **Generative functions** with `@gen` decorator
 - **Named random choices** with `@` operator (e.g., `@ "a"`)
 - **Composable vectorization** with `.vmap()` on generative functions
-- **Programmable inference** using the `generate()` interface
+- **Programmable inference** write inference using generative function interface (here, the `generate()` interface)
 - **modular_vmap** for vectorizing inference (handles seeding automatically)
-
----
 
 ## Getting Started
 
@@ -261,48 +278,3 @@ All figures are saved to `genjax/figs/`:
 ### Localization
 - `localization_r8_p200_basic_localization_problem_1x4_explanation.pdf` - Problem setup
 - `localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf` - SMC method comparison
-
----
-
-## About GenJAX
-
-### **Probabilistic Programming Language**
-
-GenJAX is a probabilistic programming language (PPL): a system which provides automation for writing programs which perform computations on probability distributions, including sampling, variational approximation, gradient estimation for expected values, and more.
-
-### **With Programmable Inference**
-
-The design of GenJAX is centered on _programmable inference_: automation which allows users to express and customize Bayesian inference algorithms (algorithms for computing with posterior distributions: "_x_ affects _y_, and I observe _y_, what are my new beliefs about _x_?"). Programmable inference includes advanced forms of Monte Carlo and variational inference methods.
-
-### **Core Concepts**
-
-GenJAX's automation is based on two key concepts:
-- **_Generative functions_** – GenJAX's version of probabilistic programs
-- **_Traces_** – samples from probabilistic programs
-
-GenJAX provides:
-
-- **Modeling language automation** for constructing complex probability distributions from pieces
-- **Inference automation** for constructing Monte Carlo samplers using convenient idioms (programs expressed by creating and editing traces), and [variational inference automation](https://dl.acm.org/doi/10.1145/3656463) using [new extensions to automatic differentation for expected values](https://dl.acm.org/doi/10.1145/3571198)
-
-### **Fully Vectorized & Compatible with JAX**
-
-All of GenJAX's automation is fully compatible with JAX, implying that any program written in GenJAX can be `vmap`'d and `jit` compiled.
-
-### System Architecture
-
-```
-src/genjax/          # Core library implementation
-├── core/            # Generative functions, traces, combinators
-├── inference/       # Inference algorithms (IS, MCMC, SMC)
-├── distributions/   # Probability distributions
-└── viz/             # Visualization utilities
-
-examples/            # Case studies
-├── faircoin/        # Beta-Bernoulli conjugate inference
-├── curvefit/        # Polynomial regression with outliers
-├── gol/             # Game of Life inverse dynamics
-└── localization/    # Robot particle filter localization
-
-tests/               # Test suite
-```
