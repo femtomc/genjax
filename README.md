@@ -97,13 +97,13 @@ Key things to pay attention to:
 - **Define generative functions** with `@gen` decorator
 - **Syntactical abstraction for named random choices** with `@` operator (e.g., `@ "a"`)
 - **Composable vectorization** with `.vmap()` on generative functions, and `genjax.vmap` on probabilistic computations.
-- **Each of the above supports vectorized programmable inference** write inference using generative function interface (here, the `generate()` interface)
+- **Each of the above supports vectorized programmable inference** write vectorizable inference algorithms using generative function interface (here, the `generate()` interface)
 
 ## Getting Started
 
 ### Prerequisites
 
-Install [pixi](https://pixi.sh/) (package manager). That's it.
+Install [pixi](https://pixi.sh/) (package manager, which will allow you to build and run the case studies).
 
 ### Setup
 
