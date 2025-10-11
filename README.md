@@ -117,7 +117,8 @@ This creates isolated conda environments for each case study.
 ## Reproducing Paper Figures
 
 All the figures except for the multi-system benchmarking figure are provided by the commands below.
-Generate several of the case study paper figures with a single command:
+
+To generate several of the case study paper figures, use the following commands:
 
 ```bash
 # CPU execution
@@ -132,6 +133,8 @@ All figures are saved to `genjax/figs/`:
 - 5 curvefit figures
 - 2 GOL figures
 - 2 localization figures
+
+Note that, on CPU only, some of the figures may be missing comparisons between CPU and GPU.
 
 ## Case Study Details
 
