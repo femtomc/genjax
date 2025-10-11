@@ -12,17 +12,7 @@ from typing import List
 
 from . import core
 from .data import (
-    get_blinker_4x4,
     get_blinker_n,
-    get_mit_logo,
-    get_popl_logo,
-    get_small_mit_logo,
-    get_small_popl_logo,
-    get_popl_logo_white_lambda,
-    get_small_popl_logo_white_lambda,
-    get_hermes_logo,
-    get_small_hermes_logo,
-    get_wizards_logo,
     get_small_wizards_logo,
 )
 from genjax.timing import benchmark_with_warmup
