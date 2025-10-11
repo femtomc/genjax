@@ -32,7 +32,6 @@ This repository is also a POPL'26 artifact submitted alongside the paper *Probab
 - [Getting Started](#getting-started)
 - [Reproducing All Paper Figures](#reproducing-all-paper-figures)
 - [Case Study Details](#case-study-details)
-- [CPU vs GPU Execution](#cpu-vs-gpu-execution)
 - [Generated Figures](#generated-figures)
 
 ## Quick Example
@@ -185,7 +184,7 @@ pixi run -e gol gol-paper
 
 ### 4. Robot Localization with SMC
 
-**What it does**: Particle filter localization comparing bootstrap filter, SMC+HMC, and locally optimal proposals using 200 particles and 8-ray LIDAR.
+**What it does**: Particle filter localization comparing bootstrap filter, SMC+HMC, and approximate (using grid enumeration) locally optimal proposals with 200 particles and a generative model with a simulated 8-ray LIDAR measurement.
 
 **Command**:
 ```bash
@@ -199,7 +198,6 @@ pixi run -e localization python -m examples.localization.main paper \
 - `localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf`
 
 **Note**: Also generates experimental data in `examples/localization/data/` (regenerated each run).
-
 
 ## Generated Figures
 
