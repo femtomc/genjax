@@ -98,16 +98,6 @@ def save_blinker_gibbs_figure(
     print(f"Saved monitoring: {monitoring_filename}")
     print(f"Saved samples: {samples_filename}")
 
-    # Also save with legacy names for compatibility
-    monitoring_fig.savefig(
-        "figs/gibbs_on_blinker_monitoring.pdf",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    samples_fig.savefig(
-        "figs/gibbs_on_blinker_samples.pdf", dpi=300, bbox_inches="tight"
-    )
-
 
 def save_logo_gibbs_figure(
     chain_length: int = 250,
@@ -172,18 +162,6 @@ def save_logo_gibbs_figure(
 
     print(f"Saved monitoring: {monitoring_filename}")
     print(f"Saved samples: {samples_filename}")
-
-    # Also save with legacy names for compatibility
-    monitoring_fig.savefig(
-        f"figs/gibbs_on_logo_monitoring_{chain_length}.pdf",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    samples_fig.savefig(
-        f"figs/gibbs_on_logo_samples_{chain_length}.pdf",
-        dpi=300,
-        bbox_inches="tight",
-    )
 
 
 def _gibbs_task(n: int, chain_length: int, flip_prob: float, seed: int):
@@ -295,16 +273,6 @@ def save_timing_scaling_figure(
     filename = f"figs/gol_performance_scaling_analysis_{device_suffix}_chain{chain_length}_flip{flip_prob:.3f}.pdf"
     save_publication_figure(fig, filename)
     print(f"\nSaved: {filename}")
-
-    # Also save with legacy names for compatibility
-    if device in ["cpu", "both"]:
-        fig.savefig(
-            "figs/timing_scaling_cpu.pdf", dpi=300, bbox_inches="tight"
-        )
-    if device in ["gpu", "both"] and jax.devices("gpu"):
-        fig.savefig(
-            "figs/timing_scaling_gpu.pdf", dpi=300, bbox_inches="tight"
-        )
 
 
 # =====================================================================
