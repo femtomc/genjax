@@ -1,10 +1,5 @@
 import argparse
-from .figs import (
-    save_blinker_gibbs_figure,
-    save_logo_gibbs_figure,
-    save_timing_scaling_figure,
-    save_all_showcase_figures,
-)
+from .figs import save_all_showcase_figures
 
 
 def main():

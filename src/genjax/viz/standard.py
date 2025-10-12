@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 GenJAX Research Visualization Standards (GRVS)
 
@@ -18,7 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator
 import numpy as np
-from typing import Dict, Tuple, Optional, Any
+from typing import Optional, Any
 
 # =============================================================================
 # FIGURE SIZES - Standardized dimensions for LaTeX integration
@@ -414,7 +416,7 @@ def create_method_legend(methods: list, filename: Optional[str] = None) -> plt.F
 # CONVENIENCE FUNCTIONS FOR COMMON PATTERNS
 # =============================================================================
 
-def setup_comparison_plot(figsize_key: str = "framework_comparison") -> Tuple[plt.Figure, plt.Axes]:
+def setup_comparison_plot(figsize_key: str = "framework_comparison") -> tuple[plt.Figure, plt.Axes]:
     """Setup figure for method comparison with GRVS standards.
     
     Args:
@@ -493,7 +495,7 @@ def finalize_comparison_plot(ax, xlabel: str, ylabel: str,
 # VALIDATION FUNCTIONS
 # =============================================================================
 
-def validate_grvs_compliance(fig) -> Dict[str, bool]:
+def validate_grvs_compliance(fig) -> dict[str, bool]:
     """Check if figure follows GRVS standards.
     
     Args:

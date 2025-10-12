@@ -30,8 +30,7 @@ examples/localization/
 ├── figs.py             # Visualization (4-row SMC comparison, error plots)
 ├── main.py             # CLI with data export/import
 ├── export.py           # CSV data export/import system
-├── data/               # Experimental data (CSV + JSON metadata)
-└── figs/               # Generated PDF plots
+└── data/               # Experimental data (CSV + JSON metadata)
 ```
 
 ## Core Implementation
@@ -93,6 +92,8 @@ data/localization_r{rays}_p{particles}_{world_type}_{timestamp}/
 - **Ground truth**: `save_ground_truth_data()`, `load_ground_truth_data()`
 
 ## Visualization (`figs.py`)
+
+Figures are saved to the repository-level `figs/` directory by default (configurable via `--output-dir`). Create it first (`mkdir -p figs`) or pass an absolute output directory; no case-local `figs/` directory lives under `examples/localization/`.
 
 ### GenJAX Research Visualization Standards (GRVS)
 

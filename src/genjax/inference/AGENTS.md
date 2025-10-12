@@ -198,6 +198,7 @@ from genjax.inference import ParticleCollection
 # ParticleCollection attributes:
 # - traces: Vectorized trace containing all particles
 # - log_weights: Log importance weights for each particle
+# - diagnostic_weights: Log-normalized weights captured before resampling (for ESS tracking, plotting)
 # - n_samples: Number of particles (static)
 # - log_marginal_estimate: Accumulated log marginal likelihood
 
@@ -316,7 +317,7 @@ particles = resample(particles, method="systematic")
 
 #### Rejuvenation SMC
 **Function**: `rejuvenation_smc(model, transition_proposal=None, mcmc_kernel=None, observations, initial_model_args, n_particles, return_all_particles, n_rejuvenation_moves) -> ParticleCollection`
-**Location**: `smc.py:540-643`
+**Location**: `smc.py:665-780`
 **Purpose**: Full SMC algorithm with automatic resampling and rejuvenation
 
 **API Contract**:
@@ -396,7 +397,7 @@ final_particles = rejuvenation_smc(
 - **Valid**: Identity (`lambda x: x`), key remapping
 - **Invalid**: Value modification, arithmetic operations
 - Must be bijective on address space
-- See `change` docstring in `smc.py:290-310` for detailed specs
+- See `change` docstring in `smc.py:360-418` for detailed specs
 
 ### Locally Optimal Proposals
 

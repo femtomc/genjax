@@ -146,21 +146,6 @@ def jitted_hmm_ops(jit_compiler):
     return ops
 
 
-# GP-specific JIT fixtures
-@pytest.fixture(scope="module")
-def jitted_gp_ops(jit_compiler):
-    """Pre-compiled Gaussian Process operations."""
-    ops = {}
-
-    # We'll add GP-specific JIT operations here when needed
-    # For example:
-    # - Kernel evaluations
-    # - Cholesky decompositions
-    # - Posterior computations
-
-    return ops
-
-
 # Test timing utilities
 @pytest.fixture
 def timer():
