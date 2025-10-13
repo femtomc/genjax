@@ -210,7 +210,7 @@ pixi run -e localization python -m examples.localization.main paper \
 
 ## Generated Figures
 
-All figures are saved to `genjax/figs/`:
+All figures are saved to `figs/`:
 
 ### Faircoin
 - `faircoin_combined_posterior_and_timing_obs50_samples2000.pdf` - Framework comparison (timing + posterior accuracy)
