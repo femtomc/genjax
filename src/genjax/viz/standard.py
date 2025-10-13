@@ -369,10 +369,10 @@ def save_publication_figure(fig, filename: str, **kwargs):
     """
     save_kwargs = SAVE_SPECS.copy()
     save_kwargs.update(kwargs)
-    
+
     # Apply tight layout before saving
     fig.tight_layout()
-    
+
     # Save with publication settings
     fig.savefig(filename, **save_kwargs)
     
