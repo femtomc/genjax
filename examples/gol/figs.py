@@ -110,7 +110,7 @@ def save_showcase_figure(
 
 
 
-def save_timing_bar_plot(grid_sizes=[64, 128, 256, 512], chain_length=10, flip_prob=0.03, repeats=3):
+def save_timing_bar_plot(grid_sizes=[64, 128, 256, 512], chain_length=1, flip_prob=0.03, repeats=3):
     """
     Generate timing data and save the standalone timing bar plot.
 
@@ -128,10 +128,19 @@ def save_timing_bar_plot(grid_sizes=[64, 128, 256, 512], chain_length=10, flip_p
     # Run actual timing benchmarks
     print(f"  Benchmarking CPU at grid sizes: {grid_sizes}")
     cpu_times_ms = []
+    cpu_device = jax.devices('cpu')[0]
 
     for n in grid_sizes:
+        # Place data on CPU device BEFORE timing
+        target = jax.device_put(get_blinker_n(n), cpu_device)
+        key = jax.device_put(jrand.key(1), cpu_device)
+        sampler = core.GibbsSampler(target, flip_prob)
+
         def task_fn():
-            return _gibbs_task(n, chain_length, flip_prob, seed=1)
+            result = core.run_sampler_and_get_summary(
+                key, sampler, chain_length, 1
+            )
+            return result.predictive_posterior_scores[-1]
 
         _, (mean_time, std_time) = benchmark_with_warmup(
             task_fn,
@@ -152,20 +161,28 @@ def save_timing_bar_plot(grid_sizes=[64, 128, 256, 512], chain_length=10, flip_p
 
     if gpu_available:
         print(f"  Benchmarking GPU at grid sizes: {grid_sizes}")
-        with jax.default_device(jax.devices("gpu")[0]):
-            for n in grid_sizes:
-                def task_fn():
-                    return _gibbs_task(n, chain_length, flip_prob, seed=1)
+        gpu_device = jax.devices("gpu")[0]
+        for n in grid_sizes:
+            # Place data on GPU device BEFORE timing
+            target = jax.device_put(get_blinker_n(n), gpu_device)
+            key = jax.device_put(jrand.key(1), gpu_device)
+            sampler = core.GibbsSampler(target, flip_prob)
 
-                _, (mean_time, std_time) = benchmark_with_warmup(
-                    task_fn,
-                    warmup_runs=2,
-                    repeats=repeats,
-                    inner_repeats=1,
-                    auto_sync=True,
+            def task_fn():
+                result = core.run_sampler_and_get_summary(
+                    key, sampler, chain_length, 1
                 )
-                gpu_times_ms.append(mean_time * 1000)
-                print(f"    {n}×{n}: {mean_time*1000:.1f} ms")
+                return result.predictive_posterior_scores[-1]
+
+            _, (mean_time, std_time) = benchmark_with_warmup(
+                task_fn,
+                warmup_runs=2,
+                repeats=repeats,
+                inner_repeats=1,
+                auto_sync=True,
+            )
+            gpu_times_ms.append(mean_time * 1000)
+            print(f"    {n}×{n}: {mean_time*1000:.1f} ms")
 
     # Reverse order - smallest at top, largest at bottom
     sizes = list(reversed(grid_sizes))
@@ -345,7 +362,7 @@ def create_showcase_figure(
 
     # Create a 2x2 grid of inferred samples over entire chain
     n_samples = 4
-    sample_indices = jnp.linspace(0, chain_length - 1, n_samples, dtype=int)
+    sample_indices = jnp.round(jnp.linspace(0, chain_length - 1, n_samples)).astype(int)
 
     # Create subgrid for samples with padding
     inner_grid = gridspec.GridSpecFromSubplotSpec(

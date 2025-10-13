@@ -116,6 +116,8 @@ def get_gibbs_probs_fast(i, j, current_state, future_state, p_flip):
         a, b = i - next_y + 1, j - next_x + 1
         is_in_range = AND(AND(0 <= a, a < 3), AND(0 <= b, b < 3))
         val = jnp.where(is_in_range, val_at_ij, window[a, b])
+        # Ensure val matches window dtype to avoid scatter type warnings
+        val = val.astype(window.dtype)
         window = window.at[a, b].set(val)
         return window
 
@@ -147,7 +149,7 @@ def get_gibbs_probs_fast(i, j, current_state, future_state, p_flip):
         )(relevant_next_ys)
         return jnp.sum(jnp.where(mask, scores, 0))
 
-    scores = vmap(get_score_for_val)(jnp.array([0, 1]))
+    scores = vmap(get_score_for_val)(jnp.array([0, 1], dtype=jnp.int32))
 
     return softmax(scores)
 
@@ -374,7 +376,7 @@ def _setup_samples_grid(ax, frame_data, rollout_data, title_suffix=""):
     n_available = len(frame_data)
     if n_available >= 16:
         # Take samples evenly spaced across the timeline
-        indices = jnp.linspace(0, n_available - 1, 16, dtype=int)
+        indices = jnp.round(jnp.linspace(0, n_available - 1, 16)).astype(int)
     else:
         # Repeat samples if we don't have enough
         indices = jnp.tile(jnp.arange(n_available), (16 // n_available + 1))[:16]
@@ -609,7 +611,7 @@ def get_gol_figure_and_updater(
         n_available = len(frame_data)
         if n_available >= 16:
             # Take samples evenly spaced across the timeline
-            indices = jnp.linspace(0, n_available - 1, 16, dtype=int)
+            indices = jnp.round(jnp.linspace(0, n_available - 1, 16)).astype(int)
         else:
             # Repeat samples if we don't have enough
             indices = jnp.tile(jnp.arange(n_available), (16 // n_available + 1))[:16]
