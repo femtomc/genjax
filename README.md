@@ -96,10 +96,10 @@ print(f"Posterior mean for 'a': {jnp.mean(curve_a):.3f}")
 ```
 
 Key things to pay attention to:
-- **Define generative functions** with `@gen` decorator
-- **Syntactical abstraction for named random choices** with `@` operator (e.g., `@ "a"`)
+- **Define generative functions from Python functions** with `@gen` decorator
+- **Syntactical abstraction for named random choices** with `@` operator (e.g., `@ "a"`), this allows you to invoke other generative functions as callees.
 - **Composable vectorization** with `.vmap()` on generative functions, and `genjax.vmap` on probabilistic computations.
-- **Each of the above supports vectorized programmable inference** write vectorizable inference algorithms using generative function interface (here, the `generate()` interface)
+- **Each of the above works together to support vectorized programmable inference** write vectorizable inference algorithms using generative function interface (here, the `generate()` interface)
 
 ## Getting Started
 
@@ -142,7 +142,7 @@ Note that, on CPU only, some of the figures may be missing comparisons between C
 
 Here, we provide more details on the case studies. Each case study directory also contains a `README.md` file with more information.
 
-### 1. Fair Coin (Beta-Bernoulli)
+### Fair Coin (Beta-Bernoulli)
 
 **What it does**: Compares GenJAX, handcoded JAX, and NumPyro on a simple conjugate inference problem.
 
@@ -154,7 +154,7 @@ pixi run -e faircoin python -m examples.faircoin.main \
 
 **Outputs**: `figs/combined_3x2_obs50_samples2000.pdf`
 
-### 2. Curve Fitting with Outlier Detection
+### Curve Fitting with Outlier Detection
 
 **What it does**: Polynomial regression with robust outlier detection, demonstrating:
 - Importance sampling with varying particle counts
@@ -172,7 +172,7 @@ pixi run -e curvefit python -m examples.curvefit.main paper
 - `curvefit_posterior_scaling_combined.pdf`
 - `curvefit_outlier_detection_comparison.pdf`
 
-### 3. Game of Life Inverse Dynamics
+### Game of Life Inverse Dynamics
 
 **What it does**: Infers past Game of Life states from observed future states using Gibbs sampling on a 512×512 grid with 250 Gibbs steps.
 
@@ -187,7 +187,7 @@ pixi run -e gol gol-paper
 
 **Note**: Timing bar plot runs benchmarks at 64×64, 128×128, 256×256, and 512×512 grid sizes.
 
-### 4. Robot Localization with SMC
+### Robot Localization with SMC
 
 **What it does**: Particle filter localization comparing bootstrap filter, SMC+HMC, and approximate (using grid enumeration) locally optimal proposals with 200 particles and a generative model with a simulated 8-ray LIDAR measurement.
 
