@@ -42,36 +42,53 @@ It contains the GenJAX implementation (including source code and tests), extensi
 
 ## Quick Example
 
-This example follows the curve fitting workflow: define quadratic generative functions, simulate data with explicit PRNG keys, and run vectorized importance sampling.
+This example follows the curve fitting workflow: define quadratic generative functions, simulate a dataset with explicit PRNG keys, run vectorized importance sampling, and finally add a stochastic branching model with a mixed Gibbs/HMC kernel.
 
 ### 1. Define the model
-We compose three generative functions: `polynomial` samples quadratic coefficients, `point` emits a noisy observation, and `npoint_curve` maps `point` across an input vector using traced-aware `.vmap()`.
+We reuse the curvefit case study definitions: `polynomial` draws quadratic coefficients, `point` emits a noisy observation, and `npoint_curve` maps `point` across an input array using traced-aware `.vmap()`.
 
 ```python
 import jax.numpy as jnp
-from genjax import gen, normal
+from genjax import gen, normal, Pytree
+from genjax.core import Const
+
+@Pytree.dataclass
+class Lambda(Pytree):
+    f: Const[callable]
+    dynamic_vals: jnp.ndarray
+    static_vals: Const[tuple] = Const(())
+
+    def __call__(self, *x):
+        return self.f.value(*x, *self.static_vals.value, self.dynamic_vals)
+
+
+def polyfn(x, coeffs):
+    return coeffs[0] + coeffs[1] * x + coeffs[2] * x**2
+
 
 @gen
 def polynomial():
     a = normal(0.0, 1.0) @ "a"
     b = normal(0.0, 1.0) @ "b"
     c = normal(0.0, 1.0) @ "c"
-    return jnp.array([a, b, c])
+    return Lambda(Const(polyfn), jnp.array([a, b, c]))
+
 
 @gen
-def point(x, coeffs):
-    y_det = coeffs[0] + coeffs[1] * x + coeffs[2] * x**2
+def point(x, curve):
+    y_det = curve(x)
     return normal(y_det, 0.05) @ "obs"
+
 
 @gen
 def npoint_curve(xs):
-    coeffs = polynomial() @ "curve"
-    ys = point.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
-    return coeffs, (xs, ys)
+    curve = polynomial() @ "curve"
+    ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
+    return curve, (xs, ys)
 ```
 
 ### 2. Simulate data and inspect vectorized traces
-The `seed` transformation wraps a probabilistic callable so its first argument becomes a JAX `PRNGKey`. A single call produces the dataset we will condition on; the same `simulate` method composes with `modular_vmap` to produce a struct-of-arrays trace for many independent draws, and `assess` evaluates those traces in parallel.
+`seed` wraps probabilistic callables so the first argument becomes a `PRNGKey`. With `modular_vmap` we can draw many traces (and score them) in parallel while preserving the struct-of-arrays layout of choices.
 
 ```python
 import jax.random as jrand
@@ -83,81 +100,59 @@ curve_trace = simulate_curve(jrand.key(0), xs)
 coeffs_true, (_, ys_obs) = curve_trace.get_retval()
 observations = {"ys": {"obs": ys_obs}}
 
-# Inspect vectorized simulate/assess shapes to confirm struct-of-arrays traces
 keys = jrand.split(jrand.key(1), 3)
-traces_batch = modular_vmap(simulate_curve, in_axes=(0, None))(keys, xs)
-print(traces_batch.get_choices()["curve"]["a"].shape)   # (3,) coefficients
-print(traces_batch.get_retval()[1][1].shape)              # (3, 64) simulated ys
-logps, _ = modular_vmap(lambda choice: npoint_curve.assess(choice, xs), in_axes=0)(
-    traces_batch.get_choices()
-)
+vectorized_simulate = modular_vmap(simulate_curve, in_axes=(0, None))
+traces_batch = vectorized_simulate(keys, xs)
+choices = traces_batch.get_choices()
+print(choices["curve"]["a"].shape)      # (3,) sampled coefficients
+print(traces_batch.get_retval()[1][1].shape)  # (3, 64) simulated y values
+logps, _ = modular_vmap(lambda ch: npoint_curve.assess(ch, xs), in_axes=0)(choices)
 ```
 
 ### 3. Vectorized importance sampling
-Importance sampling draws many traces in parallel. GenJAX's `modular_vmap` understands probabilistic primitives, so the only change from a single-particle sampler is batching the keys.
+Importance sampling draws many traces independently. Batching the random keys is the only change from a single-particle sampler; GenJAX handles the probabilistic primitives under the hood.
 
 ```python
 import jax.nn as jnn
-from genjax.pjax import seed, modular_vmap
 
 seeded_generate = seed(npoint_curve.generate)
+
 
 def one_particle(key):
     trace, log_weight = seeded_generate(key, observations, xs)
     return trace, log_weight
 
+
 particle_keys = jrand.split(jrand.key(2), 2048)
-vectorized_importance = modular_vmap(one_particle, in_axes=0)
-traces, log_weights = vectorized_importance(particle_keys)
+traces, log_weights = modular_vmap(one_particle, in_axes=0)(particle_keys)
 
 weights = jnn.softmax(log_weights)
 curve_choices = traces.get_choices()["curve"]
 posterior_mean_a = jnp.sum(weights * curve_choices["a"])
-print(f"Posterior mean for 'a': {posterior_mean_a:.3f}")
 ```
 
-### 4. Add stochastic branching and mixed MCMC
-Outlier robustness comes from modeling measurement regimes explicitly. The `Cond` combinator switches between inlier and outlier observation models, and a mixed Gibbs/HMC kernel updates discrete outlier indicators alongside continuous coefficients.
+### 4. Add stochastic branching and a mixed Gibbs/HMC kernel
+The case study models outliers with stochastic branching and alternates Gibbs updates for discrete flags with HMC steps for continuous coefficients. We can reuse those helpers directly.
 
 ```python
-from genjax import flip, Cond, uniform
-from genjax.core import Const, sel
+from examples.curvefit.core import (
+    npoint_curve_with_outliers,
+    mixed_gibbs_hmc_kernel,
+)
 from genjax.inference import chain
-from examples.curvefit.core import mixed_gibbs_hmc_kernel
 
-@gen
-def inlier_obs(mean):
-    return normal(mean, 0.05) @ "obs"
-
-@gen
-def outlier_obs(mean):
-    return uniform(-2.0, 2.0) @ "obs"
-
-@gen
-def point_with_outliers(x, coeffs):
-    is_outlier = flip(0.1) @ "is_outlier"
-    y_det = coeffs[0] + coeffs[1] * x + coeffs[2] * x**2
-    cond_model = Cond(outlier_obs, inlier_obs)
-    return cond_model(is_outlier, y_det) @ "obs"
-
-@gen
-def npoint_curve_with_outliers(xs):
-    coeffs = polynomial() @ "curve"
-    ys = point_with_outliers.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
-    return coeffs, (xs, ys)
-
-# Seed the robust model and run a Gibbs + HMC kernel
-seeded_outlier_model = seed(npoint_curve_with_outliers.generate)
-initial_trace, _ = seeded_outlier_model(jrand.key(3), observations, xs)
+seeded_outlier_generate = seed(npoint_curve_with_outliers.generate)
+initial_trace, _ = seeded_outlier_generate(jrand.key(3), observations, xs)
 kernel = mixed_gibbs_hmc_kernel(xs, ys_obs)
 robust_chain = chain(kernel)
 robust_result = robust_chain(jrand.key(4), initial_trace, n_steps=Const(500))
+outlier_flags = robust_result.traces.get_choices()["ys"]["is_outlier"]
 ```
 
-The resulting traces expose outlier flags (via `trace.get_choices()["ys"]["is_outlier"])`, and the continuous coefficients adapt after each Gibbs/HMC sweep.
-
+The mixture-aware sampler demotes flagged outliers while refining the curve coefficients collected in `robust_result.traces`.
 
 ## Getting Started
+
 
 
 ### Prerequisites
