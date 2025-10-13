@@ -36,7 +36,7 @@ It contains the GenJAX implementation (including source code and tests), extensi
 **Contents:**
 - [Quick Example](#quick-example)
 - [Getting Started](#getting-started)
-- [Reproducing All Paper Figures](#reproducing-all-paper-figures)
+- [Reproducing Paper Figures](#reproducing-all-paper-figures)
 - [Case Study Details](#case-study-details)
 - [Generated Figures](#generated-figures)
 
@@ -122,7 +122,7 @@ This creates isolated conda environments for each case study.
 
 ## Reproducing Paper Figures
 
-All the figures except for the multi-system benchmarking figure are provided by the commands below.
+*Note:* in our artifact, all figures involving code execution are provided below _with the exception of the multi-system benchmarking figure_. The code for the benchmarking figure (Fig 16, b) is available in the Git history of this repository (but requires a complex deployment setup, and won't run on CPUs).
 
 To generate several of the case study paper figures, use the following commands:
 
@@ -134,21 +134,25 @@ pixi run paper-figures
 pixi run paper-figures-gpu
 ```
 
-All figures are saved to `genjax/figs/`:
-- 1 faircoin figure
-- 5 curvefit figures
-- 2 GOL figures
-- 2 localization figures
+All figures are saved to `genjax/figs/`.
 
-Note that, on CPU only, some of the figures may be missing comparisons between CPU and GPU.
+**Execution properties vs. device**:
+Note that, when running the artifact on CPU only, some of the figures may be missing comparisons between CPU and GPU. Here's a list of behaviors which should be expected when running the case studies on CPU:
+
+- CPU takes longer than GPU: executed on an Apple M4 (Macbook Air) takes around 4 minutes.
+- CPU won't exhibit the same vectorized scaling properties as GPU (in many cases, linear versus near-constant scaling).
+
+Keep these behaviors in mind when interpreting figures generated via CPU execution.
 
 ## Case Study Details
 
-Here, we provide more details on the case studies. Each case study directory also contains a `README.md` file with more information.
+Here, we provide more details on the case studies. Each case study directory also contains a `README.md` file with more information. In each case study, we provide a reference to the figures in the paper which the case study supports.
 
 ### Fair Coin (Beta-Bernoulli)
 
 **What it does**: Compares GenJAX, handcoded JAX, and NumPyro on a simple conjugate inference problem.
+
+**Figures in the paper**: Figure 16 (a).
 
 **Command**:
 ```bash
@@ -161,8 +165,10 @@ pixi run -e faircoin python -m examples.faircoin.main \
 ### Curve Fitting with Outlier Detection
 
 **What it does**: Polynomial regression with robust outlier detection, demonstrating:
-- Importance sampling with varying particle counts
+- GPU scaling of importance sampling with varying particle counts
 - Gibbs sampling with HMC for an outlier mixture model
+
+**Figures in the paper**: Figure 4, Figure 5, Figure 6.
 
 **Command**:
 ```bash
@@ -180,6 +186,8 @@ pixi run -e curvefit python -m examples.curvefit.main paper
 
 **What it does**: Infers past Game of Life states from observed future states using Gibbs sampling on a 512×512 grid with 250 Gibbs steps.
 
+**Figures in the paper**: Figure 18.
+
 **Command**:
 ```bash
 pixi run -e gol gol-paper
@@ -194,6 +202,8 @@ pixi run -e gol gol-paper
 ### Robot Localization with SMC
 
 **What it does**: Particle filter localization comparing bootstrap filter, SMC+HMC, and approximate (using grid enumeration) locally optimal proposals with 200 particles and a generative model with a simulated 8-ray LIDAR measurement.
+
+**Figures in the paper**: Figure 19.
 
 **Command**:
 ```bash
