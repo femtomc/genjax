@@ -37,21 +37,22 @@ pixi run -e curvefit python -m examples.curvefit.main paper
 ### Basic Inference Example
 
 ```python
-from examples.curvefit.core import infer_latents, get_points_for_inference
+from genjax import Const
 import jax.random as jrand
+from examples.curvefit.core import infer_latents, get_points_for_inference
 
 # Generate test data
 key = jrand.key(42)
-curve, (xs, ys) = get_points_for_inference()
+_, (xs, ys) = get_points_for_inference()
 
-# Run Bayesian inference
-samples, weights = infer_latents(key, ys, 1000)
+# Run Bayesian inference (importance sampling with Const-wrapped particle count)
+traces, log_weights = infer_latents(xs, ys, Const(1000))
 
 # Extract parameter samples
-coeff_choices = samples.get_choices()['curve']
-a_samples = coeff_choices['a']
-b_samples = coeff_choices['b']
-c_samples = coeff_choices['c']
+curve_choices = traces.get_choices()["curve"]
+a_samples = curve_choices["a"]
+b_samples = curve_choices["b"]
+c_samples = curve_choices["c"]
 ```
 
 ## Output

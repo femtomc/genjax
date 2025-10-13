@@ -109,21 +109,16 @@ All frameworks implement the same importance sampling strategy:
 
 ### Parametrized Filenames
 
-All figures use descriptive names prefixed with "faircoin" for clear identification:
+All generated PDFs encode the experimental configuration in their filenames:
 
 - **Timing**: `faircoin_timing_performance_comparison_obs{N}_samples{M}_repeats{R}.pdf`
-  - Shows horizontal bar chart comparing execution time performance across frameworks
-  - Clear indication that this figure is about timing/performance benchmarking
-
+  - Horizontal bar chart comparing execution time performance across frameworks
 - **Posterior**: `faircoin_posterior_accuracy_comparison_obs{N}_samples{M}.pdf`
-  - Shows 2x2 grid comparing posterior sample histograms against exact Beta distribution
-  - Clear indication that this figure is about posterior inference accuracy
-
+  - 2×2 grid comparing posterior sample histograms against the exact Beta distribution
 - **Combined**: `faircoin_combined_posterior_and_timing_obs{N}_samples{M}.pdf`
-  - Shows 3x2 layout with posterior histograms (top row) and timing comparison (bottom row)
-  - Clear indication that this figure combines both analyses
+  - 3×2 layout with posterior histograms (top row) and timing comparison (bottom row)
 
-The descriptive naming ensures anyone can understand the figure content from the filename alone, while maintaining experiment tracking with parameters.
+Together these filenames offer clear provenance while remaining easy to scan in the top-level `figs/` directory.
 
 ## Usage Patterns
 

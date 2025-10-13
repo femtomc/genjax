@@ -70,7 +70,7 @@ cmd = "faircoin"
 faircoin = "python -m examples.faircoin.main --combined"  # Main command (combined timing + posterior)
 faircoin-timing = "python -m examples.faircoin.main"  # Timing comparison only
 faircoin-combined = "python -m examples.faircoin.main --combined"  # Combined timing + posterior figure (recommended)
-# Paper-specific task: generates combined_3x2_obs50_samples2000.pdf to figs/
+# Paper-specific task: generates faircoin_combined_posterior_and_timing_obs50_samples2000.pdf to figs/
 faircoin-paper = "python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000"
 
 [tool.pixi.feature.curvefit.dependencies]

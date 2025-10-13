@@ -266,11 +266,11 @@ Both files are emitted directly by the main script using `matplotlib.pyplot.save
 
 ### 🔧 Additional Visualizations
 `examples/localization/figs.py` contains reusable helpers for deeper analysis:
-- `plot_particle_filter_evolution(..., save_dir="figs")` writes **`particle_evolution_{method}.pdf`** snapshots.
-- `plot_estimation_error(..., save_path="figs/localization_estimation_error.pdf")`, `plot_sensor_observations`, and related utilities save PDFs when a `save_path` is provided (they internally call `save_publication_figure`).
+- Call `plot_particle_filter_evolution(..., save_dir="figs")` when you want **`particle_evolution_{method}.pdf`** snapshots; leaving `save_dir=None` simply returns the figure and axes without writing to disk.
+- Functions such as `plot_estimation_error`, `plot_sensor_observations`, and the raincloud diagnostics accept optional `save_path` arguments. They invoke `plt.savefig` (or `save_publication_figure` where noted) only when a path is provided, so no files are created by default.
 - Benchmark helpers in `core.py` return particle histories and diagnostics that these plotting utilities expect.
 
-Use these functions directly when you need bespoke figures beyond the paper defaults; they mirror the naming conventions above and always target the top-level `figs/` directory unless you override the destination.
+Use these functions directly when you need bespoke figures beyond the paper defaults; specify your own output paths (the convention is to point them at the repository-level `figs/` directory) or capture the matplotlib objects for custom handling.
 
 ### 🎨 Visualization Features
 - **ESS Display**: Shows as percentage (e.g., "ESS: 75%") for intuitive understanding

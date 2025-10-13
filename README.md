@@ -154,7 +154,7 @@ pixi run -e faircoin python -m examples.faircoin.main \
   --combined --num-obs 50 --num-samples 2000 --repeats 10
 ```
 
-**Outputs**: `figs/combined_3x2_obs50_samples2000.pdf`
+**Outputs**: `figs/faircoin_combined_posterior_and_timing_obs50_samples2000.pdf`
 
 ### Curve Fitting with Outlier Detection
 
@@ -211,7 +211,7 @@ pixi run -e localization python -m examples.localization.main paper \
 All figures are saved to `genjax/figs/`:
 
 ### Faircoin
-- `combined_3x2_obs50_samples2000.pdf` - Framework comparison (timing + posterior accuracy)
+- `faircoin_combined_posterior_and_timing_obs50_samples2000.pdf` - Framework comparison (timing + posterior accuracy)
 
 ### Curvefit
 - `curvefit_prior_multipoint_traces_density.pdf` - Prior samples from generative model

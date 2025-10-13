@@ -65,7 +65,7 @@ All figures are written to the repository-level `figs/` directory:
 
 - **Timing only** (`faircoin-timing`): `faircoin_timing_performance_comparison_obs{N}_samples{M}_repeats{R}.pdf`
 - **Posterior only** (`--posterior`): `faircoin_posterior_accuracy_comparison_obs{N}_samples{M}.pdf`
-- **Combined** (`--combined`): `combined_3x2_obs{N}_samples{M}.pdf`
+- **Combined** (`--combined`): `faircoin_combined_posterior_and_timing_obs{N}_samples{M}.pdf`
 
 Timing statistics are printed to stdout alongside each run.
 

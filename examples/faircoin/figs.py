@@ -528,8 +528,9 @@ def combined_comparison_fig(
     print(f"Ours: {gj_mu:.6f}s, Handcoded: {hc_mu:.6f}s, NumPyro: {np_mu:.6f}s")
 
     # Save with parametrized filename (3x2 layout without Pyro)
-    # Use simplified paper-expected name
-    filename = f"figs/combined_3x2_obs{num_obs}_samples{num_samples}.pdf"
+    filename = (
+        f"figs/faircoin_combined_posterior_and_timing_obs{num_obs}_samples{num_samples}.pdf"
+    )
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved combined comparison plot to {filename}")
