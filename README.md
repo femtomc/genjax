@@ -29,7 +29,7 @@ GenJAX provides:
 
 This repository is also a POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*.
 
-**Canonical artifact version: [v1.0.6](https://github.com/femtomc/genjax/releases/tag/v1.0.6)** - Use this release for artifact evaluation.
+**Canonical artifact version: [v1.0.7](https://github.com/femtomc/genjax/releases/tag/v1.0.7)** - Use this release for artifact evaluation.
 
 It contains the GenJAX implementation (including source code and tests), extensive documentation, curated agentic context (see the `AGENTS.md` throughout the codebase) to allow users of Claude Code and Codex (or others) to quickly use the system, and several of the case studies used in the empirical evaluation.
 
@@ -166,7 +166,7 @@ We expect that any environment which supports JAX should allow you to run our ar
 - 16 threads (8 cores with SMT)
 - Max frequency: 5.05 GHz
 - 96 MiB L3 cache
-- NVIDIA GeForce RTX 4090 (24GB VRAM)                              -
+- NVIDIA GeForce RTX 4090 (24GB VRAM)
 
 ## Case Study Details
 
