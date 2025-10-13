@@ -38,12 +38,12 @@ paper-setup = "mkdir -p figs"
 # Individual case study tasks (run within their environments)
 paper-faircoin-gen = "pixi run -e faircoin python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
 paper-curvefit-gen = "pixi run -e curvefit python -m examples.curvefit.main paper"
-paper-gol-gen = "pixi run -e gol gol-paper"
+paper-gol-gen = "pixi run -e gol python -m examples.gol.main --mode showcase"
 paper-localization-gen = "pixi run -e localization python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
 
 paper-faircoin-gpu-gen = "pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
 paper-curvefit-gpu-gen = "pixi run -e curvefit-cuda python -m examples.curvefit.main paper"
-paper-gol-gpu-gen = "pixi run -e gol-cuda gol-paper-gpu"
+paper-gol-gpu-gen = "pixi run -e gol-cuda python -m examples.gol.main --mode showcase"
 paper-localization-gpu-gen = "pixi run -e localization-cuda python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
 
 # Main paper figures generation tasks
@@ -130,9 +130,9 @@ gol-blinker = "python -m examples.gol.main --mode blinker"  # Blinker reconstruc
 gol-logo = "python -m examples.gol.main --mode logo"  # Logo reconstruction
 gol-timing = "python -m examples.gol.main --mode timing"  # Timing analysis
 gol-quick = "python -m examples.gol.main --chain-length 10 --grid-sizes 10 20"  # Quick run
-# Paper-specific task: generates showcase figures only (includes timing bar plot)
+# Paper-specific task: generates showcase figures (includes automatic CPU/GPU timing comparison)
 gol-paper = "python -m examples.gol.main --mode showcase"
-gol-paper-gpu = "python -m examples.gol.main --mode showcase && python -m examples.gol.main --mode timing --device both --grid-sizes 64 128 256 512 --timing-repeats 3"
+gol-paper-gpu = "python -m examples.gol.main --mode showcase"
 
 [tool.pixi.feature.localization.dependencies]
 matplotlib = "*"
