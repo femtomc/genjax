@@ -70,18 +70,27 @@ def npoint_curve(xs):
     return coeffs, (xs, ys)
 ```
 
-### 2. Simulate a dataset with `seed`
-The `seed` transformation wraps a probabilistic callable so its first argument becomes a JAX `PRNGKey`. We can now simulate noisy quadratic data deterministically given a key.
+### 2. Simulate data and inspect vectorized traces
+The `seed` transformation wraps a probabilistic callable so its first argument becomes a JAX `PRNGKey`. A single call produces the dataset we will condition on; the same `simulate` method composes with `modular_vmap` to produce a struct-of-arrays trace for many independent draws, and `assess` evaluates those traces in parallel.
 
 ```python
 import jax.random as jrand
-from genjax.pjax import seed
+from genjax.pjax import seed, modular_vmap
 
 xs = jnp.linspace(-1.0, 1.0, 64)
 simulate_curve = seed(npoint_curve.simulate)
 curve_trace = simulate_curve(jrand.key(0), xs)
 coeffs_true, (_, ys_obs) = curve_trace.get_retval()
 observations = {"ys": {"obs": ys_obs}}
+
+# Vectorized simulate/assess: shapes mirror the overview in the paper
+keys = jrand.split(jrand.key(1), 3)
+traces_batch = modular_vmap(simulate_curve, in_axes=(0, None))(keys, xs)
+print(traces_batch.get_choices()["curve"]["a"].shape)   # (3,) coefficients
+print(traces_batch.get_retval()[1][1].shape)              # (3, 64) simulated ys
+logps, _ = modular_vmap(lambda choice: npoint_curve.assess(choice, xs), in_axes=0)(
+    traces_batch.get_choices()
+)
 ```
 
 ### 3. Vectorized importance sampling
@@ -89,7 +98,7 @@ Importance sampling draws many traces in parallel. GenJAX's `modular_vmap` under
 
 ```python
 import jax.nn as jnn
-from genjax.pjax import modular_vmap
+from genjax.pjax import seed, modular_vmap
 
 seeded_generate = seed(npoint_curve.generate)
 
@@ -97,7 +106,7 @@ def one_particle(key):
     trace, log_weight = seeded_generate(key, observations, xs)
     return trace, log_weight
 
-particle_keys = jrand.split(jrand.key(1), 2048)
+particle_keys = jrand.split(jrand.key(2), 2048)
 vectorized_importance = modular_vmap(one_particle, in_axes=0)
 traces, log_weights = vectorized_importance(particle_keys)
 
