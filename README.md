@@ -42,114 +42,70 @@ It contains the GenJAX implementation (including source code and tests), extensi
 
 ## Quick Example
 
-This example follows the curve fitting workflow: define quadratic generative functions, simulate a dataset with explicit PRNG keys, run vectorized importance sampling, and finally add a stochastic branching model with a mixed Gibbs/HMC kernel.
-
-### 1. Define the model
-We reuse the curvefit case study definitions: `polynomial` draws quadratic coefficients, `point` emits a noisy observation, and `npoint_curve` maps `point` across an input array using traced-aware `.vmap()`.
+Here's a simple curve fitting model showing how to write importance sampling using GenJAX's generative function interface:
 
 ```python
+from genjax import gen, normal
+from genjax.pjax import modular_vmap as vmap
 import jax.numpy as jnp
-from genjax import gen, normal, Pytree
-from genjax.core import Const
 
-@Pytree.dataclass
-class Lambda(Pytree):
-    f: Const[callable]
-    dynamic_vals: jnp.ndarray
-    static_vals: Const[tuple] = Const(())
-
-    def __call__(self, *x):
-        return self.f.value(*x, *self.static_vals.value, self.dynamic_vals)
-
-
-def polyfn(x, coeffs):
-    return coeffs[0] + coeffs[1] * x + coeffs[2] * x**2
-
-
+# Define a generative model for polynomial curve fitting
 @gen
 def polynomial():
     a = normal(0.0, 1.0) @ "a"
     b = normal(0.0, 1.0) @ "b"
     c = normal(0.0, 1.0) @ "c"
-    return Lambda(Const(polyfn), jnp.array([a, b, c]))
-
+    return jnp.array([a, b, c])
 
 @gen
-def point(x, curve):
-    y_det = curve(x)
-    return normal(y_det, 0.05) @ "obs"
-
+def point(x, coeffs):
+    y_det = coeffs[0] + coeffs[1]*x + coeffs[2]*x**2
+    y_obs = normal(y_det, 0.05) @ "obs"
+    return y_obs
 
 @gen
 def npoint_curve(xs):
-    curve = polynomial() @ "curve"
-    ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
-    return curve, (xs, ys)
+    coeffs = polynomial() @ "curve"
+    ys = point.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
+    return coeffs, (xs, ys)
+
+# Generate test data
+xs = jnp.linspace(0, 1, 10)
+trace = npoint_curve.simulate(xs)
+_, (_, ys_observed) = trace.get_retval()
+
+# Write importance sampling using the generative function interface
+def importance_sampling(model, args, observations, n_particles):
+    """Importance sampling using generate."""
+
+    def single_particle():
+        # generate() samples from model with observations as constraints
+        # Returns (trace, log_weight)
+        trace, log_weight = model.generate(observations, *args)
+        return trace, log_weight
+
+    # Vectorize over particles - our vmap handles probabilistic sampling correctly
+    # automatically
+    vectorized = vmap(single_particle, in_axes=(), axis_size=n_particles)
+
+    return vectorized()
+
+# Run inference
+observations = {"ys": {"obs": ys_observed}}
+traces, log_weights = importance_sampling(npoint_curve, (xs,), observations, 1000)
+
+# Extract posterior samples
+curve_a = traces.get_choices()["curve"]["a"]
+print(f"Posterior mean for 'a': {jnp.mean(curve_a):.3f}")
 ```
 
-### 2. Simulate data and inspect vectorized traces
-`seed` wraps probabilistic callables so the first argument becomes a `PRNGKey`. With `modular_vmap` we can draw many traces (and score them) in parallel while preserving the struct-of-arrays layout of choices.
-
-```python
-import jax.random as jrand
-from genjax.pjax import seed, modular_vmap
-
-xs = jnp.linspace(-1.0, 1.0, 64)
-simulate_curve = seed(npoint_curve.simulate)
-curve_trace = simulate_curve(jrand.key(0), xs)
-coeffs_true, (_, ys_obs) = curve_trace.get_retval()
-observations = {"ys": {"obs": ys_obs}}
-
-keys = jrand.split(jrand.key(1), 3)
-vectorized_simulate = modular_vmap(simulate_curve, in_axes=(0, None))
-traces_batch = vectorized_simulate(keys, xs)
-choices = traces_batch.get_choices()
-print(choices["curve"]["a"].shape)      # (3,) sampled coefficients
-print(traces_batch.get_retval()[1][1].shape)  # (3, 64) simulated y values
-logps, _ = modular_vmap(lambda ch: npoint_curve.assess(ch, xs), in_axes=0)(choices)
-```
-
-### 3. Vectorized importance sampling
-Here is a straightforward implementation that follows the case study’s 
-`infer_latents` helper: we call `init` once to build the importance sampling
-state, and then reuse the returned traces and log weights.
-
-```python
-from genjax.inference import init
-
-n_particles = Const(2048)
-result = init(npoint_curve, (xs,), n_particles, observations)
-traces = result.traces
-log_weights = result.log_weights
-
-weights = jnn.softmax(log_weights)
-curve_choices = traces.get_choices()["curve"]
-posterior_mean_a = jnp.sum(weights * curve_choices["a"])
-```
-
-### 4. Add stochastic branching and a mixed Gibbs/HMC kernel
-The case study models outliers with stochastic branching and alternates Gibbs updates for discrete flags with HMC steps for continuous coefficients. We can reuse those helpers directly.
-
-```python
-from examples.curvefit.core import (
-    npoint_curve_with_outliers,
-    mixed_gibbs_hmc_kernel,
-)
-from genjax.inference import chain
-
-seeded_outlier_generate = seed(npoint_curve_with_outliers.generate)
-initial_trace, _ = seeded_outlier_generate(jrand.key(3), observations, xs)
-kernel = mixed_gibbs_hmc_kernel(xs, ys_obs)
-robust_chain = chain(kernel)
-robust_result = robust_chain(jrand.key(4), initial_trace, n_steps=Const(500))
-outlier_flags = robust_result.traces.get_choices()["ys"]["is_outlier"]
-```
-
-The mixture-aware sampler demotes flagged outliers while refining the curve coefficients collected in `robust_result.traces`.
+Key things to pay attention to:
+- **Define generative functions from Python functions** with `@gen` decorator
+- **Syntactical abstraction for named random choices** with `@` operator (e.g., `@ "a"`), this allows you to invoke other generative functions as callees.
+- **Composable vectorization** with `.vmap()` on generative functions, and `genjax.vmap` on probabilistic computations.
+- **Each of the above works together to support vectorized programmable inference** write vectorizable inference algorithms using generative function interface (here, the `generate()` interface)
 
 ## Getting Started
-
-
 
 ### Prerequisites
 
