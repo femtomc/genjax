@@ -204,6 +204,7 @@ def hmc_infer_latents(
     result = hmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
 
     return result.traces, {
+        "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
         "n_chains": result.n_chains.value,
     }
@@ -644,6 +645,7 @@ def hmc_infer_latents_with_outliers(
     result = mcmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
 
     return result.traces, {
+        "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
         "n_chains": result.n_chains.value,
     }
@@ -702,6 +704,7 @@ def mixed_infer_latents_with_outliers_beta(
     result = mcmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
 
     return result.traces, {
+        "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
         "n_chains": result.n_chains.value,
         "rhat": result.rhat,
