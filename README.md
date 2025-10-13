@@ -29,7 +29,7 @@ GenJAX provides:
 
 This repository is also a POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*.
 
-**Canonical artifact version: [v1.0.8](https://github.com/femtomc/genjax/releases/tag/v1.0.8)** - Use this release for artifact evaluation.
+**Canonical artifact version: [v1.0.9](https://github.com/femtomc/genjax/releases/tag/v1.0.9)** - Use this release for artifact evaluation.
 
 It contains the GenJAX implementation (including source code and tests), extensive documentation, curated agentic context (see the `AGENTS.md` throughout the codebase) to allow users of Claude Code and Codex (or others) to quickly use the system, and several of the case studies used in the empirical evaluation.
 
@@ -42,68 +42,200 @@ It contains the GenJAX implementation (including source code and tests), extensi
 
 ## Quick Example
 
-Here's a simple curve fitting model showing how to write importance sampling using GenJAX's generative function interface:
+The snippets below develop the polynomial regression example from our paper's *Overview* section in GenJAX: we compose the model from generative functions, vectorize importance sampling to scale the number of particles, extend the model with stochastic branching to capture outliers, and finish with a programmable kernel that mixes enumerative Gibbs updates with Hamiltonian Monte Carlo. The full code can be found in `examples/curvefit`; the code here can be run as a linear notebook-style walkthrough.
+
+### Vectorizing Generative Functions with vmap
+
+We begin by expressing the quadratic regression model as a composition of generative functions. Each random choice is tagged with a string address (`"a"`, `"b"`, `"c"`, `"obs"`), which is used to construct a structured representation of the model’s latent variables and observed data, called a _trace_.
+
+Packaging the coefficients inside a callable `Lambda` Pytree mirrors the notion of sampling a function-valued random variable: downstream computations can call the curve directly while the trace retains access to its parameters.
 
 ```python
 from genjax import gen, normal
-from genjax.pjax import modular_vmap as vmap
+from genjax.core import Const
+from genjax import Pytree
 import jax.numpy as jnp
 
-# Define a generative model for polynomial curve fitting
+@Pytree.dataclass
+class Lambda(Pytree):
+    f: Const[object]
+    dynamic_vals: jnp.ndarray
+    static_vals: Const[tuple] = Const(())
+
+    def __call__(self, *x):
+        return self.f.value(*x, *self.static_vals.value, self.dynamic_vals)
+
+def polyfn(x, coeffs):
+    a, b, c = coeffs[0], coeffs[1], coeffs[2]
+    return a + b * x + c * x**2
+
 @gen
 def polynomial():
     a = normal(0.0, 1.0) @ "a"
     b = normal(0.0, 1.0) @ "b"
     c = normal(0.0, 1.0) @ "c"
-    return jnp.array([a, b, c])
+    return Lambda(Const(polyfn), jnp.array([a, b, c]))
 
 @gen
-def point(x, coeffs):
-    y_det = coeffs[0] + coeffs[1]*x + coeffs[2]*x**2
+def point(x, curve):
+    y_det = curve(x)
     y_obs = normal(y_det, 0.05) @ "obs"
     return y_obs
 
 @gen
 def npoint_curve(xs):
-    coeffs = polynomial() @ "curve"
-    ys = point.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
-    return coeffs, (xs, ys)
+    curve = polynomial() @ "curve"
+    ys = point.vmap(in_axes=(0, None))(xs, curve) @ "ys"
+    return curve, (xs, ys)
 
-# Generate test data
-xs = jnp.linspace(0, 1, 10)
+xs = jnp.linspace(0.0, 1.0, 8)
 trace = npoint_curve.simulate(xs)
-_, (_, ys_observed) = trace.get_retval()
-
-# Write importance sampling using the generative function interface
-def importance_sampling(model, args, observations, n_particles):
-    """Importance sampling using generate."""
-
-    def single_particle():
-        # generate() samples from model with observations as constraints
-        # Returns (trace, log_weight)
-        trace, log_weight = model.generate(observations, *args)
-        return trace, log_weight
-
-    # Vectorize over particles - our vmap handles probabilistic sampling correctly
-    # automatically
-    vectorized = vmap(single_particle, in_axes=(), axis_size=n_particles)
-
-    return vectorized()
-
-# Run inference
-observations = {"ys": {"obs": ys_observed}}
-traces, log_weights = importance_sampling(npoint_curve, (xs,), observations, 1000)
-
-# Extract posterior samples
-curve_a = traces.get_choices()["curve"]["a"]
-print(f"Posterior mean for 'a': {jnp.mean(curve_a):.3f}")
+print(trace.get_choices()["curve"].keys())
+print(trace.get_choices()["ys"]["obs"].shape)
 ```
 
-Key things to pay attention to:
-- **Define generative functions from Python functions** with `@gen` decorator
-- **Syntactical abstraction for named random choices** with `@` operator (e.g., `@ "a"`), this allows you to invoke other generative functions as callees.
-- **Composable vectorization** with `.vmap()` on generative functions, and `genjax.vmap` on probabilistic computations.
-- **Each of the above works together to support vectorized programmable inference** write vectorizable inference algorithms using generative function interface (here, the `generate()` interface)
+Vectorizing the `point` generative function with `vmap` mirrors the Overview’s Figure 3: the resulting trace preserves the hierarchical structure of the coefficients while lifting the observation site into an array-valued address. That “structure preserving” vectorization is what later enables us to reason about entire datasets and inference states in bulk.
+
+### Vectorized Programmable Inference
+
+The generative function interface supplies a small set of methods—`simulate`, `generate`, `assess`, `update`—that we can compose into inference algorithms.
+
+Here we implement likelihood weighting (importance sampling): a single-particle routine constrains the observation site via the `generate` interface, while a vectorized wrapper scales out the number of particles. The logic of guessing (sampling) and checking (computing an importance weight) -- internally implemented in `generate` -- remains the same across particles, only the array dimensions vary with the particle count.
+
+```python
+from jax.scipy.special import logsumexp
+from genjax.pjax import modular_vmap
+import jax.numpy as jnp
+
+def single_particle_importance(model, xs, ys_obs):
+    trace, log_weight = model.generate({"ys": {"obs": ys_obs}}, xs)
+    return trace, log_weight
+
+def vectorized_importance_sampling(model, xs, ys_obs, num_particles):
+    sampler = modular_vmap(
+        single_particle_importance,
+        in_axes=(None, None, None),
+        axis_size=num_particles,
+    )
+    return sampler(model, xs, ys_obs)
+
+def log_marginal_likelihood(log_weights):
+    return logsumexp(log_weights) - jnp.log(log_weights.shape[0])
+
+xs = jnp.linspace(0.0, 1.0, 8)
+trace = npoint_curve.simulate(xs)
+_, (_, ys_obs) = trace.get_retval()
+
+traces, log_weights = vectorized_importance_sampling(
+    npoint_curve, xs, ys_obs, num_particles=512
+)
+print(traces.get_choices()["curve"]["a"].shape, log_marginal_likelihood(log_weights))
+```
+
+Running on hardware with ample parallel resources (e.g., a GPU) simply increases that axis size as far as memory allows, just as in the scaling curves shown in Figure 5.
+
+### Improving Robustness using Stochastic Branching
+
+Real datasets often include heterogeneous noise processes. Following the Overview, we enrich the observation model with stochastic branching that classifies each datapoint as an inlier or an outlier. The latent `is_outlier` switch feeds a `Cond` combinator that chooses between a tight Gaussian noise model and a broad uniform alternative; both branches write to the same observation address so later inference can target the entire `ys` subtree uniformly.
+
+```python
+from genjax import Cond, flip, uniform
+
+@gen
+def inlier_branch(mean, extra_noise):
+    return normal(mean, 0.1) @ "obs"
+
+@gen
+def outlier_branch(_, extra_noise):
+    return uniform(-2.0, 2.0) @ "obs"
+
+@gen
+def point_with_outliers(x, curve, outlier_rate=0.1, extra_noise=5.0):
+    is_outlier = flip(outlier_rate) @ "is_outlier"
+    cond_model = Cond(outlier_branch, inlier_branch)
+    y_det = curve(x)
+    return cond_model(is_outlier, y_det, extra_noise) @ "y"
+
+@gen
+def npoint_curve_with_outliers(xs, outlier_rate=0.1):
+    curve = polynomial() @ "curve"
+    ys = point_with_outliers.vmap(
+        in_axes=(0, None, None, None)
+    )(xs, curve, outlier_rate, 5.0) @ "ys"
+    return curve, (xs, ys)
+
+xs = jnp.linspace(0.0, 1.0, 8)
+trace = npoint_curve_with_outliers.simulate(xs)
+choices = trace.get_choices()["ys"]
+print(choices["is_outlier"].shape, choices["y"]["obs"].shape)
+```
+
+The resulting trace contains a boolean vector of outlier indicators alongside the observations, matching the mixture-structured traces shown in Figure 6. Because the addresses are shared across branches, regenerating either the discrete switches or the continuous curve parameters becomes a matter of selecting the appropriate keys in the trace.
+
+### Improving Inference Accuracy using Programmable Inference
+
+To improve inference accuracy on the richer model we combine discrete and continuous updates within a single programmable kernel. Enumerative Gibbs updates each `is_outlier` choice by scoring the two possible values with `assess` before resampling, while Hamiltonian Monte Carlo refines the continuous parameters. Both steps operate on traces using a _selection_ (a way to target addresses within a trace), and they compose sequentially without requiring special-case code.
+
+```python
+import jax
+import jax.numpy as jnp
+from genjax.core import Const, sel
+from genjax.distributions import categorical
+from genjax.pjax import modular_vmap, seed
+from genjax.inference import hmc, chain
+
+def enumerative_gibbs_outliers(trace, xs, ys, outlier_rate=0.1):
+    curve_params = trace.get_choices()["curve"]
+    curve = Lambda(
+        Const(polyfn),
+        jnp.array([curve_params["a"], curve_params["b"], curve_params["c"]]),
+    )
+
+    def update_single_point(x, y_obs):
+        chm_false = {"is_outlier": False, "y": {"obs": y_obs}}
+        log_false, _ = point_with_outliers.assess(chm_false, x, curve, outlier_rate, 5.0)
+
+        chm_true = {"is_outlier": True, "y": {"obs": y_obs}}
+        log_true, _ = point_with_outliers.assess(chm_true, x, curve, outlier_rate, 5.0)
+
+        logits = jnp.array([log_false, log_true])
+        return categorical.sample(logits=logits) == 1
+
+    new_outliers = modular_vmap(update_single_point)(xs, ys)
+    gen_fn = trace.get_gen_fn()
+    args = trace.get_args()
+    new_trace, _, _ = gen_fn.update(
+        trace, {"ys": {"is_outlier": new_outliers}}, *args[0], **args[1]
+    )
+    return new_trace
+
+def mixed_gibbs_hmc_kernel(xs, ys, hmc_step_size=0.01, hmc_n_steps=10, outlier_rate=0.1):
+    def kernel(trace):
+        trace = enumerative_gibbs_outliers(trace, xs, ys, outlier_rate)
+        return hmc(
+            trace,
+            sel(("curve", "a")) | sel(("curve", "b")) | sel(("curve", "c")),
+            step_size=hmc_step_size,
+            n_steps=hmc_n_steps,
+        )
+    return kernel
+
+xs = jnp.linspace(0.0, 1.0, 8)
+trace = npoint_curve_with_outliers.simulate(xs)
+_, (_, ys) = trace.get_retval()
+constraints = {"ys": {"y": {"obs": ys}}}
+initial_trace, _ = npoint_curve_with_outliers.generate(constraints, xs, 0.1)
+
+kernel = mixed_gibbs_hmc_kernel(xs, ys, hmc_step_size=0.02, hmc_n_steps=5)
+runner = chain(kernel)
+samples = seed(runner)(jax.random.key(0), initial_trace, n_steps=Const(10))
+
+print(samples.traces.get_choices()["curve"]["a"].shape)
+```
+
+These moves yields a chain that captures both inlier/outlier classifications and posterior uncertainty over polynomial coefficients.
+
+For the full treatment—including command-line tooling, figure generation, and alternative inference routines—see `examples/curvefit`.
 
 ## Getting Started
 
