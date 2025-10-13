@@ -50,14 +50,14 @@ from genjax.viz.standard import (
     PRIMARY_COLORS, LINE_SPECS, MARKER_SPECS
 )
 
-# Figure sizes and styling now imported from shared examples.viz module
+# Figure sizes and styling imported from shared GRVS helpers
 # FIGURE_SIZES, PRIMARY_COLORS, etc. are available from the import above
 
 # Apply GenJAX Research Visualization Standards
 setup_publication_fonts()
 
 
-# set_minimal_ticks function now imported from examples.viz
+# set_minimal_ticks function imported from shared GRVS helpers
 
 
 def get_reference_dataset(seed=42, n_points=20):
@@ -374,7 +374,7 @@ def save_inference_scaling_viz(
     fig.savefig("figs/curvefit_scaling_performance.pdf")
     plt.close()
 
-    print("✓ Saved inference scaling visualization with GPU OOM markers")
+    print("Saved inference scaling visualization with GPU OOM markers")
 
 
 

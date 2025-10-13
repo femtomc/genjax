@@ -107,11 +107,11 @@ if __name__ == "__main__":
 
     try:
         trace, weight = vmapped_fn.generate(constraints, x_values, y_value)
-        print("✅ vmap generate works (bug is fixed)")
+        print("PASS: vmap generate works (bug is fixed)")
     except ValueError as e:
         if "vmap in_axes must be" in str(e):
-            print("🐛 vmap generate bug still exists")
+            print("BUG: vmap generate issue still exists")
         else:
-            print(f"❌ Unexpected error: {e}")
+            print(f"ERROR: Unexpected ValueError: {e}")
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"ERROR: Unexpected exception: {e}")

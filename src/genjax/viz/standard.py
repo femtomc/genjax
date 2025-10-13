@@ -7,7 +7,7 @@ Shared styling utilities for consistent figure generation across all GenJAX case
 Based on the curvefit aesthetic system with publication-quality standards.
 
 Usage:
-    from examples.viz import setup_publication_fonts, FIGURE_SIZES, get_method_color
+    from genjax.viz.standard import setup_publication_fonts, FIGURE_SIZES, get_method_color
     
     setup_publication_fonts()
     fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
@@ -542,7 +542,7 @@ Output:
 - Layout: Tight bounding box
 
 Usage:
-    from examples.viz import setup_publication_fonts, FIGURE_SIZES
+    from genjax.viz.standard import setup_publication_fonts, FIGURE_SIZES
     setup_publication_fonts()
     fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
 """

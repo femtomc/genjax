@@ -1398,9 +1398,12 @@ def seed(
 ):
     """Transform a function to accept an explicit PRNG key.
 
-    This transformation eliminates probabilistic primitives by providing
-    explicit randomness through a PRNG key, enabling the use of standard
-    JAX transformations like jit and vmap.
+    The input function `f` should *not* accept a PRNG key. The returned wrapper
+    expects a `jax.random.KeyArray` as its first positional argument, forwards
+    the remaining arguments unchanged, and rewrites every `sample_p` primitive in
+    the underlying Jaxpr to use keyed sampling (splitting the key as required).
+    This makes the function compatible with JAX transformations such as `jit`,
+    `vmap`, and `scan` while keeping randomness explicit and reproducible.
 
     Args:
         f: Function containing probabilistic computations to transform.

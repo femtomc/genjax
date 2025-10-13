@@ -1,260 +1,36 @@
-# AGENTS.md - Fair Coin Case Study
+# Fair Coin Case Study Guide
 
-This file provides guidance to AI coding agents when working with the fair coin (Beta-Bernoulli) timing comparison case study.
+The fair coin example benchmarks GenJAX against NumPyro and a hand-coded JAX baseline on a Beta–Bernoulli model. Outputs include timing comparisons and posterior accuracy checks.
 
-## Overview
+## Key Files
+- `core.py`: model definition (`beta_ber_multi`), timing harnesses, posterior sampling utilities.
+- `figs.py`: figure builders (timing bars, posterior histograms, combined layouts). Uses local Matplotlib styling; migrate to `genjax.viz.standard` when refactoring.
+- `main.py`: CLI entry point exposing `--timing`, `--posterior`, `--combined`, and `--all` modes.
+- `README.md`: user-facing description (optional for agents).
 
-The fair coin case study demonstrates probabilistic programming framework performance and accuracy through a Beta-Bernoulli model comparing GenJAX, NumPyro, and handcoded JAX implementations. It includes both timing comparisons and posterior sampling accuracy validation.
-
-## Directory Structure
-
-```
-examples/faircoin/
-├── AGENTS.md           # This file - guidance for AI coding agents
-├── README.md           # User documentation
-├── __init__.py         # Python package marker
-├── core.py             # Model definitions and timing functions
-├── figs.py             # Visualization utilities
-└── main.py             # Command-line interface
-```
-
-## Code Organization
-
-### `core.py` - Model Implementations
-
-- **`beta_ber_multi(num_obs: Const[int])`**: GenJAX model for multiple coin flips using `@gen` decorator
-- **`genjax_timing()`**: GenJAX importance sampling benchmark using `beta_ber_multi`
-- **`numpyro_timing()`**: NumPyro importance sampling benchmark with multiple observations
-- **`handcoded_timing()`**: Direct JAX implementation benchmark with multiple observations
-- **`timing()`**: Core benchmarking utility function
-- **Posterior sampling functions**: `genjax_posterior_samples()`, `handcoded_posterior_samples()`, `numpyro_posterior_samples()`
-- **`exact_beta_posterior_stats()`**: Analytical Beta posterior computation for validation
-
-### `figs.py` - Visualization
-
-**NOTE**: This case study uses local styling and should be migrated to the shared `examples.viz` module for consistency with GenJAX Research Visualization Standards (GRVS).
-
-All figures are written to the repository-level `figs/` directory (filenames prefixed with `faircoin_...`). Create the directory first (`mkdir -p figs`) before running the figure commands.
-
-- **`timing_comparison_fig()`**: Generates horizontal bar chart comparisons
-- **`posterior_comparison_fig()`**: Generates 2x2 grid of posterior histograms vs exact posterior
-- **`combined_comparison_fig()`**: Generates 3x2 layout with posterior plots (top) and timing (bottom)
-- **Research paper ready**: Large fonts, high DPI, professional formatting
-- **Error bars**: Standard deviation whiskers on timing measurements
-- **Parametrized filenames**: Includes experimental parameters in output filename
-
-**Migration needed**: Replace local `plt.rcParams.update()` calls with `examples.viz` imports and GRVS standards.
-
-### `main.py` - CLI Interface
-
-- **Default parameters**: 50 obs, 1000 samples, 200 repeats
-- **Multiple figure types**: `--timing`, `--posterior`, `--combined`, `--all`
-- **Three frameworks**: GenJAX, handcoded JAX, and NumPyro comparison
-- **Configurable**: All timing and sampling parameters adjustable via command line
-
-## Key Implementation Details
-
-### Model Specification
-
-```python
-# Multi-observation Beta-Bernoulli model: Beta(10, 10) prior, multiple Bernoulli observations
-@gen
-def beta_ber_multi(num_obs: Const[int]):
-    alpha0, beta0 = jnp.array(10.0), jnp.array(10.0)
-    f = beta(alpha0, beta0) @ "latent_fairness"
-    return flip.repeat(n=num_obs.value)(f) @ "obs"
-```
-
-### Data Pattern
-
-All frameworks use **80% heads, 20% tails** observations:
-
-- `num_heads = int(0.8 * num_obs)`
-- `num_tails = num_obs - num_heads`
-- `data = jnp.concatenate([jnp.ones(num_heads), jnp.zeros(num_tails)])`
-
-This creates a realistic scenario where all frameworks recover the exact Beta posterior: **Beta(50, 20)** for 50 observations.
-
-### Importance Sampling Pattern
-
-All frameworks implement the same importance sampling strategy:
-
-1. Sample from prior Beta(10, 10) as proposal
-2. Compute likelihood weights for 50 observed coin flips (80% heads, 20% tails)
-3. Vectorized execution with JAX/framework primitives
-4. Different random seeds: GenJAX (123), handcoded JAX (456), NumPyro (42)
-
-### Timing Methodology
-
-- **Warm-up runs**: 2 JIT compilation runs before timing
-- **Multiple repeats**: Default 200 outer repeats for statistical reliability
-- **Inner repeats**: 200 inner repeats per outer repeat, taking minimum
-- **Block until ready**: Ensures GPU/async operations complete
-
-## Visualization Features
-
-### Research Paper Quality
-
-- **Font sizes**: 18-22pt for publication readability
-- **High DPI**: 300 DPI PDF output for crisp figures
-- **Clean layout**: No overall titles (suitable for figure captions)
-- **Error bars**: Standard deviation whiskers on timing measurements
-- **Professional styling**: No gridlines, minimal axis decoration
-
-### Figure Types
-
-1. **Timing comparison**: Horizontal bar chart with error bars, embedded framework labels
-2. **Posterior comparison**: 2x2 grid of histograms vs exact posterior, no y-axis labels
-3. **Combined comparison**: 3x2 layout with posterior plots (top row) and timing (bottom row)
-
-### Parametrized Filenames
-
-All generated PDFs encode the experimental configuration in their filenames:
-
-- **Timing**: `faircoin_timing_performance_comparison_obs{N}_samples{M}_repeats{R}.pdf`
-  - Horizontal bar chart comparing execution time performance across frameworks
-- **Posterior**: `faircoin_posterior_accuracy_comparison_obs{N}_samples{M}.pdf`
-  - 2×2 grid comparing posterior sample histograms against the exact Beta distribution
-- **Combined**: `faircoin_combined_posterior_and_timing_obs{N}_samples{M}.pdf`
-  - 3×2 layout with posterior histograms (top row) and timing comparison (bottom row)
-
-Together these filenames offer clear provenance while remaining easy to scan in the top-level `figs/` directory.
-
-## Usage Patterns
-
-### Execution Environments
-
-The faircoin case study can be run in different environments:
-
-- **CPU environment**: `pixi run -e faircoin` (default, works everywhere)
-- **CUDA environment**: `pixi run -e faircoin-cuda` (GPU acceleration when available)
-
-### Timing Comparison Only
-
+## Typical Commands
 ```bash
-# CPU version
-pixi run -e faircoin faircoin-timing
-
-# CUDA version (recommended for better performance)
-pixi run -e faircoin-cuda faircoin-timing
+pixi run -e faircoin python -m examples.faircoin.main --combined
+pixi run -e faircoin python -m examples.faircoin.main --timing --num-samples 5000
+pixi run -e faircoin-cuda python -m examples.faircoin.main --all     # GPU variant
 ```
 
-### Combined Figure (Recommended)
+Figures are saved to the repository `figs/` directory; ensure it exists or pass `--output-dir`.
 
-```bash
-# CPU version
-pixi run -e faircoin faircoin-combined
+## Modeling Notes
+- Prior: `Beta(10, 10)` with Bernoulli observations stored under `"obs"`.
+- Data generator: 80% heads, 20% tails (`num_heads = int(0.8 * num_obs)`).
+- Importance sampling uses the prior as proposal; ensure particle counts and repeat counts are wrapped in `Const[...]` when wiring automated benchmarks.
 
-# CUDA version (recommended)
-pixi run -e faircoin-cuda faircoin-combined
-```
+## Visualization Notes
+- `figs.py` currently sets Matplotlib globals directly; replicate patterns exactly to keep styling consistent until GRVS migration occurs.
+- `timing_comparison_fig` expects timing summaries from `core.py.timing`.
+- Posterior figures overlay analytic Beta posteriors computed via `exact_beta_posterior_stats`.
 
-### Posterior Comparison Only
+## Testing / Validation
+- Smoke tests for timing harnesses live in `tests/test_simple_benchmark.py` and `tests/test_benchmarks.py`.
+- When modifying the model or data generation logic, add coverage under `tests/test_faircoin.py` (create if absent) to assert posterior mean/variance against analytic values.
 
-```bash
-# CPU version
-pixi run -e faircoin python -m examples.faircoin.main --posterior
-
-# CUDA version
-pixi run -e faircoin-cuda python -m examples.faircoin.main --posterior
-```
-
-### All Figures
-
-```bash
-# CPU version
-pixi run -e faircoin python -m examples.faircoin.main --all
-
-# CUDA version (recommended)
-pixi run -e faircoin-cuda python -m examples.faircoin.main --all
-```
-
-### Custom Parameters
-
-```bash
-# CPU version
-pixi run -e faircoin python -m examples.faircoin.main --combined --num-obs 100 --num-samples 5000
-
-# CUDA version
-pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 100 --num-samples 5000
-```
-
-## Performance Expectations
-
-### Typical Results (CPU)
-
-- **GenJAX**: ~100% of handcoded baseline (identical performance)
-- **Handcoded JAX**: 100% baseline (theoretical optimum)
-- **NumPyro**: ~130-400% of baseline (varies by workload)
-
-### Typical Results (CUDA/GPU)
-
-With GPU acceleration (e.g., cuda:0):
-- **GenJAX**: ~0.000087s (~97% of handcoded baseline)
-- **Handcoded JAX**: ~0.000090s (baseline)
-- **NumPyro**: ~0.000141s (~157% of baseline)
-
-GPU execution shows:
-- Much faster absolute times (microsecond range)
-- GenJAX maintains near-identical performance to handcoded
-- NumPyro overhead is reduced with GPU acceleration (~1.6x vs ~1.3-4x on CPU)
-
-### Framework Characteristics
-
-- **GenJAX**: Clean syntax with zero performance overhead - compiles to identical performance as handcoded JAX
-- **NumPyro**: Mature ecosystem, good performance for complex models, moderate overhead for simple models
-- **Handcoded**: Raw JAX performance ceiling - serves as the reference implementation
-
-## Development Guidelines
-
-### When Modifying Timing Functions
-
-1. **Maintain consistency**: All frameworks should implement identical algorithms
-2. **Preserve warm-up**: Always include JIT warm-up runs before timing
-3. **Use block_until_ready()**: Ensure accurate timing measurements
-4. **Keep static parameters**: Avoid dynamic arguments that break JIT compilation
-
-### When Updating Visualizations
-
-1. **Research paper standards**: Maintain large fonts and high DPI
-2. **Color consistency**: Use established color scheme for frameworks
-3. **Filename parametrization**: Include all relevant parameters in filename
-4. **Clear interpretation**: Maintain "smaller bar is better" guidance
-
-### Testing Changes
-
-```bash
-# Quick test with minimal parameters
-pixi run -e faircoin python -m examples.faircoin.main --combined --num-samples 1000
-
-# Timing only test
-pixi run -e faircoin python -m examples.faircoin.main --repeats 20
-
-# Posterior only test
-pixi run -e faircoin python -m examples.faircoin.main --posterior --num-samples 2000
-```
-
-## Common Issues
-
-### Import Errors
-
-- **Cause**: Missing dependencies in faircoin environment
-- **Solution**: Ensure `pixi install -e faircoin` completed successfully
-- **Dependencies**: matplotlib, seaborn, numpy, jax, numpyro
-
-### JIT Compilation Issues
-
-- **Cause**: Dynamic arguments breaking JAX compilation
-- **Solution**: Keep model parameters static, use closures for configuration
-- **Pattern**: All timing functions use fixed model configurations
-
-## Integration with Main GenJAX
-
-This case study serves as:
-
-1. **Performance benchmark**: Demonstrates GenJAX competitive performance
-2. **Usage example**: Shows proper `@gen` function patterns
-3. **Framework comparison**: Contextualizes GenJAX within PPL ecosystem
-4. **Research validation**: Provides publication-ready performance comparisons
-
-The case study should remain stable and serve as a reference implementation for GenJAX performance characteristics.
+## Extension Guidelines
+- Add new frameworks by mirroring the pattern in `core.py` (separate timing + posterior helpers) and extending CLI switches in `main.py`.
+- Keep analytic references up to date in `exact_beta_posterior_stats` when altering priors or data composition.

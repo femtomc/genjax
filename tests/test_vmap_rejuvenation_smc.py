@@ -363,12 +363,12 @@ if __name__ == "__main__":
             initial_args,
             const(10),
         )
-        print("✗ Test failed - expected ValueError but got success")
+        print("FAIL: Expected ValueError but the call succeeded")
 
     except ValueError as e:
         if "vmap in_axes must be" in str(e):
-            print("✓ Test passed (correctly caught the expected Vmap error)")
+            print("PASS: Correctly caught the expected vmap error")
         else:
-            print(f"✗ Test failed - wrong ValueError: {e}")
+            print(f"FAIL: Received unexpected ValueError: {e}")
     except Exception as e:
-        print(f"✗ Test failed unexpectedly: {e}")
+        print(f"FAIL: Unexpected exception: {e}")

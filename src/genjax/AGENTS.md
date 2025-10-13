@@ -64,8 +64,7 @@ This guide covers the core GenJAX concepts implemented in:
 **Purpose**: Merge two choice maps, with optional conditional selection
 - Returns `(merged_choices, discarded_values)`
 - If `check` is provided, uses `jnp.where(check, x, x_)` for conditional selection at leaf level
-- Used internally for compositional generative functions and Cond combinator
-- **Enhanced API (June 2025)**: Added `check` parameter and tuple return for conditional merge support
+- Used internally for compositional generative functions and Cond combinator to support conditional merges
 
 #### filter
 **Method**: `filter(x: X, selection: Selection) -> tuple[X | None, X | None]`
@@ -177,11 +176,11 @@ Higher-order generative functions for composition:
 **Purpose**: Conditional execution with full support for same-address branches
 - First argument to resulting GF must be boolean condition
 - Both branches must have same return type
-- **Enhanced (June 2025)**: Now supports branches with same addresses via conditional merge API
+- Supports branches with the same addresses through conditional merge logic
 - Uses `merge(x, x_, check=condition)` for efficient conditional selection
-- `CondTr.get_choices()` automatically applies conditional selection using enhanced merge
+- `CondTr.get_choices()` automatically applies conditional selection using the merge utility
 - Enables natural mixture models without address conflicts
-- No NaN masking needed when structures match - direct `jnp.where` selection instead
+- Avoids NaN masking when structures match by selecting values with `jnp.where`
 
 ## Critical API Patterns
 
@@ -227,11 +226,13 @@ Higher-order generative functions for composition:
 **Key Transformations**:
 
 #### seed
-**Function**: `seed(fn) -> seeded_fn`
+**Function**: `seed(fn: Callable[..., T]) -> Callable[[jax.random.KeyArray, ...], T]`
 **Location**: `pjax.py:seed`
-- Eliminates PJAX primitives for JAX compatibility
-- Requires explicit PRNG keys
-- **CRITICAL**: Only use external to `src/`, never inside library code
+- Accepts a function that does not take a PRNG key and returns a wrapper whose first positional argument is a JAX `KeyArray`.
+- Inside the wrapper every `sample_p` primitive is replaced with keyed sampling logic, so the transformed function behaves deterministically given the supplied key.
+- Use the seeded function whenever you need to supply randomness explicitly or before applying `jax.jit`, `jax.vmap`, `jax.scan`, etc.
+- Typical pattern: `simulate_with_key = seed(model.simulate); trace = simulate_with_key(key, *args)`.
+- Apply `seed` at call sites (tests, examples, scripts); library code inside `src/genjax/` should expose unseeded functions so callers control randomness.
 
 #### modular_vmap
 **Function**: `modular_vmap(fn, in_axes, axis_size) -> vmapped_fn`
@@ -275,7 +276,7 @@ Higher-order generative functions for composition:
 - Nested: `namespace(namespace(fn, "inner"), "outer")`
 - See `state.py` for implementation details
 
-### Enhanced Cond Combinator (June 2025)
+### Cond Combinator with Shared Addresses
 
 **Mixture Model Pattern with Same Addresses**:
 ```python
@@ -290,7 +291,7 @@ def mixture_observation(condition, value):
     def heavy_tail_branch():
         return normal(value, 1.0) @ "obs"  # Same address!
 
-    # This now works correctly thanks to enhanced merge API
+    # This pattern works because the merge API performs conditional selection
     cond_model = Cond(heavy_tail_branch, normal_branch)
     observation = cond_model(condition) @ "mixture"
     return observation
@@ -299,8 +300,8 @@ def mixture_observation(condition, value):
 **How It Works**:
 - `CondTr` stores choices from both branches
 - When `get_choices()` is called, uses `merge(branch1_choices, branch2_choices, check=condition)`
-- Distribution.merge implements `jnp.where(condition, branch1_val, branch2_val)` at leaves
-- Result: Efficient conditional selection without address conflicts
+    - `distribution.merge` implements `jnp.where(condition, branch1_val, branch2_val)` at leaves
+    - Result: Efficient conditional selection without address conflicts
 
 #### MCMC Integration
 

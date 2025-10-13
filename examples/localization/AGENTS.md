@@ -1,283 +1,43 @@
-# AGENTS.md - Localization Case Study
+# Localization Case Study Guide
 
-Probabilistic robot localization using particle filtering with GenJAX. Demonstrates SMC with MCMC rejuvenation, vectorized LIDAR sensing, and drift-only dynamics for improved convergence.
+GenJAX localization demonstrates particle filtering with optional MCMC rejuvenation for drift-only robot dynamics in a simple indoor map.
 
-## Environment Setup
+## Key Files
+- `core.py`: model definition, particle filter variants, utility dataclasses
+- `data.py`: reproducible trajectory generation
+- `figs.py`: plotting utilities backed by `genjax.viz.standard`
+- `export.py`: experiment export/import helpers
+- `main.py`: CLI entry point (generate data, plot figures, full pipeline)
 
-**IMPORTANT**: This case study requires the CUDA environment for proper execution:
+## Environment
+Run localization tasks inside the CUDA environment so that JAX sees GPU-capable dependencies:
 
 ```bash
-# Always use the cuda environment for localization
-pixi run -e cuda python -m examples.localization.main [command]
-
-# Or use the predefined tasks (which automatically use cuda environment):
-pixi run cuda-localization-generate-data
-pixi run cuda-localization-plot-figures
-pixi run cuda-localization  # Full pipeline
+pixi run -e cuda python -m examples.localization.main generate-data
+pixi run -e cuda python -m examples.localization.main plot-figures --experiment-name <name>
+pixi run cuda-localization  # end-to-end shortcut
 ```
 
-The `cuda` environment includes:
-- JAX with GPU support (if available)
-- Matplotlib for visualization
-- All required dependencies for the case study
+Generated artefacts live under `examples/localization/data/` and figures default to the repository `figs/` directory.
 
-## Directory Structure
+## Workflow Summary
+1. `generate-data` produces ground-truth trajectories, observations, and serialized particle dumps via `export.py`.
+2. `plot-figures` consumes a saved experiment and renders comparison figures (ESS diagnostics, timing, trajectory overlays).
+3. `run` combines both steps for quick smoke tests.
 
-```
-examples/localization/
-├── core.py             # SMC methods, drift-only model, world geometry
-├── data.py             # Trajectory generation
-├── figs.py             # Visualization (4-row SMC comparison, error plots)
-├── main.py             # CLI with data export/import
-├── export.py           # CSV data export/import system
-└── data/               # Experimental data (CSV + JSON metadata)
-```
+The CLI exposes knobs for particle count, rejuvenation iterations, and which figure suites to emit; prefer adjusting these via command-line flags rather than modifying source.
 
-## Core Implementation
+## Modeling Notes
+- State variables cover position and heading only. Velocity terms are intentionally absent to keep rejuvenation effective.
+- Observation constraints rely on vectorised LIDAR beams; always wrap static configuration (particle counts, ray counts) with `Const[...]`.
+- Rejuvenation kernels are optional: pass `None` to rely on the model’s proposal or supply an `mcmc_kernel` callable constructed in `core.py`.
 
-### Drift-Only Model Design
-The localization model uses **drift-only dynamics** without velocity variables for improved SMC convergence:
-- **State space**: Only (x, y, θ) - no velocity or angular velocity
-- **Dynamics**: Simple positional drift `x_t ~ Normal(x_{t-1}, σ)`
-- **Benefits**: Better particle diversity, stable convergence, faster computation
+## Visualization Notes
+- Import typography and colour utilities from `genjax.viz.standard` (`setup_publication_fonts`, `get_method_color`, `save_publication_figure`, etc.).
+- Keep plots free of ad-hoc styling; reuse the helpers in `figs.py` when adding new figures so that ESS diagnostics and timing charts stay comparable.
 
-### SMC Methods (`core.py`)
-- **`run_smc_basic()`**: Bootstrap filter (no rejuvenation)
-- **`run_smc_with_mh()`**: SMC + Metropolis-Hastings rejuvenation
-- **`run_smc_with_hmc()`**: SMC + Hamiltonian Monte Carlo rejuvenation
-- **`run_smc_with_locally_optimal()`**: SMC + Locally optimal proposal using grid evaluation
-- **K parameter**: Uses `Const[int]` pattern for JAX compilation: `K: Const[int] = const(10)`
-
-### Models
-- **`localization_model()`**: Drift-only dynamics with no velocity variables
-  - Initial distribution: Centered at (1.5, 1.5) near true start with σ=0.5
-  - Drift noise: σ=0.25 for x/y and σ=0.1 for heading (matches drift-only implementation)
-  - Sensor noise: σ=0.3 (reduced from 1.5 for better tracking)
-- **`sensor_model_single_ray()`**: LIDAR ray model with Gaussian noise
-- **`initial_model()`**: Initial pose distribution near true starting position
-
-### Locally Optimal Proposal (`core.py`)
-- **`create_locally_optimal_proposal()`**: Creates transition proposal using grid evaluation
-- **Grid Evaluation**: Default 15×15×15 grid over (x, y, θ); paper pipeline widens this to 25×25×25 for higher fidelity
-- **Vectorized Assessment**: Uses `jax.vmap` to evaluate `localization_model.assess()` at all grid points
-- **Optimal Selection**: Finds `argmax` of log probabilities across grid
-- **Noise Injection**: Adds Gaussian noise around selected point (σ≈0.15 for position, σ≈0.075 for heading in paper configuration)
-- **JAX Compatible**: Fully vectorized implementation using JAX primitives
-
-### World Geometry
-- **3-room layout**: 12×10 world with 9 internal walls and doorways
-- **JAX arrays**: Wall coordinates stored as `walls_x1`, `walls_y1`, `walls_x2`, `walls_y2`
-- **Vectorized intersections**: Ray-wall calculations use JAX vmap
-
-## Data Export System (`export.py`)
-
-### Structure
-```
-data/localization_r{rays}_p{particles}_{world_type}_{timestamp}/
-├── experiment_metadata.json          # All config parameters
-├── benchmark_summary.csv            # Method comparison
-├── ground_truth_poses.csv           # timestep,x,y,theta
-├── ground_truth_observations.csv    # timestep,ray_0,...,ray_7
-├── smc_basic/timing.csv              # mean_time_sec,std_time_sec
-├── smc_basic/diagnostic_weights.csv # ESS computation data
-├── smc_basic/particles/timestep_*.csv # particle_id,x,y,theta,weight
-├── smc_mh/...                       # Same structure
-├── smc_hmc/...                      # Same structure
-└── smc_locally_optimal/...          # Same structure
-```
-
-### API
-- **Export**: `save_benchmark_results(data_dir, results, config)`
-- **Import**: `load_benchmark_results(data_dir)` → identical plot generation
-- **Ground truth**: `save_ground_truth_data()`, `load_ground_truth_data()`
-
-## Visualization (`figs.py`)
-
-Figures are saved to the repository-level `figs/` directory by default (configurable via `--output-dir`). Create it first (`mkdir -p figs`) or pass an absolute output directory; no case-local `figs/` directory lives under `examples/localization/`.
-
-### GenJAX Research Visualization Standards (GRVS)
-
-All visualization functions use the shared `examples.viz` module for consistent styling across case studies:
-
-**Core Standards:**
-- **Typography**: 18pt base fonts, bold axis labels, 16pt legends
-- **Colors**: Colorblind-friendly palette with consistent SMC method colors
-- **Clean Room Visualization**: LIDAR and trajectory plots remove axes/grid for cleaner spatial view
-- **Shared Axes**: Distance readings plots use shared y-axis with single "Distance" label
-- **Publication Quality**: 300 DPI PDF output with GRVS compliance
-
-**Usage Pattern:**
-```python
-from examples.viz import (
-    setup_publication_fonts, FIGURE_SIZES, get_method_color,
-    apply_grid_style, save_publication_figure
-)
-```
-
-### SMC Method Comparison Plot
-**4-row layout** (`plot_smc_method_comparison()`):
-1. **Initial particles** with "Start" label (left side)
-2. **Final particles** with "End" label (left side)
-3. **Raincloud plots** - ESS diagnostics with color coding (good/medium/bad)
-4. **Timing comparison** - horizontal bars with error bars
-
-**Visualization features**:
-- **Color coding**: Bootstrap filter (blue), SMC+MH (orange), SMC+HMC (green), SMC+Locally Optimal (red)
-- **ESS thresholds**: Good ≥50% particles, Medium ≥25%, Bad <25%
-- **Ground truth**: Marked with 'x' symbols
-- **Particle blending**: Shows temporal evolution with alpha transparency
-
-### Clean Room Visualization
-**LIDAR and trajectory plots** (`plot_lidar_demo()`, `plot_ground_truth_trajectory()`):
-- **No axes, ticks, or grid**: Clean spatial visualization focusing on room layout
-- **Hidden spines**: All axis borders removed for uncluttered view
-- **Room-only focus**: Emphasizes spatial relationships without distracting elements
-- **Enhanced visibility**: Legend placed inside room (lower left), doubled marker sizes (160 vs 80), increased legend font size (20pt), larger robot arrows with thicker lines
-- **Larger room labels**: "Room _" labels increased from 14pt to 20pt for better readability in LIDAR demo
-
-### Shared Distance Plots
-**Sensor observations** (`plot_sensor_observations()`):
-- **Shared y-axis**: All subplots use consistent distance scaling
-- **Single label**: "Distance" label only on leftmost column
-- **Ray-specific plots**: Each LIDAR ray shown in separate subplot with shared scaling
-- **Improved label positioning**: "Ray _" labels moved from (0.02, 0.98) to (0.15, 0.85) for better visibility within subplots
-
-### Other Plots
-- **`plot_particle_filter_evolution()`**: 4×4 grid showing particle evolution over 16 timesteps
-- **`plot_multi_method_estimation_error()`**: Position and heading error comparison across methods
-- **`plot_smc_timing_comparison()`**: Horizontal bar chart with confidence intervals
-
-## CLI Usage (`main.py`)
-
-### Two-Step Workflow
-```bash
-# Step 1: Generate all experimental data
-pixi run cuda-localization-generate-data
-
-# Step 2: Plot all figures from saved data
-pixi run cuda-localization-plot-figures
-
-# Or run full pipeline:
-pixi run cuda-localization
-```
-
-### Direct Environment Usage
-```bash
-# Generate data with specific parameters
-pixi run -e cuda python -m examples.localization.main generate-data \
-    --n-particles 100 --k-rejuv 20 --timing-repeats 5 \
-    --include-basic-demo --include-smc-comparison
-
-# Plot from specific experiment
-pixi run -e cuda python -m examples.localization.main plot-figures \
-    --experiment-name localization_r8_p100_basic_20250620_123456
-```
-
-### Key Arguments for `generate-data`
-- **`--include-basic-demo`**: Include basic particle filter demo
-- **`--include-smc-comparison`**: Include 4-method SMC comparison (adds computation time)
-- **`--n-particles N`**: Particle count (default: 200)
-- **`--k-rejuv K`**: MCMC rejuvenation steps (default: 20)
-- **`--timing-repeats R`**: Timing repetitions (default: 20)
-- **`--experiment-name NAME`**: Custom experiment name (defaults to timestamped)
-
-### Key Arguments for `plot-figures`
-- **`--experiment-name NAME`**: Experiment to plot (defaults to most recent)
-- **`--no-lidar-rays`**: Disable LIDAR ray visualization in plots
-- **`--output-dir DIR`**: Output directory for figures (default: figs)
-
-## Technical Details
-
-### JAX Patterns
-- **rejuvenation_smc usage**: `seed(rejuvenation_smc)(key, model, observations=obs, n_particles=const(N))`
-- **Const[...] pattern**: Static parameters use `K: Const[int] = const(10)` for proper JIT compilation
-- **Vmap integration**: Sensor model uses GenJAX `Vmap` for 8-ray LIDAR vectorization
-- **Key management**: Use `seed()` transformation at top level, avoid explicit keys in @gen functions
-
-### Performance (Drift-Only Model)
-- **LIDAR rays**: 8 rays provide good accuracy vs speed tradeoff
-- **Particle counts**: 50-200 particles for real-time performance
-- **Timing (100 particles)**:
-  - Basic SMC: ~22ms
-  - SMC + MH: ~26ms
-  - SMC + HMC: ~53ms
-  - SMC + Locally Optimal: ~30ms
-- **Convergence**: Excellent tracking with average position error < 0.2
-
-### Drift-Only Model Parameters
-- **Initial distribution**: (1.5, 1.5) with σ=0.5 (near true start at 1.2, 1.2)
-- **Drift noise**: σ_x=0.25, σ_y=0.25, σ_θ=0.1
-- **Sensor noise**: σ=0.3 for LIDAR measurements
-- **No velocity variables**: Simplified state space improves convergence
-
-### Common Issues
-- **Environment**: Always use `pixi run -e cuda` for proper dependencies
-- **Const[...] errors**: Ensure `from genjax import const` in imports
-- **PJAX primitives**: Apply `seed()` before JAX transformations
-- **Observation format**: Ground truth must match 8-element LIDAR array structure
-
-## Current Status (June 20, 2025)
-
-### OK Production Ready
-- **Drift-only model**: Simplified dynamics for excellent SMC convergence
-- **Enhanced visualization**: 4-row SMC comparison with particle blending
-- **Complete data export**: CSV system with metadata preservation
-- **Plot-from-data**: Generate visualizations without recomputation
-- **GPU acceleration**: CUDA environment for fast computation
-
-### 🎯 Model Improvements
-1. **Removed velocity variables**: Simplified state space to (x, y, θ) only
-2. **Centered initial distribution**: Near true start position (1.5, 1.5)
-3. **Reduced sensor noise**: From σ=1.5 to σ=0.3 for better tracking
-4. **Updated locally optimal proposal**: 3D grid search without velocity dimensions
-5. **Achieved excellent convergence**: All methods track ground truth effectively
-
-### 📊 Data Export Benefits
-- **Reproducibility**: Complete experimental record with metadata
-- **Efficiency**: Avoid rerunning expensive experiments for plot adjustments
-- **Sharing**: CSV format enables external analysis (R, MATLAB, pandas)
-- **Comparison**: Easy parameter studies across experimental conditions
-
-###  Ready for Research
-- **Four SMC methods** fully implemented and benchmarked
-- **Drift-only dynamics** provide stable, interpretable results
-- **Complete experimental pipeline** with data export/import
-- **Publication-ready visualizations** with method comparison plots
-- **Fast performance** suitable for real-time applications
-
-All functionality tested and verified with the drift-only model providing excellent convergence properties.
-
-## Figure Generation and Naming
-
-### 📊 Paper Mode Outputs
-`examples/localization/main.py` exposes a single `paper` command that writes publication-ready PDFs to the repository-level `figs/` directory. The filenames capture the experiment parameters via:
-
-```
-param_prefix = f"localization_r{n_rays}_p{n_particles}_{world_type}"
-```
-
-Paper mode always produces:
-- **`{param_prefix}_localization_problem_1x4_explanation.pdf`** – problem overview (trajectory, observations, error summaries, diagnostics)
-
-When `--include-smc-comparison` is supplied it additionally generates:
-- **`{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf`** – 4-row comparison across bootstrap, MH, HMC, and locally optimal proposals
-
-Both files are emitted directly by the main script using `matplotlib.pyplot.savefig`, so they inherit the DPI and bounding-box settings encoded there.
-
-### 🔧 Additional Visualizations
-`examples/localization/figs.py` contains reusable helpers for deeper analysis:
-- Call `plot_particle_filter_evolution(..., save_dir="figs")` when you want **`particle_evolution_{method}.pdf`** snapshots; leaving `save_dir=None` simply returns the figure and axes without writing to disk.
-- Functions such as `plot_estimation_error`, `plot_sensor_observations`, and the raincloud diagnostics accept optional `save_path` arguments. They invoke `plt.savefig` (or `save_publication_figure` where noted) only when a path is provided, so no files are created by default.
-- Benchmark helpers in `core.py` return particle histories and diagnostics that these plotting utilities expect.
-
-Use these functions directly when you need bespoke figures beyond the paper defaults; specify your own output paths (the convention is to point them at the repository-level `figs/` directory) or capture the matplotlib objects for custom handling.
-
-### 🎨 Visualization Features
-- **ESS Display**: Shows as percentage (e.g., "ESS: 75%") for intuitive understanding
-- **Legend Design**: 
-  - Large colored squares (3×2 units) for visibility
-  - 18pt font at bottom of figure
-  - Line breaks in method labels for readability
-- **Method Titles**: Each subplot shows method name with parameters
-- **Consistent Prefix**: All figures start with "localization_" for clear identification
-- **Parametric Naming**: Configuration encoded in filename (r8=8 rays, p200=200 particles, basic=world type)
+## Implementation Checklist
+- Before `jax.jit`, `jax.vmap`, or `jax.scan`, derive a seeded callable (`seeded_fn = genjax.pjax.seed(fn)`) and invoke it as `seeded_fn(key, ...)`.
+- Use `Const[int]` for static loop bounds (e.g., particle counts, rejuvenation steps).
+- When extending exports, update both `save_*` and `load_*` helpers to maintain backward compatibility.
+- Validate changes against `tests/test_vmap_rejuvenation_smc.py` when modifying rejuvenation logic.

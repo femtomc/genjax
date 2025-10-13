@@ -4,7 +4,7 @@ This note briefs AI coding agents that assist with the POPL 2026 paper artifact 
 
 Terminology: within the POPL submission the system is called VPPL; inside this repository we continue to use the GenJAX name. They refer to the same implementation.
 
-## 🔥 CRITICAL: Initial Context Loading
+## Critical Initial Context Loading
 
 When starting work in this codebase, ALWAYS read the relevant AGENTS.md files first:
 1. **Core concepts**: Read `src/genjax/AGENTS.md` for GenJAX fundamentals
@@ -16,15 +16,9 @@ When starting work in this codebase, ALWAYS read the relevant AGENTS.md files fi
 
 GenJAX is a probabilistic programming language embedded in Python centered on programmable inference.
 
-## Recent Updates
+## Inference Highlights
 
-### Enhanced rejuvenation_smc API
-- **Optional Parameters**: `transition_proposal` and `mcmc_kernel` are now optional in `rejuvenation_smc`
-- **Simplified Usage**: Can use model's internal proposal without custom proposals
-- **Backwards Compatible**: All existing code continues to work unchanged
-- **Improved Documentation**: See `src/genjax/inference/AGENTS.md` for updated API examples
-- **Case Study Update**: Localization example now demonstrates simplified usage pattern
-- **SMC Diagnostics**: Particle collections retain log-normalized diagnostic weights for ESS tracking and visualization
+`rejuvenation_smc` supports optional custom proposals while defaulting to the model’s internal transition. Existing call sites continue to work. Diagnostics expose log-normalized weights so downstream code can track ESS (see `src/genjax/inference/AGENTS.md` for usage patterns).
 
 ## JAX Best Practices
 
@@ -73,7 +67,7 @@ x = jax.lax.fori_loop(0, n, body, x)
 
 ### GenJAX-Specific JAX Tips
 - Use `Const[T]` for static values that must not become tracers
-- Use `seed()` transformation before JAX transformations on PJAX code
+- Wrap probabilistic callables with `genjax.pjax.seed` so the seeded version accepts a `PRNGKey` before applying `jax.jit`, `jax.vmap`, etc.
 - Prefer `modular_vmap` over `jax.vmap` for probabilistic operations
 - All GenJAX types inherit from `Pytree` for automatic vectorization
 
@@ -125,7 +119,7 @@ genjax/
 - Ensure the plan addresses all requirements
 
 ### 3. Code
-- **🔥 NEVER use command line Python** - always write test scripts
+- **Do not use the command line Python interpreter** - always write test scripts
 - Create `test_<feature>.py` scripts for experiments
 - Run with: `pixi run python test_feature.py`
 - Follow patterns from existing tests/examples
