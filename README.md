@@ -316,7 +316,7 @@ In this section, we provide more details on the case studies. Each case study di
 
 ### Fair Coin (Beta-Bernoulli)
 
-**What it does**: Compares GenJAX, handcoded JAX, and NumPyro on a simple conjugate inference problem.
+**What it does**: Compares GenJAX, handcoded JAX, and NumPyro on a simple inference problem (with known exact inference).
 
 **Figures in the paper**: Figure 16 (a).
 
