@@ -14,10 +14,12 @@ authors:
     given-names: Mathieu
     email: mhuot@mit.edu
     affiliation: Massachusetts Institute of Technology
+    orcid: "https://orcid.org/0000-0002-5294-9088"
   - family-names: Matheos
     given-names: George
     email: gmatheos@mit.edu
     affiliation: Massachusetts Institute of Technology
+    orcid: "https://orcid.org/0000-0002-5872-5851"
   - family-names: Wang
     given-names: Xiaoyan
     email: xyz@mit.edu
@@ -26,6 +28,7 @@ authors:
     given-names: Karen
     email: seoyeon@mit.edu
     affiliation: Massachusetts Institute of Technology
+    orcid: "https://orcid.org/0000-0001-6063-1224"
   - family-names: Smith
     given-names: Colin
     email: colin.smith@gmail.com
