@@ -406,62 +406,62 @@ def test_fn_conditional_sampling(standard_tolerance, helpers):
 @pytest.mark.regression
 def test_cond_update_with_vmap_regression(base_key, standard_tolerance, helpers):
     """Regression test for Cond.update bug with vmap (Issue #XXX).
-    
+
     This test verifies that Cond.update works correctly in vectorized contexts.
     The bug was that jnp.select was used incorrectly with scalar conditions.
     """
-    
+
     # Define a simple conditional model
     @gen
     def branch_a(value):
         return normal(value, 0.1) @ "obs"
-    
+
     @gen
     def branch_b(value):
         return normal(value, 1.0) @ "obs"
-    
+
     @gen
     def conditional_point(value, use_branch_a):
         cond_model = Cond(branch_b, branch_a)
         return cond_model(use_branch_a, value) @ "result"
-    
+
     @gen
     def vectorized_model(values, conditions):
         # Vectorize the conditional model
-        results = conditional_point.vmap(in_axes=(0, 0))(
-            values, conditions
-        ) @ "points"
+        results = conditional_point.vmap(in_axes=(0, 0))(values, conditions) @ "points"
         return results
-    
+
     # Test data
     n_points = 3
     values = jnp.array([1.0, 2.0, 3.0])
     conditions = jnp.array([True, False, True])
-    
+
     # Generate initial trace
     trace = seed(vectorized_model.simulate)(base_key, values, conditions)
     helpers.assert_valid_trace(trace)
-    
+
     # Create new observations for update
     new_obs = jnp.array([1.1, 2.2, 2.9])
     constraints = {"points": {"result": {"obs": new_obs}}}
-    
+
     # This should NOT raise TypeError anymore
     new_trace, weight, discard = vectorized_model.update(
         trace, constraints, values, conditions
     )
-    
+
     # Verify the update worked correctly
     assert new_trace is not None
     assert weight.shape == ()  # Should be a scalar
     helpers.assert_valid_density(weight)
-    
+
     # Check that the new observations were incorporated
     new_choices = new_trace.get_choices()
     updated_obs = new_choices["points"]["result"]["obs"]
     helpers.assert_finite_and_close(
-        updated_obs, new_obs, rtol=standard_tolerance,
-        msg="Updated observations should match constraints"
+        updated_obs,
+        new_obs,
+        rtol=standard_tolerance,
+        msg="Updated observations should match constraints",
     )
 
 
@@ -470,54 +470,56 @@ def test_cond_update_with_vmap_regression(base_key, standard_tolerance, helpers)
 @pytest.mark.fast
 def test_cond_with_same_addresses_in_branches(base_key, standard_tolerance, helpers):
     """Test that Cond works correctly with same addresses in both branches.
-    
+
     This is the mixture model pattern that should be supported.
     """
-    
+
     @gen
     def normal_component(x, mean):
         return normal(mean, 0.1) @ "y"  # Same address in both branches!
-    
-    @gen 
+
+    @gen
     def outlier_component(x, mean):
         return normal(mean, 1.0) @ "y"  # Same address in both branches!
-    
+
     @gen
     def mixture_model(x, outlier_prob=0.1):
         mean = normal(0.0, 1.0) @ "mean"
         is_outlier = flip(outlier_prob) @ "is_outlier"
-        
+
         # Conditional with same addresses
         cond = Cond(outlier_component, normal_component)
         observation = cond(is_outlier, x, mean) @ "obs"
-        
+
         return observation
-    
+
     # Test simulate
     trace = seed(mixture_model.simulate)(base_key, 1.0)
     choices = trace.get_choices()
     helpers.assert_valid_trace(trace)
-    
+
     # Verify we have all expected addresses
     assert "mean" in choices
     assert "is_outlier" in choices
     assert "obs" in choices
     assert "y" in choices["obs"]  # The observation from the selected branch
-    
+
     # Test assess - should handle same addresses correctly
     density, retval = mixture_model.assess(choices, 1.0)
     helpers.assert_valid_density(density)
-    
+
     # Test update
     new_choices = {"obs": {"y": 1.5}}
     new_trace, weight, discard = mixture_model.update(trace, new_choices, 1.0)
     helpers.assert_valid_density(weight)
-    
+
     # Verify the observation was updated
     updated_choices = new_trace.get_choices()
     helpers.assert_finite_and_close(
-        updated_choices["obs"]["y"], 1.5, rtol=standard_tolerance,
-        msg="Updated observation should match constraint"
+        updated_choices["obs"]["y"],
+        1.5,
+        rtol=standard_tolerance,
+        msg="Updated observation should match constraint",
     )
 
 

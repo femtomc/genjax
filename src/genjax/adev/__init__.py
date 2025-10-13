@@ -67,6 +67,7 @@ from genjax.pjax import (
     modular_vmap,
     stage,
 )
+
 # Use internal util (jax.util versions deprecated in 0.6.0)
 from jax._src import util as jax_util
 from jax.extend import source_info_util as src_util

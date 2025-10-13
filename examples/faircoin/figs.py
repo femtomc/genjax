@@ -383,7 +383,7 @@ def combined_comparison_fig(
         # Calculate sample statistics (for numerical comparison)
         sample_mean = np.average(samples, weights=weights)
         sample_std = np.sqrt(np.average((samples - sample_mean) ** 2, weights=weights))
-    
+
     # Get y-limits from all axes and set them to be the same
     y_min = min(ax.get_ylim()[0] for ax in axes_top)
     y_max = max(ax.get_ylim()[1] for ax in axes_top)
@@ -528,9 +528,7 @@ def combined_comparison_fig(
     print(f"Ours: {gj_mu:.6f}s, Handcoded: {hc_mu:.6f}s, NumPyro: {np_mu:.6f}s")
 
     # Save with parametrized filename (3x2 layout without Pyro)
-    filename = (
-        f"figs/faircoin_combined_posterior_and_timing_obs{num_obs}_samples{num_samples}.pdf"
-    )
+    filename = f"figs/faircoin_combined_posterior_and_timing_obs{num_obs}_samples{num_samples}.pdf"
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved combined comparison plot to {filename}")

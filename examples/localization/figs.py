@@ -3,7 +3,6 @@ Visualization functions for the localization case study.
 """
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import jax.numpy as jnp
 import numpy as np
 from typing import Dict, Any, List
@@ -11,9 +10,14 @@ from .core import Pose, World
 
 # Import shared GenJAX Research Visualization Standards
 from genjax.viz.standard import (
-    setup_publication_fonts, FIGURE_SIZES, get_method_color,
-    apply_grid_style, set_minimal_ticks, apply_standard_ticks, save_publication_figure,
-    SMC_METHOD_COLORS, PRIMARY_COLORS, MARKER_SPECS, LINE_SPECS
+    setup_publication_fonts,
+    FIGURE_SIZES,
+    get_method_color,
+    apply_grid_style,
+    set_minimal_ticks,
+    save_publication_figure,
+    MARKER_SPECS,
+    LINE_SPECS,
 )
 
 # Apply GRVS typography standards
@@ -98,7 +102,9 @@ def plot_pose(
         fig, ax = plt.subplots(figsize=(8, 8))
 
     # Plot position
-    ax.scatter(pose.x, pose.y, color=color, s=markersize, label=label, zorder=5, marker=marker)
+    ax.scatter(
+        pose.x, pose.y, color=color, s=markersize, label=label, zorder=5, marker=marker
+    )
 
     # Plot heading arrow if requested
     if show_arrow:
@@ -156,8 +162,8 @@ def plot_lidar_rays(
         fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_large"])
         # Apply GRVS styling
         apply_grid_style(ax)
-        ax.set_xlabel("X Position (m)", fontweight='bold')
-        ax.set_ylabel("Y Position (m)", fontweight='bold')
+        ax.set_xlabel("X Position (m)", fontweight="bold")
+        ax.set_ylabel("Y Position (m)", fontweight="bold")
 
     # Import distance computation function
     from .core import distance_to_wall_lidar
@@ -181,24 +187,15 @@ def plot_lidar_rays(
             line_spec = LINE_SPECS["lidar_rays"].copy()
             line_spec["alpha"] = ray_alpha  # Override with custom alpha
             ax.plot(
-                [pose.x, end_x],
-                [pose.y, end_y],
-                color=ray_color,
-                zorder=2,
-                **line_spec
+                [pose.x, end_x], [pose.y, end_y], color=ray_color, zorder=2, **line_spec
             )
 
         # Plot measurement endpoint with enlarged marker specifications
         if show_measurements:
             marker_spec = MARKER_SPECS["lidar_endpoints"].copy()
             marker_spec["alpha"] = 0.8  # Override alpha for visibility
-            marker_spec["s"] = 160      # Double the default size for better visibility
-            ax.scatter(
-                end_x,
-                end_y,
-                color=measurement_color,
-                **marker_spec
-            )
+            marker_spec["s"] = 160  # Double the default size for better visibility
+            ax.scatter(end_x, end_y, color=measurement_color, **marker_spec)
 
     return ax
 
@@ -285,7 +282,7 @@ def plot_particles(
             c=color,
             label=label,
             zorder=3,
-            edgecolors='black',  # Add black edge for better visibility
+            edgecolors="black",  # Add black edge for better visibility
             linewidth=0.5,
         )
     else:
@@ -298,7 +295,7 @@ def plot_particles(
             cmap=cmap,
             label=label if label else f"Particles (n={len(particles)})",
             zorder=3,
-            edgecolors='black',  # Add black edge for better visibility
+            edgecolors="black",  # Add black edge for better visibility
             linewidth=0.5,
         )
 
@@ -660,8 +657,8 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
                     label="True Mean Distance",
                 )
 
-            ax.set_xlabel("Ray Angle (radians)", fontweight='bold')
-            ax.set_ylabel("Distance (m)", fontweight='bold')
+            ax.set_xlabel("Ray Angle (radians)", fontweight="bold")
+            ax.set_ylabel("Distance (m)", fontweight="bold")
             # Title removed following curvefit "no titles" principle
             ax.legend(fontsize=16)
             ax.grid(True, alpha=0.3)
@@ -675,8 +672,9 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
             # For smaller numbers of rays, use shared y-axis approach
             n_cols = min(4, n_rays)
             n_rows = (n_rays + n_cols - 1) // n_cols
-            fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), 
-                                   sharey=True)
+            fig, axes = plt.subplots(
+                n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), sharey=True
+            )
 
             if n_rows == 1 and n_cols == 1:
                 axes = [axes]
@@ -734,16 +732,23 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
                             alpha=0.7,
                         )
 
-                ax.set_xlabel("Time Step", fontweight='bold')
-                
-                # Only add y-label to leftmost column 
+                ax.set_xlabel("Time Step", fontweight="bold")
+
+                # Only add y-label to leftmost column
                 if ray_idx % n_cols == 0:
-                    ax.set_ylabel("Distance", fontweight='bold')
-                
+                    ax.set_ylabel("Distance", fontweight="bold")
+
                 # Show ray info in text box instead of title - moved further into subplot
-                ax.text(0.15, 0.85, f"Ray {ray_idx}", transform=ax.transAxes, 
-                       verticalalignment='top', fontsize=14, fontweight='bold',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
+                ax.text(
+                    0.15,
+                    0.85,
+                    f"Ray {ray_idx}",
+                    transform=ax.transAxes,
+                    verticalalignment="top",
+                    fontsize=14,
+                    fontweight="bold",
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7),
+                )
                 apply_grid_style(ax)
                 ax.legend(fontsize=12)
                 set_minimal_ticks(ax)
@@ -759,15 +764,21 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
         fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
 
         # Plot observations with larger markers (following curvefit standards)
-        ax.plot(observations, "b-", linewidth=3, label="Observed Distance", 
-                marker="o", markersize=8)
+        ax.plot(
+            observations,
+            "b-",
+            linewidth=3,
+            label="Observed Distance",
+            marker="o",
+            markersize=8,
+        )
 
         # Plot true distances if available
         if true_distances is not None:
             ax.plot(true_distances, "r--", linewidth=3, label="True Distance")
 
-        ax.set_xlabel("Time Step", fontweight='bold')
-        ax.set_ylabel("Distance to Wall (m)", fontweight='bold')
+        ax.set_xlabel("Time Step", fontweight="bold")
+        ax.set_ylabel("Distance to Wall (m)", fontweight="bold")
         # Title removed following curvefit "no titles" principle
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=16)
@@ -811,10 +822,10 @@ def plot_ground_truth_trajectory(
     ax1.set_xlabel("")
     ax1.set_ylabel("")
     ax1.grid(False)
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.spines['bottom'].set_visible(False)
-    ax1.spines['left'].set_visible(False)
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+    ax1.spines["bottom"].set_visible(False)
+    ax1.spines["left"].set_visible(False)
     ax1.legend()
 
     # Top right: Control commands over time
@@ -824,14 +835,21 @@ def plot_ground_truth_trajectory(
 
     ax2_twin = ax2.twinx()
 
-    line1 = ax2.plot(velocities, "b-", marker="o", label="Velocity", linewidth=3, markersize=8)
+    line1 = ax2.plot(
+        velocities, "b-", marker="o", label="Velocity", linewidth=3, markersize=8
+    )
     line2 = ax2_twin.plot(
-        angular_velocities, "r-", marker="s", label="Angular Velocity", linewidth=3, markersize=8
+        angular_velocities,
+        "r-",
+        marker="s",
+        label="Angular Velocity",
+        linewidth=3,
+        markersize=8,
     )
 
-    ax2.set_xlabel("Time Step", fontweight='bold')
-    ax2.set_ylabel("Velocity", color="b", fontweight='bold')
-    ax2_twin.set_ylabel("Angular Velocity (rad/s)", color="r", fontweight='bold')
+    ax2.set_xlabel("Time Step", fontweight="bold")
+    ax2.set_ylabel("Velocity", color="b", fontweight="bold")
+    ax2_twin.set_ylabel("Angular Velocity (rad/s)", color="r", fontweight="bold")
     # Title removed following curvefit "no titles" principle
     ax2.grid(True, alpha=0.3)
 
@@ -849,11 +867,13 @@ def plot_ground_truth_trajectory(
     ax3.plot(xs, "b-", marker="o", label="X Position", linewidth=3, markersize=8)
     ax3.plot(ys, "g-", marker="s", label="Y Position", linewidth=3, markersize=8)
     ax3_twin = ax3.twinx()
-    ax3_twin.plot(thetas, "r-", marker="^", label="Heading (rad)", linewidth=3, markersize=8)
+    ax3_twin.plot(
+        thetas, "r-", marker="^", label="Heading (rad)", linewidth=3, markersize=8
+    )
 
-    ax3.set_xlabel("Time Step", fontweight='bold')
-    ax3.set_ylabel("Position", fontweight='bold')
-    ax3_twin.set_ylabel("Heading (rad)", color="r", fontweight='bold')
+    ax3.set_xlabel("Time Step", fontweight="bold")
+    ax3.set_ylabel("Position", fontweight="bold")
+    ax3_twin.set_ylabel("Heading (rad)", color="r", fontweight="bold")
     # Title removed following curvefit "no titles" principle
     ax3.grid(True, alpha=0.3)
     ax3.legend(loc="upper left", fontsize=16)
@@ -861,9 +881,16 @@ def plot_ground_truth_trajectory(
 
     # Bottom right: Sensor observations
     ax4 = axes[1, 1]
-    ax4.plot(observations, "b-", marker="o", label="Observed Distance", linewidth=3, markersize=8)
-    ax4.set_xlabel("Time Step", fontweight='bold')
-    ax4.set_ylabel("Distance to Wall (m)", fontweight='bold')
+    ax4.plot(
+        observations,
+        "b-",
+        marker="o",
+        label="Observed Distance",
+        linewidth=3,
+        markersize=8,
+    )
+    ax4.set_xlabel("Time Step", fontweight="bold")
+    ax4.set_ylabel("Distance to Wall (m)", fontweight="bold")
     # Title removed following curvefit "no titles" principle
     ax4.grid(True, alpha=0.3)
     ax4.legend(fontsize=16)
@@ -889,14 +916,20 @@ def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=8):
     ax.set_xlabel("")
     ax.set_ylabel("")
     ax.grid(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(False)
 
     # Plot robot pose with GRVS color - increased arrow length and marker size
-    plot_pose(pose, ax, color=get_method_color("robot_pose"), label="Robot", 
-              arrow_length=0.8, markersize=180)
+    plot_pose(
+        pose,
+        ax,
+        color=get_method_color("robot_pose"),
+        label="Robot",
+        arrow_length=0.8,
+        markersize=180,
+    )
 
     # Plot LIDAR measurements with both true and noisy observations
     from .core import distance_to_wall_lidar, sensor_model_single_ray
@@ -948,24 +981,19 @@ def plot_lidar_demo(pose: Pose, world: World, save_path=None, n_rays=8):
     # Add legend entries with larger marker specs
     lidar_marker_spec = MARKER_SPECS["lidar_endpoints"].copy()
     lidar_marker_spec["s"] = 160  # Double the default size for better visibility
-    ax.scatter(
-        [],
-        [],
-        color="black",
-        label=f"True Measurements",
-        **lidar_marker_spec
-    )
-    ax.scatter(
-        [],
-        [],
-        color="orange", 
-        label=f"Noisy Measurements",
-        **lidar_marker_spec
-    )
+    ax.scatter([], [], color="black", label="True Measurements", **lidar_marker_spec)
+    ax.scatter([], [], color="orange", label="Noisy Measurements", **lidar_marker_spec)
 
     # Place legend inside the room at an appropriate location (lower left area)
-    ax.legend(loc="lower left", fontsize=20, bbox_to_anchor=(0.05, 0.05), 
-              frameon=True, fancybox=True, shadow=True, framealpha=0.9)
+    ax.legend(
+        loc="lower left",
+        fontsize=20,
+        bbox_to_anchor=(0.05, 0.05),
+        frameon=True,
+        fancybox=True,
+        shadow=True,
+        framealpha=0.9,
+    )
     # Title removed following curvefit "no titles" principle
 
     if save_path:
@@ -1080,7 +1108,7 @@ def plot_weight_evolution(weight_history, save_path=None):
         ax.text(
             0.02,
             0.98,
-            f"Step {timestep}\nESS: {ess_ratio*100:.0f}%\nMax: {jnp.max(weights_norm):.3f}",
+            f"Step {timestep}\nESS: {ess_ratio * 100:.0f}%\nMax: {jnp.max(weights_norm):.3f}",
             transform=ax.transAxes,
             verticalalignment="top",
             bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
@@ -1223,7 +1251,7 @@ def plot_weight_flow(weight_data, save_path=None):
         ax.text(
             t,
             weight_max * 1.1,
-            f"ESS: {ess_ratio*100:.0f}%",
+            f"ESS: {ess_ratio * 100:.0f}%",
             fontsize=10,
             va="bottom",
             ha="center",
@@ -1341,15 +1369,23 @@ def plot_smc_timing_comparison(
                 method_n_particles = n_particles_big_grid
             else:
                 method_n_particles = result.get("n_particles", n_particles)
-            
+
             if method_name == "smc_basic":
-                method_labels[method_name] = f"Bootstrap filter\n(N={method_n_particles})"
+                method_labels[method_name] = (
+                    f"Bootstrap filter\n(N={method_n_particles})"
+                )
             elif method_name == "smc_hmc":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                )
             elif method_name == "smc_locally_optimal":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                )
             elif method_name == "smc_locally_optimal_big_grid":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                )
 
     # Extract timing data
     method_names = []
@@ -1434,8 +1470,10 @@ def plot_smc_method_comparison(
     }
 
     # Filter out smc_locally_optimal from results
-    filtered_results = {k: v for k, v in benchmark_results.items() if k != "smc_locally_optimal"}
-    
+    filtered_results = {
+        k: v for k, v in benchmark_results.items() if k != "smc_locally_optimal"
+    }
+
     # Only count methods we have colors for
     valid_methods = [name for name in filtered_results.keys() if name in colors]
     n_methods = len(valid_methods)
@@ -1464,13 +1502,19 @@ def plot_smc_method_comparison(
                 method_n_particles = n_particles_big_grid
             else:
                 method_n_particles = result.get("n_particles", n_particles)
-            
+
             if method_name == "smc_basic":
-                method_labels[method_name] = f"Bootstrap filter\n(N={method_n_particles})"
+                method_labels[method_name] = (
+                    f"Bootstrap filter\n(N={method_n_particles})"
+                )
             elif method_name == "smc_hmc":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ HMC (K=25)"
+                )
             elif method_name == "smc_locally_optimal_big_grid":
-                method_labels[method_name] = f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                method_labels[method_name] = (
+                    f"SMC (N={method_n_particles})\n+ Locally Optimal (L=25)"
+                )
 
     # Grayscale colors for raincloud plots
     grayscale_colors = {
@@ -1479,24 +1523,24 @@ def plot_smc_method_comparison(
         # Removed smc_locally_optimal
         "smc_locally_optimal_big_grid": "#a0a0a0",
     }
-    
+
     # Extract timing data early to sort methods by speed
     timing_data = {}
     for method_name, result in filtered_results.items():
         if method_name in colors:
-            timing_mean = float(result["timing_stats"][0]) * 1000  # Convert to milliseconds
+            timing_mean = (
+                float(result["timing_stats"][0]) * 1000
+            )  # Convert to milliseconds
             timing_data[method_name] = timing_mean
-    
+
     # Sort methods by timing (fastest to slowest) - but only use this for timing bars
     sorted_methods_by_speed = sorted(timing_data.keys(), key=lambda x: timing_data[x])
-    
+
     # Keep original order for particle plots (as they appear in colors dict)
     original_order = [name for name in colors.keys() if name in filtered_results]
-    
+
     # Process methods in original order for particle plots
-    method_items = [
-        (name, filtered_results[name]) for name in original_order
-    ]
+    method_items = [(name, filtered_results[name]) for name in original_order]
 
     for i, (method_name, result) in enumerate(method_items):
         particle_history = result["particle_history"]
@@ -1694,13 +1738,15 @@ def plot_smc_method_comparison(
                     ax_weights.text(
                         0.98,
                         plot_pos,
-                        f"ESS: {ess*100:.0f}%",
+                        f"ESS: {ess * 100:.0f}%",
                         fontsize=16,
                         va="center",
                         ha="right",
                         fontweight="bold",
                         color=ess_color,
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9),
+                        bbox=dict(
+                            boxstyle="round,pad=0.3", facecolor="white", alpha=0.9
+                        ),
                         transform=ax_weights.get_yaxis_transform(),
                     )
 
@@ -1719,7 +1765,9 @@ def plot_smc_method_comparison(
 
                 # Only show x-axis label on the leftmost plot
                 if i == 0:
-                    ax_weights.set_xlabel("Particle Weight", fontsize=18, fontweight="bold")
+                    ax_weights.set_xlabel(
+                        "Particle Weight", fontsize=18, fontweight="bold"
+                    )
                     ax_weights.set_ylabel("Timestep", fontsize=18, fontweight="bold")
                 else:
                     ax_weights.set_xlabel("")
@@ -1745,12 +1793,8 @@ def plot_smc_method_comparison(
     for method_name in sorted_methods_by_speed:
         result = filtered_results[method_name]
         method_names.append(method_labels[method_name])
-        timing_mean = (
-            float(result["timing_stats"][0]) * 1000
-        )  # Convert to milliseconds
-        timing_std = (
-            float(result["timing_stats"][1]) * 1000
-        )  # Convert to milliseconds
+        timing_mean = float(result["timing_stats"][0]) * 1000  # Convert to milliseconds
+        timing_std = float(result["timing_stats"][1]) * 1000  # Convert to milliseconds
         timing_means.append(timing_mean)
         timing_stds.append(timing_std)
         method_colors.append(colors[method_name])
@@ -1760,11 +1804,16 @@ def plot_smc_method_comparison(
     timing_means_reversed = list(reversed(timing_means))
     timing_stds_reversed = list(reversed(timing_stds))
     method_colors_reversed = list(reversed(method_colors))
-    
+
     # Create horizontal bar chart
     y_pos = jnp.arange(len(method_names_reversed))
     bars = ax_timing.barh(
-        y_pos, timing_means_reversed, xerr=timing_stds_reversed, color=method_colors_reversed, alpha=0.7, capsize=5
+        y_pos,
+        timing_means_reversed,
+        xerr=timing_stds_reversed,
+        color=method_colors_reversed,
+        alpha=0.7,
+        capsize=5,
     )
 
     ax_timing.set_yticks([])
@@ -1775,12 +1824,16 @@ def plot_smc_method_comparison(
     ax_timing.grid(True, axis="x", alpha=0.3)
 
     # Add timing values as text on bars
-    for i, (bar, mean, std) in enumerate(zip(bars, timing_means_reversed, timing_stds_reversed)):
+    for i, (bar, mean, std) in enumerate(
+        zip(bars, timing_means_reversed, timing_stds_reversed)
+    ):
         width = bar.get_width()
         mean_val = float(mean)
         std_val = float(std)
         ax_timing.text(
-            width + std_val + max(timing_means_reversed) * 0.01,  # Position after error bar
+            width
+            + std_val
+            + max(timing_means_reversed) * 0.01,  # Position after error bar
             bar.get_y() + bar.get_height() / 2,  # Center vertically
             f"{mean_val:.1f}±{std_val:.1f}ms",  # Format as mean±std in milliseconds
             ha="left",
@@ -1799,10 +1852,7 @@ def plot_smc_method_comparison(
         ]
         legend = fig.legend(
             legend_elements,
-            [
-                method_labels[method]
-                for method in sorted_methods
-            ],
+            [method_labels[method] for method in sorted_methods],
             loc="lower center",
             bbox_to_anchor=(0.5, 0.02),
             ncol=len(legend_elements),
@@ -1830,10 +1880,10 @@ def plot_localization_problem_explanation(
     n_rays: int = 8,
 ):
     """Create a 1x4 row explaining the localization problem with LIDAR measurements.
-    
+
     Shows the robot at different timesteps with LIDAR rays and measurements,
     illustrating how the robot moves through the environment and senses walls.
-    
+
     Args:
         true_poses: List of true robot poses
         observations: Array of LIDAR observations (shape: [T, n_rays])
@@ -1848,19 +1898,19 @@ def plot_localization_problem_explanation(
         timesteps = [0, n_poses // 3, 2 * n_poses // 3, n_poses - 1]
         # Ensure timesteps are valid
         timesteps = [min(t, n_poses - 1) for t in timesteps]
-    
+
     # Create 1x4 subplot with GRVS styling (single row)
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     axes = axes.flatten()
-    
+
     for idx, t in enumerate(timesteps):
         ax = axes[idx]
         pose = true_poses[t]
         obs = observations[t]
-        
+
         # Plot world
         plot_world(world, ax)
-        
+
         # Remove axis frames for clean visualization
         ax.grid(False)
         for spine in ax.spines.values():
@@ -1869,20 +1919,26 @@ def plot_localization_problem_explanation(
         ax.set_yticks([])
         ax.set_xlabel("")
         ax.set_ylabel("")
-        
+
         # Plot trajectory up to this point with fading effect
         if t > 0:
             for i in range(t):
                 alpha = 0.2 + 0.6 * (i / t)  # Fade from 0.2 to 0.8
                 if i > 0:
-                    ax.plot([true_poses[i-1].x, true_poses[i].x],
-                           [true_poses[i-1].y, true_poses[i].y],
-                           color='gray', linewidth=2, alpha=alpha, zorder=2)
-        
+                    ax.plot(
+                        [true_poses[i - 1].x, true_poses[i].x],
+                        [true_poses[i - 1].y, true_poses[i].y],
+                        color="gray",
+                        linewidth=2,
+                        alpha=alpha,
+                        zorder=2,
+                    )
+
         # Plot LIDAR rays and measurements
         from .core import distance_to_wall_lidar
+
         true_distances = distance_to_wall_lidar(pose, world, n_angles=n_rays)
-        
+
         # Plot true LIDAR rays (what the robot actually sees)
         plot_lidar_rays(
             pose,
@@ -1895,7 +1951,7 @@ def plot_localization_problem_explanation(
             show_rays=True,
             ray_alpha=0.3,
         )
-        
+
         # Plot noisy observations as orange dots
         plot_lidar_rays(
             pose,
@@ -1907,7 +1963,7 @@ def plot_localization_problem_explanation(
             measurement_color="orange",
             show_rays=False,  # Don't show rays for noisy observations
         )
-        
+
         # Plot robot pose prominently
         plot_pose(
             pose,
@@ -1918,34 +1974,66 @@ def plot_localization_problem_explanation(
             show_arrow=True,
             markersize=150,
         )
-        
+
         # Add timestep label
-        ax.text(0.05, 0.95, f"t = {t}", 
-                transform=ax.transAxes,
-                fontsize=18, fontweight='bold',
-                verticalalignment='top',
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
-        
+        ax.text(
+            0.05,
+            0.95,
+            f"t = {t}",
+            transform=ax.transAxes,
+            fontsize=18,
+            fontweight="bold",
+            verticalalignment="top",
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+        )
+
         # Add simple legend only in first subplot
         if idx == 0:
             # Create proxy artists for legend
             from matplotlib.lines import Line2D
+
             legend_elements = [
-                Line2D([0], [0], marker='o', color='w', markerfacecolor='black',
-                       markersize=10, label='True distances'),
-                Line2D([0], [0], marker='o', color='w', markerfacecolor='orange',
-                       markersize=10, label='Noisy observations'),
-                Line2D([0], [0], marker='o', color='w', markerfacecolor='red',
-                       markersize=12, label='Robot'),
+                Line2D(
+                    [0],
+                    [0],
+                    marker="o",
+                    color="w",
+                    markerfacecolor="black",
+                    markersize=10,
+                    label="True distances",
+                ),
+                Line2D(
+                    [0],
+                    [0],
+                    marker="o",
+                    color="w",
+                    markerfacecolor="orange",
+                    markersize=10,
+                    label="Noisy observations",
+                ),
+                Line2D(
+                    [0],
+                    [0],
+                    marker="o",
+                    color="w",
+                    markerfacecolor="red",
+                    markersize=12,
+                    label="Robot",
+                ),
             ]
-            ax.legend(handles=legend_elements, loc='lower right', fontsize=14,
-                     frameon=True, framealpha=0.9)
-    
+            ax.legend(
+                handles=legend_elements,
+                loc="lower right",
+                fontsize=14,
+                frameon=True,
+                framealpha=0.9,
+            )
+
     plt.tight_layout()
-    
+
     if save_path:
         save_publication_figure(fig, save_path)
-    
+
     return fig, axes
 
 

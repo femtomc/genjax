@@ -678,7 +678,7 @@ def mixed_infer_latents_with_outliers_beta(
         alpha: Beta distribution alpha parameter
         beta_param: Beta distribution beta parameter
     """
-    from genjax.inference import hmc, mh, chain
+    from genjax.inference import chain
 
     # Constraint on observations
     constraints = {"ys": {"y": {"obs": ys}}}
@@ -962,8 +962,6 @@ def enumerative_gibbs_outliers(trace, xs, ys, outlier_rate=0.1):
 
     For each data point, exactly compute P(is_outlier | rest) and sample.
     """
-    from genjax.distributions import categorical
-    from genjax.pjax import modular_vmap
 
     curve_params = trace.get_choices()["curve"]
     curve = Lambda(

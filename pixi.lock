@@ -4163,8 +4163,8 @@ packages:
   requires_python: '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*'
 - pypi: ./
   name: genjax
-  version: 0.1.0
-  sha256: 60d1b6e274d409ba1c02770d05f20d64d9cf3069b0e5202129c422bfd168fba5
+  version: 1.0.2
+  sha256: d0e00bd1ee607a5092749376e7d39ed72a1ba5e900c7f594fe528f3f4fd00091
   requires_dist:
   - penzai>=0.2.5,<0.3
   - beartype>=0.21.0,<0.22

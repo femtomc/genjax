@@ -60,7 +60,7 @@ def main():
     args = parser.parse_args()
 
     print("=== GenJAX Game of Life Case Study ===")
-    print(f"Mode: showcase (paper artifact)")
+    print("Mode: showcase (paper artifact)")
     print(
         f"Parameters: chain_length={args.chain_length}, flip_prob={args.flip_prob}, seed={args.seed}"
     )

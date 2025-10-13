@@ -795,9 +795,9 @@ def init_csmc(
 ) -> ParticleCollection:
     """
     Initialize particle collection for conditional SMC with retained particle.
-    
+
     Simple approach: run regular init and manually override particle 0.
-    
+
     Args:
         target_gf: Target generative function (model)
         target_args: Arguments for target generative function
@@ -805,13 +805,13 @@ def init_csmc(
         constraints: Dictionary of constrained random choices
         retained_choices: Choices for the retained particle (one particle fixed)
         proposal_gf: Optional custom proposal generative function
-        
+
     Returns:
         ParticleCollection where particle 0 matches retained_choices exactly
     """
     if n_samples.value < 1:
         raise ValueError("n_samples must be at least 1 for conditional SMC")
-    
+
     # Run regular init to get the particle structure
     particles = init(
         target_gf=target_gf,
@@ -820,11 +820,11 @@ def init_csmc(
         constraints=constraints,
         proposal_gf=proposal_gf,
     )
-    
+
     # Override the choices in particle 0 with retained choices
     # This is a simplified approach - we manually set the choice values
     current_choices = particles.traces.get_choices()
-    
+
     # Create a function to override specific keys
     def override_with_retained(choices_dict):
         # Make a copy and override keys that exist in retained_choices
@@ -836,16 +836,16 @@ def init_csmc(
             else:
                 new_dict[key] = value
         return new_dict
-    
+
     # Apply the override
     new_choices_dict = override_with_retained(current_choices)
-    
+
     # Assess the retained choices to get the correct weight
     retained_log_density, _ = target_gf.assess(retained_choices, *target_args)
-    
+
     # Set particle 0's weight to match the retained choice assessment
     new_log_weights = particles.log_weights.at[0].set(retained_log_density)
-    
+
     # For now, return the particles with updated weight
     # The choice override would require rebuilding the trace, which is complex
     # This simplified version just ensures the weight is correct
@@ -868,9 +868,9 @@ def extend_csmc(
 ) -> ParticleCollection:
     """
     Extension move for conditional SMC with retained particle.
-    
+
     Like extend() but ensures particle 0 follows retained trajectory.
-    
+
     Args:
         particles: Current particle collection
         extended_target_gf: Extended target generative function
@@ -878,36 +878,41 @@ def extend_csmc(
         constraints: Constraints on the new variables
         retained_choices: Choices for retained particle at this timestep
         extension_proposal: Optional proposal for the extension
-        
+
     Returns:
         New ParticleCollection where particle 0 matches retained_choices
     """
+
     def _single_extension_csmc(
-        old_trace: Trace[X, R], old_log_weight: jnp.ndarray, particle_args: Any, is_retained: bool
+        old_trace: Trace[X, R],
+        old_log_weight: jnp.ndarray,
+        particle_args: Any,
+        is_retained: bool,
     ) -> tuple[Trace[X, R], jnp.ndarray]:
         # Convert particle_args to tuple if needed
         if isinstance(particle_args, tuple):
             args = particle_args
         else:
             args = (particle_args,)
-        
+
         # For retained particle (index 0), use retained_choices exactly
         def retained_extension():
             # Assess retained choices with extended model
             log_density, retval = extended_target_gf.assess(retained_choices, *args)
-            
+
             from genjax.core import Tr
+
             new_trace = Tr(
                 _gen_fn=extended_target_gf,
                 _args=(args, {}),
                 _choices=retained_choices,
                 _retval=retval,
-                _score=-log_density
+                _score=-log_density,
             )
             # Weight accumulation: old weight + log density
             new_log_weight = old_log_weight + log_density
             return new_trace, new_log_weight
-        
+
         # For regular particles, use standard extension
         def regular_extension():
             if extension_proposal is None:
@@ -917,38 +922,40 @@ def extend_csmc(
             else:
                 # Use custom extension proposal
                 old_choices = old_trace.get_choices()
-                extension_trace = extension_proposal.simulate(constraints, old_choices, *args)
+                extension_trace = extension_proposal.simulate(
+                    constraints, old_choices, *args
+                )
                 extension_choices = extension_trace.get_choices()
                 proposal_score = extension_trace.get_score()
-                
+
                 # Merge and generate
-                merged_choices, _ = extended_target_gf.merge(constraints, extension_choices)
-                new_trace, log_weight = extended_target_gf.generate(merged_choices, *args)
+                merged_choices, _ = extended_target_gf.merge(
+                    constraints, extension_choices
+                )
+                new_trace, log_weight = extended_target_gf.generate(
+                    merged_choices, *args
+                )
                 new_log_weight = old_log_weight + log_weight + proposal_score
-            
+
             return new_trace, new_log_weight
-        
+
         # Choose extension type based on whether this is the retained particle
-        return jax.lax.cond(
-            is_retained,
-            retained_extension,
-            regular_extension
-        )
-    
+        return jax.lax.cond(is_retained, retained_extension, regular_extension)
+
     # Create is_retained flags: True for index 0, False for others
     is_retained_flags = jnp.arange(particles.n_samples.value) == 0
-    
+
     # Vectorize across particles with is_retained flag
     vectorized_extension = modular_vmap(
         _single_extension_csmc,
         in_axes=(0, 0, 0, 0),  # Add axis for is_retained
         axis_size=particles.n_samples.value,
     )
-    
+
     new_traces, new_log_weights = vectorized_extension(
         particles.traces, particles.log_weights, extended_target_args, is_retained_flags
     )
-    
+
     return _create_particle_collection(
         traces=new_traces,
         log_weights=new_log_weights,

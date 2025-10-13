@@ -839,7 +839,7 @@ def run_smc_with_locally_optimal(
         return_all_particles=const(True),
         n_rejuvenation_moves=K,
     )
-    
+
     # Extract particle history and weights from SMC result
     all_traces = particles_smc.traces
     all_weights = particles_smc.log_weights
@@ -898,7 +898,7 @@ def run_smc_with_locally_optimal_big_grid(
         return_all_particles=const(True),
         n_rejuvenation_moves=K,
     )
-    
+
     # Extract particle history and weights from SMC result
     all_traces = particles_smc.traces
     all_weights = particles_smc.log_weights
@@ -955,7 +955,15 @@ def run_smc_with_locally_optimal_big_grid(
 
 
 def benchmark_smc_methods(
-    n_particles, observations, world, key, n_rays=8, repeats=5, K=20, K_hmc=25, n_particles_big_grid=5
+    n_particles,
+    observations,
+    world,
+    key,
+    n_rays=8,
+    repeats=5,
+    K=20,
+    K_hmc=25,
+    n_particles_big_grid=5,
 ):
     """Benchmark different SMC methods and return timing results."""
     import jax
@@ -967,7 +975,10 @@ def benchmark_smc_methods(
         "smc_basic": (run_smc_basic, n_particles),
         "smc_hmc": (run_smc_with_hmc, n_particles),
         "smc_locally_optimal": (run_smc_with_locally_optimal, n_particles),
-        "smc_locally_optimal_big_grid": (run_smc_with_locally_optimal_big_grid, n_particles_big_grid),  # Use parameter
+        "smc_locally_optimal_big_grid": (
+            run_smc_with_locally_optimal_big_grid,
+            n_particles_big_grid,
+        ),  # Use parameter
     }
 
     results = {}
@@ -990,7 +1001,9 @@ def benchmark_smc_methods(
                     method_n_particles, observations, world, key, n_rays, const(K)
                 )
             else:
-                return jitted_method(method_n_particles, observations, world, key, n_rays)
+                return jitted_method(
+                    method_n_particles, observations, world, key, n_rays
+                )
 
         # Warm up and time the method
         times, (mean_time, std_time) = benchmark_with_warmup(

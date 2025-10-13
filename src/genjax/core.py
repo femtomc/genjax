@@ -810,24 +810,24 @@ class StrSel(Pytree):
 @Pytree.dataclass
 class TupleSel(Pytree):
     """Selection that matches a hierarchical tuple address.
-    
+
     Tuple addresses represent hierarchical paths like ("outer", "inner", "leaf").
     When matched against a single string address, it checks if that string
     matches the first element of the tuple, and returns a selection for
     the remaining path.
-    
+
     Args:
         t: Tuple of strings representing the hierarchical path.
     """
-    
+
     t: Const[tuple[str, ...]]
-    
+
     def match(self, addr) -> tuple[bool, Union[AllSel, NoneSel, "TupleSel"]]:
         path = self.t.value
         if not path:
             # Empty tuple matches nothing
             return False, NoneSel()
-        
+
         if len(path) == 1:
             # Single element tuple behaves like StrSel
             check = addr == path[0]
@@ -984,7 +984,7 @@ def sel(*v: tuple[()] | str | tuple[str, ...] | dict[str, Any] | None) -> Select
         ```python
         # Select specific address
         sel("x")                    # Matches address "x"
-        
+
         # Select hierarchical address
         sel(("outer", "inner"))     # Matches hierarchical path outer/inner
 

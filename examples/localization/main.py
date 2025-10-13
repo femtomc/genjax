@@ -9,49 +9,21 @@ Restructured to have two main commands:
 
 import argparse
 import os
-import datetime
-import jax.numpy as jnp
 import jax.random as jrand
 import matplotlib.pyplot as plt
 
 from .core import (
-    Pose,
     create_multi_room_world,
-    run_particle_filter,
-    distance_to_wall_lidar,
     benchmark_smc_methods,
 )
 
 from .data import (
     generate_ground_truth_data,
-    generate_multiple_trajectories,
 )
 
 from .figs import (
-    plot_world,
-    plot_trajectory,
-    plot_particle_filter_step,
-    plot_particle_filter_evolution,
-    plot_estimation_error,
-    plot_sensor_observations,
-    plot_multiple_trajectories,
-    plot_lidar_demo,
-    plot_weight_flow,
-    plot_smc_timing_comparison,
     plot_smc_method_comparison,
-    plot_multi_method_estimation_error,
     plot_localization_problem_explanation,
-)
-
-from .export import (
-    save_experiment_metadata,
-    save_ground_truth_data,
-    save_benchmark_results,
-    save_smc_results,
-    load_experiment_metadata,
-    load_ground_truth_data,
-    load_benchmark_results,
-    load_smc_results,
 )
 
 
@@ -250,7 +222,9 @@ def paper_mode(args):
             K_hmc=25,  # Special K value for HMC
             n_particles_big_grid=args.n_particles_big_grid,
         )
-        comparison_filename = f"{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf"
+        comparison_filename = (
+            f"{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf"
+        )
         comparison_path = os.path.join(figs_dir, comparison_filename)
         plot_smc_method_comparison(
             benchmark_results,

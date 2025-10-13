@@ -470,7 +470,7 @@ def diagnostic_raincloud(
 
     # Compute ESS (Effective Sample Size)
     ess = 1.0 / jnp.sum(data**2)
-    
+
     # Compute ESS ratio (ESS / n_particles)
     ess_ratio = ess / n_particles if n_particles is not None else ess
 
