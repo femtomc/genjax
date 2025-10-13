@@ -110,21 +110,17 @@ logps, _ = modular_vmap(lambda ch: npoint_curve.assess(ch, xs), in_axes=0)(choic
 ```
 
 ### 3. Vectorized importance sampling
-Importance sampling draws many traces independently. Batching the random keys is the only change from a single-particle sampler; GenJAX handles the probabilistic primitives under the hood.
+Here is a straightforward implementation that follows the case study’s 
+`infer_latents` helper: we call `init` once to build the importance sampling
+state, and then reuse the returned traces and log weights.
 
 ```python
-import jax.nn as jnn
+from genjax.inference import init
 
-seeded_generate = seed(npoint_curve.generate)
-
-
-def one_particle(key):
-    trace, log_weight = seeded_generate(key, observations, xs)
-    return trace, log_weight
-
-
-particle_keys = jrand.split(jrand.key(2), 2048)
-traces, log_weights = modular_vmap(one_particle, in_axes=0)(particle_keys)
+n_particles = Const(2048)
+result = init(npoint_curve, (xs,), n_particles, observations)
+traces = result.traces
+log_weights = result.log_weights
 
 weights = jnn.softmax(log_weights)
 curve_choices = traces.get_choices()["curve"]
