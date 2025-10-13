@@ -42,7 +42,7 @@ It contains the GenJAX implementation (including source code and tests), extensi
 
 ## Quick Example
 
-We mirror the curve fitting case study from the paper's overview section. The example walks through (1) defining quadratic generative functions, (2) simulating a dataset with explicit PRNG keys, and (3) running vectorized importance sampling.
+This example follows the curve fitting workflow: define quadratic generative functions, simulate data with explicit PRNG keys, and run vectorized importance sampling.
 
 ### 1. Define the model
 We compose three generative functions: `polynomial` samples quadratic coefficients, `point` emits a noisy observation, and `npoint_curve` maps `point` across an input vector using traced-aware `.vmap()`.
@@ -83,7 +83,7 @@ curve_trace = simulate_curve(jrand.key(0), xs)
 coeffs_true, (_, ys_obs) = curve_trace.get_retval()
 observations = {"ys": {"obs": ys_obs}}
 
-# Vectorized simulate/assess: shapes mirror the overview in the paper
+# Inspect vectorized simulate/assess shapes to confirm struct-of-arrays traces
 keys = jrand.split(jrand.key(1), 3)
 traces_batch = modular_vmap(simulate_curve, in_axes=(0, None))(keys, xs)
 print(traces_batch.get_choices()["curve"]["a"].shape)   # (3,) coefficients
@@ -116,7 +116,46 @@ posterior_mean_a = jnp.sum(weights * curve_choices["a"])
 print(f"Posterior mean for 'a': {posterior_mean_a:.3f}")
 ```
 
-This mirrors the literate walkthrough in the paper: generative functions compose naturally, the same code vectorizes over data and particles, and explicit seeding keeps randomness under user control.
+### 4. Add stochastic branching and mixed MCMC
+Outlier robustness comes from modeling measurement regimes explicitly. The `Cond` combinator switches between inlier and outlier observation models, and a mixed Gibbs/HMC kernel updates discrete outlier indicators alongside continuous coefficients.
+
+```python
+from genjax import flip, Cond, uniform
+from genjax.core import Const, sel
+from genjax.inference import chain
+from examples.curvefit.core import mixed_gibbs_hmc_kernel
+
+@gen
+def inlier_obs(mean):
+    return normal(mean, 0.05) @ "obs"
+
+@gen
+def outlier_obs(mean):
+    return uniform(-2.0, 2.0) @ "obs"
+
+@gen
+def point_with_outliers(x, coeffs):
+    is_outlier = flip(0.1) @ "is_outlier"
+    y_det = coeffs[0] + coeffs[1] * x + coeffs[2] * x**2
+    cond_model = Cond(outlier_obs, inlier_obs)
+    return cond_model(is_outlier, y_det) @ "obs"
+
+@gen
+def npoint_curve_with_outliers(xs):
+    coeffs = polynomial() @ "curve"
+    ys = point_with_outliers.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
+    return coeffs, (xs, ys)
+
+# Seed the robust model and run a Gibbs + HMC kernel
+seeded_outlier_model = seed(npoint_curve_with_outliers.generate)
+initial_trace, _ = seeded_outlier_model(jrand.key(3), observations, xs)
+kernel = mixed_gibbs_hmc_kernel(xs, ys_obs)
+robust_chain = chain(kernel)
+robust_result = robust_chain(jrand.key(4), initial_trace, n_steps=Const(500))
+```
+
+The resulting traces expose outlier flags (via `trace.get_choices()["ys"]["is_outlier"])`, and the continuous coefficients adapt after each Gibbs/HMC sweep.
+
 
 ## Getting Started
 
