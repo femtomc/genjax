@@ -42,14 +42,15 @@ It contains the GenJAX implementation (including source code and tests), extensi
 
 ## Quick Example
 
-Here's a simple curve fitting model showing how to write importance sampling using GenJAX's generative function interface:
+We mirror the curve fitting case study from the paper's overview section. The example walks through (1) defining quadratic generative functions, (2) simulating a dataset with explicit PRNG keys, and (3) running vectorized importance sampling.
+
+### 1. Define the model
+We compose three generative functions: `polynomial` samples quadratic coefficients, `point` emits a noisy observation, and `npoint_curve` maps `point` across an input vector using traced-aware `.vmap()`.
 
 ```python
-from genjax import gen, normal
-from genjax.pjax import modular_vmap as vmap
 import jax.numpy as jnp
+from genjax import gen, normal
 
-# Define a generative model for polynomial curve fitting
 @gen
 def polynomial():
     a = normal(0.0, 1.0) @ "a"
@@ -59,53 +60,57 @@ def polynomial():
 
 @gen
 def point(x, coeffs):
-    y_det = coeffs[0] + coeffs[1]*x + coeffs[2]*x**2
-    y_obs = normal(y_det, 0.05) @ "obs"
-    return y_obs
+    y_det = coeffs[0] + coeffs[1] * x + coeffs[2] * x**2
+    return normal(y_det, 0.05) @ "obs"
 
 @gen
 def npoint_curve(xs):
     coeffs = polynomial() @ "curve"
     ys = point.vmap(in_axes=(0, None))(xs, coeffs) @ "ys"
     return coeffs, (xs, ys)
-
-# Generate test data
-xs = jnp.linspace(0, 1, 10)
-trace = npoint_curve.simulate(xs)
-_, (_, ys_observed) = trace.get_retval()
-
-# Write importance sampling using the generative function interface
-def importance_sampling(model, args, observations, n_particles):
-    """Importance sampling using generate."""
-
-    def single_particle():
-        # generate() samples from model with observations as constraints
-        # Returns (trace, log_weight)
-        trace, log_weight = model.generate(observations, *args)
-        return trace, log_weight
-
-    # Vectorize over particles - our vmap handles probabilistic sampling correctly
-    # automatically
-    vectorized = vmap(single_particle, in_axes=(), axis_size=n_particles)
-
-    return vectorized()
-
-# Run inference
-observations = {"ys": {"obs": ys_observed}}
-traces, log_weights = importance_sampling(npoint_curve, (xs,), observations, 1000)
-
-# Extract posterior samples
-curve_a = traces.get_choices()["curve"]["a"]
-print(f"Posterior mean for 'a': {jnp.mean(curve_a):.3f}")
 ```
 
-Key things to pay attention to:
-- **Define generative functions from Python functions** with `@gen` decorator
-- **Syntactical abstraction for named random choices** with `@` operator (e.g., `@ "a"`), this allows you to invoke other generative functions as callees.
-- **Composable vectorization** with `.vmap()` on generative functions, and `genjax.vmap` on probabilistic computations.
-- **Each of the above works together to support vectorized programmable inference** write vectorizable inference algorithms using generative function interface (here, the `generate()` interface)
+### 2. Simulate a dataset with `seed`
+The `seed` transformation wraps a probabilistic callable so its first argument becomes a JAX `PRNGKey`. We can now simulate noisy quadratic data deterministically given a key.
+
+```python
+import jax.random as jrand
+from genjax.pjax import seed
+
+xs = jnp.linspace(-1.0, 1.0, 64)
+simulate_curve = seed(npoint_curve.simulate)
+curve_trace = simulate_curve(jrand.key(0), xs)
+coeffs_true, (_, ys_obs) = curve_trace.get_retval()
+observations = {"ys": {"obs": ys_obs}}
+```
+
+### 3. Vectorized importance sampling
+Importance sampling draws many traces in parallel. GenJAX's `modular_vmap` understands probabilistic primitives, so the only change from a single-particle sampler is batching the keys.
+
+```python
+import jax.nn as jnn
+from genjax.pjax import modular_vmap
+
+seeded_generate = seed(npoint_curve.generate)
+
+def one_particle(key):
+    trace, log_weight = seeded_generate(key, observations, xs)
+    return trace, log_weight
+
+particle_keys = jrand.split(jrand.key(1), 2048)
+vectorized_importance = modular_vmap(one_particle, in_axes=0)
+traces, log_weights = vectorized_importance(particle_keys)
+
+weights = jnn.softmax(log_weights)
+curve_choices = traces.get_choices()["curve"]
+posterior_mean_a = jnp.sum(weights * curve_choices["a"])
+print(f"Posterior mean for 'a': {posterior_mean_a:.3f}")
+```
+
+This mirrors the literate walkthrough in the paper: generative functions compose naturally, the same code vectorizes over data and particles, and explicit seeding keeps randomness under user control.
 
 ## Getting Started
+
 
 ### Prerequisites
 
