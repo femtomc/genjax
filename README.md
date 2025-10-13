@@ -29,7 +29,7 @@ GenJAX provides:
 
 This repository is also a POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*.
 
-**Canonical artifact version: [v1.0.9](https://github.com/femtomc/genjax/releases/tag/v1.0.9)** - Use this release for artifact evaluation.
+**Canonical artifact version: [v1.0.10](https://github.com/femtomc/genjax/releases/tag/v1.0.10)** - Use this release for artifact evaluation.
 
 It contains the GenJAX implementation (including source code and tests), extensive documentation, curated agentic context (see the `AGENTS.md` throughout the codebase) to allow users of Claude Code and Codex (or others) to quickly use the system, and several of the case studies used in the empirical evaluation.
 
@@ -46,7 +46,9 @@ The snippets below develop the polynomial regression example from our paper's *O
 
 ### Vectorizing Generative Functions with vmap
 
-We begin by expressing the quadratic regression model as a composition of generative functions. Each random choice is tagged with a string address (`"a"`, `"b"`, `"c"`, `"obs"`), which is used to construct a structured representation of the model’s latent variables and observed data, called a _trace_.
+We begin by expressing the quadratic regression model as a composition of generative functions (`@gen`-decorated Python functions).
+
+Each random choice is tagged with a string address (`"a"`, `"b"`, `"c"`, `"obs"`), which is used to construct a structured representation of the model’s latent variables and observed data, called a _trace_.
 
 Packaging the coefficients inside a callable `Lambda` Pytree mirrors the notion of sampling a function-valued random variable: downstream computations can call the curve directly while the trace retains access to its parameters.
 
