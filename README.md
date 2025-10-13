@@ -29,7 +29,7 @@ GenJAX provides:
 
 This repository is also a POPL'26 artifact submitted alongside the paper *Probabilistic Programming with Vectorized Programmable Inference*.
 
-**Canonical artifact version: [v1.0.5](https://github.com/femtomc/genjax/releases/tag/v1.0.5)** - Use this release for artifact evaluation.
+**Canonical artifact version: [v1.0.6](https://github.com/femtomc/genjax/releases/tag/v1.0.6)** - Use this release for artifact evaluation.
 
 It contains the GenJAX implementation (including source code and tests), extensive documentation, curated agentic context (see the `AGENTS.md` throughout the codebase) to allow users of Claude Code and Codex (or others) to quickly use the system, and several of the case studies used in the empirical evaluation.
 
@@ -136,17 +136,41 @@ pixi run paper-figures-gpu
 
 All figures are saved to `genjax/figs/`.
 
-**Execution properties vs. device**:
-Note that, when running the artifact on CPU only, some of the figures may be missing comparisons between CPU and GPU. Here's a list of behaviors which should be expected when running the case studies on CPU:
+### Execution properties vs. device
+
+Here's a list of behaviors which should be expected when running the case studies on CPU:
 
 - CPU takes longer than GPU: executed on an Apple M4 (Macbook Air) takes around 4 minutes.
 - CPU won't exhibit the same vectorized scaling properties as GPU (in many cases, linear versus near-constant scaling).
+- When running the artifact on CPU only, some of the timing figures may be missing comparisons between CPU and GPU.
 
 Keep these behaviors in mind when interpreting figures generated via CPU execution.
 
+### Devices that we tested the artifact on
+
+We expect that any environment which supports JAX should allow you to run our artifact (using `pixi`) -- but for precision, here's a list of devices which we tested the artifact on (using `pixi run paper-figures` for CPU and `pixi run paper-figures-gpu` for GPU):
+
+**Apple M4 (Macbook Air)**
+- Model: MacBook Air (Mac16,12)
+- Chip: Apple M4
+- CPU Cores: 10 cores total (4 performance + 6 efficiency)
+- Memory: 16 GB
+- OS: macOS 15.6 (Sequoia)
+- Build: 24G84
+- Kernel: Darwin 24.6.0
+
+**Linux machine with Nvidia RTX 4090**
+- Pop!_OS 22.04 LTS
+- Kernel: Linux 6.16.3-76061603-generic
+- AMD Ryzen 7 7800X3D 8-Core Processor
+- 16 threads (8 cores with SMT)
+- Max frequency: 5.05 GHz
+- 96 MiB L3 cache
+- NVIDIA GeForce RTX 4090 (24GB VRAM)                              -
+
 ## Case Study Details
 
-Here, we provide more details on the case studies. Each case study directory also contains a `README.md` file with more information. In each case study, we provide a reference to the figures in the paper which the case study supports.
+In this section, we provide more details on the case studies. Each case study directory also contains a `README.md` file with more information. In each case study, we provide a reference to the figures in the paper which the case study supports.
 
 ### Fair Coin (Beta-Bernoulli)
 
