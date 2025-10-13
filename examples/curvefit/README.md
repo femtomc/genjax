@@ -1,15 +1,15 @@
 # Curve Fitting Case Study
 
-This case study demonstrates Bayesian curve fitting using GenJAX for outlier-robust inference of sine wave parameters.
+This case study demonstrates Bayesian curve fitting using GenJAX for outlier-robust inference of quadratic polynomial coefficients.
 
 ## Model
 
-The model fits sine curves to noisy data with automatic outlier detection:
+The model fits degree-2 polynomials to noisy data with automatic outlier detection:
 
-- **Sine wave**: `y = sin(2π * freq * x + offset)`
-- **Parameters**: Frequency ~ Exponential(10), Offset ~ Uniform(0, 2π)
-- **Noise**: Gaussian noise (σ = 0.2) with 8% outlier probability
-- **Outliers**: Uniform(-3, 3) when present
+- **Polynomial**: `y = a + b x + c x^2`
+- **Coefficients**: Independent Normal(0, 1) priors for `a`, `b`, and `c`
+- **Noise**: Gaussian noise (σ = 0.05) on observations
+- **Outliers**: Mixture branch that inflates noise (Gaussian or Uniform depending on variant)
 
 ## Code Structure
 
@@ -29,8 +29,9 @@ pixi install -e curvefit
 ### Run Complete Case Study
 
 ```bash
-# Generate all figures
-pixi run -e curvefit curvefit
+# Generate POPL paper figures
+pixi run -e curvefit python -m examples.curvefit.main paper
+# (alias) pixi run -e curvefit curvefit-paper
 ```
 
 ### Basic Inference Example
@@ -47,20 +48,23 @@ curve, (xs, ys) = get_points_for_inference()
 samples, weights = infer_latents(key, ys, 1000)
 
 # Extract parameter samples
-freq_samples = samples.get_choices()['curve']['freq']
-offset_samples = samples.get_choices()['curve']['off']
+coeff_choices = samples.get_choices()['curve']
+a_samples = coeff_choices['a']
+b_samples = coeff_choices['b']
+c_samples = coeff_choices['c']
 ```
 
 ## Output
 
-The case study generates several visualization types:
+`paper` mode writes a fixed set of publication-ready PDFs to the repository-level `figs/` directory:
 
-- **Trace visualizations**: Single and multi-point curve examples
-- **Inference plots**: Posterior uncertainty bands over fitted curves
-- **Scaling studies**: Performance analysis across different sample sizes
-- **Density comparisons**: Log-probability evaluations
+- `curvefit_prior_multipoint_traces_density.pdf`
+- `curvefit_single_multipoint_trace_density.pdf`
+- `curvefit_scaling_performance.pdf`
+- `curvefit_posterior_scaling_combined.pdf`
+- `curvefit_outlier_detection_comparison.pdf`
 
-All figures are saved as high-resolution PDFs in `examples/curvefit/figs/`.
+The static illustration `curvefit_vectorization_illustration.pdf` is checked into the repository and not regenerated.
 
 ## Key Features
 

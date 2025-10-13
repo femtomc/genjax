@@ -14,7 +14,6 @@ The model is a simple hierarchical Beta-Bernoulli representing fair coin inferen
 1. **GenJAX**: Using the `@gen` decorator and vectorized importance sampling
 2. **NumPyro**: Using Numpyro's importance sampling with manual guide
 3. **Handcoded**: Direct JAX implementation without PPL overhead
-4. **Pyro** (optional): Using Pyro's importance sampling interface
 
 ## Code Structure
 
@@ -43,33 +42,37 @@ pixi run -e faircoin faircoin-timing
 pixi run -e faircoin python -m examples.faircoin.main --num-obs 100 --repeats 50 --num-samples 2000
 ```
 
-### Run Full Comparison (Including Pyro)
+### Run Combined Comparison
 
 ```bash
-# Run full comparison including Pyro
-pixi run -e faircoin faircoin-comparison
+# Recommended combined timing + posterior figure
+pixi run -e faircoin faircoin-combined
 
-# Or manually with the --comparison flag
-pixi run -e faircoin python -m examples.faircoin.main --comparison
+# Manually specify parameters
+pixi run -e faircoin python -m examples.faircoin.main --combined --num-obs 100 --num-samples 2000
+```
+
+### Posterior-Only Figure
+
+```bash
+# Compare posterior histograms only
+pixi run -e faircoin python -m examples.faircoin.main --posterior --num-samples 5000
 ```
 
 ## Output
 
-The script will:
+All figures are written to the repository-level `figs/` directory:
 
-1. Run timing benchmarks for each framework
-2. Print timing statistics to the console
-3. Generate a horizontal bar chart comparison saved to `examples/faircoin/figs/`
-   - `comparison.pdf`: GenJAX, NumPyro, Handcoded only
-   - `comparison_with_pyro.pdf`: All frameworks including Pyro
+- **Timing only** (`faircoin-timing`): `faircoin_timing_performance_comparison_obs{N}_samples{M}_repeats{R}.pdf`
+- **Posterior only** (`--posterior`): `faircoin_posterior_accuracy_comparison_obs{N}_samples{M}.pdf`
+- **Combined** (`--combined`): `combined_3x2_obs{N}_samples{M}.pdf`
 
-The visualization shows relative performance as percentages compared to the handcoded JAX baseline, with absolute times in milliseconds.
+Timing statistics are printed to stdout alongside each run.
 
 ## Performance Notes
 
 - **GenJAX** typically shows competitive performance with clean probabilistic programming syntax
 - **Handcoded** represents the theoretical performance ceiling with minimal PPL overhead
 - **NumPyro** provides a mature probabilistic programming interface with good performance
-- **Pyro** offers rich probabilistic programming features but may be slower for simple models like this
 
 The comparison helps demonstrate GenJAX's performance characteristics relative to established frameworks in the probabilistic programming ecosystem.

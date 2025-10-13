@@ -46,7 +46,7 @@ examples/{case_study_name}/
 ├── __init__.py         # Python package marker (optional)
 ├── main.py             # CLI entry point (REQUIRED)
 ├── core.py             # Model definitions and core logic (REQUIRED)
-├── data.py             # Data generation and loading utilities (REQUIRED)
+├── data.py             # Data generation helpers (RECOMMENDED for nontrivial data; optional when not needed)
 ├── figs.py             # Visualization and figure generation (REQUIRED)
 ├── export.py           # Data export/import utilities (OPTIONAL)
 └── data/               # Experimental data storage (OPTIONAL)
@@ -82,6 +82,7 @@ examples/{case_study_name}/
 ### `data.py` (REQUIRED)
 
 - **Purpose**: Standardized data generation across all frameworks
+- **When to include**: Required for case studies with bespoke datasets; lightweight examples may omit it if no helpers are needed (document that decision in AGENTS.md)
 - **Consistency**: Same random seeds and data patterns for fair comparison
 - **Reusability**: Functions that can be imported by other case studies
 - **Documentation**: Clear docstrings explaining data generation process

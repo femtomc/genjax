@@ -16,8 +16,16 @@ tests/
 ├── test_smc.py          # Tests for src/genjax/smc.py (Sequential Monte Carlo)
 ├── test_vi.py           # Tests for src/genjax/vi.py (Variational inference)
 ├── test_adev.py         # Tests for src/genjax/adev/ (Automatic Differentiation of Expected Values)
+├── test_linear_gaussian.py # Tests for linear Gaussian state-space utilities
+├── test_mvnormal_estimators.py # Tests for multivariate normal estimators
+├── test_benchmarks.py   # Smoke tests for benchmark harnesses
+├── test_simple_benchmark.py # Micro-benchmarks for regression detection
+├── test_utils.py        # Shared helper tests for miscellaneous utilities
+├── test_vmap_generate_bug.py # Regression test for vmap + generate bugfix
+├── test_vmap_rejuvenation_smc.py # Regression tests for vectorized rejuvenation SMC
 ├── discrete_hmm.py      # Discrete HMM test utilities
-└── conftest.py          # Test configuration and shared fixtures
+├── conftest.py          # Test configuration and shared fixtures
+└── conftest_jit.py      # Fixture helpers for JIT compilation reuse
 ```
 
 ## Testing Guidelines

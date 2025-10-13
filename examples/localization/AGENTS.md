@@ -51,17 +51,17 @@ The localization model uses **drift-only dynamics** without velocity variables f
 ### Models
 - **`localization_model()`**: Drift-only dynamics with no velocity variables
   - Initial distribution: Centered at (1.5, 1.5) near true start with σ=0.5
-  - Drift noise: σ=0.15 for position, σ=0.05 for heading
+  - Drift noise: σ=0.25 for x/y and σ=0.1 for heading (matches drift-only implementation)
   - Sensor noise: σ=0.3 (reduced from 1.5 for better tracking)
 - **`sensor_model_single_ray()`**: LIDAR ray model with Gaussian noise
 - **`initial_model()`**: Initial pose distribution near true starting position
 
 ### Locally Optimal Proposal (`core.py`)
 - **`create_locally_optimal_proposal()`**: Creates transition proposal using grid evaluation
-- **Grid Evaluation**: 15×15×15 grid over (x, y, θ) space (no velocity dimensions)
+- **Grid Evaluation**: Default 15×15×15 grid over (x, y, θ); paper pipeline widens this to 25×25×25 for higher fidelity
 - **Vectorized Assessment**: Uses `jax.vmap` to evaluate `localization_model.assess()` at all grid points
 - **Optimal Selection**: Finds `argmax` of log probabilities across grid
-- **Noise Injection**: Adds Gaussian noise around selected point (σ=0.1 for position, σ=0.05 for angle)
+- **Noise Injection**: Adds Gaussian noise around selected point (σ≈0.15 for position, σ≈0.075 for heading in paper configuration)
 - **JAX Compatible**: Fully vectorized implementation using JAX primitives
 
 ### World Geometry
@@ -206,7 +206,7 @@ pixi run -e cuda python -m examples.localization.main plot-figures \
 
 ### Drift-Only Model Parameters
 - **Initial distribution**: (1.5, 1.5) with σ=0.5 (near true start at 1.2, 1.2)
-- **Drift noise**: σ_x=0.15, σ_y=0.15, σ_θ=0.05
+- **Drift noise**: σ_x=0.25, σ_y=0.25, σ_θ=0.1
 - **Sensor noise**: σ=0.3 for LIDAR measurements
 - **No velocity variables**: Simplified state space improves convergence
 
@@ -249,72 +249,28 @@ All functionality tested and verified with the drift-only model providing excell
 
 ## Figure Generation and Naming
 
-### 📊 Generated Figures
-The localization case study generates 15 distinct visualizations, each with descriptive filenames:
+### 📊 Paper Mode Outputs
+`examples/localization/main.py` exposes a single `paper` command that writes publication-ready PDFs to the repository-level `figs/` directory. The filenames capture the experiment parameters via:
 
-1. **`localization_r8_p200_basic_true_robot_path_with_lidar_observations.pdf`**
-   - Ground truth robot trajectory through the multi-room environment
-   - LIDAR sensor readings annotated along the path
-   - Shows actual robot movement for comparison with estimates
+```
+param_prefix = f"localization_r{n_rays}_p{n_particles}_{world_type}"
+```
 
-2. **`localization_r8_p200_basic_trajectory_types_exploration_vs_navigation.pdf`**
-   - Compares different movement strategies: exploration vs room navigation
-   - Multiple trajectories overlaid on the same world map
-   - Demonstrates variety in robot movement patterns
+Paper mode always produces:
+- **`{param_prefix}_localization_problem_1x4_explanation.pdf`** – problem overview (trajectory, observations, error summaries, diagnostics)
 
-3. **`localization_r8_p200_basic_lidar_8ray_wall_detection_visualization.pdf`**
-   - Single robot pose with 8 LIDAR rays extending to walls
-   - Shows how distance measurements are computed
-   - Illustrates sensor model used in particle filtering
+When `--include-smc-comparison` is supplied it additionally generates:
+- **`{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf`** – 4-row comparison across bootstrap, MH, HMC, and locally optimal proposals
 
-4. **`localization_r8_p200_basic_particle_filter_temporal_evolution_16steps.pdf`**
-   - 4×4 grid showing particle cloud evolution over 16 timesteps
-   - Visualizes convergence from initial uncertainty to final estimate
-   - Particles colored by viridis colormap for visual distinction
+Both files are emitted directly by the main script using `matplotlib.pyplot.savefig`, so they inherit the DPI and bounding-box settings encoded there.
 
-5. **`localization_r8_p200_basic_final_particle_distribution_at_convergence.pdf`**
-   - Final timestep particles showing convergence to true location
-   - Weighted particle sizes indicate importance
-   - Demonstrates successful localization
+### 🔧 Additional Visualizations
+`examples/localization/figs.py` contains reusable helpers for deeper analysis:
+- `plot_particle_filter_evolution(..., save_dir="figs")` writes **`particle_evolution_{method}.pdf`** snapshots.
+- `plot_estimation_error(..., save_path="figs/localization_estimation_error.pdf")`, `plot_sensor_observations`, and related utilities save PDFs when a `save_path` is provided (they internally call `save_publication_figure`).
+- Benchmark helpers in `core.py` return particle histories and diagnostics that these plotting utilities expect.
 
-6. **`localization_r8_p200_basic_position_and_heading_error_over_time.pdf`**
-   - Two subplots: position error (meters) and heading error (radians)
-   - Tracks estimation accuracy throughout trajectory
-   - Shows convergence behavior over time
-
-7. **`localization_r8_p200_basic_particle_weights_and_ess_percentage_timeline.pdf`**
-   - Raincloud plots of particle weight distributions
-   - ESS (Effective Sample Size) shown as percentage of total particles
-   - Color-coded by ESS quality: good (>50%), fair (10-50%), poor (<10%)
-
-8. **`localization_r8_p200_basic_lidar_distance_readings_along_trajectory.pdf`**
-   - LIDAR distance measurements plotted over trajectory steps
-   - 8 lines representing each LIDAR ray's readings
-   - Shows sensor data variation along the path
-
-9. **`localization_r8_p200_basic_inference_runtime_performance_comparison.pdf`**
-   - Horizontal bar chart comparing SMC method execution times
-   - Error bars show standard deviation across timing runs
-   - Methods sorted by speed (fastest to slowest)
-
-10. **`localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf`**
-    - Main 4-row comparison figure with all SMC variants
-    - Row 1: Initial particle distributions with method titles
-    - Row 2: Particle evolution showing trajectory blending
-    - Row 3: Raincloud plots with ESS percentages
-    - Row 4: Timing comparison bars
-    - Legend at bottom with method descriptions
-
-11-14. **Per-method particle evolution timelines**:
-    - `smc-basic_particle_evolution_timeline.pdf` - Bootstrap filter
-    - `smc-hmc_particle_evolution_timeline.pdf` - SMC with HMC rejuvenation
-    - `smc-locally-optimal_particle_evolution_timeline.pdf` - SMC with locally optimal proposal
-    - `smc-locally-optimal-big-grid_particle_evolution_timeline.pdf` - SMC with 5 particles
-
-15. **`localization_r8_p200_basic_all_methods_tracking_accuracy_comparison.pdf`**
-    - Side-by-side position and heading error plots for all methods
-    - Direct comparison of tracking accuracy
-    - Shows which methods maintain lowest error
+Use these functions directly when you need bespoke figures beyond the paper defaults; they mirror the naming conventions above and always target the top-level `figs/` directory unless you override the destination.
 
 ### 🎨 Visualization Features
 - **ESS Display**: Shows as percentage (e.g., "ESS: 75%") for intuitive understanding

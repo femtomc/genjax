@@ -91,12 +91,6 @@ from .inference import (  # noqa: E402
     resample,
     rejuvenation_smc,
 )
-from .state import (  # noqa: E402
-    state,
-    save,
-    tag_state,
-    namespace,
-)
 from .viz import (  # noqa: E402
     horizontal_raincloud,
     raincloud,
@@ -200,11 +194,6 @@ __all__ = [
     "rejuvenate",
     "resample",
     "rejuvenation_smc",
-    # State functionality
-    "state",
-    "save",
-    "tag_state",
-    "namespace",
     # Visualization functionality
     "horizontal_raincloud",
     "raincloud",

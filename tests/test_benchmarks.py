@@ -21,7 +21,6 @@ from genjax.distributions import normal, bernoulli
 from genjax.inference import mh, hmc, mala, init, extend, resample, rejuvenate
 from genjax.inference.vi import elbo_vi, mean_field_normal_family
 from genjax.pjax import seed
-from genjax.sp import ImportanceSampling, Target
 
 
 @pytest.fixture
@@ -225,35 +224,6 @@ class TestVIPerformance:
                 learning_rate=1e-3,
                 n_iterations=50  # Minimal iterations for benchmarking
             )
-
-        key = random.PRNGKey(42)
-        result = benchmark(setup_and_run, key)
-        assert result is not None
-
-
-class TestSPPerformance:
-    """Benchmark Stochastic Probabilities (SP) module."""
-
-    @pytest.mark.benchmark
-    def test_importance_sampling_benchmark(self, benchmark, simple_model):
-        """Benchmark importance sampling."""
-        @seed
-        def setup_and_run():
-            # Setup target and importance sampling
-            target = Target(
-                model=simple_model,
-                args=(),
-                observations={"y": 1.5}
-            )
-
-            sp_dist = ImportanceSampling(
-                target=target,
-                proposal=None,
-                n_particles=const(50)
-            )
-
-            # Single sample
-            return sp_dist.random_weighted()
 
         key = random.PRNGKey(42)
         result = benchmark(setup_and_run, key)

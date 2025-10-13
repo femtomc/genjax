@@ -1,7 +1,6 @@
 from genjax import gen, normal, Cond, flip, uniform, beta
 from genjax.core import Const, sel
 from genjax.pjax import seed
-from genjax.state import save
 from genjax.inference import hmc
 import jax.numpy as jnp
 import jax.random as jrand
@@ -205,7 +204,6 @@ def hmc_infer_latents(
     result = hmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
 
     return result.traces, {
-        "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
         "n_chains": result.n_chains.value,
     }
@@ -646,7 +644,6 @@ def hmc_infer_latents_with_outliers(
     result = mcmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
 
     return result.traces, {
-        "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
         "n_chains": result.n_chains.value,
     }
@@ -705,7 +702,6 @@ def mixed_infer_latents_with_outliers_beta(
     result = mcmc_chain(initial_trace, n_steps=Const(total_steps), burn_in=n_warmup)
 
     return result.traces, {
-        "acceptance_rate": result.acceptance_rate,
         "n_samples": result.n_steps.value,
         "n_chains": result.n_chains.value,
         "rhat": result.rhat,
@@ -1009,9 +1005,6 @@ def enumerative_gibbs_outliers(trace, xs, ys, outlier_rate=0.1):
     new_trace, weight, _ = gen_fn.update(
         trace, {"ys": {"is_outlier": new_outliers}}, *args[0], **args[1]
     )
-
-    # For diagnostics, we always accept Gibbs moves (they're exact)
-    save(accept=True)
 
     return new_trace
 

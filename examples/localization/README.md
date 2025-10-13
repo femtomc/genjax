@@ -10,7 +10,7 @@ The localization problem involves estimating a robot's position and orientation 
 
 - **Vectorized LIDAR Sensor**: 8-directional distance measurements using GenJAX Vmap combinator
 - **Multi-Room Navigation**: Complex 3-room environment with doorways and obstacles
-- **Control Inference**: Robot velocity and angular velocity as random variables
+- **Drift-Only Dynamics**: State space limited to (x, y, θ) for stable particle evolution
 - **Wall Bouncing Physics**: Realistic collision detection and response
 - **Initial + Step Models**: Modern particle filtering approach instead of Scan
 - **Enhanced Visualizations**: Individual LIDAR ray plots and cross-room trajectory tracking
@@ -22,7 +22,7 @@ The localization problem involves estimating a robot's position and orientation 
 The robot navigates a complex multi-room environment with:
 
 - **Pose**: Position (x, y) and heading angle (θ)
-- **Inferred Controls**: Velocity and angular velocity as random variables
+- **Drift-Only Updates**: No velocity state — each timestep perturbs pose directly
 - **Wall Bouncing**: Physics-based collision detection with internal walls
 - **Multi-Room Geometry**: 3 rooms with doorways, alcoves, and obstacles
 
@@ -30,7 +30,7 @@ The robot navigates a complex multi-room environment with:
 
 - **8-ray LIDAR**: Directional distance measurements at regular angular intervals
 - **Vectorized Implementation**: GenJAX Vmap combinator for efficient computation
-- **Realistic Noise**: Gaussian noise (σ=0.5) appropriate for meter-scale measurements
+- **Realistic Noise**: Gaussian noise (σ=0.3) appropriate for meter-scale measurements
 - **Ray-wall Intersection**: Vectorized geometric computation for all walls
 
 ### Trajectory Generation
@@ -52,17 +52,16 @@ pixi run -e cuda python -m examples.localization.main
 
 ### Generated Outputs
 
-The demo generates several visualization files:
+Paper mode (the default entry point) writes high-resolution PDFs to the repository-level `figs/` directory. Filenames encode the experiment configuration via `localization_r{n_rays}_p{n_particles}_{world_type}`:
 
-1. **`ground_truth_detailed.png`**: Comprehensive 4-panel analysis with trajectory, controls, position/heading, and sensor data
-2. **`ground_truth.png`**: Simple trajectory overview with observations
-3. **`particle_evolution.png`**: 16-step particle filter evolution in grid layout
-4. **`final_step.png`**: Final particle distribution vs true pose
-5. **`estimation_error.png`**: Position and heading errors over time
-6. **`sensor_observations.png`**: 8-ray LIDAR measurements showing individual directional sensors
-7. **`multiple_trajectories.png`**: Comparison of room navigation, exploration, and wall bouncing trajectories
+1. **`{param_prefix}_localization_problem_1x4_explanation.pdf`** – overview figure with trajectory, measurements, and diagnostics
+2. **`{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf`** – optional SMC comparison (emitted when `--include-smc-comparison` is passed)
+
+Additional helper functions in `examples/localization/figs.py` can generate per-method evolutions, error curves, and sensor plots; pass a `save_path`/`save_dir` pointing at `figs/` to persist those PDFs.
 
 ### Example Output
+
+Example console output (with `--include-smc-comparison`):
 
 ```
 GenJAX Localization Case Study
@@ -94,13 +93,8 @@ Final estimated pose: x=9.81, y=5.35, theta=-0.03
 Final position error: 4.481
 
 Generating visualizations...
-Saved: figs/ground_truth_detailed.png
-Saved: figs/ground_truth.png
-Saved: figs/particle_evolution.png
-Saved: figs/final_step.png
-Saved: figs/estimation_error.png
-Saved: figs/sensor_observations.png
-Saved: figs/multiple_trajectories.png
+Saved: figs/localization_r8_p200_basic_localization_problem_1x4_explanation.pdf
+Saved: figs/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf
 
 Localization demo completed!
 ```
@@ -118,7 +112,7 @@ Localization demo completed!
 
 **Vectorized LIDAR Sensor**:
 
-- **Single Ray Model**: Individual LIDAR ray with Gaussian noise (σ=0.5)
+- **Single Ray Model**: Individual LIDAR ray with Gaussian noise (σ=0.3)
 - **GenJAX Vmap**: Combines 8 individual ray models into joint LIDAR sensor
 - **Vector Observations**: Returns array of 8 distance measurements per timestep
 - **Joint Density**: Vmap.assess sums individual ray log densities for proper likelihood
@@ -126,7 +120,7 @@ Localization demo completed!
 **Initial + Step Model Pattern**:
 
 - **Separate Models**: Initial model for broad particle initialization, step model for sequential updates
-- **Control Inference**: Step model samples velocity and angular_velocity as random variables
+- **Drift Updates**: Step model perturbs pose directly (no velocity state)
 - **ESS Resampling**: Resample when effective sample size < n_particles/8 for diversity
 - **Sequential Updates**: Standard predict-update cycle with systematic resampling
 
@@ -149,16 +143,15 @@ Localization demo completed!
 
 ### Motion Model
 
-- **Control Inference**: Velocity ~ N(1.5, 0.5), Angular velocity ~ N(0, 0.3)
-- **Position noise**: σ = 0.5 units (increased for cross-room exploration)
-- **Heading noise**: σ = 0.2 radians
+- **Initial distribution**: x/y ~ N(1.5, 0.5) with θ ~ N(0, 0.3)
+- **Drift noise**: σ_x = σ_y = 0.25, σ_θ = 0.1
 - **Wall Bouncing**: Physics-based collision detection and response
 - **Boundary Constraints**: Clipping with bounce margin = 0.3 units
 
 ### LIDAR Sensor Model
 
 - **Ray Count**: 8 directional measurements (0° to 315° in 45° increments)
-- **Distance noise**: σ = 0.8 units per ray (increased for better particle diversity)
+- **Distance noise**: σ = 0.3 units per ray (matches `sensor_model_single_ray`)
 - **Max Range**: 10.0 units
 - **Vectorization**: JAX vmap for boundary/wall intersection computation
 - **Joint Density**: Vmap.assess sums individual ray log densities
@@ -166,7 +159,7 @@ Localization demo completed!
 ### Particle Filter
 
 - **Particles**: 200 particles (increased for multi-room complexity)
-- **Initialization**: Uniform distribution across entire 3-room world
+- **Initialization**: Gaussian prior near (1.5, 1.5, 0.0) with σ ≈ 0.5
 - **Resampling**: When effective sample size < n_particles/8 (25 particles)
 - **Resampling method**: Systematic resampling with diversity preservation
 - **Weight Computation**: Joint likelihood across 8 LIDAR rays

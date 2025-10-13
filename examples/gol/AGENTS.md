@@ -16,8 +16,7 @@ examples/gol/
 ├── figs.py             # Timing benchmarks and figure generation
 ├── main.py             # Command-line interface and timing studies
 └── assets/             # Image assets for patterns
-    ├── mit.png         # MIT logo pattern
-    └── popl.png        # POPL logo pattern
+    └── wizards.jpg     # POPL 2026 wizard showcase (current bundled asset)
 ```
 
 ## Code Organization
@@ -62,10 +61,10 @@ examples/gol/
 
 **Image Pattern Loading**:
 
-- **`get_popl_logo()`**: Load and process POPL conference logo from PNG (512×512)
-- **`get_mit_logo()`**: Load and process MIT logo from PNG (512×512)
-- **`get_small_mit_logo(size=128)`**: Downsampled MIT logo for reasonable computation time
-- **`get_small_popl_logo(size=128)`**: Downsampled POPL logo for reasonable computation time
+- **`get_popl_logo()`**: Load and process POPL conference logo from PNG (512×512). Requires user-supplied `examples/gol/assets/popl.png`.
+- **`get_mit_logo()`**: Load and process MIT logo from PNG (512×512). Requires user-supplied `examples/gol/assets/mit.png`.
+- **`get_small_mit_logo(size=128)`**: Downsampled MIT logo for reasonable computation time (depends on the PNG above).
+- **`get_small_popl_logo(size=128)`**: Downsampled POPL logo for reasonable computation time (depends on the PNG above).
 - **Image preprocessing**: Convert RGBA to binary patterns with proper thresholding
 - **Smart downsampling**: 128×128 provides optimal balance between logo detail and performance
 
@@ -242,6 +241,8 @@ save_timing_scaling_figure(
 ```
 
 ### Modern Logo Pattern Loading
+
+> **Note**: The logo helpers expect PNG assets (`mit.png`, `popl.png`, `popl_white_lambda.png`) inside `examples/gol/assets/`. These files are not tracked in the repository; add them locally before running the logo pipelines.
 
 ```python
 # Load optimized logo pattern (recommended)

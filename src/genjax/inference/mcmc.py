@@ -49,7 +49,6 @@ from genjax.core import (
     Callable,
 )
 from genjax.distributions import uniform, normal
-from genjax.state import save, state
 from genjax.pjax import modular_vmap
 
 # Type alias for MCMC kernel functions
@@ -252,8 +251,6 @@ class MCMCResult(Pytree):
     """Result of MCMC chain sampling containing traces and diagnostics."""
 
     traces: Trace[X, R]  # Vectorized over chain steps and chains (if multiple)
-    accepts: jnp.ndarray  # Individual acceptance decisions (boolean)
-    acceptance_rate: FloatArray  # Overall acceptance rate (per chain if multiple)
     n_steps: Const[int]  # Total number of steps (after any burn-in/thinning)
     n_chains: Const[int]  # Number of parallel chains
 
@@ -280,9 +277,6 @@ def mh(
 
     Returns:
         Updated trace after MH step
-
-    State:
-        accept: Boolean indicating whether the proposal was accepted
     """
     target_gf = current_trace.get_gen_fn()
     args = current_trace.get_args()
@@ -305,9 +299,6 @@ def mh(
         new_trace,
         current_trace,
     )
-
-    # Save acceptance as auxiliary state (can be accessed via state decorator)
-    save(accept=accept)
 
     return final_trace
 
@@ -338,9 +329,6 @@ def mala(
 
     Returns:
         Updated trace after MALA step
-
-    State:
-        accept: Boolean indicating whether the proposal was accepted
     """
     target_gf = current_trace.get_gen_fn()
     args = current_trace.get_args()
@@ -351,7 +339,6 @@ def mala(
 
     if selected_choices is None:
         # No choices selected, return current trace unchanged
-        save(accept=True)
         return current_trace
 
     # Create closure to compute gradients with respect to only selected choices
@@ -431,9 +418,6 @@ def mala(
         current_trace,
     )
 
-    # Save acceptance for diagnostics
-    save(accept=accept)
-
     return final_trace
 
 
@@ -469,9 +453,6 @@ def hmc(
 
     Returns:
         Updated trace after HMC step
-
-    State:
-        accept: Boolean indicating whether the proposal was accepted
     """
     target_gf = current_trace.get_gen_fn()
     args = current_trace.get_args()
@@ -482,7 +463,6 @@ def hmc(
 
     if selected_choices is None:
         # No choices selected, return current trace unchanged
-        save(accept=True)
         return current_trace
 
     # Create closure to compute gradients with respect to only selected choices
@@ -581,9 +561,6 @@ def hmc(
         current_trace,
     )
 
-    # Save acceptance for diagnostics
-    save(accept=accept)
-
     return final_trace
 
 
@@ -593,17 +570,12 @@ def chain(mcmc_kernel: MCMCKernel):
 
     This function transforms simple MCMC moves (like metropolis_hastings_step)
     into full-fledged MCMC algorithms with burn-in, thinning, and parallel chains.
-    The kernel should save acceptances via state for diagnostics.
 
     Args:
         mcmc_kernel: MCMC kernel function that takes and returns a trace
 
     Returns:
         Function that runs MCMC chains with burn-in, thinning, and diagnostics
-
-    Note:
-        The mcmc_kernel should use save(accept=...) to record acceptances
-        for proper diagnostics collection.
     """
 
     def run_chain(
@@ -634,39 +606,29 @@ def chain(mcmc_kernel: MCMCKernel):
 
         if n_chains.value == 1:
             # Single chain case
-            @state  # Use state decorator to collect acceptances
             def run_scan():
                 final_trace, all_traces = jax.lax.scan(
                     scan_fn, initial_trace, jnp.arange(n_steps.value)
                 )
                 return all_traces
 
-            # Run chain and collect state (including accepts)
-            all_traces, chain_state = run_scan()
-
-            # Extract accepts from state
-            accepts = chain_state.get("accept", jnp.zeros(n_steps.value))
+            # Run chain
+            all_traces = run_scan()
 
             # Apply burn-in and thinning
             start_idx = burn_in.value
             end_idx = n_steps.value
             indices = jnp.arange(start_idx, end_idx, autocorrelation_resampling.value)
 
-            # Apply selection to traces and accepts
+            # Apply selection to traces
             final_traces = jax.tree_util.tree_map(
                 lambda x: x[indices] if hasattr(x, "shape") and len(x.shape) > 0 else x,
                 all_traces,
             )
-            final_accepts = accepts[indices]
-
-            # Compute final acceptance rate
-            acceptance_rate = jnp.mean(final_accepts)
             final_n_steps = len(indices)
 
             return MCMCResult(
                 traces=final_traces,
-                accepts=final_accepts,
-                acceptance_rate=acceptance_rate,
                 n_steps=const(final_n_steps),
                 n_chains=n_chains,
             )
@@ -698,12 +660,6 @@ def chain(mcmc_kernel: MCMCKernel):
             # Combine results from multiple chains
             # Traces shape: (n_chains, n_steps, ...)
             combined_traces = multi_chain_results.traces
-            combined_accepts = multi_chain_results.accepts  # (n_chains, n_steps)
-
-            # Per-chain acceptance rates
-            acceptance_rates = jnp.mean(combined_accepts, axis=1)  # (n_chains,)
-            overall_acceptance_rate = jnp.mean(acceptance_rates)
-
             final_n_steps = multi_chain_results.n_steps.value
 
             # Compute between-chain diagnostics using Pytree utilities
@@ -744,8 +700,6 @@ def chain(mcmc_kernel: MCMCKernel):
 
             return MCMCResult(
                 traces=combined_traces,
-                accepts=combined_accepts,
-                acceptance_rate=overall_acceptance_rate,
                 n_steps=const(final_n_steps),
                 n_chains=n_chains,
                 rhat=rhat_values,
