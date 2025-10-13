@@ -431,7 +431,7 @@ def mixture_observation(condition, value):
 
 - **Gen Julia Documentation**: Comprehensive documentation for the original Gen probabilistic programming language. [https://www.gen.dev/docs/stable/](https://www.gen.dev/docs/stable/)
 - **Gen Julia GitHub Repository**: Source code and examples for the Julia implementation. [https://github.com/probcomp/Gen.jl](https://github.com/probcomp/Gen.jl)
-- **Generative Function Interface**: Mathematical specification and API reference. [https://www.gen.dev/docs/stable/api/model/gfi/](https://www.gen.dev/docs/stable/api/model/gfi/)
+- **Generative Function Interface**: Mathematical specification and API reference. [https://www.gen.dev/docs/stable/ref/core/gfi/](https://www.gen.dev/docs/stable/ref/core/gfi/)
 
 ### Notes
 
