@@ -58,6 +58,7 @@ import jax.numpy as jnp
 
 @Pytree.dataclass
 class Lambda(Pytree):
+    # Wrap polynomial coefficients in a callable pytree so traces retain parameters.
     f: Const[object]
     dynamic_vals: jnp.ndarray
     static_vals: Const[tuple] = Const(())
@@ -66,6 +67,7 @@ class Lambda(Pytree):
         return self.f.value(*x, *self.static_vals.value, self.dynamic_vals)
 
 def polyfn(x, coeffs):
+    # Deterministic quadratic curve evaluated at x.
     a, b, c = coeffs[0], coeffs[1], coeffs[2]
     return a + b * x + c * x**2
 
@@ -108,11 +110,13 @@ from genjax.pjax import modular_vmap
 import jax.numpy as jnp
 
 def single_particle_importance(model, xs, ys_obs):
-    trace, log_weight = model.generate({"ys": {"obs": ys_obs}}, xs)
-    return trace, log_weight
+    # Draw a single constrained trace and compute its importance weight.
+   trace, log_weight = model.generate({"ys": {"obs": ys_obs}}, xs)
+   return trace, log_weight
 
 def vectorized_importance_sampling(model, xs, ys_obs, num_particles):
-    sampler = modular_vmap(
+    # Lift the single-particle routine across an explicit particle axis.
+   sampler = modular_vmap(
         single_particle_importance,
         in_axes=(None, None, None),
         axis_size=num_particles,
@@ -143,10 +147,12 @@ from genjax import Cond, flip, uniform
 
 @gen
 def inlier_branch(mean, extra_noise):
+    # Inlier observations stay near the quadratic trend.
     return normal(mean, 0.1) @ "obs"
 
 @gen
 def outlier_branch(_, extra_noise):
+    # Outliers come from a broad, curve-independent distribution.
     return uniform(-2.0, 2.0) @ "obs"
 
 @gen
@@ -193,9 +199,11 @@ def enumerative_gibbs_outliers(trace, xs, ys, outlier_rate=0.1):
 
     def update_single_point(x, y_obs):
         chm_false = {"is_outlier": False, "y": {"obs": y_obs}}
+        # Score the inlier explanation for the current observation.
         log_false, _ = point_with_outliers.assess(chm_false, x, curve, outlier_rate, 5.0)
 
         chm_true = {"is_outlier": True, "y": {"obs": y_obs}}
+        # Score the outlier explanation for the same observation.
         log_true, _ = point_with_outliers.assess(chm_true, x, curve, outlier_rate, 5.0)
 
         logits = jnp.array([log_false, log_true])
