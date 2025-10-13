@@ -10,6 +10,42 @@ authors:
     email: mccoyb@mit.edu
     affiliation: Massachusetts Institute of Technology
     orcid: "https://orcid.org/0009-0000-1930-8150"
+  - family-names: Huot
+    given-names: Mathieu
+    email: mhuot@mit.edu
+    affiliation: Massachusetts Institute of Technology
+  - family-names: Matheos
+    given-names: George
+    email: gmatheos@mit.edu
+    affiliation: Massachusetts Institute of Technology
+  - family-names: Wang
+    given-names: Xiaoyan
+    email: xyz@mit.edu
+    affiliation: Massachusetts Institute of Technology
+  - family-names: Chung
+    given-names: Karen
+    email: seoyeon@mit.edu
+    affiliation: Massachusetts Institute of Technology
+  - family-names: Smith
+    given-names: Colin
+    email: colin.smith@gmail.com
+    affiliation: MIT CHI FRO
+  - family-names: Ritchie
+    given-names: Sam
+    email: sam@frogrocket.ai
+    affiliation: MIT CHI FRO
+  - family-names: Lew
+    given-names: Alexander K.
+    email: alexander.lew@yale.edu
+    affiliation: Yale University
+  - family-names: Rinard
+    given-names: Martin
+    email: rinard@csail.mit.edu
+    affiliation: Massachusetts Institute of Technology
+  - family-names: Mansinghka
+    given-names: Vikash K.
+    email: vkm@mit.edu
+    affiliation: Massachusetts Institute of Technology
 repository-code: "https://github.com/femtomc/genjax"
 url: "https://github.com/femtomc/genjax"
 abstract: >
@@ -38,3 +74,21 @@ references:
     authors:
       - family-names: Becker
         given-names: McCoy R.
+      - family-names: Huot
+        given-names: Mathieu
+      - family-names: Matheos
+        given-names: George
+      - family-names: Wang
+        given-names: Xiaoyan
+      - family-names: Chung
+        given-names: Karen
+      - family-names: Smith
+        given-names: Colin
+      - family-names: Ritchie
+        given-names: Sam
+      - family-names: Lew
+        given-names: Alexander K.
+      - family-names: Rinard
+        given-names: Martin
+      - family-names: Mansinghka
+        given-names: Vikash K.
