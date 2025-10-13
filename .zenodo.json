@@ -1,7 +1,7 @@
 {
   "title": "GenJAX: Probabilistic Programming Language with Vectorized Programmable Inference",
   "description": "GenJAX is a probabilistic programming language (PPL) designed around programmable inference - automation that allows users to express and customize Bayesian inference algorithms. The system provides modeling language automation for constructing complex probability distributions and inference automation for constructing Monte Carlo samplers and variational inference methods. This repository includes the GenJAX implementation, extensive documentation, and case studies from the POPL 2026 paper 'Probabilistic Programming with Vectorized Programmable Inference'.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "upload_type": "software",
   "creators": [
     {
@@ -38,15 +38,18 @@
     },
     {
       "name": "Lew, Alexander K.",
-      "affiliation": "Yale University"
+      "affiliation": "Yale University",
+      "orcid": "0000-0002-9262-4392"
     },
     {
       "name": "Rinard, Martin",
-      "affiliation": "Massachusetts Institute of Technology"
+      "affiliation": "Massachusetts Institute of Technology",
+      "orcid": "0000-0001-8095-8523"
     },
     {
       "name": "Mansinghka, Vikash K.",
-      "affiliation": "Massachusetts Institute of Technology"
+      "affiliation": "Massachusetts Institute of Technology",
+      "orcid": "0000-0003-2507-0833"
     }
   ],
   "license": "Apache-2.0",
