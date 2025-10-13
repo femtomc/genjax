@@ -2,9 +2,7 @@
 <img width="450" src="./logo.png"/>
 </p>
 
-<p align="center">
-<a href="https://doi.org/10.5281/zenodo.17342547"><img src="https://zenodo.org/badge/971731825.svg" alt="DOI"></a>
-</p>
+[![DOI](https://zenodo.org/badge/971731825.svg)](https://doi.org/10.5281/zenodo.17342547)
 
 ## What is it?
 
