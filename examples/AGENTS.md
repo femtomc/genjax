@@ -27,13 +27,13 @@ The `examples/` directory contains case studies that demonstrate GenJAX capabili
 
 ## Shared Utilities
 
-The `examples/utils.py` module provides shared utilities for all case studies:
+Use the shared helpers in `genjax.timing` for consistent benchmarking:
 
-- **`timing()`**: Standard benchmarking function with consistent methodology
-- **`benchmark_with_warmup()`**: Automatic JIT warm-up before timing
-- **`compare_timings()`**: Formatted comparison of multiple timing results
+- **`timing()`**: Standard timing harness with inner/outer repeats
+- **`benchmark_with_warmup()`**: Wrapper that performs JIT warm-up automatically
+- **`compare_timings()`**: Utility to print formatted timing comparisons
 
-**Always use `examples.utils.timing()` instead of duplicating timing code.**
+**Always import timing helpers from `genjax.timing` instead of duplicating code.**
 
 ## Standard Case Study Structure
 
@@ -49,11 +49,9 @@ examples/{case_study_name}/
 ├── data.py             # Data generation and loading utilities (REQUIRED)
 ├── figs.py             # Visualization and figure generation (REQUIRED)
 ├── export.py           # Data export/import utilities (OPTIONAL)
-├── data/               # Experimental data storage (OPTIONAL)
-│   ├── README.md       # Data format documentation
-│   └── experiment_*/   # Timestamped experiment directories
-└── figs/               # Generated figure outputs (REQUIRED)
-    └── *.pdf           # Research-quality PDF outputs
+└── data/               # Experimental data storage (OPTIONAL)
+    ├── README.md       # Data format documentation
+    └── experiment_*/   # Timestamped experiment directories
 ```
 
 ## File Responsibilities
@@ -112,12 +110,13 @@ examples/{case_study_name}/
 - **Documentation**: Include `README.md` explaining data format and usage
 - **Reproducibility**: Complete experimental record with configuration metadata
 
-### `figs/` directory (REQUIRED)
+### Figure outputs
 
-- **Purpose**: Output directory for generated figures
+- **Location**: Write figures to the repository-level `figs/` directory (e.g., `figs/faircoin_timing_*.pdf`)
+- **Preparation**: Create the directory up front (`mkdir -p figs`) if it does not exist
 - **Format**: Prefer PDF for research publications
-- **Naming**: Parametrized filenames with experimental configuration
-- **Git**: Directory should exist but figures may be gitignored
+- **Naming**: Use parametrized filenames that encode experimental configuration
+- **Version control**: Do not check in per-case `figs/` directories under `examples/`
 
 ## Implementation Standards
 
@@ -134,10 +133,10 @@ def model_name(param: Const[type]):
 
 ### Timing Benchmarks
 
-**Use `examples.utils.timing()` or `examples.utils.benchmark_with_warmup()` instead of duplicating timing code.**
+**Use `genjax.timing.timing()` or `genjax.timing.benchmark_with_warmup()` instead of duplicating timing code.**
 
 ```python
-from examples.utils import timing, benchmark_with_warmup
+from genjax.timing import timing, benchmark_with_warmup
 
 def framework_timing(num_obs=50, repeats=200, num_samples=1000):
     """Standard timing function signature using shared utilities."""
@@ -486,7 +485,7 @@ When creating or modifying case studies:
 ### 2. **Follow standard structure**
 
 - Create all required files (`main.py`, `core.py`, `data.py`, `figs.py`)
-- Create `figs/` directory for outputs
+- Route figure outputs to the repository-level `figs/` directory (run `mkdir -p figs` if missing)
 - Consider adding `export.py` and `data/` for complex experiments
 - Write comprehensive `AGENTS.md` with case study guidance
 

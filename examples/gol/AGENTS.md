@@ -15,17 +15,9 @@ examples/gol/
 ├── data.py             # Test patterns and image loading utilities
 ├── figs.py             # Timing benchmarks and figure generation
 ├── main.py             # Command-line interface and timing studies
-├── assets/             # Image assets for patterns
-│   ├── mit.png         # MIT logo pattern
-│   └── popl.png        # POPL logo pattern
-└── figs/               # Generated visualizations (parametrized outputs)
-    ├── gol_gibbs_convergence_monitoring_blinker_4x4_chain250_flip0.030_seed1.pdf   # Blinker Gibbs convergence monitoring
-    ├── gol_gibbs_inferred_states_grid_blinker_4x4_chain250_flip0.030_seed1.pdf      # Blinker inferred states grid
-    ├── gol_gibbs_convergence_monitoring_mit_logo_128x128_chain250_flip0.030_seed1.pdf # Logo convergence monitoring
-    ├── gol_gibbs_inferred_states_grid_mit_logo_128x128_chain250_flip0.030_seed1.pdf   # Logo inferred states grid
-    ├── gol_performance_scaling_analysis_gpu_chain10_flip0.030.pdf          # GPU performance scaling analysis
-    ├── gibbs_on_blinker_monitoring.pdf                        # Legacy monitoring
-    └── gibbs_on_blinker_samples.pdf                           # Legacy samples
+└── assets/             # Image assets for patterns
+    ├── mit.png         # MIT logo pattern
+    └── popl.png        # POPL logo pattern
 ```
 
 ## Code Organization
@@ -79,6 +71,8 @@ examples/gol/
 
 ### `figs.py` - Figure Generation and Benchmarks
 
+Outputs are written to the repository-level `figs/` directory with filenames prefixed `gol_...`. Ensure `figs/` exists (`mkdir -p figs`) before running the figure generation commands; no case-local `figs/` directory is tracked.
+
 **IMPORTANT**: All visualization functions now use the shared GenJAX Research Visualization Standards (GRVS) from `examples.viz` module for consistent styling across case studies.
 
 **Modern Figure Generation**:
@@ -117,7 +111,7 @@ from examples.viz import (
 
 **Timing Infrastructure**:
 
-- **`benchmark_with_warmup()`**: Standardized timing using `examples.utils` with automatic JIT warm-up
+- **`benchmark_with_warmup()`**: Standardized timing from `genjax.timing` with automatic JIT warm-up
 - **`_gibbs_task()`**: Single Gibbs sampling task for performance measurement
 - **Multiple device support**: CPU/GPU benchmarking with automatic device detection
 - **Error reporting**: Track prediction accuracy and bit reconstruction errors
@@ -134,7 +128,7 @@ from examples.viz import (
 
 **Performance Analysis**:
 
-- **Standardized benchmarking**: Uses `examples.utils.benchmark_with_warmup()`
+- **Standardized benchmarking**: Uses `genjax.timing.benchmark_with_warmup()`
 - **Statistical rigor**: Multiple repeats with proper warm-up for reliable measurements
 - **Cross-device comparison**: CPU vs GPU performance analysis
 - **Automatic fallback**: Graceful handling when GPU unavailable
@@ -361,7 +355,7 @@ The GoL case study represents a sophisticated application of probabilistic progr
 
 OK **Structure Standardization**: Updated to follow `examples/` directory best practices
 - Modern CLI with argparse and multiple execution modes
-- Standardized timing utilities using `examples.utils.benchmark_with_warmup()`
+- Standardized timing utilities using `genjax.timing.benchmark_with_warmup()`
 - Research-quality parametrized figure filenames
 
 OK **API Compatibility**: Fixed bit rot issues for modern GenJAX

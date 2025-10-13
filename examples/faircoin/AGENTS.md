@@ -15,9 +15,7 @@ examples/faircoin/
 ├── __init__.py         # Python package marker
 ├── core.py             # Model definitions and timing functions
 ├── figs.py             # Visualization utilities
-├── main.py             # Command-line interface
-└── figs/               # Generated comparison plots
-    └── *.pdf           # Parametrized filename plots
+└── main.py             # Command-line interface
 ```
 
 ## Code Organization
@@ -35,6 +33,8 @@ examples/faircoin/
 ### `figs.py` - Visualization
 
 **NOTE**: This case study uses local styling and should be migrated to the shared `examples.viz` module for consistency with GenJAX Research Visualization Standards (GRVS).
+
+All figures are written to the repository-level `figs/` directory (filenames prefixed with `faircoin_...`). Create the directory first (`mkdir -p figs`) before running the figure commands.
 
 - **`timing_comparison_fig()`**: Generates horizontal bar chart comparisons
 - **`posterior_comparison_fig()`**: Generates 2x2 grid of posterior histograms vs exact posterior

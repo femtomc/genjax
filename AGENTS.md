@@ -24,7 +24,7 @@ GenJAX is a probabilistic programming language embedded in Python centered on pr
 - **Backwards Compatible**: All existing code continues to work unchanged
 - **Improved Documentation**: See `src/genjax/inference/AGENTS.md` for updated API examples
 - **Case Study Update**: Localization example now demonstrates simplified usage pattern
-- **Simplified SMC**: Removed diagnostic weights to focus on core SMC functionality
+- **SMC Diagnostics**: Particle collections retain log-normalized diagnostic weights for ESS tracking and visualization
 
 ## JAX Best Practices
 
@@ -89,7 +89,7 @@ genjax/
 │   ├── mcmc.py          # MCMC algorithms (Metropolis-Hastings, HMC)
 │   ├── smc.py           # Sequential Monte Carlo methods
 │   ├── vi.py            # Variational inference algorithms
-│   └── adev.py          # Automatic differentiation for variational estimates
+│   └── adev             # Automatic Differentiation of Expected Values (ADEV)
 ├── examples/            # Example applications and case studies
 │   ├── faircoin/        # Beta-Bernoulli framework comparison (GenJAX vs NumPyro vs handcoded JAX)
 │   ├── curvefit/        # Curve fitting with multiple frameworks
@@ -164,7 +164,7 @@ Follow this enhanced commit workflow to avoid failed commits and wasted time:
 
 ### Examples and Case Studies
 - Follow standardized structure in `examples/AGENTS.md`
-- Use `examples.utils` for shared functionality
+- Reuse shared helpers from `genjax.timing` and existing case studies
 - See existing examples for patterns before implementing
 
 ### Documentation Style for AGENTS.md Files

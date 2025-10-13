@@ -15,9 +15,7 @@ examples/curvefit/
 ├── main.py             # Main script to generate all figures
 ├── core.py             # Model definitions and inference functions
 ├── data.py             # Standardized test data generation across frameworks
-├── figs.py             # Visualization and figure generation utilities
-└── figs/               # Generated visualization outputs
-    └── *.pdf           # Various curve fitting visualizations
+└── figs.py             # Visualization and figure generation utilities
 ```
 
 ## Code Organization
@@ -70,6 +68,8 @@ examples/curvefit/
 - **Benchmark Suites**: Pre-configured datasets for performance and accuracy comparisons
 
 ### `figs.py` - Comprehensive Visualization Suite
+
+Figure outputs are written to the repository-level `figs/` directory with filenames prefixed by `curvefit_...`. Create the directory first (`mkdir -p figs`) before running the figure workflow.
 
 **IMPORTANT**: All visualization functions now use the shared GenJAX Research Visualization Standards (GRVS) from `examples.viz` module for consistent styling across case studies.
 

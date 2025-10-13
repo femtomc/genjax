@@ -288,6 +288,20 @@ def generate_dataset_with_outliers(
     return result
 
 
+def get_reference_dataset(seed=42, n_points=20):
+    """Get the standard reference dataset for all visualizations."""
+    return generate_fixed_dataset(
+        n_points=n_points,
+        x_min=0.0,
+        x_max=1.0,
+        true_a=-0.211,
+        true_b=-0.395,
+        true_c=0.673,
+        noise_std=0.05,  # Observation noise
+        seed=seed,
+    )
+
+
 def print_dataset_summary(data_dict, name="Dataset"):
     """
     Print a summary of the dataset characteristics.

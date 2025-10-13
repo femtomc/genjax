@@ -84,10 +84,11 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
         seed: Random seed
     """
     from examples.curvefit.core import infer_latents_jit
+    from examples.curvefit.data import get_reference_dataset
     from genjax.core import Const
-    
+
     print("Making posterior scaling plots (N=10, 100, 100000)...")
-    
+
     # Get reference dataset
     data = get_reference_dataset(seed=seed)
     xs = data["xs"]

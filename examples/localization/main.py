@@ -178,11 +178,17 @@ def parse_args():
 
 def paper_mode(args):
     """Generate only the paper figures (1x4 explanation + 4panel SMC comparison)."""
-    # Generate data and get the experiment directory
-    experiment_data_dir = generate_data(args)
-
-    # Load config
-    config = load_experiment_metadata(experiment_data_dir)
+    print("GenJAX Localization Case Study - Paper Mode")
+    print("=" * 50)
+    print("Configuration:")
+    print(f"  LIDAR rays: {args.n_rays}")
+    print(f"  Particles: {args.n_particles}")
+    print(f"  Trajectory steps: {args.n_steps}")
+    print(f"  Random seed: {args.seed}")
+    print(f"  World type: {args.world_type}")
+    print(f"  K rejuvenation steps: {args.k_rejuv}")
+    print(f"  Include SMC comparison: {args.include_smc_comparison}")
+    print("=" * 50)
 
     # Setup output directory
     if os.path.isabs(args.output_dir):
@@ -192,18 +198,34 @@ def paper_mode(args):
         figs_dir = os.path.join(genjax_root, args.output_dir)
     os.makedirs(figs_dir, exist_ok=True)
 
-    # Load ground truth
-    world = create_multi_room_world(world_type=config["world_type"])
-    true_poses, observations = load_ground_truth_data(experiment_data_dir)
+    # Set random seed
+    key = jrand.key(args.seed)
 
-    param_prefix = f"localization_r{config['n_rays']}_p{config['n_particles']}_{config['world_type']}"
+    # Create world
+    print(f"\nCreating {args.world_type} multi-room world...")
+    world = create_multi_room_world(world_type=args.world_type)
+    print(f"World dimensions: {world.width} x {world.height}")
+
+    # Generate ground truth data
+    print("\nGenerating ground truth trajectory...")
+    key, subkey = jrand.split(key)
+    true_poses, controls, observations = generate_ground_truth_data(
+        world, subkey, n_steps=args.n_steps, n_rays=args.n_rays
+    )
+    initial_pose = true_poses[0]
+    print(f"Generated trajectory with {len(true_poses)} poses")
+    print(
+        f"Initial pose: x={initial_pose.x:.2f}, y={initial_pose.y:.2f}, theta={initial_pose.theta:.2f}"
+    )
+
+    param_prefix = f"localization_r{args.n_rays}_p{args.n_particles}_{args.world_type}"
 
     print("\n=== Paper Mode: Generating only paper figures ===")
 
     # 1. Localization problem explanation (1x4)
     print("  Generating localization problem explanation (1x4)...")
     fig_explain, axes_explain = plot_localization_problem_explanation(
-        true_poses, observations, world, n_rays=config["n_rays"]
+        true_poses, observations, world, n_rays=args.n_rays
     )
     filename_explain = f"{param_prefix}_localization_problem_1x4_explanation.pdf"
     plt.savefig(os.path.join(figs_dir, filename_explain), dpi=300, bbox_inches="tight")
@@ -211,9 +233,23 @@ def paper_mode(args):
     print(f"    Saved: {filename_explain}")
 
     # 2. SMC method comparison (4panel)
-    if config.get("include_smc_comparison", False):
+    if args.include_smc_comparison:
         print("  Generating SMC method comparison (4panel)...")
-        benchmark_results = load_benchmark_results(experiment_data_dir)
+        print(
+            "    Running benchmarks (Bootstrap filter, SMC+MH, SMC+HMC, SMC+Locally Optimal)..."
+        )
+        key, subkey = jrand.split(key)
+        benchmark_results = benchmark_smc_methods(
+            args.n_particles,
+            observations,
+            world,
+            subkey,
+            n_rays=args.n_rays,
+            repeats=args.timing_repeats,
+            K=args.k_rejuv,
+            K_hmc=25,  # Special K value for HMC
+            n_particles_big_grid=args.n_particles_big_grid,
+        )
         comparison_filename = f"{param_prefix}_comprehensive_4panel_smc_methods_analysis.pdf"
         comparison_path = os.path.join(figs_dir, comparison_filename)
         plot_smc_method_comparison(
@@ -221,15 +257,18 @@ def paper_mode(args):
             true_poses,
             world,
             save_path=comparison_path,
-            n_rays=config["n_rays"],
-            n_particles=config["n_particles"],
-            K=config["k_rejuv"],
-            n_particles_big_grid=config.get("n_particles_big_grid", 5),
+            n_rays=args.n_rays,
+            n_particles=args.n_particles,
+            K=args.k_rejuv,
+            n_particles_big_grid=args.n_particles_big_grid,
         )
         print(f"    Saved: {comparison_filename}")
+    else:
+        print("  Skipping SMC comparison (use --include-smc-comparison to enable)")
 
     print("\n=== Paper mode complete! ===")
-    print(f"Generated 2 paper figures in: {figs_dir}")
+    figures_generated = 2 if args.include_smc_comparison else 1
+    print(f"Generated {figures_generated} paper figure(s) in: {figs_dir}")
 
 
 def main():
