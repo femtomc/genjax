@@ -60,6 +60,20 @@ setup_publication_fonts()
 # set_minimal_ticks function now imported from examples.viz
 
 
+def get_reference_dataset(seed=42, n_points=20):
+    """Get the standard reference dataset for all visualizations."""
+    from examples.curvefit.data import generate_fixed_dataset
+
+    return generate_fixed_dataset(
+        n_points=n_points,
+        x_min=0.0,
+        x_max=1.0,
+        true_a=-0.211,
+        true_b=-0.395,
+        true_c=0.673,
+        noise_std=0.05,  # Observation noise
+        seed=seed,
+    )
 
 
 def save_posterior_scaling_plots(n_runs=1000, seed=42):
@@ -203,112 +217,163 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
 
 
 def save_inference_scaling_viz(
-    n_trials: int = 10,
+    n_trials: int = 100,
     extended_timing: bool = False,
     particle_counts: list[int] | None = None,
     max_large_trials: int = 3,
 ):
-    """Save the runtime/accuracy scaling analysis."""
-    from examples.curvefit.core import infer_latents, get_points_for_inference
-    from genjax import Const, seed as gf_seed
+    """Save the runtime/accuracy scaling visualization with GPU OOM markers.
 
-    seed = gf_seed
-    key = jrand.key(0)
-    xs, ys = get_points_for_inference()
+    Args:
+        n_trials: Number of independent trials to run for each sample size
+        extended_timing: If True, run extended timing trials for GPU behavior
+        particle_counts: List of particle counts to test (None = extended range)
+        max_large_trials: Maximum trials for large particle counts
+    """
+    from examples.curvefit.core import infer_latents_jit
+    from genjax.core import Const
 
+    print(f"Making and saving inference scaling visualization with {n_trials} trials per N.")
+    if extended_timing:
+        print("  Running extended timing trials to capture GPU behavior...")
+
+    # Get reference dataset
+    data = get_reference_dataset()
+    xs = data["xs"]
+    ys = data["ys"]
+
+    # Use extended range if particle_counts not specified (for OOM visualization)
     if particle_counts is None:
-        particle_counts = [50, 200, 1000]
-        if extended_timing:
-            particle_counts = particle_counts + [5000]
+        n_samples_list = [10, 20, 50, 100, 200, 300, 500, 700, 1000, 1500, 2000, 3000,
+                          4000, 5000, 7000, 10000, 15000, 20000, 30000, 40000, 50000,
+                          70000, 100000, 150000, 200000, 300000, 400000, 500000, 700000, 1000000]
+    else:
+        n_samples_list = particle_counts
 
-    runtimes: list[tuple[float, float]] = []
-    lml_estimates: list[tuple[float, float]] = []
-    ess_values: list[tuple[float, float]] = []
+    lml_estimates = []
+    lml_stds = []
+    runtime_means = []
+    runtime_stds = []
 
-    print("Running inference scaling analysis...")
-    for n_particles in particle_counts:
-        trials = max(1, n_trials)
-        if n_particles > 100_000:
-            trials = min(max_large_trials, trials)
-        print(f"  Testing N={n_particles:,} particles with {trials} trials...")
+    base_key = jrand.key(42)
 
-        times = []
-        lmls = []
-        ess_list = []
+    for n_samples in n_samples_list:
+        trials = n_trials if n_samples <= 100_000 else min(max_large_trials, n_trials)
+        print(f"  Testing with {n_samples} samples ({trials} trials)...")
 
-        for _ in range(trials):
-            key, subkey = jrand.split(key)
-            import time
+        # Storage for trial results
+        trial_lml = []
 
-            start_time = time.time()
-            _, log_weights = seed(infer_latents)(
-                subkey, xs, ys, Const(n_particles)
-            )
-            elapsed = (time.time() - start_time) * 1000.0
-            times.append(elapsed)
+        # Run multiple trials
+        for trial in range(trials):
+            trial_key = jrand.key(42 + trial)
 
-            log_weights = jnp.asarray(log_weights)
-            log_max = jnp.max(log_weights)
-            lml = jnp.log(jnp.sum(jnp.exp(log_weights - log_max))) + log_max - jnp.log(
-                n_particles
-            )
-            lmls.append(float(lml))
+            # Run inference
+            samples, weights = infer_latents_jit(trial_key, xs, ys, Const(n_samples))
 
-            weights = jnp.exp(log_weights - log_max)
-            weights = weights / jnp.sum(weights)
-            ess = float(1.0 / jnp.sum(weights**2))
-            ess_list.append(ess)
+            # Estimate log marginal likelihood
+            lml = jnp.log(jnp.mean(jnp.exp(weights - jnp.max(weights)))) + jnp.max(weights)
+            trial_lml.append(float(lml))
 
-        runtimes.append((float(np.mean(times)), float(np.std(times)) if len(times) > 1 else 0.0))
-        lml_estimates.append((float(np.mean(lmls)), float(np.std(lmls)) if len(lmls) > 1 else 0.0))
-        ess_values.append((float(np.mean(ess_list)), float(np.std(ess_list)) if len(ess_list) > 1 else 0.0))
+        # Average over trials
+        lml_mean = jnp.mean(jnp.array(trial_lml))
+        lml_std = jnp.std(jnp.array(trial_lml))
+        lml_estimates.append(lml_mean)
+        lml_stds.append(lml_std)
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4.5))
+        # Benchmark runtime
+        timing_repeats = 500 if extended_timing else 100
+        inner_repeats = 50 if extended_timing else 20
 
-    runtime_means = [mean for mean, _ in runtimes]
-    ax1.plot(
-        particle_counts,
-        runtime_means,
-        color=get_method_color('genjax_is'),
-        marker='o',
-        linewidth=2.0,
-    )
-    ax1.set_xlabel('Number of Particles', fontweight='bold')
-    ax1.set_ylabel('Runtime (ms)', fontweight='bold')
-    ax1.set_xscale('log')
-    apply_grid_style(ax1)
+        times, (mean_time, std_time) = benchmark_with_warmup(
+            lambda: infer_latents_jit(base_key, xs, ys, Const(n_samples)),
+            repeats=timing_repeats,
+            inner_repeats=inner_repeats
+        )
+        runtime_means.append(mean_time * 1000)
+        runtime_stds.append(std_time * 1000)
 
-    lml_means = [mean for mean, _ in lml_estimates]
-    ax2.plot(
-        particle_counts,
-        lml_means,
-        color=get_method_color('genjax_is'),
-        marker='o',
-        linewidth=2.0,
-    )
-    ax2.set_xlabel('Number of Particles', fontweight='bold')
-    ax2.set_ylabel('Log Marginal Likelihood', fontweight='bold')
-    ax2.set_xscale('log')
-    apply_grid_style(ax2)
+    # Create figure with two panels
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 3.5))
 
-    ess_means = [mean for mean, _ in ess_values]
-    ax3.plot(
-        particle_counts,
-        ess_means,
-        color=get_method_color('genjax_is'),
-        marker='o',
-        linewidth=2.0,
-    )
-    ax3.set_xlabel('Number of Particles', fontweight='bold')
-    ax3.set_ylabel('Effective Sample Size', fontweight='bold')
-    ax3.set_xscale('log')
-    apply_grid_style(ax3)
+    genjax_is_color = "#0173B2"
+
+    # Runtime plot with GPU OOM markers
+    runtime_array = np.array(runtime_means)
+    runtime_std_array = np.array(runtime_stds)
+
+    ax1.plot(n_samples_list, runtime_array, marker="o", linewidth=3, markersize=8,
+             color=genjax_is_color, label="Mean Runtime")
+    ax1.fill_between(n_samples_list, runtime_array - runtime_std_array,
+                      runtime_array + runtime_std_array, alpha=0.3, color=genjax_is_color)
+
+    ax1.set_xlabel("Number of Samples")
+    ax1.set_ylabel("Runtime (ms)")
+    ax1.set_xscale("log")
+    ax1.set_xlim(8, 1200000)
+    ax1.set_ylim(0.1, 0.5)
+
+    # Add GPU behavior annotations
+    ax1.axvspan(100000, 1200000, alpha=0.1, color='orange', label='GPU Throttling')
+    ax1.axvline(10, color='#B19CD9', linestyle='-', alpha=0.8, linewidth=4)
+    ax1.axvline(100, color='#0173B2', linestyle='-', alpha=0.8, linewidth=4)
+    ax1.axvline(100000, color='#029E73', linestyle='-', alpha=0.8, linewidth=4)
+
+    ax1.text(3000, 0.15, 'GPU\nUnderutilized', ha='center', va='bottom',
+             color='gray', fontsize=12, fontweight='bold')
+    ax1.text(300000, 0.15, 'GPU\nThrottling', ha='center', va='bottom',
+             color='darkorange', fontsize=12, fontweight='bold')
+
+    # GPU OOM marker
+    ax1.axvline(1000000, color='red', linestyle='--', alpha=0.7, linewidth=2)
+    ax1.text(1000000, 1.05, 'GPU OOM', ha='center', va='bottom',
+             color='red', fontsize=14, fontweight='bold',
+             transform=ax1.get_xaxis_transform())
+
+    ax1.set_xticks([100, 1000, 10000, 100000, 1000000])
+    ax1.set_xticklabels(['$10^2$', '$10^3$', '$10^4$', '$10^5$', '$10^6$'])
+    ax1.yaxis.set_major_locator(MaxNLocator(nbins=3, prune='both'))
+
+    # LML plot with same annotations
+    lml_means = np.array(lml_estimates)
+    lml_std_array = np.array(lml_stds)
+
+    ax2.plot(n_samples_list, lml_means, marker="o", linewidth=3, markersize=8,
+             color=genjax_is_color, label="Mean LML")
+    ax2.fill_between(n_samples_list, lml_means - lml_std_array,
+                      lml_means + lml_std_array, alpha=0.3, color=genjax_is_color)
+
+    ax2.set_xlabel("Number of Samples")
+    ax2.set_ylabel("LMLE")
+    ax2.set_xscale("log")
+    ax2.set_xlim(8, 1200000)
+
+    # Add convergence line
+    final_lml = lml_means[-1]
+    ax2.axhline(final_lml, color='gray', linestyle='--', alpha=0.7, linewidth=2)
+    ax2.text(70, final_lml, f'{final_lml:.2f}', ha='right', va='center',
+             color='gray', fontsize=12, fontweight='bold')
+
+    # Add GPU behavior annotations
+    ax2.axvspan(100000, 1200000, alpha=0.1, color='orange')
+    ax2.axvline(10, color='#B19CD9', linestyle='-', alpha=0.8, linewidth=4)
+    ax2.axvline(100, color='#0173B2', linestyle='-', alpha=0.8, linewidth=4)
+    ax2.axvline(100000, color='#029E73', linestyle='-', alpha=0.8, linewidth=4)
+    ax2.axvline(1000000, color='red', linestyle='--', alpha=0.7, linewidth=2)
+
+    ax2.text(1000000, 1.05, 'GPU OOM', ha='center', va='bottom',
+             color='red', fontsize=14, fontweight='bold',
+             transform=ax2.get_xaxis_transform())
+
+    ax2.set_xticks([100, 1000, 10000, 100000, 1000000])
+    ax2.set_xticklabels(['$10^2$', '$10^3$', '$10^4$', '$10^5$', '$10^6$'])
+    ax2.yaxis.set_major_locator(MaxNLocator(nbins=3, prune='both'))
 
     plt.tight_layout()
+    fig.savefig("figs/curvefit_scaling_performance.pdf")
+    plt.close()
 
-    save_publication_figure(fig, "figs/curvefit_scaling_performance.pdf")
-
-    print('Saved inference scaling visualization')
+    print("✓ Saved inference scaling visualization with GPU OOM markers")
 
 
 

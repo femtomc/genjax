@@ -93,7 +93,8 @@ def run_paper_mode(args):
     save_single_multipoint_trace_with_density()
     save_inference_scaling_viz(
         n_trials=5,
-        particle_counts=[50, 200, 1000],
+        particle_counts=None,  # Use full extended range from original (30 counts: 10 to 1M)
+        max_large_trials=2,
     )
     save_posterior_scaling_plots()
     save_outlier_detection_comparison()
