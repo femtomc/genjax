@@ -312,7 +312,8 @@ We expect that any environment which supports JAX should allow you to run our ar
 
 ## Case Study Details
 
-In this section, we provide more details on the case studies. Each case study directory also contains a `README.md` file with more information. In each case study, we provide a reference to the figures in the paper which the case study supports.
+In this section, we provide more details on the case studies. 
+In each case study, we provide a reference to the figures in the paper which the case study supports.
 
 ### Fair Coin (Beta-Bernoulli)
 
