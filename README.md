@@ -46,11 +46,11 @@ The snippets below develop the polynomial regression example from our paper's *O
 
 ### Vectorizing Generative Functions with vmap
 
-We begin by expressing the quadratic regression model as a composition of generative functions (`@gen`-decorated Python functions).
+We begin by expressing the polynomial regression model as a composition of generative functions (`@gen`-decorated Python functions).
 
-Each random choice (invocation of a generative function) is tagged with a string address (`"a"`, `"b"`, `"c"`, `"obs"`), which is used to construct a structured representation of the model’s latent variables and observed data, called a _trace_.
+Each random choice (invocation of a generative function) is tagged with a string address (`"a"`, `"b"`, `"c"`, `"obs"`), which is used to construct a structured representation of the model’s random variables, called a _trace_.
 
-Packaging the coefficients inside a callable `Lambda` Pytree mirrors the notion of sampling a function-valued random variable: downstream computations can call the curve directly while the trace retains access to its parameters.
+In GenJAX, packaging the coefficients inside a callable `Lambda` Pytree is a convenient way to allow downstream computations to call the curve directly, while the trace retains access to its parameters.
 
 ```python
 from genjax import gen, normal
@@ -98,13 +98,13 @@ print(trace.get_choices()["curve"].keys())
 print(trace.get_choices()["ys"]["obs"].shape)
 ```
 
-Vectorizing the `point` generative function with `vmap` mirrors the Overview section's Figure 3: the resulting trace preserves the hierarchical structure of the coefficients while lifting the observation random choice into a vectorized array valued version. This "structure preserving” vectorization is what later enables us to reason about datasets and other inference logic in a vectorized fashion.
+Vectorizing the `point` generative function with `vmap` mirrors the Overview section's Figure 3: the resulting trace preserves the hierarchical structure of the coefficients of the polynomial while lifting the observation random choice into a vectorized array-valued version. This structure preserving vectorization is what later enables us to reason about datasets consisting of many points (and other inference logic) in a vectorized fashion.
 
 ### Vectorized Programmable Inference
 
-The generative function interface supplies a small set of methods—`simulate`, `generate`, `assess`, `update`—that we can compose into inference algorithms.
+The generative function interface supplies a small set of methods - `simulate`, `generate`, `assess`, `update` - that we can compose into inference algorithms.
 
-Here we implement likelihood weighting (importance sampling): a single-particle routine constrains the observation site via the `generate` interface, while a vectorized wrapper increases the number of particles. The logic of guessing (sampling) and checking (computing an importance weight) -- internally implemented in `generate` -- remains the same across particles, only the array dimensions vary with the particle count.
+Here, we implement likelihood weighting (importance sampling): a single-particle routine constrains the observation site given a fixed value via the `generate` interface, while a vectorized wrapper increases the number of particles. The logic of guessing (sampling) and checking (computing an importance weight) -- internally implemented in `generate` -- remains the same across particles, only the array dimensions vary with the particle count.
 
 ```python
 from jax.scipy.special import logsumexp
@@ -138,7 +138,7 @@ traces, log_weights = vectorized_importance_sampling(
 print(traces.get_choices()["curve"]["a"].shape, log_marginal_likelihood(log_weights))
 ```
 
-Running on a GPU allows us to increase the axis size as far as memory allows, just as in the scaling curves shown in Figure 5 in the paper.
+Running on a GPU allows us to increase the number of particles as far as memory allows, just as in the scaling curves shown in Figure 5 in the paper.
 
 ### Improving Robustness using Stochastic Branching
 
