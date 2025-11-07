@@ -346,9 +346,9 @@ pixi run -e faircoin python -m examples.faircoin.main \
 
 **Figures in the paper**: Figure 4, Figure 5, Figure 6.
 
-**Command**:
+**Command (CPU, full sweep)**:
 ```bash
-pixi run -e curvefit python -m examples.curvefit.main paper
+pixi run paper-curvefit-gen
 ```
 
 **Outputs**: 5 figures in `figs/`:
@@ -358,15 +358,21 @@ pixi run -e curvefit python -m examples.curvefit.main paper
 - `curvefit_posterior_scaling_combined.pdf`
 - `curvefit_outlier_detection_comparison.pdf`
 
-**Low-resource variant**:
+**Low-resource variant (pass custom flags)**:
+```bash
+pixi run paper-curvefit-custom -- --scaling-max-samples 20000 --scaling-trials 2
+```
+
+You can still run the raw Python entry point directly:
 ```bash
 pixi run -e curvefit python -m examples.curvefit.main paper \
   --scaling-max-samples 20000 --scaling-trials 2
 ```
 
-This trims the GPU scaling benchmark to particle counts ≤20k (or supply `--scaling-particle-counts` for a custom grid).
-You can run the same configuration through the Pixi task interface by passing flags after `--`, e.g.
-`pixi run -e curvefit -- curvefit --scaling-max-samples 20000 --scaling-trials 2`.
+For CUDA, use `pixi run paper-curvefit-gpu-gen` (full sweep) or
+`pixi run paper-curvefit-gpu-custom -- --scaling-max-samples 20000 --scaling-trials 2`.
+
+These variants trim the GPU scaling benchmark to particle counts ≤20k (or supply `--scaling-particle-counts` for a custom grid).
 
 ### Game of Life Inverse Dynamics
 

@@ -38,11 +38,13 @@ paper-setup = "mkdir -p figs"
 # Individual case study tasks (run within their environments)
 paper-faircoin-gen = "pixi run -e faircoin python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
 paper-curvefit-gen = "pixi run -e curvefit python -m examples.curvefit.main paper"
+paper-curvefit-custom = "pixi run -e curvefit python -m examples.curvefit.main"
 paper-gol-gen = "pixi run -e gol python -m examples.gol.main --mode showcase"
 paper-localization-gen = "pixi run -e localization python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
 
 paper-faircoin-gpu-gen = "pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
 paper-curvefit-gpu-gen = "pixi run -e curvefit-cuda python -m examples.curvefit.main paper"
+paper-curvefit-gpu-custom = "pixi run -e curvefit-cuda python -m examples.curvefit.main"
 paper-gol-gpu-gen = "pixi run -e gol-cuda python -m examples.gol.main --mode showcase"
 paper-localization-gpu-gen = "pixi run -e localization-cuda python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
 
@@ -88,6 +90,7 @@ cmd = "curvefit"
 # Paper-friendly defaults (only "paper" mode is supported)
 curvefit = "python -m examples.curvefit.main paper"  # Default POPL figure generation
 curvefit-paper = "python -m examples.curvefit.main paper"  # Alias for backwards compatibility
+curvefit-custom = "python -m examples.curvefit.main"  # Pass flags after `--` to customise runs
 
 [tool.pixi.feature.format.tasks]
 # Code formatting and linting

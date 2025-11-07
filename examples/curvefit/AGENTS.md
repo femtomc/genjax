@@ -29,8 +29,9 @@ To reproduce a minimal GPU-friendly variant of the paper figures:
 pixi run -e curvefit python -m examples.curvefit.main paper \
   --scaling-max-samples 20000 --scaling-trials 2
 ```
-When using Pixi tasks, pass custom flags after `--`, e.g.
-`pixi run -e curvefit -- curvefit --scaling-max-samples 20000 --scaling-trials 2`.
+Pixi tasks expose both the default (full particle grid) and a customizable entry point:
+- `pixi run paper-curvefit-gen` – full range (up to 1M particles, long CPU runtime)
+- `pixi run paper-curvefit-custom -- --scaling-max-samples 20000 --scaling-trials 2` – pass your own flags after `--` (same idea for CUDA via `paper-curvefit-gpu-custom`).
 
 ## Modeling Notes
 - All static sizes (sample counts, chain lengths) should use the `Const[...]` wrapper.
