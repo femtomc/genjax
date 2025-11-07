@@ -295,7 +295,7 @@ Different case studies stress different JAX vectorization patterns, so device ch
 - **Fair Coin** – entirely CPU-friendly; GPU only affects wall-clock time, not the outputs.
 - **Curvefit** – scaling/timing plots assume a GPU so that the importance sampler can sweep up to 1M particles; on CPU you can pass smaller `--scaling-*` flags (see below) and expect longer runtimes plus different timing curves.
 - **Game of Life** – Gibbs timing bars compare CPU vs GPU throughput; animations work everywhere but the scaling panel only matches the paper if both device types are available.
-- **Localization** – Figure 19 relies on CUDA (`pixi run -e localization-cuda …`). The SMC+HMC rejuvenation loop and vectorised LIDAR beams batch thousands of operations per step; on CPU we drop to much smaller grids/particle counts, so the four-panel comparison will differ. Use the GPU command whenever you need parity with the paper.
+- **Localization** – Figure 19 relies on CUDA (`pixi run -e localization-cuda …`). The SMC+HMC rejuvenation loop and vectorised LIDAR beams batch thousands of operations per step; on CPU we drop to much smaller grids/particle counts, so the four-panel comparison will differ. If you have access to a GPU, use the GPU command to match the paper.
 
 ### Devices that we tested the artifact on
 
