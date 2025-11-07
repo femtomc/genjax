@@ -85,12 +85,9 @@ funsor = "*"
 
 [tool.pixi.feature.curvefit.tasks]
 cmd = "curvefit"
-# Curve fitting with GenJAX and NumPyro
-curvefit = "python -m examples.curvefit.main quick"  # Quick demonstration
-curvefit-full = "python -m examples.curvefit.main full"  # Complete analysis
-curvefit-benchmark = "python -m examples.curvefit.main benchmark"  # Framework comparison
-# Paper-specific task: generates the five POPL figures via paper mode
-curvefit-paper = "python -m examples.curvefit.main paper"
+# Paper-friendly defaults (only "paper" mode is supported)
+curvefit = "python -m examples.curvefit.main paper"  # Default POPL figure generation
+curvefit-paper = "python -m examples.curvefit.main paper"  # Alias for backwards compatibility
 
 [tool.pixi.feature.format.tasks]
 # Code formatting and linting

@@ -81,10 +81,56 @@ def parse_args():
         help="Run comprehensive outlier analysis with all figures",
     )
 
+    # Scaling benchmark controls
+    parser.add_argument(
+        "--scaling-trials",
+        type=int,
+        default=5,
+        help="Trials per particle count in the scaling benchmark (default: 5)",
+    )
+    parser.add_argument(
+        "--scaling-max-large-trials",
+        type=int,
+        default=2,
+        help="Maximum trials to run for particle counts above 100k (default: 2)",
+    )
+    parser.add_argument(
+        "--scaling-max-samples",
+        type=int,
+        help="Upper bound on particle counts (filters the default grid)",
+    )
+    parser.add_argument(
+        "--scaling-particle-counts",
+        type=str,
+        help="Comma-separated list overriding the default particle counts",
+    )
+    parser.add_argument(
+        "--scaling-extended-timing",
+        action="store_true",
+        help="Enable extended timing sweeps for the scaling figure",
+    )
+
     return parser.parse_args()
 
 
 # All old modes removed - keeping only paper mode
+
+
+def _parse_particle_counts_arg(arg: str | None) -> list[int] | None:
+    if not arg:
+        return None
+    counts = []
+    for chunk in arg.split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        try:
+            counts.append(int(chunk))
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid integer '{chunk}' in --scaling-particle-counts"
+            ) from exc
+    return counts or None
 
 
 def run_paper_mode(args):
@@ -102,9 +148,11 @@ def run_paper_mode(args):
     save_multiple_multipoint_traces_with_density()
     save_single_multipoint_trace_with_density()
     save_inference_scaling_viz(
-        n_trials=5,
-        particle_counts=None,  # Use full extended range from original (30 counts: 10 to 1M)
-        max_large_trials=2,
+        n_trials=args.scaling_trials,
+        particle_counts=_parse_particle_counts_arg(args.scaling_particle_counts),
+        max_large_trials=args.scaling_max_large_trials,
+        max_samples=args.scaling_max_samples,
+        extended_timing=args.scaling_extended_timing,
     )
     save_posterior_scaling_plots()
     save_outlier_detection_comparison()

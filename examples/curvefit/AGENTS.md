@@ -19,6 +19,19 @@ pixi run -e curvefit-cuda python -m examples.curvefit.main --scaling  # GPU timi
 
 Figures are written to the repository-level `figs/` directory. Create it (`mkdir -p figs`) before running the CLI or pass `--output-dir`.
 
+### Resource-Constrained Benchmarks
+- `--scaling-max-samples <N>` limits the largest particle count used in the GPU scaling figure (default grid tops out at 1M particles).
+- `--scaling-particle-counts <comma separated list>` replaces the grid entirely (e.g., `--scaling-particle-counts 10,100,1000`).
+- `--scaling-trials` and `--scaling-max-large-trials` control how many repetitions are run per particle count.
+
+To reproduce a minimal GPU-friendly variant of the paper figures:
+```bash
+pixi run -e curvefit python -m examples.curvefit.main paper \
+  --scaling-max-samples 20000 --scaling-trials 2
+```
+When using Pixi tasks, pass custom flags after `--`, e.g.
+`pixi run -e curvefit -- curvefit --scaling-max-samples 20000 --scaling-trials 2`.
+
 ## Modeling Notes
 - All static sizes (sample counts, chain lengths) should use the `Const[...]` wrapper.
 - When building mixture models, define branch functions at module scope and reuse the `Cond` combinator pattern shown in `core.py`.

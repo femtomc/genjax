@@ -265,6 +265,7 @@ def save_inference_scaling_viz(
     extended_timing: bool = False,
     particle_counts: list[int] | None = None,
     max_large_trials: int = 3,
+    max_samples: int | None = None,
 ):
     """Save the runtime/accuracy scaling visualization with GPU OOM markers.
 
@@ -273,6 +274,7 @@ def save_inference_scaling_viz(
         extended_timing: If True, run extended timing trials for GPU behavior
         particle_counts: List of particle counts to test (None = extended range)
         max_large_trials: Maximum trials for large particle counts
+        max_samples: Optional upper bound applied to the default particle grid
     """
     from examples.curvefit.core import infer_latents_jit
     from genjax.core import Const
@@ -324,6 +326,15 @@ def save_inference_scaling_viz(
         ]
     else:
         n_samples_list = particle_counts
+
+    if max_samples is not None:
+        n_samples_list = [n for n in n_samples_list if n <= max_samples]
+        if not n_samples_list:
+            raise ValueError(
+                "max_samples filtered out all particle counts; provide a larger limit "
+                "or an explicit --scaling-particle-counts list."
+            )
+        print(f"  Limiting particle counts to <= {max_samples}.")
 
     lml_estimates = []
     lml_stds = []

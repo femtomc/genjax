@@ -280,13 +280,22 @@ All figures are saved to `genjax/figs/`.
 
 ### Execution properties vs. device
 
-Here's a list of behaviors which should be expected when running the case studies on CPU:
+Here's a list of behaviors which should be expected when running the case studies on CPU (see also [Case-study device expectations](#case-study-device-expectations) for per-study notes):
 
 - CPU takes longer than GPU: executed on an Apple M4 (Macbook Air) takes around 4 minutes.
 - CPU won't exhibit the same vectorized scaling properties as GPU (in many cases, linear versus near-constant scaling).
 - When running the artifact on CPU only, some of the timing figures may be missing comparisons between CPU and GPU.
 
 Keep these behaviors in mind when interpreting figures generated via CPU execution.
+
+### Case-study device expectations
+
+Different case studies stress different JAX vectorization patterns, so device characteristics matter:
+
+- **Fair Coin** – entirely CPU-friendly; GPU only affects wall-clock time, not the outputs.
+- **Curvefit** – scaling/timing plots assume a GPU so that the importance sampler can sweep up to 1M particles; on CPU you can pass smaller `--scaling-*` flags (see below) and expect longer runtimes plus different timing curves.
+- **Game of Life** – Gibbs timing bars compare CPU vs GPU throughput; animations work everywhere but the scaling panel only matches the paper if both device types are available.
+- **Localization** – Figure 19 relies on CUDA (`pixi run -e localization-cuda …`). The SMC+HMC rejuvenation loop and vectorised LIDAR beams batch thousands of operations per step; on CPU we drop to much smaller grids/particle counts, so the four-panel comparison will differ. Use the GPU command whenever you need parity with the paper.
 
 ### Devices that we tested the artifact on
 
@@ -349,6 +358,16 @@ pixi run -e curvefit python -m examples.curvefit.main paper
 - `curvefit_posterior_scaling_combined.pdf`
 - `curvefit_outlier_detection_comparison.pdf`
 
+**Low-resource variant**:
+```bash
+pixi run -e curvefit python -m examples.curvefit.main paper \
+  --scaling-max-samples 20000 --scaling-trials 2
+```
+
+This trims the GPU scaling benchmark to particle counts ≤20k (or supply `--scaling-particle-counts` for a custom grid).
+You can run the same configuration through the Pixi task interface by passing flags after `--`, e.g.
+`pixi run -e curvefit -- curvefit --scaling-max-samples 20000 --scaling-trials 2`.
+
 ### Game of Life Inverse Dynamics
 
 **What it does**: Infers past Game of Life states from observed future states using Gibbs sampling on a 512×512 grid with 250 Gibbs steps.
@@ -372,7 +391,16 @@ pixi run -e gol gol-paper
 
 **Figures in the paper**: Figure 19.
 
-**Command**:
+**Command (GPU, matches paper)**:
+```bash
+pixi run -e localization-cuda python -m examples.localization.main paper \
+  --include-basic-demo --include-smc-comparison \
+  --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs
+```
+
+Running without CUDA (`pixi run -e localization …`) executes the same probabilistic program, but the SMC benchmark scales back the vectorised LIDAR beams and rejuvenation sweeps to keep the CPU runtime manageable, so timing/ESS panels will no longer match the GPU figure shown in the paper (see “Case-study device expectations” above for details).
+
+**Historical CPU command** (slower, produces reduced-resolution figures):
 ```bash
 pixi run -e localization python -m examples.localization.main paper \
   --include-basic-demo --include-smc-comparison \
