@@ -19,11 +19,18 @@ coverage.xml
 data/
 /data/
 **/data/
+examples/perfbench/data/
+examples/perfbench/data_cpu/
+examples/perfbench/.genjl_instantiated
+examples/perfbench/.julia_depot/
+examples/perfbench/.julia_home/
 
 # Generated figures and outputs (keep logo assets)
 figs/
 examples/**/figs/*.pdf
 examples/**/figs/*.png
+examples/perfbench/figs/
+examples/perfbench/figs_cpu/
 
 # Image files (except in asset directories)
 *.png

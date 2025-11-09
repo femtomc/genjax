@@ -1,0 +1,177 @@
+[project]
+name = "timing_benchmarks"
+version = "0.1.0"
+description = "Timing benchmarks for probabilistic programming frameworks"
+authors = [{name = "GenJAX Team"}]
+requires-python = ">=3.10"
+
+[project.scripts]
+timing-benchmarks = "timing_benchmarks.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "benchmarks/src"}
+
+[tool.setuptools.packages.find]
+where = ["benchmarks/src"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge", "pytorch", "nvidia"]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = "3.12.*"
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.pypi-dependencies]
+jax = ">=0.6.0,<0.7"
+jaxlib = ">=0.6.0,<0.7"
+numpyro = "*"
+genjax = { path = "../..", editable = true }
+tensorflow-probability = "*"
+
+[tool.pixi.feature.cuda.system-requirements]
+cuda = "12"
+
+[tool.pixi.feature.cuda.target.linux-64.dependencies]
+# CUDA-enabled JAX for GPU acceleration on linux-64
+jaxlib = { version = ">=0.6.0,<0.7", build = "*cuda12*" }
+
+[tool.pixi.feature.cuda.dependencies]
+python = ">=3.10"
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.feature.cuda.pypi-dependencies]
+jax = ">=0.6.0,<0.7"
+numpyro = "*"
+genjax = { path = "../..", editable = true }
+tensorflow-probability = "*"
+
+[tool.pixi.feature.pyro.dependencies]
+python = ">=3.10"
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.feature.pyro.target.linux-64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+pytorch-cuda = { version = "12.*", channel = "pytorch" }
+torchvision = { version = "*", channel = "pytorch" }
+
+[tool.pixi.feature.pyro.target.osx-arm64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+torchvision = { version = "*", channel = "pytorch" }
+
+[tool.pixi.feature.pyro.pypi-dependencies]
+pyro-ppl = "*"
+
+[tool.pixi.feature.torch.dependencies]
+python = ">=3.10"
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.feature.torch.target.linux-64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+pytorch-cuda = { version = "12.*", channel = "pytorch" }
+
+[tool.pixi.feature.torch.target.osx-arm64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+
+[tool.pixi.feature.torch.pypi-dependencies]
+setuptools = "*"
+
+[tool.pixi.feature.torch.target.linux-64.pypi-dependencies]
+triton = "*"
+
+[tool.pixi.environments]
+default = { features = [], solve-group = "default" }
+cuda = { features = ["cuda"], solve-group = "cuda" }
+pyro = { features = ["pyro"], solve-group = "pyro" }
+torch = { features = ["torch"], solve-group = "torch" }
+
+[tool.pixi.tasks]
+# === CurveFit Benchmarks ===
+# Generate curvefit data
+generate-data = "python main.py generate-data --n-points 50 --seed 42 --output data/curvefit/polynomial_data.npz"
+
+# Run individual framework benchmarks
+curvefit-genjax = "python main.py run --framework genjax --repeats 100 --output-dir data/curvefit/genjax -- --n-particles 1000 5000 10000"
+curvefit-numpyro = "python main.py run --framework numpyro --repeats 100 --output-dir data/curvefit/numpyro -- --n-particles 1000 5000 10000"
+curvefit-genjl = "python main.py run --framework genjl --repeats 50 --output-dir data/curvefit/genjl_dynamic -- --n-particles 1000 5000 10000"
+
+# Combine results and generate plots
+curvefit-plot = "python main.py combine --data-dir data --output-dir figs"
+curvefit-plot-cpu = "python main.py combine --data-dir data_cpu --output-dir figs_cpu --frameworks genjax numpyro handcoded_jax pyro handcoded_torch genjl"
+curvefit-export = "python main.py export --source-dir figs --dest-dir ../../figs --prefix perfbench"
+curvefit-export-cpu = "python main.py export --source-dir figs_cpu --dest-dir ../../figs --prefix perfbench_cpu"
+
+# Gen.jl HMC helpers
+genjl-hmc = "python main.py genjl-hmc --chain-lengths 100 500 1000 --n-warmup 500 --repeats 10 --step-size 0.01 --n-leapfrog 20 --dataset data/curvefit/polynomial_data.npz --output-dir data/curvefit/genjl"
+genjl-hmc-cpu = "python main.py genjl-hmc --chain-lengths 100 500 1000 --n-warmup 200 --repeats 5 --step-size 0.01 --n-leapfrog 15 --dataset data_cpu/curvefit/polynomial_data.npz --output-dir data_cpu/curvefit/genjl"
+
+# Full curvefit pipeline
+curvefit-all = { depends-on = ["generate-data", "curvefit-genjax", "curvefit-numpyro", "curvefit-genjl", "cuda-curvefit-handcoded", "pyro-curvefit", "curvefit-plot"] }
+curvefit-cpu = { depends-on = ["generate-data-cpu", "curvefit-genjax-cpu", "curvefit-numpyro-cpu", "curvefit-handcoded-cpu", "pyro-curvefit-cpu", "pyro-torch-cpu", "curvefit-genjl-cpu", "curvefit-hmc-cpu", "genjl-hmc-cpu", "curvefit-plot-cpu"] }
+
+# CPU path helpers
+generate-data-cpu = "python main.py generate-data --n-points 20 --seed 7 --output data_cpu/curvefit/polynomial_data.npz"
+curvefit-genjax-cpu = "python main.py run --framework genjax --repeats 5 --output-dir data_cpu/curvefit/genjax -- --n-particles 1000 --n-points 20"
+curvefit-numpyro-cpu = "python main.py run --framework numpyro --repeats 5 --output-dir data_cpu/curvefit/numpyro -- --n-particles 1000 --n-points 20"
+curvefit-genjl-cpu = "python main.py run --framework genjl --repeats 5 --output-dir data_cpu/curvefit/genjl -- --n-particles 1000 --n-points 20"
+curvefit-handcoded-cpu = "python main.py run --framework handcoded-jax --repeats 5 --output-dir data_cpu/curvefit/handcoded_jax -- --n-particles 1000 --n-points 20"
+curvefit-hmc-cpu = "JAX_PLATFORMS=cpu python benchmarks/run_hmc_benchmarks.py --frameworks genjax numpyro handcoded_jax --chain-lengths 100 500 1000 --repeats 5 --device cpu --output-dir data_cpu/curvefit --n-warmup 200 --step-size 0.01 --n-leapfrog 15"
+
+# === Cleanup ===
+clean-data = "rm -rf data/curvefit data/genjax_handcoded data/handcoded_jax data/handcoded_torch"
+clean-figs = "rm -rf figs/*.pdf figs/*.png"
+clean-all = { depends-on = ["clean-data", "clean-figs"] }
+clean-cpu = "rm -rf data_cpu figs_cpu"
+
+# === CUDA Environment Tasks ===
+[tool.pixi.feature.cuda.tasks]
+# CurveFit benchmarks
+cuda-curvefit-handcoded = "python main.py run --framework handcoded-jax --repeats 100 --output-dir data/curvefit/handcoded_jax -- --n-particles 1000 5000 10000"
+
+# HMC benchmarks on GPU
+hmc-genjax = "python benchmarks/run_hmc_benchmarks.py --frameworks genjax --chain-lengths 100 500 1000 --repeats 100 --device cuda"
+hmc-numpyro = "python benchmarks/run_hmc_benchmarks.py --frameworks numpyro --chain-lengths 100 500 1000 --repeats 100 --device cuda"
+hmc-handcoded-jax = "python benchmarks/run_hmc_benchmarks.py --frameworks handcoded_jax --chain-lengths 100 500 1000 --repeats 100 --device cuda"
+hmc-all = { depends-on = ["hmc-genjax", "hmc-numpyro", "hmc-handcoded-jax"] }
+
+# Quick HMC test with fewer repeats
+hmc-test = "python run_hmc_benchmarks.py --frameworks genjax numpyro handcoded_jax --chain-lengths 100 1000 --repeats 5 --device cuda"
+
+# Generate HMC comparison plots
+hmc-plot = "python benchmarks/combine_results.py --frameworks genjax numpyro handcoded_jax handcoded_torch genjl --data-dir data --output-dir figs"
+
+# === PyTorch Environment Tasks ===
+[tool.pixi.feature.torch.tasks]
+# HMC benchmarks
+hmc-torch = "python benchmarks/run_hmc_benchmarks.py --frameworks handcoded_torch --chain-lengths 100 500 1000 --repeats 100 --device cuda"
+
+# === Pyro Environment Tasks ===
+[tool.pixi.feature.pyro.tasks]
+# Pyro benchmarks (with CUDA support)
+pyro-curvefit = "python main.py run --framework pyro --repeats 50 --output-dir data/curvefit/pyro --device cuda -- --n-particles 1000 5000 10000"
+pyro-torch = "python main.py run --framework torch --repeats 50 --output-dir data/curvefit/handcoded_torch --device cuda -- --n-particles 1000 5000 10000"
+pyro-curvefit-cpu = "python main.py run --framework pyro --repeats 5 --output-dir data_cpu/curvefit/pyro --device cpu -- --n-particles 1000 --n-points 20"
+pyro-torch-cpu = "python main.py run --framework torch --repeats 5 --output-dir data_cpu/curvefit/handcoded_torch --device cpu -- --n-particles 1000 --n-points 20"
+
+# HMC benchmarks
+hmc-pyro = "python benchmarks/run_hmc_benchmarks.py --frameworks pyro --chain-lengths 100 500 1000 --repeats 100 --device cuda"

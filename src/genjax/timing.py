@@ -7,11 +7,39 @@ from collections.abc import Callable
 from typing import Any, Optional
 
 
+def _block_until_ready(result: Any) -> None:
+    """Best-effort synchronization helper (ignores non-JAX types)."""
+
+    try:
+        jax.block_until_ready(result)
+    except (TypeError, AttributeError):
+        # result might be a PyTree; try mapping block_until_ready over leaves
+        try:
+            jax.tree_util.tree_map(lambda x: jax.block_until_ready(x), result)
+        except Exception:
+            pass
+
+
+def _aggregate(samples: jnp.ndarray, trim_fraction: float) -> float:
+    """Return trimmed-mean aggregate of per-iteration timings."""
+
+    if samples.size == 0:
+        return 0.0
+
+    trimmed = samples
+    if 0.0 < trim_fraction < 0.5 and samples.size > 2:
+        k = int(samples.size * trim_fraction)
+        if k > 0 and 2 * k < samples.size:
+            trimmed = jnp.sort(samples)[k:-k]
+    return float(jnp.mean(trimmed))
+
+
 def timing(
     fn: Callable[[], Any],
     repeats: int = 20,
     inner_repeats: int = 20,
     auto_sync: bool = True,
+    trim_fraction: float = 0.2,
 ) -> tuple[jnp.ndarray, tuple[float, float]]:
     """Benchmark function execution time with multiple runs.
 
@@ -49,19 +77,18 @@ def timing(
         times, (mean, std) = timing(lambda: jitted_fn(data), repeats=200)
     """
     times = []
-    for i in range(repeats):
-        possible = []
-        for j in range(inner_repeats):
-            start_time = time.perf_counter()
+    for _ in range(repeats):
+        samples = []
+        for _ in range(inner_repeats):
+            start_time = time.perf_counter_ns()
+            result = fn()
             if auto_sync:
-                # Automatically synchronize JAX computations
-                result = fn()
-                jax.block_until_ready(result)
-            else:
-                result = fn()
-            interval = time.perf_counter() - start_time
-            possible.append(interval)
-        times.append(jnp.array(possible).min())
+                _block_until_ready(result)
+            elapsed = (time.perf_counter_ns() - start_time) / 1e9
+            samples.append(elapsed)
+
+        aggregated = _aggregate(jnp.array(samples), trim_fraction)
+        times.append(aggregated)
 
     times = jnp.array(times)
     return times, (float(jnp.mean(times)), float(jnp.std(times)))
@@ -73,6 +100,7 @@ def benchmark_with_warmup(
     repeats: int = 10,
     inner_repeats: int = 10,
     auto_sync: bool = True,
+    trim_fraction: float = 0.2,
 ) -> tuple[jnp.ndarray, tuple[float, float]]:
     """Benchmark function with automatic JIT warm-up runs.
 
@@ -100,7 +128,13 @@ def benchmark_with_warmup(
         _ = fn()
 
     # Actual timing
-    return timing(fn, repeats=repeats, inner_repeats=inner_repeats, auto_sync=auto_sync)
+    return timing(
+        fn,
+        repeats=repeats,
+        inner_repeats=inner_repeats,
+        auto_sync=auto_sync,
+        trim_fraction=trim_fraction,
+    )
 
 
 def compare_timings(*timing_results, labels: Optional[list] = None) -> None:
