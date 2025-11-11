@@ -13,11 +13,8 @@ import jax.random as jrand
 import numpyro
 import numpyro.distributions as dist
 from numpyro import handlers
-# Note: HMC timing uses low-level kernels; MCMC/Predictive are imported for IS code.
-from numpyro.infer import MCMC, Predictive
-from numpyro.infer.hmc import hmc as numpyro_hmc
+from numpyro.infer.hmc import hmc as hmc_lowlevel
 from numpyro.infer.util import initialize_model
-from numpyro.util import fori_collect
 
 from genjax.timing import benchmark_with_warmup
 from ..data.generation import PolynomialDataset, polyfn
@@ -140,7 +137,7 @@ def numpyro_polynomial_hmc_timing(
     dataset: PolynomialDataset,
     n_samples: int,
     n_warmup: int = 50,
-    repeats: int = 100,
+    repeats: int = 10,
     key: Optional[jax.Array] = None,
     step_size: float = 0.01,
     n_leapfrog: int = 20,
@@ -172,8 +169,15 @@ def numpyro_polynomial_hmc_timing(
         mu = a + b * xs + c * xs**2
         numpyro.sample("ys", dist.Normal(mu, 0.05), obs=ys)
 
-    model_info = initialize_model(key, model, model_args=(xs, ys))
-    init_kernel, sample_kernel = numpyro_hmc(model_info.potential_fn, algo="HMC")
+    init_key, run_key = jrand.split(key)
+    model_info = initialize_model(
+        init_key,
+        model,
+        model_args=(xs, ys),
+        model_kwargs={},
+        dynamic_args=False,
+    )
+    init_kernel, sample_kernel = hmc_lowlevel(model_info.potential_fn, algo="HMC")
 
     def run_chain(rng_key):
         hmc_state = init_kernel(
@@ -185,28 +189,32 @@ def numpyro_polynomial_hmc_timing(
             adapt_mass_matrix=False,
             rng_key=rng_key,
         )
-        samples = fori_collect(
-            0,
-            n_samples,
-            sample_kernel,
-            hmc_state,
-            transform=lambda state: model_info.postprocess_fn(state.z),
-        )
-        return samples
+        def one_step(state, _):
+            new_state = sample_kernel(state)
+            return new_state, new_state.z
+
+        total_steps = n_warmup + n_samples
+        _, raw_samples = jax.lax.scan(one_step, hmc_state, jnp.arange(total_steps))
+        raw_samples = jax.tree_util.tree_map(lambda x: x[n_warmup:], raw_samples)
+
+        def constrain(z_sample):
+            return model_info.postprocess_fn(z_sample)
+
+        constrained = jax.vmap(constrain)(raw_samples)
+        return constrained
 
     jitted_chain = jax.jit(run_chain)
 
-    rng_key = key
+    key_state = {"key": run_key}
 
     def task():
-        nonlocal rng_key
-        rng_key, subkey = jrand.split(rng_key)
+        key_state["key"], subkey = jrand.split(key_state["key"])
         samples = jitted_chain(subkey)
         jax.block_until_ready(samples["a"])
         return samples
 
     times, (mean_time, std_time) = benchmark_with_warmup(
-        task, warmup_runs=3, repeats=10, inner_repeats=10, auto_sync=False
+        task, warmup_runs=3, repeats=repeats, inner_repeats=10, auto_sync=False
     )
 
     samples = task()
