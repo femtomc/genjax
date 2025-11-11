@@ -281,7 +281,7 @@ def pyro_polynomial_hmc_timing(
                 num_samples=n_samples,
                 warmup_steps=n_warmup,
                 initial_params=make_initial_params(),
-                progress_bar=False,
+                disable_progbar=True,
             )
             if device.type == "cuda":
                 torch.cuda.synchronize()
