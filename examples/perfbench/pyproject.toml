@@ -106,72 +106,60 @@ pyro = { features = ["pyro"], solve-group = "pyro" }
 torch = { features = ["torch"], solve-group = "torch" }
 
 [tool.pixi.tasks]
-# === CurveFit Benchmarks ===
-# Generate curvefit data
+# =====================================================================
+# MAIN PERFBENCH TASKS - Full Pipeline (Figure 16b reproduction)
+# =====================================================================
+# Run the complete performance benchmark case study
+perfbench = "python main.py pipeline --mode cuda"
+perfbench-cpu = "python main.py pipeline --mode cpu"
+
+# Run only Importance Sampling benchmarks
+perfbench-is = "python main.py pipeline --mode cuda --skip-hmc"
+perfbench-is-cpu = "python main.py pipeline --mode cpu --skip-hmc"
+
+# Run only HMC benchmarks
+perfbench-hmc = "python main.py pipeline --mode cuda --skip-is"
+perfbench-hmc-cpu = "python main.py pipeline --mode cpu --skip-is"
+
+# Custom framework selection examples (modify as needed)
+perfbench-jax-only = "python main.py pipeline --mode cuda --is-frameworks genjax numpyro handcoded-jax --hmc-frameworks genjax numpyro handcoded_jax"
+perfbench-quick = "python main.py pipeline --mode cuda --particles 1000 --hmc-chain-lengths 100 500"
+
+# =====================================================================
+# INDIVIDUAL FRAMEWORK TASKS - For debugging/development
+# =====================================================================
+# Run a single framework (use --particles to override defaults)
+run-genjax = "python main.py run --framework genjax --repeats 100 --particles 1000 5000 10000 --output-dir data/curvefit/genjax"
+run-numpyro = "python main.py run --framework numpyro --repeats 100 --particles 1000 5000 10000 --output-dir data/curvefit/numpyro"
+run-genjl = "python main.py run --framework genjl --repeats 50 --particles 1000 5000 10000 --output-dir data/curvefit/genjl_dynamic"
+
+# =====================================================================
+# UTILITY TASKS
+# =====================================================================
+# Generate dataset only
 generate-data = "python main.py generate-data --n-points 50 --seed 42 --output data/curvefit/polynomial_data.npz"
 
-# Run individual framework benchmarks
-curvefit-genjax = "python main.py run --framework genjax --repeats 100 --particles 1000 5000 10000 --output-dir data/curvefit/genjax"
-curvefit-numpyro = "python main.py run --framework numpyro --repeats 100 --particles 1000 5000 10000 --output-dir data/curvefit/numpyro"
-curvefit-genjl = "python main.py run --framework genjl --repeats 50 --particles 1000 5000 10000 --output-dir data/curvefit/genjl_dynamic"
+# Plotting and exporting (if you have existing data)
+plot = "python main.py combine --data-dir data --output-dir figs"
+export = "python main.py export --source-dir figs --dest-dir ../../figs --prefix perfbench"
 
-# Combine results and generate plots
-curvefit-plot = "python main.py combine --data-dir data --output-dir figs"
-curvefit-plot-cpu = "python main.py combine --data-dir data_cpu --output-dir figs_cpu --frameworks genjax numpyro handcoded_jax pyro handcoded_torch genjl"
-curvefit-export = "python main.py export --source-dir figs --dest-dir ../../figs --prefix perfbench"
-curvefit-export-cpu = "python main.py export --source-dir figs_cpu --dest-dir ../../figs --prefix perfbench_cpu"
-
-# Gen.jl HMC helpers
-genjl-hmc = "python main.py genjl-hmc --chain-lengths 100 500 1000 --n-warmup 50 --repeats 10 --step-size 0.01 --n-leapfrog 20 --dataset data/curvefit/polynomial_data.npz --output-dir data/curvefit/genjl"
-genjl-hmc-cpu = "python main.py genjl-hmc --chain-lengths 100 500 1000 --n-warmup 50 --repeats 5 --step-size 0.01 --n-leapfrog 15 --dataset data_cpu/curvefit/polynomial_data.npz --output-dir data_cpu/curvefit/genjl"
-
-# Full curvefit pipeline
-curvefit-all = { depends-on = ["generate-data", "curvefit-genjax", "curvefit-numpyro", "curvefit-genjl", "cuda-curvefit-handcoded", "pyro-curvefit", "curvefit-plot"] }
-curvefit-cpu = { depends-on = ["generate-data-cpu", "curvefit-genjax-cpu", "curvefit-numpyro-cpu", "curvefit-handcoded-cpu", "pyro-curvefit-cpu", "pyro-torch-cpu", "curvefit-genjl-cpu", "curvefit-hmc-cpu", "genjl-hmc-cpu", "curvefit-plot-cpu"] }
-
-# CPU path helpers
-generate-data-cpu = "python main.py generate-data --n-points 20 --seed 7 --output data_cpu/curvefit/polynomial_data.npz"
-curvefit-genjax-cpu = "python main.py run --framework genjax --repeats 5 --particles 1000 --output-dir data_cpu/curvefit/genjax -- --n-points 20"
-curvefit-numpyro-cpu = "python main.py run --framework numpyro --repeats 5 --particles 1000 --output-dir data_cpu/curvefit/numpyro -- --n-points 20"
-curvefit-genjl-cpu = "python main.py run --framework genjl --repeats 5 --particles 1000 --output-dir data_cpu/curvefit/genjl -- --n-points 20"
-curvefit-handcoded-cpu = "python main.py run --framework handcoded-jax --repeats 5 --particles 1000 --output-dir data_cpu/curvefit/handcoded_jax -- --n-points 20"
-curvefit-hmc-cpu = "JAX_PLATFORMS=cpu python benchmarks/run_hmc_benchmarks.py --frameworks genjax numpyro handcoded_jax --chain-lengths 100 500 1000 --repeats 5 --device cpu --output-dir data_cpu/curvefit --n-warmup 50 --step-size 0.01 --n-leapfrog 15"
-
-# === Cleanup ===
-clean-data = "rm -rf data/curvefit data/genjax_handcoded data/handcoded_jax data/handcoded_torch"
-clean-figs = "rm -rf figs/*.pdf figs/*.png"
-clean-all = { depends-on = ["clean-data", "clean-figs"] }
+# Cleanup
+clean = "rm -rf data data_cpu figs figs_cpu"
 clean-cpu = "rm -rf data_cpu figs_cpu"
 
-# === CUDA Environment Tasks ===
+# =====================================================================
+# CUDA/PYRO/TORCH ENVIRONMENT TASKS - Advanced users
+# =====================================================================
+# These run in specific environments for frameworks requiring special setup
+
 [tool.pixi.feature.cuda.tasks]
-# CurveFit benchmarks
-cuda-curvefit-handcoded = "python main.py run --framework handcoded-jax --repeats 100 --particles 1000 5000 10000 --output-dir data/curvefit/handcoded_jax"
+# JAX CUDA tasks
+run-handcoded-jax = "python main.py run --framework handcoded-jax --repeats 100 --particles 1000 5000 10000 --output-dir data/curvefit/handcoded_jax"
 
-# HMC benchmarks on GPU
-hmc-genjax = "python benchmarks/run_hmc_benchmarks.py --frameworks genjax --chain-lengths 100 500 1000 --repeats 100 --device cuda"
-hmc-numpyro = "python benchmarks/run_hmc_benchmarks.py --frameworks numpyro --chain-lengths 100 500 1000 --repeats 100 --device cuda"
-hmc-handcoded-jax = "python benchmarks/run_hmc_benchmarks.py --frameworks handcoded_jax --chain-lengths 100 500 1000 --repeats 100 --device cuda"
-hmc-all = { depends-on = ["hmc-genjax", "hmc-numpyro", "hmc-handcoded-jax"] }
-
-# Quick HMC test with fewer repeats
-hmc-test = "python run_hmc_benchmarks.py --frameworks genjax numpyro handcoded_jax --chain-lengths 100 1000 --repeats 5 --device cuda"
-
-# Generate HMC comparison plots
-hmc-plot = "python benchmarks/combine_results.py --frameworks genjax numpyro handcoded_jax handcoded_torch genjl --data-dir data --output-dir figs"
-
-# === PyTorch Environment Tasks ===
-[tool.pixi.feature.torch.tasks]
-# HMC benchmarks
-hmc-torch = "python benchmarks/run_hmc_benchmarks.py --frameworks handcoded_torch --chain-lengths 100 500 1000 --repeats 100 --device cuda"
-
-# === Pyro Environment Tasks ===
 [tool.pixi.feature.pyro.tasks]
-# Pyro benchmarks (with CUDA support)
-pyro-curvefit = "python main.py run --framework pyro --repeats 50 --particles 1000 5000 10000 --output-dir data/curvefit/pyro --device cuda"
-pyro-torch = "python main.py run --framework torch --repeats 50 --particles 1000 5000 10000 --output-dir data/curvefit/handcoded_torch --device cuda"
-pyro-curvefit-cpu = "python main.py run --framework pyro --repeats 5 --particles 1000 --output-dir data_cpu/curvefit/pyro --device cpu -- --n-points 20"
-pyro-torch-cpu = "python main.py run --framework torch --repeats 5 --particles 1000 --output-dir data_cpu/curvefit/handcoded_torch --device cpu -- --n-points 20"
+# PyTorch-based frameworks (Pyro and handcoded PyTorch)
+run-pyro = "python main.py run --framework pyro --repeats 50 --particles 1000 5000 10000 --output-dir data/curvefit/pyro --device cuda"
+run-torch = "python main.py run --framework torch --repeats 50 --particles 1000 5000 10000 --output-dir data/curvefit/handcoded_torch --device cuda"
 
-# HMC benchmarks
-hmc-pyro = "python benchmarks/run_hmc_benchmarks.py --frameworks pyro --chain-lengths 100 500 1000 --repeats 100 --device cuda"
+[tool.pixi.feature.torch.tasks]
+# Torch-specific tasks (if needed separately from Pyro)

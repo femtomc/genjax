@@ -109,11 +109,11 @@ def numpyro_polynomial_is_timing(
     
     # Run benchmark with automatic warm-up - more inner repeats for accuracy
     times, (mean_time, std_time) = benchmark_with_warmup(
-        task, 
+        task,
         warmup_runs=5,
-        repeats=repeats,
-        inner_repeats=200,  # Increased for better accuracy
-        auto_sync=False
+        repeats=10,
+        inner_repeats=10,
+        auto_sync=False,
     )
     
     # Get samples for validation
@@ -206,7 +206,7 @@ def numpyro_polynomial_hmc_timing(
         return samples
 
     times, (mean_time, std_time) = benchmark_with_warmup(
-        task, warmup_runs=3, repeats=repeats, inner_repeats=1, auto_sync=False
+        task, warmup_runs=3, repeats=10, inner_repeats=10, auto_sync=False
     )
 
     samples = task()

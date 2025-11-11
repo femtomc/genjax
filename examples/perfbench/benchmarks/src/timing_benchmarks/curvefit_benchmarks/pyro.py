@@ -4,7 +4,6 @@ This module contains Pyro-specific models and timing functions for
 polynomial regression with importance sampling and HMC.
 """
 
-import time
 from typing import Dict, Any, Optional
 import numpy as np
 
@@ -15,8 +14,8 @@ from ..data.generation import PolynomialDataset
 def pyro_polynomial_is_timing(
     dataset: PolynomialDataset,
     n_particles: int,
-    repeats: int = 100,
-    device: str = "cpu"
+    repeats: int = 10,
+    device: str = "cpu",
 ) -> Dict[str, Any]:
     """Time Pyro importance sampling on polynomial regression.
     
@@ -161,25 +160,21 @@ def pyro_polynomial_is_timing(
         else:
             importance_sampling = importance_sampling_traced
         
-        # Define task for benchmarking
-        def task():
+        def timing_task():
             result = importance_sampling()
-            # Synchronize CUDA if using GPU
             if device.type == "cuda":
                 torch.cuda.synchronize()
             return result
         
-        # Run benchmark with automatic warm-up - fewer inner repeats for Pyro
         times, (mean_time, std_time) = benchmark_with_warmup(
-            task, 
+            timing_task,
             warmup_runs=2,
-            repeats=repeats,
-            inner_repeats=10,  # Reduced for Pyro's slower execution
-            auto_sync=False  # We handle sync manually
+            repeats=10,
+            inner_repeats=10,
+            auto_sync=False,
         )
         
-        # Get samples for validation
-        samples = task()
+        samples = timing_task()
         
         return {
             "framework": "pyro",
@@ -215,7 +210,7 @@ def pyro_polynomial_hmc_timing(
     dataset: PolynomialDataset,
     n_samples: int,
     n_warmup: int = 50,
-    repeats: int = 100,
+    repeats: int = 10,
     device: str = "cuda",
     step_size: float = 0.01,
     num_steps: int = 20,
@@ -279,45 +274,30 @@ def pyro_polynomial_hmc_timing(
         # Create HMC kernel with specified parameters
         hmc_kernel = HMC(polynomial_model, step_size=step_size, num_steps=num_steps)
         
-        # Warm-up run
-        mcmc = MCMC(
-            hmc_kernel,
-            num_samples=10,
-            warmup_steps=10,
-            initial_params=make_initial_params(),
-        )
-        mcmc.run(xs, ys)
-        
-        # Timing runs
-        times = []
-        for _ in range(repeats):
+        def run_mcmc():
             mcmc = MCMC(
                 hmc_kernel,
                 num_samples=n_samples,
                 warmup_steps=n_warmup,
                 initial_params=make_initial_params(),
+                progress_bar=False,
             )
-            
-            torch.cuda.synchronize() if device.type == "cuda" else None
-            start_time = time.time()
+            if device.type == "cuda":
+                torch.cuda.synchronize()
             mcmc.run(xs, ys)
-            torch.cuda.synchronize() if device.type == "cuda" else None
-            times.append(time.time() - start_time)
-        
-        # Calculate timing statistics
-        times = np.array(times)
-        mean_time = float(np.mean(times))
-        std_time = float(np.std(times))
-        
-        # Get final samples for validation
-        mcmc = MCMC(
-            hmc_kernel,
-            num_samples=n_samples,
-            warmup_steps=n_warmup,
-            initial_params=make_initial_params(),
+            if device.type == "cuda":
+                torch.cuda.synchronize()
+            return mcmc.get_samples()
+
+        times, (mean_time, std_time) = benchmark_with_warmup(
+            run_mcmc,
+            warmup_runs=1,
+            repeats=10,
+            inner_repeats=10,
+            auto_sync=False,
         )
-        mcmc.run(xs, ys)
-        samples = mcmc.get_samples()
+
+        samples = run_mcmc()
         
         return {
             "framework": "pyro",

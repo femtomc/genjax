@@ -10,6 +10,7 @@ from datetime import datetime
 import time
 
 from ..data.generation import generate_polynomial_data, PolynomialDataset
+from .timing_utils import benchmark_with_warmup
 from typing import Dict, Any, Optional
 
 
@@ -44,43 +45,36 @@ def importance_sampling(xs, ys, n_particles, device='cuda'):
     return log_weights
 
 
-def handcoded_torch_timing(dataset, n_particles, repeats=100, device='cuda'):
+def handcoded_torch_timing(dataset, n_particles, repeats=10, device='cuda'):
     """Time handcoded PyTorch importance sampling."""
     # Convert JAX arrays to numpy if needed
     xs = np.array(dataset.xs) if hasattr(dataset.xs, '__array__') else dataset.xs
     ys = np.array(dataset.ys) if hasattr(dataset.ys, '__array__') else dataset.ys
-    
-    # Warm-up runs
-    for _ in range(5):
+
+    def task():
         with torch.no_grad():
-            _ = importance_sampling(xs, ys, n_particles, device)
+            result = importance_sampling(xs, ys, n_particles, device)
         if device == 'cuda':
             torch.cuda.synchronize()
-    
-    # Timing runs
-    times = []
-    for _ in range(repeats):
-        # Take minimum of inner runs to reduce noise
-        inner_times = []
-        for _ in range(200):  # Inner repeats
-            start = time.perf_counter()
-            with torch.no_grad():
-                _ = importance_sampling(xs, ys, n_particles, device)
-            if device == 'cuda':
-                torch.cuda.synchronize()
-            inner_times.append(time.perf_counter() - start)
-        times.append(min(inner_times))
-    
-    times = np.array(times)
-    
+        return result
+
+    # Use common timing utility with standardized parameters
+    times, (mean_time, std_time) = benchmark_with_warmup(
+        task,
+        warmup_runs=5,
+        repeats=10,
+        inner_repeats=10,
+        auto_sync=False,  # We handle synchronization manually in task()
+    )
+
     return {
         'framework': 'handcoded_torch',
-        'method': 'importance_sampling', 
+        'method': 'importance_sampling',
         'n_particles': n_particles,
         'n_points': dataset.n_points,
-        'times': times.tolist(),
-        'mean_time': float(np.mean(times)),
-        'std_time': float(np.std(times)),
+        'times': times.tolist(),  # Convert numpy array to list for JSON serialization
+        'mean_time': mean_time,
+        'std_time': std_time,
         'device': device
     }
 
@@ -88,13 +82,13 @@ def handcoded_torch_timing(dataset, n_particles, repeats=100, device='cuda'):
 def main():
     """Main entry point for handcoded PyTorch benchmarks."""
     parser = argparse.ArgumentParser(description="Run handcoded PyTorch benchmarks")
-    parser.add_argument("--n-particles", type=int, nargs="+", 
+    parser.add_argument("--n-particles", type=int, nargs="+",
                         default=[100, 1000, 10000, 100000],
                         help="Number of particles for IS")
     parser.add_argument("--n-points", type=int, default=50,
                         help="Number of data points")
-    parser.add_argument("--repeats", type=int, default=100,
-                        help="Number of timing repetitions")
+    parser.add_argument("--repeats", type=int, default=10,
+                        help="Number of timing repetitions (outer repeats)")
     parser.add_argument("--device", default="cuda", choices=["cpu", "cuda"],
                         help="Device to run on")
     parser.add_argument("--output-dir", type=str, default=None,
@@ -257,33 +251,25 @@ def handcoded_torch_polynomial_hmc_timing(
     except:
         # Fall back to regular function if compile not available
         run_hmc_compiled = run_hmc
-    
-    # Warm-up run
-    _ = run_hmc_compiled()
-    
+
     # Timing function
     def task():
         samples = run_hmc_compiled()
-        if device == "cuda":
+        if device.type == "cuda":
             torch.cuda.synchronize()
         return samples
-    
-    # Timing runs
-    times = []
-    for _ in range(repeats):
-        if device == "cuda":
-            torch.cuda.synchronize()
-        start_time = time.time()
-        samples = task()
-        end_time = time.time()
-        times.append(end_time - start_time)
-    
-    times = np.array(times)
-    mean_time = float(np.mean(times))
-    std_time = float(np.std(times))
-    
+
+    # Use common timing utility with standardized parameters
+    times, (mean_time, std_time) = benchmark_with_warmup(
+        task,
+        warmup_runs=3,
+        repeats=10,
+        inner_repeats=10,
+        auto_sync=False,  # We handle synchronization manually in task()
+    )
+
     # Get final samples for validation
-    samples = run_hmc_compiled()
+    samples = task()
     
     return {
         "framework": "handcoded_torch",
@@ -291,7 +277,7 @@ def handcoded_torch_polynomial_hmc_timing(
         "n_samples": n_samples,
         "n_warmup": n_warmup,
         "n_points": dataset.n_points,
-        "times": times,
+        "times": times.tolist(),  # Convert numpy array to list for JSON serialization
         "mean_time": mean_time,
         "std_time": std_time,
         "step_size": step_size,
