@@ -296,7 +296,7 @@ Different case studies stress different JAX vectorization patterns, so device ch
 - **Curvefit** – scaling/timing plots assume a GPU so that the importance sampler can sweep up to 1M particles; on CPU you can pass smaller `--scaling-*` flags (see below) and expect longer runtimes plus different timing curves.
 - **Game of Life** – Gibbs timing bars compare CPU vs GPU throughput; animations work everywhere but the scaling panel only matches the paper if both device types are available.
 - **Localization** – Figure 19 relies on access to a CUDA environment (`pixi run -e localization-cuda …`). The SMC+HMC rejuvenation loop and vectorised LIDAR beams batch over large arrays; on CPU we drop the computational load to much smaller grids/particle counts, so the four-panel comparison generated via the CPU command will differ. If you have access to a GPU, use the GPU command to match the paper.
-- **Performance benchmark** – the `examples/perfbench` case study (Figure 16b) spins up separate Pixi environments for NumPyro, TensorFlow Probability, Pyro, hand-coded PyTorch, and Gen.jl. CUDA is required for the default Pyro/TFP runs (use `--device cpu` when invoking the scripts to fall back to CPU). Expect multi-minute runtimes; reduce the particle/chain grids or repeats for quick local checks.
+- **Performance benchmark** – the `examples/perfbench` case study (Figure 16b) spins up separate Pixi environments for NumPyro, TensorFlow Probability, Pyro, hand-coded PyTorch, and Gen.jl. CUDA is required for the default Pyro/TFP runs (use `--device cpu` when invoking the scripts to fall back to CPU). Expect multi-minute runtimes, otherwise reduce the particle/chain grids or repeats for quick local checks.
 
 ### Devices that we tested the artifact on
 
