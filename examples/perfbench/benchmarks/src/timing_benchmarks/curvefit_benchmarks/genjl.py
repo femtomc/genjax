@@ -29,7 +29,7 @@ def genjl_polynomial_is_timing(dataset, n_particles, repeats=100, setup_julia=Fa
     return result
 
 
-def genjl_polynomial_hmc_timing(dataset, n_samples, n_warmup=500, repeats=100, setup_julia=False, **kwargs):
+def genjl_polynomial_hmc_timing(dataset, n_samples, n_warmup=50, repeats=100, setup_julia=False, **kwargs):
     """Run Gen.jl polynomial regression HMC timing."""
     gen_jl = GenJLBenchmark()
     

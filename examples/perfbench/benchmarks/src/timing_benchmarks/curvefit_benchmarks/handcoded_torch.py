@@ -147,7 +147,7 @@ def main():
 def handcoded_torch_polynomial_hmc_timing(
     dataset: PolynomialDataset,
     n_samples: int = 1000,
-    n_warmup: int = 500,
+    n_warmup: int = 50,
     repeats: int = 100,
     key: Optional[Any] = None,
     step_size: float = 0.01,

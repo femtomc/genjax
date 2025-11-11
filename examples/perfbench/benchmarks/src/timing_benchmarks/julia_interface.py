@@ -173,7 +173,7 @@ class GenJLBenchmark:
         xs: np.ndarray,
         ys: np.ndarray,
         n_samples: int,
-        n_warmup: int = 500,
+        n_warmup: int = 50,
         repeats: int = 100,
         step_size: float = 0.01,
         n_leapfrog: int = 20

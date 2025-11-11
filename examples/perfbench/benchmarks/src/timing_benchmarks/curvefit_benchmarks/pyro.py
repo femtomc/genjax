@@ -214,7 +214,7 @@ def pyro_polynomial_is_timing(
 def pyro_polynomial_hmc_timing(
     dataset: PolynomialDataset,
     n_samples: int,
-    n_warmup: int = 500,
+    n_warmup: int = 50,
     repeats: int = 100,
     device: str = "cuda",
     step_size: float = 0.01,
@@ -269,17 +269,34 @@ def pyro_polynomial_hmc_timing(
             
             return a, b, c
         
+        def make_initial_params():
+            """Construct leaf tensors for the HMC kernel's initial state."""
+            return {
+                name: torch.zeros((), device=device, dtype=torch.float32)
+                for name in ("a", "b", "c")
+            }
+        
         # Create HMC kernel with specified parameters
         hmc_kernel = HMC(polynomial_model, step_size=step_size, num_steps=num_steps)
         
         # Warm-up run
-        mcmc = MCMC(hmc_kernel, num_samples=10, warmup_steps=10)
+        mcmc = MCMC(
+            hmc_kernel,
+            num_samples=10,
+            warmup_steps=10,
+            initial_params=make_initial_params(),
+        )
         mcmc.run(xs, ys)
         
         # Timing runs
         times = []
         for _ in range(repeats):
-            mcmc = MCMC(hmc_kernel, num_samples=n_samples, warmup_steps=n_warmup)
+            mcmc = MCMC(
+                hmc_kernel,
+                num_samples=n_samples,
+                warmup_steps=n_warmup,
+                initial_params=make_initial_params(),
+            )
             
             torch.cuda.synchronize() if device.type == "cuda" else None
             start_time = time.time()
@@ -293,7 +310,12 @@ def pyro_polynomial_hmc_timing(
         std_time = float(np.std(times))
         
         # Get final samples for validation
-        mcmc = MCMC(hmc_kernel, num_samples=n_samples, warmup_steps=n_warmup)
+        mcmc = MCMC(
+            hmc_kernel,
+            num_samples=n_samples,
+            warmup_steps=n_warmup,
+            initial_params=make_initial_params(),
+        )
         mcmc.run(xs, ys)
         samples = mcmc.get_samples()
         

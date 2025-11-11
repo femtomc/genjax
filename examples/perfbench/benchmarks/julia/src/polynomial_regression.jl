@@ -44,25 +44,20 @@ function run_polynomial_is_benchmark(
         observations[:y => i] = ys[i]
     end
     
-    # Warm-up run
+    times = Float64[]
+    for _ in 1:repeats
+        elapsed = @elapsed begin
+            importance_sampling(polynomial_model, (xs,), observations, n_particles)
+        end
+        push!(times, elapsed)
+    end
+    mean_time = mean(times)
+    std_time = std(times)
+    
+    # Get representative outputs for downstream validation
     traces, log_weights, _ = importance_sampling(
         polynomial_model, (xs,), observations, n_particles
     )
-    
-    # Additional warm-up runs to ensure JIT compilation
-    for _ in 1:5
-        importance_sampling(polynomial_model, (xs,), observations, n_particles)
-    end
-    
-    # Timing runs
-    times = Float64[]
-    for _ in 1:repeats
-        start_time = time()
-        traces, log_weights, _ = importance_sampling(
-            polynomial_model, (xs,), observations, n_particles
-        )
-        push!(times, time() - start_time)
-    end
     
     # Extract final samples for validation
     samples_a = [traces[i][:a] for i in 1:n_particles]
@@ -74,8 +69,8 @@ function run_polynomial_is_benchmark(
         "method" => "is",
         "n_particles" => n_particles,
         "times" => times,
-        "mean_time" => mean(times),
-        "std_time" => std(times),
+        "mean_time" => mean_time,
+        "std_time" => std_time,
         "samples" => Dict(
             "a" => samples_a,
             "b" => samples_b,
@@ -89,7 +84,7 @@ end
 function run_polynomial_hmc_benchmark(
     data::PolynomialData,
     n_samples::Int;
-    n_warmup::Int = 500,
+    n_warmup::Int = 50,
     repeats::Int = 100,
     step_size::Float64 = 0.01,
     n_leapfrog::Int = 20
@@ -106,27 +101,19 @@ function run_polynomial_hmc_benchmark(
     # Selection for continuous parameters
     selection = Gen.select(:a, :b, :c)
     
-    # Warm-up run
-    trace, _ = Gen.generate(polynomial_model, (xs,), observations)
-    
-    # Full warm-up chain
-    for _ in 1:n_warmup
-        trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
-    end
-    
-    # Timing runs
+    total_steps = n_warmup + n_samples
     times = Float64[]
     for _ in 1:repeats
-        # Reset trace
-        trace, _ = Gen.generate(polynomial_model, (xs,), observations)
-        
-        # Time the full chain
-        start_time = time()
-        for _ in 1:(n_warmup + n_samples)
-            trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
+        elapsed = @elapsed begin
+            trace_inner, _ = Gen.generate(polynomial_model, (xs,), observations)
+            for _ in 1:total_steps
+                trace_inner, _ = Gen.hmc(trace_inner, selection; L=n_leapfrog, eps=step_size)
+            end
         end
-        push!(times, time() - start_time)
+        push!(times, elapsed)
     end
+    mean_time = mean(times)
+    std_time = std(times)
     
     # Get one final chain for samples
     trace, _ = Gen.generate(polynomial_model, (xs,), observations)
@@ -151,8 +138,8 @@ function run_polynomial_hmc_benchmark(
         "framework" => "genjl",
         "method" => "hmc",
         "times" => times,
-        "mean_time" => mean(times),
-        "std_time" => std(times),
+        "mean_time" => mean_time,
+        "std_time" => std_time,
         "samples" => Dict(
             "a" => samples_a,
             "b" => samples_b,

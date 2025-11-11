@@ -107,7 +107,7 @@ def handcoded_jax_polynomial_is_timing(
 def handcoded_jax_polynomial_hmc_timing(
     dataset: PolynomialDataset,
     n_samples: int = 1000,
-    n_warmup: int = 500,
+    n_warmup: int = 50,
     repeats: int = 100,
     key: Optional[jax.Array] = None,
     step_size: float = 0.01,
@@ -135,26 +135,16 @@ def handcoded_jax_polynomial_hmc_timing(
     
     # HMC implementation
     def leapfrog(q, p, step_size, n_leapfrog):
-        """Leapfrog integrator for HMC using JAX control flow."""
-        # Initial half step for momentum
+        """Leapfrog integrator for HMC (legacy timing-benchmarks version)."""
         grad = jax.grad(log_joint)(q)
         p = p + 0.5 * step_size * grad
-        
-        # Full steps using lax.fori_loop
-        def leapfrog_step(i, state):
-            q, p = state
+        for _ in range(n_leapfrog - 1):
             q = q + step_size * p
             grad = jax.grad(log_joint)(q)
             p = p + step_size * grad
-            return (q, p)
-        
-        q, p = jax.lax.fori_loop(0, n_leapfrog - 1, leapfrog_step, (q, p))
-        
-        # Final position update and half step for momentum
         q = q + step_size * p
         grad = jax.grad(log_joint)(q)
         p = p + 0.5 * step_size * grad
-        
         return q, p
     
     def hmc_step(state, key):

@@ -120,7 +120,7 @@ def main() -> None:
         default=[100, 500, 1000],
         help="Chain lengths (number of samples) to benchmark.",
     )
-    parser.add_argument("--n-warmup", type=int, default=500)
+    parser.add_argument("--n-warmup", type=int, default=50)
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--step-size", type=float, default=0.01)
     parser.add_argument("--n-leapfrog", type=int, default=20)

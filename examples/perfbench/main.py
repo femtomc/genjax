@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import json
 
 CASE_ROOT = Path(__file__).resolve().parent
 BENCH_ROOT = CASE_ROOT / "benchmarks"
@@ -24,6 +25,30 @@ EXPORT_DEFAULTS = [
     "benchmark_timings_is_all_frameworks.pdf",
     "benchmark_timings_hmc_all_frameworks.pdf",
 ]
+DEFAULT_IS_FRAMEWORKS = [
+    "genjax",
+    "numpyro",
+    "genjl",
+    "handcoded-jax",
+    "pyro",
+    "torch",
+]
+DEFAULT_HMC_FRAMEWORKS = [
+    "genjax",
+    "numpyro",
+    "handcoded_jax",
+    "pyro",
+    "handcoded_torch",
+    "genjl",
+]
+IS_OUTPUT_SUBDIRS = {
+    "genjax": "genjax",
+    "numpyro": "numpyro",
+    "genjl": "genjl_dynamic",
+    "handcoded-jax": "handcoded_jax",
+    "pyro": "pyro",
+    "torch": "handcoded_torch",
+}
 
 
 def _ensure_bench_module(module: str):
@@ -46,6 +71,85 @@ def _bench_env() -> dict[str, str]:
     home_path.mkdir(exist_ok=True)
     env["HOME"] = str(home_path)
     return env
+
+
+def _ensure_env_bootstrap(env_name: str) -> None:
+    pixi_bin = shutil.which("pixi")
+    if pixi_bin is None:
+        raise RuntimeError(
+            f"Pixi executable not found in PATH; cannot initialize environment '{env_name}'."
+        )
+    cmd = [pixi_bin, "run"]
+    if env_name != "default":
+        cmd.extend(["-e", env_name])
+    cmd.extend(["python", "-c", "print('initializing pixi env')"])
+    subprocess.run(cmd, check=True, cwd=str(CASE_ROOT))
+
+
+def _python_in_env(env_name: str | None) -> str:
+    label = env_name or "default"
+    env_dir = CASE_ROOT / ".pixi" / "envs" / label
+    if os.name == "nt":
+        candidates = [
+            env_dir / "python.exe",
+            env_dir / "Scripts" / "python.exe",
+        ]
+    else:
+        candidates = [env_dir / "bin" / "python"]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    _ensure_env_bootstrap(label)
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    raise FileNotFoundError(
+        f"Unable to locate Python interpreter for pixi environment '{label}'. "
+        "Run `pixi install` inside examples/perfbench to create the environment."
+    )
+
+
+def _run_example_script(
+    env_name: str | None, script: str, *args: str, env_overrides: dict[str, str] | None = None
+) -> None:
+    python_bin = _python_in_env(env_name)
+    cmd = [python_bin, script, *args]
+    env = _bench_env()
+    if env_overrides:
+        env.update(env_overrides)
+    subprocess.run(cmd, check=True, cwd=str(CASE_ROOT), env=env)
+
+
+def _run_main_subcommand(
+    env_name: str | None, *cli_args: str, env_overrides: dict[str, str] | None = None
+) -> None:
+    _run_example_script(env_name, "main.py", *cli_args, env_overrides=env_overrides)
+
+
+def _is_env_for_framework(framework: str, mode: str) -> str | None:
+    norm = framework.replace("-", "_")
+    if norm in {"genjax", "numpyro", "handcoded_jax"} and mode == "cuda":
+        return "cuda"
+    if framework in {"pyro", "torch"}:
+        return "pyro"
+    return None
+
+
+def _hmc_env_for_framework(framework: str, mode: str) -> str | None:
+    norm = framework.replace("-", "_")
+    if norm in {"genjax", "numpyro", "handcoded_jax"}:
+        return "cuda" if mode == "cuda" else None
+    if norm == "pyro":
+        return "pyro"
+    if norm == "handcoded_torch":
+        return "torch"
+    if norm == "genjl":
+        return None
+    return None
+
+
+def _normalize_hmc_framework(framework: str) -> str:
+    return framework.replace("-", "_")
 
 
 def _run_python(relative_script: Path, *extra: str) -> None:
@@ -106,6 +210,10 @@ def command_run(args: argparse.Namespace) -> None:
     module = module_map[args.framework]
     if args.framework == "genjl":
         _ensure_genjl_ready()
+    framework_args = [arg for arg in args.framework_args if arg != "--"]
+    if args.particles:
+        framework_args.extend(["--n-particles", *[str(p) for p in args.particles]])
+
     extra = [
         "--output-dir",
         str(args.output_dir),
@@ -114,9 +222,8 @@ def command_run(args: argparse.Namespace) -> None:
     ]
     if args.device:
         extra.extend(["--device", args.device])
-    if args.framework_args:
-        forwarded = [arg for arg in args.framework_args if arg != "--"]
-        extra.extend(forwarded)
+    if framework_args:
+        extra.extend(framework_args)
     if args.framework == "genjl":
         _ensure_genjl_ready()
     _run_module(module, *extra)
@@ -191,6 +298,209 @@ def command_export(args: argparse.Namespace) -> None:
         print(f"No matching artifacts found in {src} for patterns: {patterns}")
 
 
+def _resolve_is_output_dir(base_dir: Path, framework: str) -> Path:
+    if framework not in IS_OUTPUT_SUBDIRS:
+        raise ValueError(f"Unknown IS framework '{framework}'")
+    return base_dir / "curvefit" / IS_OUTPUT_SUBDIRS[framework]
+
+
+def _print_is_timings(framework: str, output_dir: Path, particles: list[int]) -> None:
+    for n in particles:
+        path = output_dir / f"is_n{n}.json"
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+            mean = float(data.get("mean_time", float("nan")))
+            std = float(data.get("std_time", float("nan")))
+            print(f"    ↳ IS {framework} @ n={n}: {mean:.6f}s ± {std:.6f}s")
+        except Exception as err:
+            print(f"    ↳ IS {framework} @ n={n}: failed to read timings ({err})")
+
+
+def _print_hmc_timings(framework: str, output_dir: Path, chain_lengths: list[int]) -> None:
+    fw_dir = output_dir / framework
+    for n in chain_lengths:
+        path = fw_dir / f"hmc_n{n}.json"
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+            mean = float(data.get("mean_time", float("nan")))
+            std = float(data.get("std_time", float("nan")))
+            print(f"    ↳ HMC {framework} @ n={n}: {mean:.6f}s ± {std:.6f}s")
+        except Exception as err:
+            print(f"    ↳ HMC {framework} @ n={n}: failed to read timings ({err})")
+
+
+def command_pipeline(args: argparse.Namespace) -> None:
+    mode = args.mode
+    particles = args.particles or [1000, 5000, 10000]
+    is_frameworks = args.is_frameworks or DEFAULT_IS_FRAMEWORKS
+    hmc_frameworks = args.hmc_frameworks or DEFAULT_HMC_FRAMEWORKS
+    norm_hmc = [_normalize_hmc_framework(fw) for fw in hmc_frameworks]
+    device = "cuda" if mode == "cuda" else "cpu"
+
+    data_root = (CASE_ROOT / ("data" if mode == "cuda" else "data_cpu")).resolve()
+    figs_root = (CASE_ROOT / ("figs" if mode == "cuda" else "figs_cpu")).resolve()
+    data_root.mkdir(parents=True, exist_ok=True)
+    figs_root.mkdir(parents=True, exist_ok=True)
+    curvefit_root = (data_root / "curvefit").resolve()
+    curvefit_root.mkdir(parents=True, exist_ok=True)
+    dataset_output = (args.data_output or curvefit_root / "polynomial_data.npz").resolve()
+    dataset_output.parent.mkdir(parents=True, exist_ok=True)
+    export_prefix = args.fig_prefix or ("perfbench" if mode == "cuda" else "perfbench_cpu")
+    export_dest = (CASE_ROOT / args.export_dest).resolve()
+    export_dest.mkdir(parents=True, exist_ok=True)
+    hmc_output_dir = (data_root if mode == "cuda" else curvefit_root).resolve()
+
+    if not args.skip_generate:
+        print("→ Generating dataset")
+        gen_env = "cuda" if mode == "cuda" else None
+        _run_main_subcommand(
+            gen_env,
+            "generate-data",
+            "--n-points",
+            str(args.data_n_points),
+            "--seed",
+            str(args.data_seed),
+            "--output",
+            str(dataset_output),
+        )
+
+    if not args.skip_is:
+        for framework in is_frameworks:
+            output_dir = _resolve_is_output_dir(data_root, framework).resolve()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            env_name = _is_env_for_framework(framework, mode)
+            cmd = [
+                "run",
+                "--framework",
+                framework,
+                "--repeats",
+                str(args.is_repeats),
+                "--output-dir",
+                str(output_dir),
+            ]
+            if particles:
+                cmd.append("--particles")
+                cmd.extend(str(p) for p in particles)
+            if framework in {"pyro", "torch"}:
+                cmd.extend(["--device", device])
+            extra_env = {"JAX_PLATFORMS": "cpu"} if framework in {"pyro", "torch"} else None
+            print(f"→ IS {framework} (env={env_name or 'default'})")
+            _run_main_subcommand(env_name, *cmd, env_overrides=extra_env)
+            _print_is_timings(framework, output_dir, particles)
+
+    if not args.skip_plots:
+        print("→ Combining IS results")
+        _run_main_subcommand(
+            None,
+            "combine",
+            "--data-dir",
+            str(data_root),
+            "--output-dir",
+            str(figs_root),
+        )
+
+    if not args.skip_hmc:
+        def run_hmc_group(frameworks: list[str], env_name: str | None, device_arg: str | None = None, env_overrides: dict[str, str] | None = None):
+            if not frameworks:
+                return
+            cli = [
+                "benchmarks/run_hmc_benchmarks.py",
+                "--frameworks",
+                *frameworks,
+                "--chain-lengths",
+                *[str(v) for v in args.hmc_chain_lengths],
+                "--repeats",
+                str(args.hmc_repeats),
+                "--n-warmup",
+                str(args.hmc_warmup),
+                "--step-size",
+                str(args.hmc_step_size),
+                "--n-leapfrog",
+                str(args.hmc_n_leapfrog),
+                "--output-dir",
+                str(hmc_output_dir),
+                "--n-points",
+                str(args.data_n_points),
+            ]
+            if device_arg:
+                cli.extend(["--device", device_arg])
+            print(f"→ HMC {', '.join(frameworks)} (env={env_name or 'default'})")
+            _run_example_script(env_name, *cli, env_overrides=env_overrides)
+
+        jax_group = [fw for fw in norm_hmc if fw in {"genjax", "numpyro", "handcoded_jax"}]
+        pyro_group = [fw for fw in norm_hmc if fw == "pyro"]
+        torch_group = [fw for fw in norm_hmc if fw == "handcoded_torch"]
+        genjl_requested = "genjl" in norm_hmc
+
+        run_hmc_group(jax_group, "cuda" if mode == "cuda" else None, device)
+        for fw in jax_group:
+            _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
+
+        run_hmc_group(pyro_group, "pyro", device, env_overrides={"JAX_PLATFORMS": "cpu"})
+        for fw in pyro_group:
+            _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
+
+        run_hmc_group(torch_group, "torch", device, env_overrides={"JAX_PLATFORMS": "cpu"})
+        for fw in torch_group:
+            _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
+
+        if genjl_requested:
+            genjl_dir = (curvefit_root / "genjl").resolve()
+            genjl_dir.mkdir(parents=True, exist_ok=True)
+            genjl_cmd = [
+                "genjl-hmc",
+                "--chain-lengths",
+                *[str(v) for v in args.hmc_chain_lengths],
+                "--n-warmup",
+                str(args.hmc_warmup),
+                "--repeats",
+                str(args.hmc_repeats),
+                "--step-size",
+                str(args.hmc_step_size),
+                "--n-leapfrog",
+                str(args.hmc_n_leapfrog),
+                "--dataset",
+                str(dataset_output),
+                "--output-dir",
+                str(genjl_dir),
+                "--n-points",
+                str(args.data_n_points),
+            ]
+            print("→ HMC genjl")
+            _run_main_subcommand(None, *genjl_cmd)
+            _print_hmc_timings("genjl", genjl_dir, args.hmc_chain_lengths)
+
+    if not args.skip_plots and not args.skip_hmc and norm_hmc:
+        plot_args = [
+            "benchmarks/combine_results.py",
+            "--data-dir",
+            str(hmc_output_dir),
+            "--output-dir",
+            str(figs_root),
+            "--frameworks",
+            *norm_hmc,
+        ]
+        print("→ Combining HMC results")
+        _run_example_script(None, *plot_args)
+
+    if not args.skip_export:
+        print("→ Exporting figures")
+        _run_main_subcommand(
+            None,
+            "export",
+            "--source-dir",
+            str(figs_root),
+            "--dest-dir",
+            str(export_dest),
+            "--prefix",
+            export_prefix,
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Perfbench helper CLI (wraps timing-benchmarks)."
@@ -217,11 +527,45 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--output-dir", type=Path, required=True)
     run.add_argument("--device", choices=["cpu", "cuda"], default=None)
     run.add_argument(
+        "--particles",
+        type=int,
+        nargs="+",
+        help="Importance sampling particle counts forwarded as --n-particles.",
+    )
+    run.add_argument(
         "framework_args",
         nargs=argparse.REMAINDER,
         help="Additional arguments forwarded to the framework script (prefix with --).",
     )
     run.set_defaults(func=command_run)
+
+    pipeline = sub.add_parser("pipeline", help="Run the full perfbench case study")
+    pipeline.add_argument("--mode", choices=["cpu", "cuda"], default="cuda")
+    pipeline.add_argument("--particles", type=int, nargs="+", help="Particle counts for IS sweeps.")
+    pipeline.add_argument("--is-frameworks", nargs="+", help="Frameworks to include in the IS sweep.")
+    pipeline.add_argument("--is-repeats", type=int, default=100, help="Timing repeats for IS.")
+    pipeline.add_argument("--hmc-frameworks", nargs="+", help="Frameworks to include in the HMC sweep.")
+    pipeline.add_argument("--hmc-chain-lengths", type=int, nargs="+", default=[100, 500, 1000])
+    pipeline.add_argument("--hmc-repeats", type=int, default=100)
+    pipeline.add_argument("--hmc-warmup", type=int, default=50)
+    pipeline.add_argument("--hmc-step-size", type=float, default=0.01)
+    pipeline.add_argument("--hmc-n-leapfrog", type=int, default=20)
+    pipeline.add_argument("--data-output", type=Path, help="Override dataset output path.")
+    pipeline.add_argument("--data-n-points", type=int, default=50)
+    pipeline.add_argument("--data-seed", type=int, default=42)
+    pipeline.add_argument("--fig-prefix", help="Prefix for exported figures.")
+    pipeline.add_argument(
+        "--export-dest",
+        type=Path,
+        default=Path("../../figs"),
+        help="Destination directory for exported figures.",
+    )
+    pipeline.add_argument("--skip-generate", action="store_true", help="Reuse existing dataset.")
+    pipeline.add_argument("--skip-is", action="store_true", help="Skip IS sweep.")
+    pipeline.add_argument("--skip-hmc", action="store_true", help="Skip HMC sweep.")
+    pipeline.add_argument("--skip-plots", action="store_true", help="Skip plotting steps.")
+    pipeline.add_argument("--skip-export", action="store_true", help="Skip exporting figures.")
+    pipeline.set_defaults(func=command_pipeline)
 
     comb = sub.add_parser("combine", help="Combine timing JSON into plots/tables")
     comb.add_argument("--data-dir", type=Path, default=Path("data"))
@@ -234,7 +578,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     genjl_hmc = sub.add_parser("genjl-hmc", help="Run Gen.jl HMC benchmarks")
     genjl_hmc.add_argument("--chain-lengths", nargs="+", type=int, default=[100, 500, 1000])
-    genjl_hmc.add_argument("--n-warmup", type=int, default=500)
+    genjl_hmc.add_argument("--n-warmup", type=int, default=50)
     genjl_hmc.add_argument("--repeats", type=int, default=10)
     genjl_hmc.add_argument("--step-size", type=float, default=0.01)
     genjl_hmc.add_argument("--n-leapfrog", type=int, default=20)

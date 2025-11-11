@@ -12,9 +12,12 @@ import jax.numpy as jnp
 import jax.random as jrand
 import numpyro
 import numpyro.distributions as dist
-from numpyro.infer import MCMC, HMC, Predictive
-from numpyro.primitives import plate, param, sample
 from numpyro import handlers
+# Note: HMC timing uses low-level kernels; MCMC/Predictive are imported for IS code.
+from numpyro.infer import MCMC, Predictive
+from numpyro.infer.hmc import hmc as numpyro_hmc
+from numpyro.infer.util import initialize_model
+from numpyro.util import fori_collect
 
 from genjax.timing import benchmark_with_warmup
 from ..data.generation import PolynomialDataset, polyfn
@@ -136,7 +139,7 @@ def numpyro_polynomial_is_timing(
 def numpyro_polynomial_hmc_timing(
     dataset: PolynomialDataset,
     n_samples: int,
-    n_warmup: int = 500,
+    n_warmup: int = 50,
     repeats: int = 100,
     key: Optional[jax.Array] = None,
     step_size: float = 0.01,
@@ -159,59 +162,53 @@ def numpyro_polynomial_hmc_timing(
     if key is None:
         key = jrand.key(42)
     
-    import numpyro
-    import numpyro.distributions as dist
-    from numpyro.infer import MCMC, NUTS, HMC
-    
     xs, ys = dataset.xs, dataset.ys
-    
-    # NumPyro model
+
     def model(xs, ys):
         a = numpyro.sample("a", dist.Normal(0, 1))
         b = numpyro.sample("b", dist.Normal(0, 1))
         c = numpyro.sample("c", dist.Normal(0, 1))
-        
+
         mu = a + b * xs + c * xs**2
         numpyro.sample("ys", dist.Normal(mu, 0.05), obs=ys)
-    
-    # Create HMC sampler with fixed number of leapfrog steps
-    # Note: Using fixed num_steps for fair comparison with other frameworks
-    hmc_kernel = HMC(
-        model, 
-        step_size=step_size, 
-        num_steps=n_leapfrog,
-        adapt_step_size=False,  # No adaptation for fair comparison
-        adapt_mass_matrix=False  # No mass matrix adaptation
-    )
-    
-    # Create MCMC object
-    mcmc = MCMC(
-        hmc_kernel,
-        num_warmup=n_warmup,
-        num_samples=n_samples,
-        num_chains=1,  # Single chain for fair comparison
-        progress_bar=False,
-        jit_model_args=True,
-    )
-    
-    # JIT compile the run function
-    @jax.jit
-    def run_mcmc(key):
-        mcmc.run(key, xs, ys)
-        return mcmc.get_samples()
-    
-    # Timing function
+
+    model_info = initialize_model(key, model, model_args=(xs, ys))
+    init_kernel, sample_kernel = numpyro_hmc(model_info.potential_fn, algo="HMC")
+
+    def run_chain(rng_key):
+        hmc_state = init_kernel(
+            model_info.param_info,
+            num_warmup=n_warmup,
+            step_size=step_size,
+            num_steps=n_leapfrog,
+            adapt_step_size=False,
+            adapt_mass_matrix=False,
+            rng_key=rng_key,
+        )
+        samples = fori_collect(
+            0,
+            n_samples,
+            sample_kernel,
+            hmc_state,
+            transform=lambda state: model_info.postprocess_fn(state.z),
+        )
+        return samples
+
+    jitted_chain = jax.jit(run_chain)
+
+    rng_key = key
+
     def task():
-        samples = run_mcmc(key)
+        nonlocal rng_key
+        rng_key, subkey = jrand.split(rng_key)
+        samples = jitted_chain(subkey)
         jax.block_until_ready(samples["a"])
         return samples
-    
-    # Run benchmark with automatic warm-up
+
     times, (mean_time, std_time) = benchmark_with_warmup(
         task, warmup_runs=3, repeats=repeats, inner_repeats=1, auto_sync=False
     )
-    
-    # Get final samples for validation
+
     samples = task()
     
     return {

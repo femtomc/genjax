@@ -1,25 +1,34 @@
 #!/usr/bin/env python
 """Run HMC benchmarks with multiple chain lengths for all frameworks."""
 
-import argparse
-import json
+import os
 import sys
 import time
 from pathlib import Path
-import os
-
-# Configure JAX backend – respect pre-set overrides so CPU runs can opt out.
-if "JAX_PLATFORMS" not in os.environ:
-    os.environ["JAX_PLATFORMS"] = "cuda"
-os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
-
-import jax
-import jax.numpy as jnp
+import argparse
 import importlib.util
+import json
 
-# Check JAX GPU availability
-print(f"JAX default backend: {jax.default_backend()}")
-print(f"JAX devices: {jax.devices()}")
+JAX_FRAMEWORKS = {"genjax", "numpyro", "handcoded_jax"}
+
+
+def ensure_jax_backend():
+    """Initialize JAX only when a JAX-backed framework is requested."""
+    if "JAX_PLATFORMS" not in os.environ:
+        os.environ["JAX_PLATFORMS"] = "cuda"
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+
+    try:
+        import jax  # local import to keep Pyro-only runs JAX-free
+    except RuntimeError as err:
+        raise RuntimeError(
+            "Failed to initialize the requested JAX backend. "
+            "Set JAX_PLATFORMS=cpu or install a CUDA-enabled jaxlib."
+        ) from err
+
+    print(f"JAX default backend: {jax.default_backend()}")
+    print(f"JAX devices: {jax.devices()}")
+    return jax
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -46,7 +55,7 @@ def load_module(framework_name):
 from timing_benchmarks.data.generation import generate_polynomial_data
 
 
-def run_framework_hmc(framework, n_samples, dataset, repeats=100, n_warmup=500, **kwargs):
+def run_framework_hmc(framework, n_samples, dataset, repeats=100, n_warmup=50, **kwargs):
     """Run HMC benchmark for a specific framework."""
     # Load the framework module
     module = load_module(framework)
@@ -135,7 +144,7 @@ def main():
                        help="Number of data points")
     parser.add_argument("--repeats", type=int, default=100,
                        help="Number of timing repetitions")
-    parser.add_argument("--n-warmup", type=int, default=500,
+    parser.add_argument("--n-warmup", type=int, default=50,
                        help="Number of HMC warmup steps")
     parser.add_argument("--output-dir", type=Path, default=Path("data"),
                        help="Output directory for results")
@@ -149,6 +158,9 @@ def main():
                        help="Device for PyTorch/Pyro (cpu or cuda)")
     
     args = parser.parse_args()
+    needs_jax = any(f in JAX_FRAMEWORKS for f in args.frameworks)
+    if needs_jax:
+        ensure_jax_backend()
     
     # Print GPU status
     print("\n" + "="*60)

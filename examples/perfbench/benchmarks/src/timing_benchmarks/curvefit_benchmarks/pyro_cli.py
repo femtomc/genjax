@@ -48,7 +48,7 @@ def main():
         print("Running Pyro HMC benchmarks...")
         hmc_results = {
             "pyro": pyro_polynomial_hmc_timing(
-                dataset, n_samples=1000, n_warmup=500, 
+                dataset, n_samples=1000, n_warmup=50,
                 repeats=args.repeats, device=args.device
             )
         }

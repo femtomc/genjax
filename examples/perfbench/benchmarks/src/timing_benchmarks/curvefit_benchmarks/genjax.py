@@ -141,7 +141,7 @@ def genjax_polynomial_is_timing(
 def genjax_polynomial_hmc_timing(
     dataset: PolynomialDataset,
     n_samples: int,
-    n_warmup: int = 500,
+    n_warmup: int = 50,
     repeats: int = 100,
     key: Optional[jax.Array] = None,
     step_size: float = 0.01,
