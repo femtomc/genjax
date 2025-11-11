@@ -214,6 +214,7 @@ def pyro_polynomial_hmc_timing(
     device: str = "cuda",
     step_size: float = 0.01,
     num_steps: int = 20,
+    inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Time Pyro HMC on polynomial regression.
     
@@ -292,8 +293,8 @@ def pyro_polynomial_hmc_timing(
         times, (mean_time, std_time) = benchmark_with_warmup(
             run_mcmc,
             warmup_runs=1,
-            repeats=10,
-            inner_repeats=10,
+            repeats=repeats,
+            inner_repeats=inner_repeats,
             auto_sync=False,
         )
 

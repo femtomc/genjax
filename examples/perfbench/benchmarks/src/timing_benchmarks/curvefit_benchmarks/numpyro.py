@@ -141,6 +141,7 @@ def numpyro_polynomial_hmc_timing(
     key: Optional[jax.Array] = None,
     step_size: float = 0.01,
     n_leapfrog: int = 20,
+    inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Time NumPyro HMC on polynomial regression.
     
@@ -214,7 +215,11 @@ def numpyro_polynomial_hmc_timing(
         return samples
 
     times, (mean_time, std_time) = benchmark_with_warmup(
-        task, warmup_runs=3, repeats=repeats, inner_repeats=10, auto_sync=False
+        task,
+        warmup_runs=3,
+        repeats=repeats,
+        inner_repeats=inner_repeats,
+        auto_sync=False,
     )
 
     samples = task()

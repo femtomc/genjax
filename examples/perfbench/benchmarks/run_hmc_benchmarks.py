@@ -55,7 +55,15 @@ def load_module(framework_name):
 from timing_benchmarks.data.generation import generate_polynomial_data
 
 
-def run_framework_hmc(framework, n_samples, dataset, repeats=100, n_warmup=50, **kwargs):
+def run_framework_hmc(
+    framework,
+    n_samples,
+    dataset,
+    repeats=100,
+    n_warmup=50,
+    inner_repeats=10,
+    **kwargs,
+):
     """Run HMC benchmark for a specific framework."""
     # Load the framework module
     module = load_module(framework)
@@ -117,6 +125,7 @@ def run_framework_hmc(framework, n_samples, dataset, repeats=100, n_warmup=50, *
     
     # Run the timing
     try:
+        framework_kwargs["inner_repeats"] = inner_repeats
         results = hmc_timing_fn(
             dataset=dataset,
             n_samples=n_samples,
@@ -144,6 +153,8 @@ def main():
                        help="Number of data points")
     parser.add_argument("--repeats", type=int, default=100,
                        help="Number of timing repetitions")
+    parser.add_argument("--inner-repeats", type=int, default=10,
+                       help="Inner timing repeats per outer loop")
     parser.add_argument("--n-warmup", type=int, default=50,
                        help="Number of HMC warmup steps")
     parser.add_argument("--output-dir", type=Path, default=Path("data"),
@@ -203,6 +214,7 @@ def main():
                 dataset=dataset,
                 repeats=args.repeats,
                 n_warmup=args.n_warmup,
+                inner_repeats=args.inner_repeats,
                 step_size=args.step_size,
                 n_leapfrog=args.n_leapfrog,
                 target_accept_prob=args.target_accept_prob,

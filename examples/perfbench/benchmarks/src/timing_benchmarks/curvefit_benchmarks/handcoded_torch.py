@@ -147,6 +147,7 @@ def handcoded_torch_polynomial_hmc_timing(
     step_size: float = 0.01,
     n_leapfrog: int = 20,
     device: str = "cuda",
+    inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Handcoded PyTorch HMC timing for polynomial regression."""
     import torch
@@ -263,8 +264,8 @@ def handcoded_torch_polynomial_hmc_timing(
     times, (mean_time, std_time) = benchmark_with_warmup(
         task,
         warmup_runs=3,
-        repeats=10,
-        inner_repeats=10,
+        repeats=repeats,
+        inner_repeats=inner_repeats,
         auto_sync=False,  # We handle synchronization manually in task()
     )
 
