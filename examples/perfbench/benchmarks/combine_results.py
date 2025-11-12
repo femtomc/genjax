@@ -12,43 +12,47 @@ import argparse
 
 def load_framework_results(data_dir, framework):
     """Load all results for a given framework."""
-    # Check if we should look in curvefit subdirectory
-    if Path(data_dir).name != "curvefit":
-        framework_dir = Path(data_dir) / "curvefit" / framework
+    base = Path(data_dir)
+    candidates = []
+    if base.name != "curvefit":
+        candidates.append(base / "curvefit" / framework)
+        if framework == "genjl":
+            candidates.append(base / "curvefit" / "genjl_dynamic")
     else:
-        framework_dir = Path(data_dir) / framework
-        
-    if not framework_dir.exists():
-        # Try old location as fallback
-        framework_dir = Path(data_dir) / framework
-        if not framework_dir.exists():
-            print(f"Warning: No results found for {framework}")
-            return None
+        candidates.append(base / framework)
+        if framework == "genjl":
+            candidates.append(base / "genjl_dynamic")
+    candidates.append(base / framework)
+    if framework == "genjl":
+        candidates.append(base / "genjl_dynamic")
+    candidates = [cand for cand in candidates if cand.exists()]
+    if not candidates:
+        print(f"Warning: No results found for {framework}")
+        return None
     
     results = {}
-    
-    # Load IS results
-    for n_particles in [100, 1000, 5000, 10000, 100000]:
-        result_file = framework_dir / f"is_n{n_particles}.json"
-        if result_file.exists():
-            with open(result_file, "r") as f:
-                results[f"is_n{n_particles}"] = json.load(f)
-    
-    # Load HMC results for different chain lengths
-    for n_samples in [100, 500, 1000, 5000, 10000]:
-        # Check both curvefit dir and top-level dir
-        hmc_file = framework_dir / f"hmc_n{n_samples}.json"
-        if hmc_file.exists():
-            with open(hmc_file, "r") as f:
-                results[f"hmc_n{n_samples}"] = json.load(f)
-            print(f"Loaded HMC results from {hmc_file}")
-        else:
-            # Also check top-level data/framework directory for HMC results
-            top_level_hmc = Path(data_dir) / framework / f"hmc_n{n_samples}.json"
-            if top_level_hmc.exists():
-                with open(top_level_hmc, "r") as f:
-                    results[f"hmc_n{n_samples}"] = json.load(f)
-                print(f"Loaded HMC results from {top_level_hmc}")
+    base = Path(data_dir)
+
+    def maybe_load(path: Path, key: str):
+        if key not in results and path.exists():
+            with open(path, "r") as f:
+                results[key] = json.load(f)
+            return True
+        return False
+
+    for framework_dir in candidates:
+        for n_particles in [100, 1000, 5000, 10000, 100000]:
+            key = f"is_n{n_particles}"
+            maybe_load(framework_dir / f"is_n{n_particles}.json", key)
+
+        for n_samples in [100, 500, 1000, 5000, 10000]:
+            key = f"hmc_n{n_samples}"
+            if maybe_load(framework_dir / f"hmc_n{n_samples}.json", key):
+                print(f"Loaded HMC results from {framework_dir / f'hmc_n{n_samples}.json'}")
+            else:
+                top_level = base / framework / f"hmc_n{n_samples}.json"
+                if maybe_load(top_level, key):
+                    print(f"Loaded HMC results from {top_level}")
     
     return results
 
@@ -347,9 +351,6 @@ def create_plots(df, output_dir):
         return
 
     is_df = df[df['method'] == 'IS'].copy()
-    if 'n_particles' not in is_df.columns:
-        print("No IS results to plot")
-        return
     is_df = is_df[is_df['n_particles'].isin([1000, 5000, 10000])]
     
     if len(is_df) == 0:
