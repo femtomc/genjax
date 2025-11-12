@@ -45,7 +45,7 @@ def importance_sampling(xs, ys, n_particles, device='cuda'):
     return log_weights
 
 
-def handcoded_torch_timing(dataset, n_particles, repeats=10, device='cuda'):
+def handcoded_torch_timing(dataset, n_particles, repeats=10, inner_repeats=10, device='cuda'):
     """Time handcoded PyTorch importance sampling."""
     # Convert JAX arrays to numpy if needed
     xs = np.array(dataset.xs) if hasattr(dataset.xs, '__array__') else dataset.xs
@@ -62,8 +62,8 @@ def handcoded_torch_timing(dataset, n_particles, repeats=10, device='cuda'):
     times, (mean_time, std_time) = benchmark_with_warmup(
         task,
         warmup_runs=5,
-        repeats=10,
-        inner_repeats=10,
+        repeats=repeats,
+        inner_repeats=inner_repeats,
         auto_sync=False,  # We handle synchronization manually in task()
     )
 
@@ -89,6 +89,8 @@ def main():
                         help="Number of data points")
     parser.add_argument("--repeats", type=int, default=10,
                         help="Number of timing repetitions (outer repeats)")
+    parser.add_argument("--inner-repeats", type=int, default=10,
+                        help="Number of inner timing repeats")
     parser.add_argument("--device", default="cuda", choices=["cpu", "cuda"],
                         help="Device to run on")
     parser.add_argument("--output-dir", type=str, default=None,
@@ -115,8 +117,13 @@ def main():
     
     for n_particles in args.n_particles:
         print(f"  N = {n_particles:,} particles...")
-        result = handcoded_torch_timing(dataset, n_particles, 
-                                       repeats=args.repeats, device=args.device)
+        result = handcoded_torch_timing(
+            dataset,
+            n_particles,
+            repeats=args.repeats,
+            inner_repeats=args.inner_repeats,
+            device=args.device,
+        )
         
         # Save individual result
         result_file = output_dir / f"is_n{n_particles}.json"

@@ -66,9 +66,10 @@ def make_genjax_infer_is(n_particles: int):
 def genjax_polynomial_is_timing(
     dataset: PolynomialDataset,
     n_particles: int,
-    repeats: int = 100,
+    repeats: int = 50,
     key: Optional[jrand.PRNGKey] = None,
     use_direct: bool = False,
+    inner_repeats: int = 50,
 ) -> Dict[str, Any]:
     """Time optimized GenJAX importance sampling on polynomial regression.
 
@@ -98,7 +99,11 @@ def genjax_polynomial_is_timing(
 
     # Run benchmark with automatic warm-up - more inner repeats for accuracy
     times, (mean_time, std_time) = benchmark_with_warmup(
-        task, warmup_runs=5, repeats=10, inner_repeats=10, auto_sync=False
+        task,
+        warmup_runs=5,
+        repeats=repeats,
+        inner_repeats=inner_repeats,
+        auto_sync=False,
     )
 
     # Get final weights
@@ -264,7 +269,10 @@ if __name__ == "__main__":
         "--n-points", type=int, default=50, help="Number of data points"
     )
     parser.add_argument(
-        "--repeats", type=int, default=100, help="Number of timing repetitions"
+        "--repeats", type=int, default=50, help="Number of timing repetitions"
+    )
+    parser.add_argument(
+        "--inner-repeats", type=int, default=50, help="Inner timing repeats for IS"
     )
     parser.add_argument(
         "--use-direct", action="store_true", help="Use direct implementation"
@@ -313,7 +321,11 @@ if __name__ == "__main__":
         for n_particles in args.n_particles:
             print(f"  N = {n_particles:,} particles...")
             result = genjax_polynomial_is_timing(
-                dataset, n_particles, repeats=args.repeats, use_direct=args.use_direct
+                dataset,
+                n_particles,
+        repeats=args.repeats,
+        use_direct=args.use_direct,
+        inner_repeats=args.inner_repeats,
             )
             is_results[f"n{n_particles}"] = result
 

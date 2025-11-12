@@ -11,7 +11,7 @@ from ..data.generation import generate_polynomial_data
 from ..julia_interface import GenJLBenchmark
 
 
-def genjl_polynomial_is_timing(dataset, n_particles, repeats=100, setup_julia=False):
+def genjl_polynomial_is_timing(dataset, n_particles, repeats=100, setup_julia=False, inner_repeats: int = 10):
     """Run Gen.jl polynomial regression importance sampling timing."""
     gen_jl = GenJLBenchmark()
     
@@ -67,6 +67,8 @@ if __name__ == "__main__":
                         help="Number of data points")
     parser.add_argument("--repeats", type=int, default=20,
                         help="Number of timing repetitions")
+    parser.add_argument("--inner-repeats", type=int, default=10,
+                        help="Inner timing repeats for IS (unused placeholder)")
     parser.add_argument("--output-dir", type=str, default="data/genjl",
                         help="Output directory for results")
     parser.add_argument("--setup-julia", action="store_true",
@@ -100,7 +102,11 @@ if __name__ == "__main__":
         for n_particles in args.n_particles:
             print(f"  N = {n_particles:,} particles...")
             result = genjl_polynomial_is_timing(
-                dataset, n_particles, repeats=args.repeats, setup_julia=False
+                dataset,
+                n_particles,
+                repeats=args.repeats,
+                setup_julia=False,
+                inner_repeats=args.inner_repeats,
             )
             is_results[f"n{n_particles}"] = result
             

@@ -250,6 +250,8 @@ def command_run(args: argparse.Namespace) -> None:
         str(args.output_dir),
         "--repeats",
         str(args.repeats),
+        "--inner-repeats",
+        str(args.inner_repeats),
     ]
     if args.device:
         extra.extend(["--device", args.device])
@@ -422,6 +424,8 @@ def command_pipeline(args: argparse.Namespace) -> None:
                 framework,
                 "--repeats",
                 str(args.is_repeats),
+                "--inner-repeats",
+                str(args.is_inner_repeats),
                 "--output-dir",
                 str(output_dir),
             ]
@@ -584,6 +588,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["genjax", "numpyro", "genjl", "handcoded-jax", "pyro", "torch"],
     )
     run.add_argument("--repeats", type=int, default=100)
+    run.add_argument("--inner-repeats", type=int, default=10)
     run.add_argument("--output-dir", type=Path, required=True)
     run.add_argument("--device", choices=["cpu", "cuda"], default=None)
     run.add_argument(
@@ -605,7 +610,8 @@ def build_parser() -> argparse.ArgumentParser:
                           help="Select which inference stages to run (default: all).")
     pipeline.add_argument("--particles", type=int, nargs="+", help="Particle counts for IS sweeps.")
     pipeline.add_argument("--is-frameworks", nargs="+", help="Frameworks to include in the IS sweep (overrides --frameworks).")
-    pipeline.add_argument("--is-repeats", type=int, default=100, help="Timing repeats for IS.")
+    pipeline.add_argument("--is-repeats", type=int, default=50, help="Timing repeats for IS.")
+    pipeline.add_argument("--is-inner-repeats", type=int, default=50, help="Inner timing repeats for IS.")
     pipeline.add_argument("--hmc-frameworks", nargs="+", help="Frameworks to include in the HMC sweep (overrides --frameworks).")
     pipeline.add_argument("--frameworks", nargs="+", help="Convenience list applied to --is-frameworks/--hmc-frameworks when those flags are omitted.")
     pipeline.add_argument("--hmc-chain-lengths", type=int, nargs="+", default=[100, 500, 1000])

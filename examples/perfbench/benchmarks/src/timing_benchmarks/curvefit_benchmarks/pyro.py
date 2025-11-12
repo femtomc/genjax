@@ -16,6 +16,7 @@ def pyro_polynomial_is_timing(
     n_particles: int,
     repeats: int = 10,
     device: str = "cpu",
+    inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Time Pyro importance sampling on polynomial regression.
     
@@ -169,8 +170,8 @@ def pyro_polynomial_is_timing(
         times, (mean_time, std_time) = benchmark_with_warmup(
             timing_task,
             warmup_runs=2,
-            repeats=10,
-            inner_repeats=10,
+            repeats=repeats,
+            inner_repeats=inner_repeats,
             auto_sync=False,
         )
         
@@ -355,6 +356,8 @@ if __name__ == "__main__":
                         help="Number of data points")
     parser.add_argument("--repeats", type=int, default=20,
                         help="Number of timing repetitions")
+    parser.add_argument("--inner-repeats", type=int, default=10,
+                        help="Inner timing repetitions for IS")
     parser.add_argument("--output-dir", type=str, default="data/pyro",
                         help="Output directory for results")
     parser.add_argument("--device", type=str, default="cuda",
@@ -378,7 +381,11 @@ if __name__ == "__main__":
         for n_particles in args.n_particles:
             print(f"  N = {n_particles:,} particles...")
             result = pyro_polynomial_is_timing(
-                dataset, n_particles, repeats=args.repeats, device=args.device
+                dataset,
+                n_particles,
+                repeats=args.repeats,
+                device=args.device,
+                inner_repeats=args.inner_repeats,
             )
             is_results[f"n{n_particles}"] = result
             

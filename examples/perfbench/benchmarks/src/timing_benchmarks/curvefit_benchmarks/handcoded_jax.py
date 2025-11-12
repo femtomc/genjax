@@ -21,8 +21,9 @@ tfd = tfp.distributions
 def handcoded_jax_polynomial_is_timing(
     dataset: PolynomialDataset,
     n_particles: int,
-    repeats: int = 100,
-    key: Optional[jrand.PRNGKey] = None
+    repeats: int = 50,
+    key: Optional[jrand.PRNGKey] = None,
+    inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Handcoded JAX importance sampling with TFP distributions on polynomial regression.
     
@@ -77,8 +78,8 @@ def handcoded_jax_polynomial_is_timing(
     times, (mean_time, std_time) = benchmark_with_warmup(
         task,
         warmup_runs=5,
-        repeats=10,
-        inner_repeats=10,
+        repeats=repeats,
+        inner_repeats=inner_repeats,
         auto_sync=False,
     )
     
@@ -246,8 +247,10 @@ if __name__ == "__main__":
                         help="Number of particles for IS")
     parser.add_argument("--n-points", type=int, default=50,
                         help="Number of data points")
-    parser.add_argument("--repeats", type=int, default=100,
+    parser.add_argument("--repeats", type=int, default=50,
                         help="Number of timing repetitions")
+parser.add_argument("--inner-repeats", type=int, default=10,
+                        help="Inner timing repeats for IS")
     parser.add_argument("--output-dir", type=str, default="data/handcoded_jax",
                         help="Output directory for results")
     
@@ -266,10 +269,13 @@ if __name__ == "__main__":
     print("Running Handcoded JAX+TFP Importance Sampling benchmarks...")
     is_results = {}
     for n_particles in args.n_particles:
-        print(f"  N = {n_particles:,} particles...")
-        result = handcoded_jax_polynomial_is_timing(
-            dataset, n_particles, repeats=args.repeats
-        )
+            print(f"  N = {n_particles:,} particles...")
+            result = handcoded_jax_polynomial_is_timing(
+                dataset,
+                n_particles,
+                repeats=args.repeats,
+                inner_repeats=args.inner_repeats,
+            )
         is_results[f"n{n_particles}"] = result
         
         # Save individual result (without samples to avoid JAX array serialization)
