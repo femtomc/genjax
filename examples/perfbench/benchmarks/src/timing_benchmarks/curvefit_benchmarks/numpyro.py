@@ -258,9 +258,9 @@ if __name__ == "__main__":
                         help="Number of particles for IS")
     parser.add_argument("--n-points", type=int, default=50,
                         help="Number of data points")
-parser.add_argument("--repeats", type=int, default=50,
+    parser.add_argument("--repeats", type=int, default=50,
                         help="Number of timing repetitions")
-parser.add_argument("--inner-repeats", type=int, default=10,
+    parser.add_argument("--inner-repeats", type=int, default=50,
                         help="Inner timing repeats for IS")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Output directory for results")

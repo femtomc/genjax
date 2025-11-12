@@ -14,9 +14,9 @@ from ..data.generation import PolynomialDataset
 def pyro_polynomial_is_timing(
     dataset: PolynomialDataset,
     n_particles: int,
-    repeats: int = 10,
+    repeats: int = 50,
     device: str = "cpu",
-    inner_repeats: int = 10,
+    inner_repeats: int = 50,
 ) -> Dict[str, Any]:
     """Time Pyro importance sampling on polynomial regression.
     
@@ -354,9 +354,9 @@ if __name__ == "__main__":
                         help="Number of warmup samples for HMC")
     parser.add_argument("--n-points", type=int, default=50,
                         help="Number of data points")
-    parser.add_argument("--repeats", type=int, default=20,
+    parser.add_argument("--repeats", type=int, default=50,
                         help="Number of timing repetitions")
-    parser.add_argument("--inner-repeats", type=int, default=10,
+    parser.add_argument("--inner-repeats", type=int, default=50,
                         help="Inner timing repetitions for IS")
     parser.add_argument("--output-dir", type=str, default="data/pyro",
                         help="Output directory for results")
