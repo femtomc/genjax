@@ -2,7 +2,7 @@
 authors = [{ name = "McCoy Becker", email = "mccoyb@mit.edu" }]
 name = "genjax"
 requires-python = ">= 3.12"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [ "penzai>=0.2.5,<0.3", "beartype>=0.21.0,<0.22", "jaxtyping>=0.3.2,<0.4", "tensorflow-probability>=0.25.0,<0.26",
 ]
 

@@ -495,3 +495,7 @@ All figures are saved to `figs/`:
 ### Localization
 - `localization_r8_p200_basic_localization_problem_1x4_explanation.pdf` - Problem setup
 - `localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf` - SMC method comparison
+
+### Perfbench (Figure 16b)
+- `perfbench_benchmark_timings_is_all_frameworks.pdf` / `perfbench_benchmark_timings_hmc_all_frameworks.pdf` – CUDA sweep (IS + HMC across all frameworks)
+- `perfbench_cpu_benchmark_timings_is_all_frameworks.pdf` / `perfbench_cpu_benchmark_timings_hmc_all_frameworks.pdf` – CPU-only rerun for environments without GPUs
