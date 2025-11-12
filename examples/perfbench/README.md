@@ -25,7 +25,7 @@ The `benchmarks/` tree now keeps only the code paths exercised by this case stud
 
 The Pixi manifest exposes `default`, `cuda`, `pyro`, and `torch` environments. CUDA support (Linux + NVIDIA) is required if you want Pyro, hand-coded PyTorch, or TensorFlow Probability to run on GPUs; macOS installs stay CPU-only. Regardless of device, plan for roughly 5–10 minutes to complete the full sweep (IS + HMC) unless you trim the grids or repeats.
 
-Install the local environments once:
+Install the local environments once (and make sure Julia ≥1.10 is available—`juliaup` is the easiest path: `curl -fsSL https://install.julialang.org | sh` on Linux/macOS, then `juliaup add release`):
 
 ```bash
 cd examples/perfbench
@@ -98,7 +98,7 @@ Implementation notes:
 - Summaries (`benchmark_summary_*.csv`, `benchmark_table.tex`) live next to the generated plots.
 - The pipeline prints timing summaries per stage to stdout; `combine_results.py` also emits `benchmark_summary_*.csv` and warns when baseline data is missing.
 
-Gen.jl automatically instantiates `benchmarks/julia/Project.toml` the first time you request it. Delete `julia/.julia` inside this directory if you need a clean slate.
+Gen.jl automatically instantiates `benchmarks/julia/Project.toml` the first time you request it (running `julia --project=julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`). Install Julia via [juliaup](https://github.com/JuliaLang/juliaup) if you don’t already have it on your `PATH`. Delete `julia/.julia` inside this directory if you need a clean slate.
 
 ## Legacy Scripts & Tests
 

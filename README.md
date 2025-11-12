@@ -426,6 +426,8 @@ Implementation details:
 
 Once both stages finish, the pipeline merges all available JSON into `figs_{cpu,}/benchmark_timings_{is,hmc}_all_frameworks.{pdf,png}` plus `benchmark_summary_*.csv` and `benchmark_table.tex`, then copies PDFs into the repo-level `figs/` directory if `--skip-export` is not set. See `examples/perfbench/AGENTS.md` for the full CLI reference.
 
+> **Julia requirement:** The Gen.jl baselines need a Julia toolchain (≥1.10). We recommend installing via [juliaup](https://github.com/JuliaLang/juliaup) so that `julia` is on your `PATH` (e.g., `curl -fsSL https://install.julialang.org | sh`). The first time the pipeline touches Gen.jl it will automatically run `julia --project=examples/perfbench/benchmarks/julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`.
+
 ### Game of Life Inverse Dynamics
 
 **What it does**: Infers past Game of Life states from observed future states using Gibbs sampling on a 512×512 grid with 250 Gibbs steps.

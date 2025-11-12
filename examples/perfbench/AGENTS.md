@@ -18,7 +18,7 @@ cd examples/perfbench
 pixi install            # creates the local environments defined in benchmarks/pyproject.toml
 ```
 
-> **Platform note:** Only the `linux-64` solve exposes CUDA-enabled JAX/Pyro/PyTorch. macOS installs are CPU-only but otherwise follow the same commands. In both cases the entire IS+HMC sweep typically finishes within ~5–10 minutes; reduce particle/chain grids if you need a quicker smoke test.
+> **Platform note:** Only the `linux-64` solve exposes CUDA-enabled JAX/Pyro/PyTorch. macOS installs are CPU-only but otherwise follow the same commands. In both cases the entire IS+HMC sweep typically finishes within ~5–10 minutes; reduce particle/chain grids if you need a quicker smoke test. Install Julia ≥1.10 ahead of time (we recommend [juliaup](https://github.com/JuliaLang/juliaup); `curl -fsSL https://install.julialang.org | sh` will put `julia` on your `PATH`).
 
 The local project defines four environments:
 
@@ -90,7 +90,7 @@ You generally shouldn’t need these outside of debugging, but they remain avail
 
 Raw timing JSON resides in `data{,_cpu}/curvefit/<framework>/`. Figures + tables live under `figs{,_cpu}/`. The pipeline prints per-framework summaries to stdout after each stage to make regression hunting easier.
 
-Gen.jl instantiates automatically the first time you request it (`julia --project=julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`). Delete `julia/.julia` if you want to reset the Julia environment.
+Gen.jl instantiates automatically the first time you request it (`julia --project=julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`). Install Julia via juliaup beforehand, and delete `julia/.julia` if you want to reset the environment.
 
 ## Cleanup
 
