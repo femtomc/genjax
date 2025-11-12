@@ -430,7 +430,11 @@ def command_pipeline(args: argparse.Namespace) -> None:
                 cmd.extend(str(p) for p in particles)
             if framework in {"pyro", "torch"}:
                 cmd.extend(["--device", device])
-            extra_env = {"JAX_PLATFORMS": "cpu"} if framework in {"pyro", "torch"} else None
+            extra_env = None
+            if framework in {"pyro", "torch"}:
+                extra_env = {"JAX_PLATFORMS": "cpu"}
+            elif env_name == "cuda":
+                extra_env = {"JAX_PLATFORMS": "cuda"}
             print(f"→ IS {framework} (env={env_name or 'default'})")
             _run_main_subcommand(env_name, *cmd, env_overrides=extra_env)
             _print_is_timings(framework, output_dir, particles)
@@ -471,7 +475,8 @@ def command_pipeline(args: argparse.Namespace) -> None:
         torch_group = [fw for fw in norm_hmc if fw == "handcoded_torch"]
         genjl_requested = "genjl" in norm_hmc
 
-        run_hmc_group(jax_group, "cuda" if mode == "cuda" else None, device)
+        jax_env_overrides = {"JAX_PLATFORMS": "cuda"} if mode == "cuda" else None
+        run_hmc_group(jax_group, "cuda" if mode == "cuda" else None, device, env_overrides=jax_env_overrides)
         for fw in jax_group:
             _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
             ran_hmc = True

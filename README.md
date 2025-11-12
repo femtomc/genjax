@@ -385,7 +385,7 @@ These variants trim the GPU scaling benchmark to particle counts ≤20k (or supp
 # CPU run (default)
 pixi run paper-perfbench
 
-# GPU run
+# GPU run (GenJAX/NumPyro/handcoded JAX use CUDA automatically)
 pixi run paper-perfbench --mode cuda
 
 # Stage selection
