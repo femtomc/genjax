@@ -402,7 +402,7 @@ pixi run paper-perfbench --is-frameworks genjax numpyro --hmc-frameworks genjax 
 Key pipeline flags:
 
 - `--particles` controls the IS particle grid (default 1k/5k/10k).
-- `--is-repeats` / `--is-inner-repeats` default to 50×50 and are forwarded to every IS timing helper.
+- `--is-repeats` / `--is-inner-repeats` default to 50×50; GenJAX, NumPyro, and hand-coded JAX automatically bump to 100×100 unless you pass explicit values.
 - `--hmc-chain-lengths`, `--hmc-repeats`, `--hmc-warmup`, `--hmc-step-size`, `--hmc-n-leapfrog` feed the shared HMC runner; Gen.jl reuses the same knobs via `genjl-hmc`.
 - `--skip-generate`, `--skip-is`, `--skip-hmc`, `--skip-plots`, `--skip-export` let you resume partially completed runs without redoing work. Plotting/export only happens when fresh data exists.
 

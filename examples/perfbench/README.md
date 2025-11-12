@@ -52,7 +52,7 @@ Core options:
 | `--inference {all,is,hmc}` + `--skip-*` | Decide which stages run. Plotting/export only trigger when their inputs exist. |
 | `--frameworks …` | Convenience list that feeds both IS and HMC. Use `--is-frameworks` / `--hmc-frameworks` for independent control. Framework names match `genjax`, `numpyro`, `handcoded_jax`, `pyro`, `handcoded_torch`, `genjl`. |
 | `--particles …` | Particle counts for IS (default 1 000 / 5 000 / 10 000). |
-| `--is-repeats`, `--is-inner-repeats` | Forwarded to every IS timing helper (defaults: 50 / 50). |
+| `--is-repeats`, `--is-inner-repeats` | Forwarded to every IS timing helper (defaults: 50 / 50, but GenJAX/NumPyro/handcoded JAX automatically bump to 100 / 100 unless you override). |
 | `--hmc-chain-lengths`, `--hmc-repeats`, `--hmc-warmup`, `--hmc-step-size`, `--hmc-n-leapfrog` | Shared HMC knobs (defaults: 100 / 500 / 1 000 chains, 100 repeats, 50 warmup, step size 0.01, 20 leapfrog). Gen.jl’s dedicated runner receives the same values. |
 | `--fig-prefix`, `--export-dest` | Control the filenames copied into `../../figs/`. |
 

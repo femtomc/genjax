@@ -49,6 +49,11 @@ IS_OUTPUT_SUBDIRS = {
     "pyro": "pyro",
     "torch": "handcoded_torch",
 }
+DEFAULT_IS_REPEATS = 50
+DEFAULT_IS_INNER_REPEATS = 50
+HIGH_IS_FRAMEWORKS = {"genjax", "numpyro", "handcoded-jax"}
+HIGH_IS_REPEATS = 100
+HIGH_IS_INNER_REPEATS = 100
 
 
 def _ensure_bench_module(module: str):
@@ -418,14 +423,24 @@ def command_pipeline(args: argparse.Namespace) -> None:
             output_dir = _resolve_is_output_dir(data_root, framework).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
             env_name = _is_env_for_framework(framework, mode)
+            framework_repeats = args.is_repeats
+            framework_inner_repeats = args.is_inner_repeats
+            if (
+                framework in HIGH_IS_FRAMEWORKS
+                and args.is_repeats == DEFAULT_IS_REPEATS
+                and args.is_inner_repeats == DEFAULT_IS_INNER_REPEATS
+            ):
+                framework_repeats = HIGH_IS_REPEATS
+                framework_inner_repeats = HIGH_IS_INNER_REPEATS
+
             cmd = [
                 "run",
                 "--framework",
                 framework,
                 "--repeats",
-                str(args.is_repeats),
+                str(framework_repeats),
                 "--inner-repeats",
-                str(args.is_inner_repeats),
+                str(framework_inner_repeats),
                 "--output-dir",
                 str(output_dir),
             ]
@@ -610,8 +625,8 @@ def build_parser() -> argparse.ArgumentParser:
                           help="Select which inference stages to run (default: all).")
     pipeline.add_argument("--particles", type=int, nargs="+", help="Particle counts for IS sweeps.")
     pipeline.add_argument("--is-frameworks", nargs="+", help="Frameworks to include in the IS sweep (overrides --frameworks).")
-    pipeline.add_argument("--is-repeats", type=int, default=50, help="Timing repeats for IS.")
-    pipeline.add_argument("--is-inner-repeats", type=int, default=50, help="Inner timing repeats for IS.")
+    pipeline.add_argument("--is-repeats", type=int, default=DEFAULT_IS_REPEATS, help="Timing repeats for IS.")
+    pipeline.add_argument("--is-inner-repeats", type=int, default=DEFAULT_IS_INNER_REPEATS, help="Inner timing repeats for IS.")
     pipeline.add_argument("--hmc-frameworks", nargs="+", help="Frameworks to include in the HMC sweep (overrides --frameworks).")
     pipeline.add_argument("--frameworks", nargs="+", help="Convenience list applied to --is-frameworks/--hmc-frameworks when those flags are omitted.")
     pipeline.add_argument("--hmc-chain-lengths", type=int, nargs="+", default=[100, 500, 1000])
