@@ -246,11 +246,15 @@ def handcoded_torch_polynomial_hmc_timing(
         
         return torch.stack(samples)
     
-    # Try to use torch.compile if available (PyTorch 2.0+)
-    try:
-        run_hmc_compiled = torch.compile(run_hmc)
-    except:
-        # Fall back to regular function if compile not available
+    # Try to use torch.compile when running on CUDA
+    compile_requested = device.type == "cuda"
+    if compile_requested:
+        try:
+            run_hmc_compiled = torch.compile(run_hmc)
+        except Exception:
+            # Torch compile can fail on some platforms (e.g., missing conda binary)
+            run_hmc_compiled = run_hmc
+    else:
         run_hmc_compiled = run_hmc
 
     # Timing function
