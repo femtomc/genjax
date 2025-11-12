@@ -377,7 +377,9 @@ These variants trim the GPU scaling benchmark to particle counts ≤20k (or supp
 
 ### Multi-framework Performance Survey (Figure 16b)
 
-**What it does**: Repackages the full `timing-benchmarks` project (commit `d4433b0`) that produces Figure 16(b): GenJAX vs. NumPyro, Pyro, TensorFlow Probability, hand-coded PyTorch, and Gen.jl on both importance sampling and HMC for the polynomial regression task. _You’ll need Julia ≥1.10 for the Gen.jl baselines—install it via [juliaup](https://github.com/JuliaLang/juliaup) so `julia` is on your PATH (e.g. `curl -fsSL https://install.julialang.org | sh`)._
+> **Julia requirement**: The Gen.jl baselines need Julia ≥1.10. We recommend installing via [juliaup](https://github.com/JuliaLang/juliaup) so `julia` is on your PATH (e.g. `curl -fsSL https://install.julialang.org | sh`).
+
+**What it does**: Repackages the full `timing-benchmarks` project (commit `d4433b0`) that produces Figure 16(b): GenJAX vs. NumPyro, Pyro, TensorFlow Probability, hand-coded PyTorch, and Gen.jl on both importance sampling and HMC for the polynomial regression task.
 
 **Where it lives**: `examples/perfbench` remains its own Pixi project, but the repo-level task `pixi run paper-perfbench …` shells into `python examples/perfbench/main.py pipeline` so you can supply all flags from the root.
 
