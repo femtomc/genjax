@@ -264,7 +264,7 @@ This creates isolated conda environments for each case study.
 
 ## Reproducing Paper Figures
 
-*Note:* in our artifact, all figures involving code execution are provided below _with the exception of the multi-system benchmarking figure_. The code for the benchmarking figure (Fig 16, b) is available in the Git history of this repository (but requires a complex deployment setup, and won't run on CPUs).
+*Note:* all figures are reproducible from this repository, including the multi-system benchmarking panel (Fig 16b). That benchmark now lives under `examples/perfbench`; plan for ~5–10 minutes per run whether you target CPU or CUDA.
 
 To generate several of the case study paper figures, use the following commands:
 
@@ -296,7 +296,7 @@ Different case studies stress different JAX vectorization patterns, so device ch
 - **Curvefit** – scaling/timing plots assume a GPU so that the importance sampler can sweep up to 1M particles; on CPU you can pass smaller `--scaling-*` flags (see below) and expect longer runtimes plus different timing curves.
 - **Game of Life** – Gibbs timing bars compare CPU vs GPU throughput; animations work everywhere but the scaling panel only matches the paper if both device types are available.
 - **Localization** – Figure 19 relies on access to a CUDA environment (`pixi run -e localization-cuda …`). The SMC+HMC rejuvenation loop and vectorised LIDAR beams batch over large arrays; on CPU we drop the computational load to much smaller grids/particle counts, so the four-panel comparison generated via the CPU command will differ. If you have access to a GPU, use the GPU command to match the paper.
-- **Performance benchmark** – the `examples/perfbench` case study (Figure 16b) spins up separate Pixi environments for NumPyro, TensorFlow Probability, Pyro, hand-coded PyTorch, and Gen.jl. CUDA is required for the default Pyro/TFP runs (use `--device cpu` when invoking the scripts to fall back to CPU). Expect multi-minute runtimes, otherwise reduce the particle/chain grids or repeats for quick local checks.
+- **Performance benchmark** – the `examples/perfbench` case study (Figure 16b) spins up separate Pixi environments for NumPyro, TensorFlow Probability, Pyro, hand-coded PyTorch, and Gen.jl. CUDA is required for the default Pyro/TFP runs (use `--device cpu` when invoking the scripts to fall back to CPU). Budget roughly 5–10 minutes for the full sweep on either CPU or GPU; trim the particle/chain grids or repeats if you only need a smoke test.
 
 ### Devices that we tested the artifact on
 
@@ -379,38 +379,52 @@ These variants trim the GPU scaling benchmark to particle counts ≤20k (or supp
 
 **What it does**: Repackages the full `timing-benchmarks` project (commit `d4433b0`) that produces Figure 16(b): GenJAX vs. NumPyro, Pyro, TensorFlow Probability, hand-coded PyTorch, and Gen.jl on both importance sampling and HMC for the polynomial regression task.
 
-**Where it lives**: `examples/perfbench` is its own Pixi project, but you can drive everything from the repo root via `pixi run paper-perfbench …`. The wrapper launches `python examples/perfbench/main.py pipeline` with whatever flags you pass.
+**Where it lives**: `examples/perfbench` remains its own Pixi project, but the repo-level task `pixi run paper-perfbench …` shells into `python examples/perfbench/main.py pipeline` so you can supply all flags from the root.
 
 ```bash
-# CPU run (default)
+# CPU run (default; data -> examples/perfbench/data_cpu, figs -> figs_cpu)
 pixi run paper-perfbench
 
-# GPU run (GenJAX/NumPyro/handcoded JAX use CUDA automatically)
+# CUDA run (JAX frameworks get JAX_PLATFORMS=cuda, Pyro/Torch receive --device cuda)
 pixi run paper-perfbench --mode cuda
 
 # Stage selection
 pixi run paper-perfbench --inference is      # Importance sampling only
 pixi run paper-perfbench --inference hmc     # HMC only
+
+# Framework selection (applies to both stages unless overridden)
+pixi run paper-perfbench --frameworks genjax numpyro handcoded_jax
+
+# Stage-specific overrides
+pixi run paper-perfbench --is-frameworks genjax numpyro --hmc-frameworks genjax numpyro pyro
 ```
 
-All of the pipeline flags are forwarded, so you can still tweak particle grids, HMC chain lengths, repeats, etc. Examples:
+Key pipeline flags:
+
+- `--particles` controls the IS particle grid (default 1k/5k/10k).
+- `--is-repeats` / `--is-inner-repeats` default to 50×50 and are forwarded to every IS timing helper.
+- `--hmc-chain-lengths`, `--hmc-repeats`, `--hmc-warmup`, `--hmc-step-size`, `--hmc-n-leapfrog` feed the shared HMC runner; Gen.jl reuses the same knobs via `genjl-hmc`.
+- `--skip-generate`, `--skip-is`, `--skip-hmc`, `--skip-plots`, `--skip-export` let you resume partially completed runs without redoing work. Plotting/export only happens when fresh data exists.
+
+Example (HMC-only CUDA sweep with trimmed repeats and no plotting/export):
 
 ```bash
 pixi run paper-perfbench \
   --mode cuda \
+  --frameworks genjax numpyro \
   --inference hmc \
   --hmc-chain-lengths 1000 5000 \
   --hmc-repeats 25 \
   --skip-plots --skip-export
 ```
 
-Behind the scenes the pipeline switches into the appropriate Pixi environment per framework (`cuda`, `pyro`, `torch`, or the default JAX env). You no longer need to run a dozen `pixi run curvefit-*` tasks manually.
+Implementation details:
 
-All timings are saved under `examples/perfbench/data/…`, and the paper figure appears as `examples/perfbench/figs/benchmark_timings_{is,hmc}_all_frameworks.{pdf,png}` (plus `benchmark_table.tex`). Additional helper scripts (`run_hmc_benchmarks.py`, `run_genjl_hmc.py`, `combine_results.py`, etc.) and the Gen.jl bridge live in the same directory; see `examples/perfbench/AGENTS.md` for the full matrix of tasks.
+- The pipeline automatically selects the right Pixi environment per framework (`cuda` for TensorFlow Probability + JAX HMC, `pyro` for Pyro, `torch` for the hand-coded PyTorch kernels, default for everything else) and injects `JAX_PLATFORMS` so CUDA/CPU runs are explicit.
+- HMC timings go through `benchmarks/run_hmc_benchmarks.py`. Pyro, hand-coded PyTorch, and Gen.jl are intentionally capped at 5 outer × 5 inner repeats inside that runner so the full sweep stays within a ~5–10 minute window; override them by running the helper script directly if you need denser statistics.
+- Results land in `examples/perfbench/data/curvefit/<framework>/` and `examples/perfbench/figs/…` for CUDA mode (CPU mode mirrors them under `data_cpu/` and `figs_cpu/`). Gen.jl artifacts show up once its Julia project auto-instantiates (`julia --project=examples/perfbench/benchmarks/julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`).
 
-**CPU-only re-run**: Regenerate both panels with trimmed settings (20-point dataset, 1 000 particles, 5 repeats, and shortened HMC chain lengths) to confirm the pipeline without GPUs.
-
-Outputs land in `examples/perfbench/data{,_cpu}/curvefit/<framework>/` and `examples/perfbench/figs{,_cpu}/`. This path exercises GenJAX, NumPyro, TensorFlow Probability, Pyro, hand-coded PyTorch, and Gen.jl. On CPU we keep Pyro and hand-coded PyTorch to 5 outer × 5 inner repeats by default (override via `--pyro-repeats`, `--pyro-inner-repeats`, `--torch-repeats`, `--torch-inner-repeats`) because their HMC implementations are Python-heavy; JAX/Gen.jl still respect `--hmc-repeats` / `--inner-repeats`. The first time you hit the Gen.jl runner the pipeline automatically runs `julia --project=examples/perfbench/benchmarks/julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`.
+Once both stages finish, the pipeline merges all available JSON into `figs_{cpu,}/benchmark_timings_{is,hmc}_all_frameworks.{pdf,png}` plus `benchmark_summary_*.csv` and `benchmark_table.tex`, then copies PDFs into the repo-level `figs/` directory if `--skip-export` is not set. See `examples/perfbench/AGENTS.md` for the full CLI reference.
 
 ### Game of Life Inverse Dynamics
 
