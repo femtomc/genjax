@@ -93,6 +93,8 @@ def run_framework_hmc(
         }
     elif framework == "pyro":
         # Pyro uses device parameter
+        repeats = kwargs.get("pyro_repeats", repeats)
+        inner_repeats = kwargs.get("pyro_inner_repeats", inner_repeats)
         framework_kwargs = {
             "step_size": kwargs.get("step_size", 0.01),
             "num_steps": kwargs.get("n_leapfrog", 20),
@@ -100,6 +102,8 @@ def run_framework_hmc(
         }
     elif framework == "handcoded_torch":
         # PyTorch uses device parameter
+        repeats = kwargs.get("torch_repeats", repeats)
+        inner_repeats = kwargs.get("torch_inner_repeats", inner_repeats)
         framework_kwargs = {
             "step_size": kwargs.get("step_size", 0.01),
             "n_leapfrog": kwargs.get("n_leapfrog", 20),
@@ -112,6 +116,8 @@ def run_framework_hmc(
         }
     elif framework == "genjl":
         # Gen.jl uses step_size and n_leapfrog
+        repeats = kwargs.get("genjl_repeats", repeats)
+        inner_repeats = kwargs.get("genjl_inner_repeats", inner_repeats)
         framework_kwargs = {
             "step_size": kwargs.get("step_size", 0.01),
             "n_leapfrog": kwargs.get("n_leapfrog", 20)
@@ -155,6 +161,18 @@ def main():
                        help="Number of timing repetitions")
     parser.add_argument("--inner-repeats", type=int, default=10,
                        help="Inner timing repeats per outer loop")
+    parser.add_argument("--pyro-repeats", type=int, default=10,
+                       help="Repeats override for Pyro (default 10)")
+    parser.add_argument("--pyro-inner-repeats", type=int, default=10,
+                       help="Inner repeats override for Pyro (default 10)")
+    parser.add_argument("--torch-repeats", type=int, default=10,
+                       help="Repeats override for handcoded PyTorch (default 10)")
+    parser.add_argument("--torch-inner-repeats", type=int, default=10,
+                       help="Inner repeats override for handcoded PyTorch (default 10)")
+    parser.add_argument("--genjl-repeats", type=int, default=10,
+                       help="Repeats override for Gen.jl (default 10)")
+    parser.add_argument("--genjl-inner-repeats", type=int, default=10,
+                       help="Inner repeats override for Gen.jl (default 10)")
     parser.add_argument("--n-warmup", type=int, default=50,
                        help="Number of HMC warmup steps")
     parser.add_argument("--output-dir", type=Path, default=Path("data"),
@@ -218,7 +236,13 @@ def main():
                 step_size=args.step_size,
                 n_leapfrog=args.n_leapfrog,
                 target_accept_prob=args.target_accept_prob,
-                device=args.device
+                device=args.device,
+                pyro_repeats=args.pyro_repeats,
+                pyro_inner_repeats=args.pyro_inner_repeats,
+                torch_repeats=args.torch_repeats,
+                torch_inner_repeats=args.torch_inner_repeats,
+                genjl_repeats=args.genjl_repeats,
+                genjl_inner_repeats=args.genjl_inner_repeats,
             )
             
             if results is not None:
