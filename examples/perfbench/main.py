@@ -334,10 +334,19 @@ def _print_hmc_timings(framework: str, output_dir: Path, chain_lengths: list[int
 
 
 def command_pipeline(args: argparse.Namespace) -> None:
+    # Interpret inference selection
+    if args.inference == "is":
+        args.skip_hmc = True
+        args.skip_is = False
+    elif args.inference == "hmc":
+        args.skip_is = True
+        args.skip_hmc = False
+
     mode = args.mode
     particles = args.particles or [1000, 5000, 10000]
-    is_frameworks = args.is_frameworks or DEFAULT_IS_FRAMEWORKS
-    hmc_frameworks = args.hmc_frameworks or DEFAULT_HMC_FRAMEWORKS
+    shared_fw = args.frameworks or []
+    is_frameworks = args.is_frameworks or (shared_fw if shared_fw else DEFAULT_IS_FRAMEWORKS)
+    hmc_frameworks = args.hmc_frameworks or (shared_fw if shared_fw else DEFAULT_HMC_FRAMEWORKS)
     norm_hmc = [_normalize_hmc_framework(fw) for fw in hmc_frameworks]
     device = "cuda" if mode == "cuda" else "cpu"
 
@@ -368,6 +377,9 @@ def command_pipeline(args: argparse.Namespace) -> None:
             str(dataset_output),
         )
 
+    ran_is = False
+    ran_hmc = False
+
     if not args.skip_is:
         for framework in is_frameworks:
             output_dir = _resolve_is_output_dir(data_root, framework).resolve()
@@ -391,17 +403,9 @@ def command_pipeline(args: argparse.Namespace) -> None:
             print(f"→ IS {framework} (env={env_name or 'default'})")
             _run_main_subcommand(env_name, *cmd, env_overrides=extra_env)
             _print_is_timings(framework, output_dir, particles)
+            ran_is = True
 
-    if not args.skip_plots:
-        print("→ Combining IS results")
-        _run_main_subcommand(
-            None,
-            "combine",
-            "--data-dir",
-            str(data_root),
-            "--output-dir",
-            str(figs_root),
-        )
+    # Defer plotting until after inference stages; we'll combine selectively later.
 
     if not args.skip_hmc:
         def run_hmc_group(frameworks: list[str], env_name: str | None, device_arg: str | None = None, env_overrides: dict[str, str] | None = None):
@@ -439,14 +443,17 @@ def command_pipeline(args: argparse.Namespace) -> None:
         run_hmc_group(jax_group, "cuda" if mode == "cuda" else None, device)
         for fw in jax_group:
             _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
+            ran_hmc = True
 
         run_hmc_group(pyro_group, "pyro", device, env_overrides={"JAX_PLATFORMS": "cpu"})
         for fw in pyro_group:
             _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
+            ran_hmc = True
 
         run_hmc_group(torch_group, "torch", device, env_overrides={"JAX_PLATFORMS": "cpu"})
         for fw in torch_group:
             _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
+            ran_hmc = True
 
         if genjl_requested:
             genjl_dir = (curvefit_root / "genjl").resolve()
@@ -473,19 +480,31 @@ def command_pipeline(args: argparse.Namespace) -> None:
             print("→ HMC genjl")
             _run_main_subcommand(None, *genjl_cmd)
             _print_hmc_timings("genjl", genjl_dir, args.hmc_chain_lengths)
+            ran_hmc = True
 
-    if not args.skip_plots and not args.skip_hmc and norm_hmc:
-        plot_args = [
-            "benchmarks/combine_results.py",
-            "--data-dir",
-            str(hmc_output_dir),
-            "--output-dir",
-            str(figs_root),
-            "--frameworks",
-            *norm_hmc,
-        ]
-        print("→ Combining HMC results")
-        _run_example_script(None, *plot_args)
+    if not args.skip_plots:
+        if ran_is:
+            print("→ Combining IS results")
+            _run_main_subcommand(
+                None,
+                "combine",
+                "--data-dir",
+                str(data_root),
+                "--output-dir",
+                str(figs_root),
+            )
+        if ran_hmc:
+            plot_args = [
+                "benchmarks/combine_results.py",
+                "--data-dir",
+                str(hmc_output_dir),
+                "--output-dir",
+                str(figs_root),
+                "--frameworks",
+                *norm_hmc,
+            ]
+            print("→ Combining HMC results")
+            _run_example_script(None, *plot_args)
 
     if not args.skip_export:
         print("→ Exporting figures")
@@ -540,11 +559,14 @@ def build_parser() -> argparse.ArgumentParser:
     run.set_defaults(func=command_run)
 
     pipeline = sub.add_parser("pipeline", help="Run the full perfbench case study")
-    pipeline.add_argument("--mode", choices=["cpu", "cuda"], default="cuda")
+    pipeline.add_argument("--mode", choices=["cpu", "cuda"], default="cpu")
+    pipeline.add_argument("--inference", choices=["all", "is", "hmc"], default="all",
+                          help="Select which inference stages to run (default: all).")
     pipeline.add_argument("--particles", type=int, nargs="+", help="Particle counts for IS sweeps.")
-    pipeline.add_argument("--is-frameworks", nargs="+", help="Frameworks to include in the IS sweep.")
+    pipeline.add_argument("--is-frameworks", nargs="+", help="Frameworks to include in the IS sweep (overrides --frameworks).")
     pipeline.add_argument("--is-repeats", type=int, default=100, help="Timing repeats for IS.")
-    pipeline.add_argument("--hmc-frameworks", nargs="+", help="Frameworks to include in the HMC sweep.")
+    pipeline.add_argument("--hmc-frameworks", nargs="+", help="Frameworks to include in the HMC sweep (overrides --frameworks).")
+    pipeline.add_argument("--frameworks", nargs="+", help="Convenience list applied to --is-frameworks/--hmc-frameworks when those flags are omitted.")
     pipeline.add_argument("--hmc-chain-lengths", type=int, nargs="+", default=[100, 500, 1000])
     pipeline.add_argument("--hmc-repeats", type=int, default=100)
     pipeline.add_argument("--hmc-warmup", type=int, default=50)

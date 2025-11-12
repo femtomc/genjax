@@ -379,59 +379,38 @@ These variants trim the GPU scaling benchmark to particle counts ≤20k (or supp
 
 **What it does**: Repackages the full `timing-benchmarks` project (commit `d4433b0`) that produces Figure 16(b): GenJAX vs. NumPyro, Pyro, TensorFlow Probability, hand-coded PyTorch, and Gen.jl on both importance sampling and HMC for the polynomial regression task.
 
-**Where it lives**: `examples/perfbench` is its own Pixi project. Run all commands from that directory, or use the root-level wrapper tasks described below.
+**Where it lives**: `examples/perfbench` is its own Pixi project, but you can drive everything from the repo root via `pixi run paper-perfbench …`. The wrapper launches `python examples/perfbench/main.py pipeline` with whatever flags you pass.
 
 ```bash
-cd examples/perfbench
-pixi install
+# CPU run (default)
+pixi run paper-perfbench
 
-# Full Figure 16b sweep (IS at 1k/5k/10k particles; HMC at 100/500/1k chains)
-pixi run curvefit-all
+# GPU run
+pixi run paper-perfbench --mode cuda
 
-# Individual building blocks (optional)
-pixi run generate-data
-pixi run curvefit-genjax
-pixi run curvefit-numpyro
-pixi run curvefit-genjl                     # auto-installs the Julia deps on first run
-pixi run -e cuda cuda-curvefit-handcoded    # TensorFlow Probability baseline
-pixi run -e pyro pyro-curvefit -- --device cuda
-pixi run -e pyro pyro-torch                 # Hand-coded PyTorch baseline
-pixi run curvefit-plot                      # Produces figs/benchmark_timings_{is,hmc}_all_frameworks.{pdf,png}
-pixi run curvefit-export                    # Copies the PDFs to ../../figs/perfbench_*
+# Stage selection
+pixi run paper-perfbench --inference is      # Importance sampling only
+pixi run paper-perfbench --inference hmc     # HMC only
 ```
 
-The local Pixi workspace ships with both `linux-64` (CUDA-capable) and `osx-arm64` (CPU-only). Use the Linux environments when you need the Pyro/TFP or GPU timings; on macOS you’re limited to the CPU-sized workflows, so expect different runtimes/figures.
-
-From the repository root you can trigger the same sequence (with automatic export to `figs/`) via:
+All of the pipeline flags are forwarded, so you can still tweak particle grids, HMC chain lengths, repeats, etc. Examples:
 
 ```bash
-pixi run paper-perfbench          # Runs curvefit-all (IS sweeps) then exports to figs/perfbench_*.pdf
-pixi run paper-perfbench-hmc      # Runs hmc-all + hmc-plot, then refreshes the exported figs/perfbench_*.pdf
-pixi run paper-perfbench-cpu      # Runs the CPU-sized workflow (curvefit-cpu) and exports to figs/perfbench_cpu_*.pdf
-pixi run paper-perfbench-clean    # Removes examples/perfbench/data/ and examples/perfbench/figs/
+pixi run paper-perfbench \
+  --mode cuda \
+  --inference hmc \
+  --hmc-chain-lengths 1000 5000 \
+  --hmc-repeats 25 \
+  --skip-plots --skip-export
 ```
 
-For the HMC panel run (benchmarks chain lengths 100/500/1 000):
-
-```bash
-pixi run -e cuda hmc-genjax
-pixi run -e cuda hmc-numpyro
-pixi run -e cuda hmc-handcoded-jax
-pixi run genjl-hmc
-pixi run hmc-plot
-```
+Behind the scenes the pipeline switches into the appropriate Pixi environment per framework (`cuda`, `pyro`, `torch`, or the default JAX env). You no longer need to run a dozen `pixi run curvefit-*` tasks manually.
 
 All timings are saved under `examples/perfbench/data/…`, and the paper figure appears as `examples/perfbench/figs/benchmark_timings_{is,hmc}_all_frameworks.{pdf,png}` (plus `benchmark_table.tex`). Additional helper scripts (`run_hmc_benchmarks.py`, `run_genjl_hmc.py`, `combine_results.py`, etc.) and the Gen.jl bridge live in the same directory; see `examples/perfbench/AGENTS.md` for the full matrix of tasks.
 
 **CPU-only re-run**: Regenerate both panels with trimmed settings (20-point dataset, 1 000 particles, 5 repeats, and shortened HMC chain lengths) to confirm the pipeline without GPUs.
 
-```bash
-pixi run curvefit-cpu                    # from examples/perfbench/
-# or from the repo root:
-pixi run paper-perfbench-cpu
-```
-
-Outputs land in `examples/perfbench/data_cpu/curvefit/<framework>/` and `examples/perfbench/figs_cpu/`. This path exercises GenJAX, NumPyro, TensorFlow Probability, Pyro, hand-coded PyTorch, and Gen.jl entirely on CPU (1 000 particles / 5 repeats) plus a reduced HMC sweep for GenJAX/NumPyro/hand-coded JAX (chain lengths 100/500/1 000). The Pixi tasks automatically run `julia --project=examples/perfbench/benchmarks/julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'` the first time you touch the Gen.jl runner (rerun manually if you prefer). Run `pixi run curvefit-export-cpu` (or `pixi run paper-perfbench-cpu`) afterwards to copy `perfbench_cpu_benchmark_timings_{is,hmc}_all_frameworks.pdf` into the repository-level `figs/` directory (the GPU run exports the same files with a `perfbench_` prefix).
+Outputs land in `examples/perfbench/data{,_cpu}/curvefit/<framework>/` and `examples/perfbench/figs{,_cpu}/`. This path exercises GenJAX, NumPyro, TensorFlow Probability, Pyro, hand-coded PyTorch, and Gen.jl. On CPU we keep Pyro and hand-coded PyTorch to 5 outer × 5 inner repeats by default (override via `--pyro-repeats`, `--pyro-inner-repeats`, `--torch-repeats`, `--torch-inner-repeats`) because their HMC implementations are Python-heavy; JAX/Gen.jl still respect `--hmc-repeats` / `--inner-repeats`. The first time you hit the Gen.jl runner the pipeline automatically runs `julia --project=examples/perfbench/benchmarks/julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`.
 
 ### Game of Life Inverse Dynamics
 

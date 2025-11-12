@@ -41,9 +41,9 @@ paper-curvefit-gen = "pixi run -e curvefit python -m examples.curvefit.main pape
 paper-curvefit-custom = "pixi run -e curvefit python -m examples.curvefit.main"
 paper-gol-gen = "pixi run -e gol python -m examples.gol.main --mode showcase"
 paper-localization-gen = "pixi run -e localization python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
-paper-perfbench = "bash -lc 'cd examples/perfbench && pixi run perfbench-cpu'"
-paper-perfbench-cuda = "bash -lc 'cd examples/perfbench && pixi run perfbench'"
-paper-perfbench-clean = "bash -lc 'cd examples/perfbench && pixi run clean'"
+paper-perfbench = "python examples/perfbench/main.py pipeline"
+paper-perfbench-cuda = "python examples/perfbench/main.py pipeline --mode cuda"
+paper-perfbench-clean = "python examples/perfbench/main.py clean"
 
 paper-faircoin-gpu-gen = "pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
 paper-curvefit-gpu-gen = "pixi run -e curvefit-cuda python -m examples.curvefit.main paper"
