@@ -152,6 +152,37 @@ def _normalize_hmc_framework(framework: str) -> str:
     return framework.replace("-", "_")
 
 
+def _framework_dir(base: Path, framework: str) -> Path | None:
+    base = Path(base)
+    candidates = [base / "curvefit" / framework, base / framework]
+    for cand in candidates:
+        if cand.exists():
+            return cand
+    return None
+
+
+def _has_is_results(base: Path, frameworks: list[str]) -> bool:
+    for fw in frameworks:
+        fw_dir = _framework_dir(base, fw)
+        if not fw_dir:
+            continue
+        for n in [100, 1000, 5000, 10000]:
+            if (fw_dir / f"is_n{n}.json").exists():
+                return True
+    return False
+
+
+def _has_hmc_results(base: Path, frameworks: list[str]) -> bool:
+    for fw in frameworks:
+        fw_dir = _framework_dir(base, fw)
+        if not fw_dir:
+            continue
+        for n in [100, 500, 1000, 5000, 10000]:
+            if (fw_dir / f"hmc_n{n}.json").exists():
+                return True
+    return False
+
+
 def _run_python(relative_script: Path, *extra: str) -> None:
     script_path = CASE_ROOT / relative_script
     if not script_path.exists():
@@ -482,7 +513,12 @@ def command_pipeline(args: argparse.Namespace) -> None:
             _print_hmc_timings("genjl", genjl_dir, args.hmc_chain_lengths)
             ran_hmc = True
 
-    if not args.skip_plots:
+    if not ran_is and _has_is_results(data_root, is_frameworks):
+        ran_is = True
+    if not ran_hmc and _has_hmc_results(hmc_output_dir, norm_hmc):
+        ran_hmc = True
+
+    if not args.skip_plots and (ran_is or ran_hmc):
         if ran_is:
             print("→ Combining IS results")
             _run_main_subcommand(
@@ -506,7 +542,7 @@ def command_pipeline(args: argparse.Namespace) -> None:
             print("→ Combining HMC results")
             _run_example_script(None, *plot_args)
 
-    if not args.skip_export:
+    if not args.skip_export and (ran_is or ran_hmc):
         print("→ Exporting figures")
         _run_main_subcommand(
             None,

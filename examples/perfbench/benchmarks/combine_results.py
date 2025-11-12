@@ -341,8 +341,15 @@ def create_plots(df, output_dir):
     plt.rcParams.update({"font.size": 18})
     import matplotlib.legend_handler
     
-    # Filter IS results for specific particle counts
+    # Filter IS results for specific particle counts (guard if column absent)
+    if 'method' not in df.columns or 'IS' not in df['method'].unique() or 'n_particles' not in df.columns:
+        print("No IS results to plot")
+        return
+
     is_df = df[df['method'] == 'IS'].copy()
+    if 'n_particles' not in is_df.columns:
+        print("No IS results to plot")
+        return
     is_df = is_df[is_df['n_particles'].isin([1000, 5000, 10000])]
     
     if len(is_df) == 0:
@@ -679,35 +686,38 @@ def main():
     print("SUMMARY - All Frameworks Benchmark Results")
     print("="*80)
     
-    is_df = df[df['method'] == 'IS']
-    for n_particles in sorted(is_df['n_particles'].unique()):
-        print(f"\nN = {n_particles:,} particles:")
-        subset = is_df[is_df['n_particles'] == n_particles].sort_values('mean_time')
-        
-        if len(subset) > 0:
-            fastest_time = subset['mean_time'].min()
+    is_df = df[df['method'] == 'IS'] if 'method' in df.columns else pd.DataFrame()
+    if 'n_particles' in is_df.columns and not is_df.empty:
+        for n_particles in sorted(is_df['n_particles'].unique()):
+            print(f"\nN = {n_particles:,} particles:")
+            subset = is_df[is_df['n_particles'] == n_particles].sort_values('mean_time')
             
-            # Get display names
-            display_names_local = {
-                'genjax': 'Ours',
-                'numpyro': 'NumPyro',
-                'handcoded_jax': 'Handcoded JAX',
-                'genjl': 'Gen.jl',
-                'genjl_optimized': 'Gen.jl (optimized)',
-                'genjl_dynamic': 'Gen.jl',
-                'pyro': 'Pyro',
-                'handcoded_torch': 'Handcoded PyTorch'
-            }
-            
-            print(f"{'Framework':<20} {'Time (ms)':<15} {'Speedup':<15}")
-            print("-" * 50)
-            
-            for _, row in subset.iterrows():
-                if not np.isnan(row['mean_time']):
-                    time_ms = row['mean_time'] * 1000
-                    speedup = row['mean_time'] / fastest_time
-                    framework_name = display_names_local.get(row['framework'], row['framework'])
-                    print(f"{framework_name:<20} {time_ms:<15.3f} {speedup:<15.1f}x")
+            if len(subset) > 0:
+                fastest_time = subset['mean_time'].min()
+                
+                # Get display names
+                display_names_local = {
+                    'genjax': 'Ours',
+                    'numpyro': 'NumPyro',
+                    'handcoded_jax': 'Handcoded JAX',
+                    'genjl': 'Gen.jl',
+                    'genjl_optimized': 'Gen.jl (optimized)',
+                    'genjl_dynamic': 'Gen.jl',
+                    'pyro': 'Pyro',
+                    'handcoded_torch': 'Handcoded PyTorch'
+                }
+                
+                print(f"{'Framework':<20} {'Time (ms)':<15} {'Speedup':<15}")
+                print("-" * 50)
+                
+                for _, row in subset.iterrows():
+                    if not np.isnan(row['mean_time']):
+                        time_ms = row['mean_time'] * 1000
+                        speedup = row['mean_time'] / fastest_time
+                        framework_name = display_names_local.get(row['framework'], row['framework'])
+                        print(f"{framework_name:<20} {time_ms:<15.3f} {speedup:<15.1f}x")
+    else:
+        print("\nNo IS results available for summary.")
 
 
 if __name__ == "__main__":
