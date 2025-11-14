@@ -159,7 +159,7 @@ def main():
                        help="Number of data points")
     parser.add_argument("--repeats", type=int, default=100,
                        help="Number of timing repetitions")
-    parser.add_argument("--inner-repeats", type=int, default=10,
+    parser.add_argument("--inner-repeats", type=int, default=100,
                        help="Inner timing repeats per outer loop")
     parser.add_argument("--pyro-repeats", type=int, default=5,
                        help="Repeats override for Pyro (default 5)")

@@ -55,7 +55,7 @@ What the pipeline does:
 - `--mode {cpu,cuda}` controls output roots (`data_cpu`/`figs_cpu` vs `data`/`figs`) **and** whether JAX frameworks set `JAX_PLATFORMS=cuda`.
 - `--inference {all,is,hmc}` toggles stages; the helper also honours `--skip-generate`, `--skip-is`, `--skip-hmc`, `--skip-plots`, `--skip-export`.
 - `--frameworks …` feeds both stages; use `--is-frameworks` / `--hmc-frameworks` when you need different sets.
-- `--particles …`, `--is-repeats`, `--is-inner-repeats` customise the IS sweep (defaults: 1k/5k/10k, 50 repeats, 50 inner repeats; GenJAX/NumPyro/handcoded JAX auto-bump to 100×100 unless overridden).
+- `--particles …`, `--is-repeats`, `--is-inner-repeats` customise the IS sweep (defaults: 1k/5k/10k, 100 repeats, 100 inner repeats for GenJAX/NumPyro/handcoded JAX; Pyro auto-drops to 5×5 unless overridden).
 - `--hmc-chain-lengths`, `--hmc-repeats`, `--hmc-warmup`, `--hmc-step-size`, `--hmc-n-leapfrog` feed both the shared HMC runner and the Gen.jl helper.
 - Plotting/export runs only if at least one corresponding stage finished or if existing JSON is detected on disk.
 - Pyro, hand-coded PyTorch, and Gen.jl HMC runs are clamped to 5 outer × 5 inner repeats inside `benchmarks/run_hmc_benchmarks.py` so the complete sweep stays within the ~5–10 minute target window; edit that script or execute it manually if you need larger grids.
