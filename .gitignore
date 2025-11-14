@@ -24,6 +24,8 @@ examples/perfbench/data_cpu/
 examples/perfbench/.genjl_instantiated
 examples/perfbench/.julia_depot/
 examples/perfbench/.julia_home/
+!examples/perfbench/benchmarks/src/timing_benchmarks/data/
+!examples/perfbench/benchmarks/src/timing_benchmarks/data/*
 
 # Generated figures and outputs (keep logo assets)
 figs/

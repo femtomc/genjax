@@ -54,6 +54,8 @@ DEFAULT_IS_INNER_REPEATS = 50
 HIGH_IS_FRAMEWORKS = {"genjax", "numpyro", "handcoded-jax"}
 HIGH_IS_REPEATS = 100
 HIGH_IS_INNER_REPEATS = 100
+PYRO_IS_REPEATS = 5
+PYRO_IS_INNER_REPEATS = 5
 
 
 def _ensure_bench_module(module: str):
@@ -425,7 +427,10 @@ def command_pipeline(args: argparse.Namespace) -> None:
             env_name = _is_env_for_framework(framework, mode)
             framework_repeats = args.is_repeats
             framework_inner_repeats = args.is_inner_repeats
-            if (
+            if framework == "pyro" and args.is_repeats == DEFAULT_IS_REPEATS and args.is_inner_repeats == DEFAULT_IS_INNER_REPEATS:
+                framework_repeats = PYRO_IS_REPEATS
+                framework_inner_repeats = PYRO_IS_INNER_REPEATS
+            elif (
                 framework in HIGH_IS_FRAMEWORKS
                 and args.is_repeats == DEFAULT_IS_REPEATS
                 and args.is_inner_repeats == DEFAULT_IS_INNER_REPEATS

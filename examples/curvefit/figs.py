@@ -411,7 +411,16 @@ def save_inference_scaling_viz(
     ax1.set_ylabel("Runtime (ms)")
     ax1.set_xscale("log")
     ax1.set_xlim(8, 1200000)
-    ax1.set_ylim(0.1, 0.5)
+
+    y_min = float(np.min(runtime_array - runtime_std_array))
+    y_max = float(np.max(runtime_array + runtime_std_array))
+    if not np.isfinite(y_min):
+        y_min = float(np.min(runtime_array))
+    if not np.isfinite(y_max):
+        y_max = float(np.max(runtime_array))
+    y_range = max(1e-6, y_max - y_min)
+    padding = 0.1 * y_range
+    ax1.set_ylim(max(1e-6, y_min - padding), y_max + padding)
 
     # Add GPU behavior annotations
     ax1.axvspan(100000, 1200000, alpha=0.1, color="orange", label="GPU Throttling")
@@ -419,25 +428,26 @@ def save_inference_scaling_viz(
     ax1.axvline(100, color="#0173B2", linestyle="-", alpha=0.8, linewidth=4)
     ax1.axvline(100000, color="#029E73", linestyle="-", alpha=0.8, linewidth=4)
 
+    text_kwargs = {
+        "ha": "center",
+        "va": "bottom",
+        "fontsize": 12,
+        "fontweight": "bold",
+        "transform": ax1.get_xaxis_transform(),
+    }
     ax1.text(
         3000,
         0.15,
         "GPU\nUnderutilized",
-        ha="center",
-        va="bottom",
         color="gray",
-        fontsize=12,
-        fontweight="bold",
+        **text_kwargs,
     )
     ax1.text(
         300000,
         0.15,
         "GPU\nThrottling",
-        ha="center",
-        va="bottom",
         color="darkorange",
-        fontsize=12,
-        fontweight="bold",
+        **text_kwargs,
     )
 
     # GPU OOM marker
