@@ -88,43 +88,33 @@ def genjax_polynomial_is_timing(
 
     xs, ys = dataset.xs, dataset.ys
 
-    # Create and JIT the inference function using faircoin pattern
     genjax_infer_is = make_genjax_infer_is(n_particles)
     infer_jit = jax.jit(seed(genjax_infer_is))
 
-    def task():
+    def full_task():
         log_weights = infer_jit(key, xs, ys)
-        jax.block_until_ready(log_weights)
-        return log_weights
+        # Reconstruct traces to match other frameworks (samples + weights)
+        constraints = {"ys": ys}
+        def sample_particle(_):
+            trace, _ = polynomial_flat.generate(constraints, xs)
+            return trace
+        traces = vmap(sample_particle)(jnp.arange(n_particles))
+        choices = traces.get_choices()
+        jax.block_until_ready((log_weights, choices["a"], choices["b"], choices["c"]))
+        return log_weights, choices
 
-    # Run benchmark with automatic warm-up - more inner repeats for accuracy
     times, (mean_time, std_time) = benchmark_with_warmup(
-        task,
+        full_task,
         warmup_runs=5,
         repeats=repeats,
         inner_repeats=inner_repeats,
         auto_sync=False,
     )
 
-    # Get final weights
-    log_weights = task()
-
-    # For compatibility, also get samples - run full version once
-    def get_samples():
-        constraints = {"ys": ys}
-        def sample_particle(_):
-            trace, _ = polynomial_flat.generate(constraints, xs)
-            return trace
-        traces = vmap(sample_particle)(jnp.arange(n_particles))
-        return traces
-    
-    jitted_samples = jax.jit(seed(get_samples))
-    traces = jitted_samples(key)
-    
-    # Extract samples
-    samples_a = traces.get_choices()["a"]
-    samples_b = traces.get_choices()["b"]
-    samples_c = traces.get_choices()["c"]
+    log_weights, choices = full_task()
+    samples_a = choices["a"]
+    samples_b = choices["b"]
+    samples_c = choices["c"]
 
     return {
         "framework": "genjax" if not use_direct else "genjax_direct",
