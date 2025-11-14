@@ -49,8 +49,8 @@ IS_OUTPUT_SUBDIRS = {
     "pyro": "pyro",
     "torch": "handcoded_torch",
 }
-DEFAULT_IS_REPEATS = 100
-DEFAULT_IS_INNER_REPEATS = 100
+DEFAULT_IS_REPEATS = 50
+DEFAULT_IS_INNER_REPEATS = 50
 HIGH_IS_FRAMEWORKS = {"genjax", "numpyro", "handcoded-jax"}
 HIGH_IS_REPEATS = 100
 HIGH_IS_INNER_REPEATS = 100
