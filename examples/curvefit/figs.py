@@ -412,15 +412,7 @@ def save_inference_scaling_viz(
     ax1.set_xscale("log")
     ax1.set_xlim(8, 1200000)
 
-    y_min = float(np.min(runtime_array - runtime_std_array))
-    y_max = float(np.max(runtime_array + runtime_std_array))
-    if not np.isfinite(y_min):
-        y_min = float(np.min(runtime_array))
-    if not np.isfinite(y_max):
-        y_max = float(np.max(runtime_array))
-    y_range = max(1e-6, y_max - y_min)
-    padding = 0.1 * y_range
-    ax1.set_ylim(max(1e-6, y_min - padding), y_max + padding)
+    # Let Matplotlib pick y-limits automatically so spikes don't crush the rest of the curve.
 
     # Add GPU behavior annotations
     ax1.axvspan(100000, 1200000, alpha=0.1, color="orange", label="GPU Throttling")
