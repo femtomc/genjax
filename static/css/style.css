@@ -30,6 +30,8 @@
   --color-tutorial-bg: #e8f5e9;
   --color-theory: #1565c0;
   --color-theory-bg: #e3f2fd;
+  --color-all: #6b4c9a;
+  --color-all-bg: #f3e5f5;
   
   /* Typography */
   --font-serif: "Source Serif Pro", "Charter", "Georgia", "Times New Roman", serif;
@@ -395,6 +397,11 @@ pre code {
   color: var(--color-theory);
 }
 
+.track-btn.active.all-track {
+  border-color: var(--color-all);
+  color: var(--color-all);
+}
+
 .track-btn .track-icon {
   font-size: 1.5rem;
   margin-bottom: var(--space-xs);
@@ -419,6 +426,40 @@ pre code {
 .track-content.active {
   display: block;
   animation: fadeIn 0.3s ease;
+}
+
+/* All mode: show both tracks */
+body.all-mode .track-content {
+  display: block !important;
+  animation: none;
+}
+
+body.all-mode .track-content + .track-content {
+  margin-top: var(--space-4xl);
+  padding-top: var(--space-4xl);
+  border-top: 3px solid var(--color-border);
+}
+
+body.all-mode #track-tutorial::before {
+  content: 'TUTORIAL TRACK';
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-tutorial);
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xl);
+}
+
+body.all-mode #track-theory::before {
+  content: 'THEORY TRACK';
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-theory);
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xl);
 }
 
 @keyframes fadeIn {
@@ -868,6 +909,15 @@ tr:last-child td {
   font-size: 0.8rem;
 }
 
+.toc-nav ul ul {
+  padding-left: 0;
+  margin-top: 2px;
+}
+
+.toc-nav ul ul li {
+  margin-bottom: 0;
+}
+
 /* Step/Tutorial styling */
 .tutorial-step {
   margin: var(--space-2xl) 0;
@@ -1115,9 +1165,380 @@ tr:last-child td {
   opacity: 0.5;
 }
 
+/* Artifact Section */
+.artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
+  margin: var(--space-2xl) 0;
+}
+
+.artifact-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-lg);
+  transition: all 0.2s ease;
+}
+
+.artifact-card:hover {
+  border-color: var(--color-link);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.artifact-icon {
+  font-size: 1.5rem;
+  margin-bottom: var(--space-sm);
+}
+
+.artifact-card h4 {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  margin-top: 0;
+  margin-bottom: var(--space-xs);
+  color: var(--color-text);
+}
+
+.artifact-card p {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  text-indent: 0;
+}
+
+@media (max-width: 768px) {
+  .artifact-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tutorial Progress Navigation */
+.tutorial-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: var(--space-2xl) 0;
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tutorial-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--color-link);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.tutorial-nav-btn:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-link);
+}
+
+.tutorial-nav-btn.disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tutorial-nav-btn.disabled:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+.tutorial-progress-dots {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-border);
+  transition: all 0.15s ease;
+}
+
+.progress-dot.active {
+  background: var(--color-tutorial);
+}
+
+.progress-dot.completed {
+  background: var(--color-tutorial);
+  opacity: 0.4;
+}
+
+/* Section anchor links */
+.section-anchor {
+  margin-left: var(--space-xs);
+  color: var(--color-text-light);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+h2:hover .section-anchor,
+h3:hover .section-anchor {
+  opacity: 1;
+}
+
+/* Enhanced Figure Styling - Academic Quality */
+.figure {
+  margin: var(--space-2xl) 0;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+.figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.figure-row {
+  display: grid;
+  gap: var(--space-xl);
+  margin: var(--space-2xl) 0;
+  page-break-inside: avoid;
+}
+
+.figure-row.two-col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.figure-row.three-col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+  .figure-row.two-col,
+  .figure-row.three-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fig-caption {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-md);
+  line-height: 1.6;
+  text-align: left;
+  text-indent: 0;
+}
+
+.fig-caption strong {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+/* Academic-style table enhancements */
+.comparison-table {
+  font-size: 0.92rem;
+}
+
+.comparison-table th {
+  background: var(--color-bg-tertiary);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.comparison-table tbody tr:hover {
+  background: var(--color-bg-secondary);
+}
+
+/* Mathematical notation help */
+.notation-box {
+  background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-md) var(--space-lg);
+  margin: var(--space-lg) 0;
+  font-size: 0.9rem;
+}
+
+.notation-box-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+/* Better code block styling */
+.code-block {
+  margin: var(--space-xl) 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.code-header {
+  background: linear-gradient(to bottom, var(--color-bg-tertiary), var(--color-bg-secondary));
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.code-block pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: #fafafa;
+  padding: var(--space-lg);
+  overflow-x: auto;
+}
+
+/* Print-specific improvements */
+@media print {
+  .figure {
+    margin: var(--space-xl) 0;
+  }
+  
+  .figure img {
+    max-height: 60vh;
+    object-fit: contain;
+  }
+  
+  .theorem-box {
+    page-break-inside: avoid;
+    border: 1px solid var(--color-border);
+  }
+  
+  .info-box {
+    page-break-inside: avoid;
+  }
+  
+  .code-block {
+    page-break-inside: avoid;
+    border: 1px solid #ccc;
+  }
+  
+  h2 {
+    page-break-after: avoid;
+  }
+  
+  .tutorial-step {
+    page-break-inside: avoid;
+  }
+}
+
+/* Focus styles for accessibility */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: 2px;
+}
+
+/* Smooth transitions for track switching */
+.track-content {
+  display: none;
+  opacity: 0;
+}
+
+.track-content.active {
+  display: block;
+  opacity: 1;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Enhanced theorem styling */
+.theorem-box {
+  background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-theory-bg) 100%);
+  border: 1px solid var(--color-theory-bg);
+  border-radius: 8px;
+  padding: var(--space-lg);
+  margin: var(--space-xl) 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.theorem-box .theorem-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  color: var(--color-theory);
+  margin-bottom: var(--space-md);
+  font-size: 1.1rem;
+}
+
+.theorem-box ul {
+  margin-bottom: 0;
+}
+
+.theorem-box li {
+  margin-bottom: var(--space-sm);
+}
+
+.theorem-box li:last-child {
+  margin-bottom: 0;
+}
+
+/* Track Widget in Sidebar */
+.track-widget {
+  font-family: var(--font-sans);
+}
+
+.track-widget-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.track-widget-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.track-widget-btn:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.track-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* Responsive adjustments for concept list */
 @media (max-width: 768px) {
   .concept-list dd {
     padding-left: var(--space-md);
+  }
+  
+  .tutorial-progress {
+    flex-direction: column;
+    gap: var(--space-md);
   }
 }
