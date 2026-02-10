@@ -246,7 +246,7 @@
 </section>
 
 <!-- Overview Section (Common to both tracks) -->
-<section id="overview" aria-labelledby="overview-heading">
+<section id="overview" data-nav-section aria-labelledby="overview-heading">
   <h2 id="overview-heading">Overview <a href="#overview" class="section-anchor" aria-label="Link to Overview">#</a></h2>
   
   <p>
@@ -430,7 +430,7 @@
 <!-- TUTORIAL TRACK CONTENT -->
 <div id="track-tutorial" class="track-content active" role="tabpanel" aria-labelledby="btn-tutorial">
 
-<section id="tutorial" aria-labelledby="tutorial-heading">
+<section id="tutorial" data-nav-section aria-labelledby="tutorial-heading">
   <h2 id="tutorial-heading">Tutorial: Vectorized Probabilistic Programming</h2>
   
   <p>
@@ -440,14 +440,15 @@
     showing how vectorization with <code>vmap</code> enables efficient inference on GPU.
   </p>
   
-  <h3>Core Concepts</h3>
-  
-  <p>
-    GenJAX is built around four key abstractions that work together to enable composable,
-    vectorizable probabilistic computation:
-  </p>
-  
-  <dl class="concept-list">
+  <section id="tutorial-core" class="tutorial-subsection" aria-labelledby="tutorial-core-heading">
+    <h3 id="tutorial-core-heading">Core Concepts</h3>
+    
+    <p>
+      GenJAX is built around four key abstractions that work together to enable composable,
+      vectorizable probabilistic computation:
+    </p>
+    
+    <dl class="concept-list">
     <dt>Generative Functions</dt>
     <dd>
       Python functions decorated with <code>@gen</code> that define probabilistic computations.
@@ -473,10 +474,11 @@
       <code>simulate</code> (run forward), <code>assess</code> (compute density),
       <code>update</code> (modify traces), and <code>project</code> (extract subsets).
     </dd>
-  </dl>
+    </dl>
+  </section>
   
-  <div class="tutorial-step">
-    <h3>Step 1: A Simple Polynomial Model</h3>
+  <section id="tutorial-step-1" class="tutorial-step" aria-labelledby="tutorial-step-1-heading">
+    <h3 id="tutorial-step-1-heading">Step 1: A Simple Polynomial Model</h3>
     
     <p>
       We begin with polynomial regression: given noisy datapoints $(x_i, y_i)$,
@@ -543,10 +545,10 @@ def npoint_curve(xs):
       Each trace samples coefficients $(a, b, c)$ and generates noisy observations via the <code>vmap</code>ped
       point model.</p>
     </div>
-  </div>
+  </section>
   
-  <div class="tutorial-step">
-    <h3>Step 2: Vectorized Importance Sampling</h3>
+  <section id="tutorial-step-2" class="tutorial-step" aria-labelledby="tutorial-step-2-heading">
+    <h3 id="tutorial-step-2-heading">Step 2: Vectorized Importance Sampling</h3>
     
     <p>
       To perform inference, we use the GFI methods. <code>simulate</code> runs the program forward
@@ -599,10 +601,10 @@ traces, weights = vectorized_is(model, obs, keys)</code></pre>
         particle counts. Accuracy improves until convergence.</p>
       </div>
     </div>
-  </div>
+  </section>
   
-  <div class="tutorial-step">
-    <h3>Step 3: Stochastic Branching for Outlier Detection</h3>
+  <section id="tutorial-step-3" class="tutorial-step" aria-labelledby="tutorial-step-3-heading">
+    <h3 id="tutorial-step-3-heading">Step 3: Stochastic Branching for Outlier Detection</h3>
     
     <p>
       The simple model assumes all data follows the same noise distribution. Real data often
@@ -651,10 +653,10 @@ def point_with_outlier(x, coeffs):
         of underfitting caused by the added latent variables.
       </p>
     </div>
-  </div>
+  </section>
   
-  <div class="tutorial-step">
-    <h3>Step 4: Programmable Inference with Gibbs + HMC</h3>
+  <section id="tutorial-step-4" class="tutorial-step" aria-labelledby="tutorial-step-4-heading">
+    <h3 id="tutorial-step-4-heading">Step 4: Programmable Inference with Gibbs + HMC</h3>
     
     <p>
       When generic inference fails, GenJAX enables custom algorithms tailored to the model structure.
@@ -720,7 +722,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
         with <code>vmap</code>, leading to highly efficient inference on GPU.
       </p>
     </div>
-  </div>
+  </section>
   
   <div class="info-box" style="margin-top: var(--space-xl);">
     <div class="info-box-title">Next Steps</div>
@@ -738,7 +740,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
 <!-- THEORY TRACK CONTENT -->
 <div id="track-theory" class="track-content" role="tabpanel" aria-labelledby="btn-theory">
 
-<section id="theory" aria-labelledby="theory-heading">
+<section id="theory" data-nav-section aria-labelledby="theory-heading">
   <h2 id="theory-heading">Theory: $\gen$ — A Core Calculus</h2>
   
   <p>
@@ -747,15 +749,16 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     define vectorization as a source-to-source transformation, and prove correctness.
   </p>
   
-  <h3>Syntax and Types</h3>
-  
-  <p>
-    $\gen$ extends a standard array programming calculus in two main ways:
-    a <strong>probability monad</strong> $\mathbb{P}$ for stochastic computations, and
-    a <strong>graded monad</strong> $\mathbb{G}^\gamma$ of <em>generative functions</em>
-    (traced probabilistic programs). The grading $\gamma$ tracks the address structure
-    of random choices.
-  </p>
+  <section id="theory-syntax" aria-labelledby="theory-syntax-heading">
+    <h3 id="theory-syntax-heading">Syntax and Types</h3>
+    
+    <p>
+      $\gen$ extends a standard array programming calculus in two main ways:
+      a <strong>probability monad</strong> $\mathbb{P}$ for stochastic computations, and
+      a <strong>graded monad</strong> $\mathbb{G}^\gamma$ of <em>generative functions</em>
+      (traced probabilistic programs). The grading $\gamma$ tracks the address structure
+      of random choices.
+    </p>
   
   <div class="math-block">
     $$\begin{aligned}
@@ -789,7 +792,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     \end{aligned}$$
   </div>
   
-  <table class="comparison-table">
+    <table class="comparison-table">
     <thead>
       <tr>
         <th>Construct</th>
@@ -819,15 +822,17 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
         <td>Batched conditional selection</td>
       </tr>
     </tbody>
-  </table>
+    </table>
+  </section>
   
-  <h3>Denotational Semantics</h3>
-  
-  <p>
-    We give a denotational semantics for $\gen$ using <strong>quasi-Borel spaces</strong> (QBS),
-    a convenient category for higher-order probabilistic programming. QBS supports function spaces,
-    products, and a probability monad while properly handling measure-theoretic concerns.
-  </p>
+  <section id="theory-semantics" aria-labelledby="theory-semantics-heading">
+    <h3 id="theory-semantics-heading">Denotational Semantics</h3>
+    
+    <p>
+      We give a denotational semantics for $\gen$ using <strong>quasi-Borel spaces</strong> (QBS),
+      a convenient category for higher-order probabilistic programming. QBS supports function spaces,
+      products, and a probability monad while properly handling measure-theoretic concerns.
+    </p>
   
   <div class="math-block">
     $$\begin{aligned}
@@ -840,18 +845,20 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     \end{aligned}$$
   </div>
   
-  <p>
-    A generative function denotes a pair: a measure on traces (absolutely continuous w.r.t.
-    the stock measure), and a return value function $\sem{\gamma} \to \sem{\eta}$ that
-    computes the program's output given values for all random choices.
-  </p>
+    <p>
+      A generative function denotes a pair: a measure on traces (absolutely continuous w.r.t.
+      the stock measure), and a return value function $\sem{\gamma} \to \sem{\eta}$ that
+      computes the program's output given values for all random choices.
+    </p>
+  </section>
   
-  <h3>Programmable Inference Transformations</h3>
-  
-  <p>
-    Generative functions support two fundamental operations implemented as source-to-source
-    program transformations:
-  </p>
+  <section id="theory-inference" aria-labelledby="theory-inference-heading">
+    <h3 id="theory-inference-heading">Programmable Inference Transformations</h3>
+    
+    <p>
+      Generative functions support two fundamental operations implemented as source-to-source
+      program transformations:
+    </p>
   
   <div class="math-block">
     $$\begin{aligned}
@@ -866,26 +873,28 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     constrained values.
   </p>
   
-  <div class="theorem-box">
-    <div class="theorem-title">Proposition (Correctness of Simulate and Assess)</div>
+    <div class="theorem-box">
+      <div class="theorem-title">Proposition (Correctness of Simulate and Assess)</div>
+      <p>
+        Let $\vdash t : \mathbb{G}^\gamma\{\eta\}$ with denotation $(\mu, f) = \sem{t}$
+        and let $\nu$ be the stock measure on $\gamma$. Then:
+      </p>
+      <ul>
+        <li>$\sem{\text{simulate}\{t\}} = \langle \text{id}, f, \frac{d\mu}{d\nu}\rangle_*\mu$ — 
+          simulate faithfully generates traces from $\mu$ with their densities.</li>
+        <li>$\sem{\text{assess}\{t\}} = \langle f, \frac{d\mu}{d\nu}\rangle$ — 
+          assess faithfully computes return values and densities at given traces.</li>
+      </ul>
+    </div>
+  </section>
+  
+  <section id="theory-vectorization" aria-labelledby="theory-vectorization-heading">
+    <h3 id="theory-vectorization-heading">Vectorization as Program Transformation</h3>
+    
     <p>
-      Let $\vdash t : \mathbb{G}^\gamma\{\eta\}$ with denotation $(\mu, f) = \sem{t}$
-      and let $\nu$ be the stock measure on $\gamma$. Then:
+      We define $\text{vmap}_n$ as a type-directed program transformation that takes a term
+      of type $\tau$ and produces a vectorized term of type $\tau[n]$.
     </p>
-    <ul>
-      <li>$\sem{\text{simulate}\{t\}} = \langle \text{id}, f, \frac{d\mu}{d\nu}\rangle_*\mu$ — 
-        simulate faithfully generates traces from $\mu$ with their densities.</li>
-      <li>$\sem{\text{assess}\{t\}} = \langle f, \frac{d\mu}{d\nu}\rangle$ — 
-        assess faithfully computes return values and densities at given traces.</li>
-    </ul>
-  </div>
-  
-  <h3>Vectorization as Program Transformation</h3>
-  
-  <p>
-    We define $\text{vmap}_n$ as a type-directed program transformation that takes a term
-    of type $\tau$ and produces a vectorized term of type $\tau[n]$.
-  </p>
   
   <div class="math-block">
     $$\begin{aligned}
@@ -910,27 +919,29 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     </ul>
   </div>
   
-  <div class="theorem-box">
-    <div class="theorem-title">Corollary (Commutativity of vmap and Inference)</div>
+    <div class="theorem-box">
+      <div class="theorem-title">Corollary (Commutativity of vmap and Inference)</div>
+      <p>
+        Vectorization commutes with programmable inference operations:
+      </p>
+      <ul>
+        <li>$\sem{\text{simulate}\{\text{vmap}_n\{t\}\}} = 
+          \langle \text{id}, \text{id}, v \mapsto \prod_i v[i]\rangle_*\sem{\text{vmap}_n\{\text{simulate}\{t\}\}}$</li>
+      </ul>
+      <p style="margin-top: var(--space-sm);">
+        This justifies our implementation strategy: inference on vectorized models can be
+        implemented by vectorizing inference applied to the model.
+      </p>
+    </div>
+  </section>
+  
+  <section id="theory-compiler" aria-labelledby="theory-compiler-heading">
+    <h3 id="theory-compiler-heading">Compiler Architecture</h3>
+    
     <p>
-      Vectorization commutes with programmable inference operations:
+      The GenJAX compiler translates Python with <code>@gen</code> decorators to JAX-compatible
+      code through several stages:
     </p>
-    <ul>
-      <li>$\sem{\text{simulate}\{\text{vmap}_n\{t\}\}} = 
-        \langle \text{id}, \text{id}, v \mapsto \prod_i v[i]\rangle_*\sem{\text{vmap}_n\{\text{simulate}\{t\}\}}$</li>
-    </ul>
-    <p style="margin-top: var(--space-sm);">
-      This justifies our implementation strategy: inference on vectorized models can be
-      implemented by vectorizing inference applied to the model.
-    </p>
-  </div>
-  
-  <h3>Compiler Architecture</h3>
-  
-  <p>
-    The GenJAX compiler translates Python with <code>@gen</code> decorators to JAX-compatible
-    code through several stages:
-  </p>
   
   <ol>
     <li><strong>Tracing:</strong> Python control flow is staged via JAX tracing, capturing
@@ -943,10 +954,11 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
       supporting automatic differentiation and TPU/GPU compilation.</li>
   </ol>
   
-  <p>
-    The formal results above guarantee that these compiler transformations preserve semantics
-    while enabling efficient vectorized execution on modern accelerators.
-  </p>
+    <p>
+      The formal results above guarantee that these compiler transformations preserve semantics
+      while enabling efficient vectorized execution on modern accelerators.
+    </p>
+  </section>
 </section>
 
 </div><!-- end theory track -->
@@ -961,25 +973,28 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
       <li><a href="#overview" class="toc-h2">Overview</a></li>
       <li><a href="#tutorial" class="toc-h2">Tutorial Track</a>
         <ul>
-          <li><a href="#tutorial" class="toc-h3">Core Concepts</a></li>
-          <li><a href="#tutorial" class="toc-h3">Step 1: Model</a></li>
-          <li><a href="#tutorial" class="toc-h3">Step 2: Inference</a></li>
-          <li><a href="#tutorial" class="toc-h3">Step 3: Branching</a></li>
-          <li><a href="#tutorial" class="toc-h3">Step 4: Gibbs + HMC</a></li>
+          <li><a href="#tutorial-core" class="toc-h3">Core Concepts</a></li>
+          <li><a href="#tutorial-step-1" class="toc-h3">Step 1: Model</a></li>
+          <li><a href="#tutorial-step-2" class="toc-h3">Step 2: Inference</a></li>
+          <li><a href="#tutorial-step-3" class="toc-h3">Step 3: Branching</a></li>
+          <li><a href="#tutorial-step-4" class="toc-h3">Step 4: Gibbs + HMC</a></li>
         </ul>
       </li>
       <li><a href="#theory" class="toc-h2">Theory Track</a>
         <ul>
-          <li><a href="#theory" class="toc-h3">Syntax &amp; Types</a></li>
-          <li><a href="#theory" class="toc-h3">Semantics</a></li>
-          <li><a href="#theory" class="toc-h3">Vectorization</a></li>
+          <li><a href="#theory-syntax" class="toc-h3">Syntax &amp; Types</a></li>
+          <li><a href="#theory-semantics" class="toc-h3">Semantics</a></li>
+          <li><a href="#theory-inference" class="toc-h3">Inference Transforms</a></li>
+          <li><a href="#theory-vectorization" class="toc-h3">Vectorization</a></li>
+          <li><a href="#theory-compiler" class="toc-h3">Compiler Architecture</a></li>
         </ul>
       </li>
       <li><a href="#evaluation" class="toc-h2">Evaluation</a>
         <ul>
-          <li><a href="#evaluation" class="toc-h3">Performance</a></li>
-          <li><a href="#evaluation" class="toc-h3">Game of Life</a></li>
-          <li><a href="#evaluation" class="toc-h3">Localization</a></li>
+          <li><a href="#evaluation-performance" class="toc-h3">Performance</a></li>
+          <li><a href="#evaluation-gol" class="toc-h3">Game of Life</a></li>
+          <li><a href="#evaluation-localization" class="toc-h3">Localization</a></li>
+          <li><a href="#evaluation-summary" class="toc-h3">Summary</a></li>
         </ul>
       </li>
       <li><a href="#artifact" class="toc-h2">Artifact</a></li>
@@ -1006,7 +1021,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
 </div><!-- end main-content -->
 
 <!-- EVALUATION (Common section) -->
-<section id="evaluation" aria-labelledby="evaluation-heading">
+<section id="evaluation" data-nav-section aria-labelledby="evaluation-heading">
   <h2 id="evaluation-heading">Evaluation <a href="#evaluation" class="section-anchor" aria-label="Link to Evaluation">#</a></h2>
   
   <p>
@@ -1017,15 +1032,16 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     enabling sophisticated inference algorithms on challenging problems.
   </p>
   
-  <h3>Performance Survey</h3>
-  
-  <p>
-    We compare GenJAX against NumPyro, Pyro, Gen.jl, hand-coded JAX, and hand-coded PyTorch
-    on two fundamental inference paradigms: importance sampling (embarrassingly parallel) and 
-    Hamiltonian Monte Carlo (iterative, gradient-based).
-  </p>
-  
-  <h4>Beta-Bernoulli Model</h4>
+  <section id="evaluation-performance" aria-labelledby="evaluation-performance-heading">
+    <h3 id="evaluation-performance-heading">Performance Survey</h3>
+    
+    <p>
+      We compare GenJAX against NumPyro, Pyro, Gen.jl, hand-coded JAX, and hand-coded PyTorch
+      on two fundamental inference paradigms: importance sampling (embarrassingly parallel) and 
+      Hamiltonian Monte Carlo (iterative, gradient-based).
+    </p>
+    
+    <h4>Beta-Bernoulli Model</h4>
   
   <p>
     The Beta-Bernoulli model infers the bias of a coin from observed flips, using a Beta(1,1) prior 
@@ -1067,22 +1083,24 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     </div>
   </div>
   
-  <div class="info-box tip">
-    <div class="info-box-title">Key Result: Zero-Cost Abstractions</div>
+    <div class="info-box tip">
+      <div class="info-box-title">Key Result: Zero-Cost Abstractions</div>
+      <p>
+        GenJAX achieves <strong>100.1% relative time</strong> compared to hand-coded JAX on the Beta-Bernoulli model.
+        Our compiler eliminates abstraction overhead through partial evaluation at compile time, 
+        leaving only optimized array operations that execute at native JAX speed.
+      </p>
+    </div>
+  </section>
+  
+  <section id="evaluation-gol" aria-labelledby="evaluation-gol-heading">
+    <h3 id="evaluation-gol-heading">Case Study: Probabilistic Game of Life Inversion</h3>
+    
     <p>
-      GenJAX achieves <strong>100.1% relative time</strong> compared to hand-coded JAX on the Beta-Bernoulli model.
-      Our compiler eliminates abstraction overhead through partial evaluation at compile time, 
-      leaving only optimized array operations that execute at native JAX speed.
+      Game of Life (GoL) inversion is the problem of inverting Conway's Game of Life dynamics: given a final state,
+      what is a possible previous state that evolves to it? Brute-force search is intractable
+      ($2^{N \times N}$ possible states for an $N \times N$ board).
     </p>
-  </div>
-  
-  <h3>Case Study: Probabilistic Game of Life Inversion</h3>
-  
-  <p>
-    Game of Life (GoL) inversion is the problem of inverting Conway's Game of Life dynamics: given a final state,
-    what is a possible previous state that evolves to it? Brute-force search is intractable
-    ($2^{N \times N}$ possible states for an $N \times N$ board).
-  </p>
   
   <div class="figure">
     <img src="static/images/conway_gol.png"
@@ -1124,14 +1142,16 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
       comparing CPU and GPU execution.</p>
     </div>
   </div>
+  </section>
   
-  <h3>Case Study: Robot Localization with Sequential Monte Carlo</h3>
-  
-  <p>
-    Simultaneous Localization and Mapping (SLAM) is a fundamental robotics problem: constructing a 
-    representation of the environment and the robot's position within it. When the map is given, 
-    this reduces to the <strong>localization problem</strong>.
-  </p>
+  <section id="evaluation-localization" aria-labelledby="evaluation-localization-heading">
+    <h3 id="evaluation-localization-heading">Case Study: Robot Localization with Sequential Monte Carlo</h3>
+    
+    <p>
+      Simultaneous Localization and Mapping (SLAM) is a fundamental robotics problem: constructing a 
+      representation of the environment and the robot's position within it. When the map is given, 
+      this reduces to the <strong>localization problem</strong>.
+    </p>
   
   <p>
     We model a robot maneuvering through a known 2D space, receiving LIDAR distance measurements.
@@ -1189,12 +1209,14 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
       with vectorized grid enumeration achieves the best accuracy-efficiency tradeoff.</p>
     </div>
   </div>
+  </section>
   
-  <h3>Summary</h3>
-  
-  <p>
-    Our evaluation demonstrates that GenJAX successfully unifies vectorization and programmable inference:
-  </p>
+  <section id="evaluation-summary" aria-labelledby="evaluation-summary-heading">
+    <h3 id="evaluation-summary-heading">Summary</h3>
+    
+    <p>
+      Our evaluation demonstrates that GenJAX successfully unifies vectorization and programmable inference:
+    </p>
   
   <ul>
     <li><strong>Performance:</strong> Zero-cost abstractions match hand-coded JAX; vectorized frameworks 
@@ -1205,9 +1227,10 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
       solved efficiently using GPU-accelerated vectorized inference.</li>
   </ul>
 </section>
+</section>
 
 <!-- Artifact -->
-<section id="artifact" aria-labelledby="artifact-heading">
+<section id="artifact" data-nav-section aria-labelledby="artifact-heading">
   <h2 id="artifact-heading">Artifact & Reproducibility <a href="#artifact" class="section-anchor" aria-label="Link to Artifact">#</a></h2>
   
   <p>
@@ -1351,7 +1374,7 @@ traces = jax.jit(batched_model.simulate)(key, (xs,))</code></pre>
 </section>
 
 <!-- Citation -->
-<section id="citation" aria-labelledby="citation-heading">
+<section id="citation" data-nav-section aria-labelledby="citation-heading">
   <h2 id="citation-heading">Citation <a href="#citation" class="section-anchor" aria-label="Link to Citation">#</a></h2>
   
   <div class="bibtex-container">

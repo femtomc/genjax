@@ -198,30 +198,34 @@
       anchor.addEventListener('click', function(e) {
         const href = this.getAttribute('href');
         
-        // Don't intercept track links
-        if (href === '#tutorial' || href === '#theory') {
-          return;
-        }
-        
         // Handle section links
         if (href !== '#') {
           e.preventDefault();
           const target = document.querySelector(href);
           if (target) {
-            const offset = 80; // Account for sticky nav
-            const top = target.getBoundingClientRect().top + window.scrollY - offset;
+            const trackSection = target.closest('.track-content');
+            const targetTrack = trackSection ? trackSection.id.replace('track-', '') : null;
             
-            window.scrollTo({
-              top: top,
-              behavior: 'smooth'
+            if (targetTrack && targetTrack !== 'all' && currentTrack !== 'all' && targetTrack !== currentTrack) {
+              switchTrack(targetTrack);
+            }
+            
+            requestAnimationFrame(() => {
+              const offset = 80; // Account for sticky nav
+              const top = target.getBoundingClientRect().top + window.scrollY - offset;
+              
+              window.scrollTo({
+                top: top,
+                behavior: 'smooth'
+              });
+              
+              // Update focus for accessibility
+              target.setAttribute('tabindex', '-1');
+              target.focus({ preventScroll: true });
+              
+              // Update URL
+              history.pushState(null, null, href);
             });
-            
-            // Update focus for accessibility
-            target.setAttribute('tabindex', '-1');
-            target.focus({ preventScroll: true });
-            
-            // Update URL
-            history.pushState(null, null, href);
           }
         }
       });
@@ -246,20 +250,27 @@
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
+          const navSection = entry.target.closest('section[data-nav-section]');
+          const navId = navSection ? navSection.id : entry.target.id;
+          
           navLinks.forEach(link => {
             link.classList.remove('active');
-            if (link.getAttribute('href') === '#' + entry.target.id) {
+            if (link.getAttribute('href') === '#' + navId) {
               link.classList.add('active');
             }
           });
           
-          // Also update sidebar TOC
-          document.querySelectorAll('.toc-nav a').forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('href') === '#' + entry.target.id) {
-              link.classList.add('active');
-            }
-          });
+          const hasNestedSections = entry.target.querySelector('section[id]');
+          
+          // Also update sidebar TOC (prefer nested sections over parent containers)
+          if (!(entry.target.hasAttribute('data-nav-section') && hasNestedSections)) {
+            document.querySelectorAll('.toc-nav a').forEach(link => {
+              link.classList.remove('active');
+              if (link.getAttribute('href') === '#' + entry.target.id) {
+                link.classList.add('active');
+              }
+            });
+          }
         }
       });
     }, observerOptions);
