@@ -1,0 +1,261 @@
+/* Academic project page — clean, minimal, SIGGRAPH-style */
+
+:root {
+  --max-width: 900px;
+  --text-color: #222;
+  --muted: #555;
+  --link: #1a5fb4;
+  --bg: #fff;
+  --section-border: #e0e0e0;
+  --code-bg: #f6f6f6;
+  --button-bg: #2d2d2d;
+  --button-hover: #444;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: "Charter", "Georgia", "Times New Roman", serif;
+  color: var(--text-color);
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+section {
+  margin-bottom: 2.5rem;
+}
+
+/* ── Header / Title ─────────────────────────────────── */
+
+header {
+  text-align: center;
+  padding: 3rem 0 1.5rem;
+}
+
+header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.3rem;
+  line-height: 1.25;
+}
+
+.venue {
+  font-size: 1.05rem;
+  color: var(--muted);
+  margin: 0.3rem 0 0;
+  font-style: italic;
+}
+
+/* ── Authors ────────────────────────────────────────── */
+
+.authors {
+  text-align: center;
+  margin: 1.2rem 0 0.5rem;
+  font-size: 0.97rem;
+  line-height: 1.8;
+}
+
+.authors .author-name {
+  white-space: nowrap;
+}
+
+.authors .equal {
+  font-size: 0.82rem;
+  color: var(--muted);
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.affiliations {
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+}
+
+/* ── Buttons row ────────────────────────────────────── */
+
+.links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 1.5rem 0 2rem;
+}
+
+.links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: var(--button-bg);
+  color: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.links a:hover {
+  background: var(--button-hover);
+}
+
+.links a svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── Teaser ─────────────────────────────────────────── */
+
+.teaser {
+  text-align: center;
+  margin: 0 0 2rem;
+}
+
+.teaser img {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.teaser .caption {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.5;
+}
+
+/* ── Section headings ───────────────────────────────── */
+
+section h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  border-bottom: 2px solid var(--section-border);
+  padding-bottom: 0.35rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+section h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Abstract ───────────────────────────────────────── */
+
+.abstract p {
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* ── Figures grid ───────────────────────────────────── */
+
+.figure-row {
+  display: grid;
+  gap: 1.2rem;
+  margin: 1rem 0;
+}
+
+.figure-row.two-col {
+  grid-template-columns: 1fr 1fr;
+}
+
+.figure-row.one-col {
+  grid-template-columns: 1fr;
+}
+
+.figure-item {
+  text-align: center;
+}
+
+.figure-item img {
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.figure-item .fig-caption {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.4rem;
+  line-height: 1.45;
+}
+
+/* ── BibTeX ─────────────────────────────────────────── */
+
+.bibtex-block {
+  background: var(--code-bg);
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre;
+  position: relative;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--button-bg);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.copy-btn:hover { background: var(--button-hover); }
+
+/* ── Footer ─────────────────────────────────────────── */
+
+footer {
+  text-align: center;
+  padding: 2rem 0 3rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  border-top: 1px solid var(--section-border);
+  margin-top: 2rem;
+}
+
+footer a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+footer a:hover { text-decoration: underline; }
+
+/* ── Responsive ─────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  header h1 { font-size: 1.5rem; }
+  .figure-row.two-col { grid-template-columns: 1fr; }
+  .links { gap: 8px; }
+  .links a { padding: 7px 14px; font-size: 0.82rem; }
+}
