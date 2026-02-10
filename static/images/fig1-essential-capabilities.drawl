@@ -1,0 +1,207 @@
+; Figure 1: Essential Capabilities for Vectorized Probabilistic Programming
+; Three-panel diagram for GenJAX website
+
+(define width 900)
+(define height 320)
+(define panel-w 280)
+(define panel-h 260)
+(define margin-x 20)
+(define start-x 30)
+(define start-y 30)
+
+; === Panel 1: vmap in Modeling and Inference ===
+(define p1-x start-x)
+(define p1-y start-y)
+
+; Outer box (vmap of simulate)
+(rect :id "p1-outer" 
+      :x (+ p1-x 20) :y (+ p1-y 20) 
+      :width 240 :height 180
+      :rx 4 :ry 4
+      :fill "#f8fafc" :stroke "#334155" :stroke-width 1.5)
+
+(text :id "p1-outer-label"
+      :x (+ p1-x 30) :y (+ p1-y 40)
+      :content "vmap of simulate of"
+      :font-size 11 :font-family "system-ui, sans-serif"
+      :fill "#475569")
+
+; Inner box (vmap of model)
+(rect :id "p1-inner"
+      :x (+ p1-x 50) :y (+ p1-y 65)
+      :width 180 :height 100
+      :rx 3 :ry 3
+      :fill "#f1f5f9" :stroke "#64748b" :stroke-width 1)
+
+(text :id "p1-inner-label"
+      :x (+ p1-x 60) :y (+ p1-y 85)
+      :content "vmap of model"
+      :font-size 10 :font-family "system-ui, sans-serif"
+      :fill "#475569")
+
+; Blue dots representing vectorized operations
+(circle :id "p1-dot1" :cx (+ p1-x 90) :cy (+ p1-y 125) :r 6 :fill "#93c5fd")
+(circle :id "p1-dot2" :cx (+ p1-x 120) :cy (+ p1-y 125) :r 6 :fill "#93c5fd")
+(circle :id "p1-dot3" :cx (+ p1-x 150) :cy (+ p1-y 125) :r 6 :fill "#93c5fd")
+(circle :id "p1-dot4" :cx (+ p1-x 180) :cy (+ p1-y 125) :r 6 :fill "#93c5fd")
+
+; Panel 1 title
+(text :id "p1-title"
+      :x (+ p1-x 140) :y (+ p1-y 225)
+      :content "vmap in Modeling and Inference"
+      :font-size 13 :font-weight "bold" :text-anchor "middle"
+      :font-family "system-ui, sans-serif" :fill "#1e293b")
+
+; Panel 1 subtitle
+(text :id "p1-subtitle"
+      :x (+ p1-x 140) :y (+ p1-y 245)
+      :content "Vectorization applies compositionally"
+      :font-size 10 :text-anchor "middle"
+      :font-family "system-ui, sans-serif" :fill "#64748b")
+
+; === Panel 2: Vectorized Traces ===
+(define p2-x (+ start-x panel-w margin-x))
+(define p2-y start-y)
+
+; Top trace box (single trace)
+(rect :id "p2-trace1"
+      :x (+ p2-x 40) :y (+ p2-y 40)
+      :width 200 :height 60
+      :rx 3 :ry 3
+      :fill "#f1f5f9" :stroke "#64748b" :stroke-width 1)
+
+(text :id "p2-trace1-label"
+      :x (+ p2-x 50) :y (+ p2-y 30)
+      :content "trace ~ P"
+      :font-size 10 :font-weight "bold"
+      :font-family "system-ui, sans-serif" :fill "#334155")
+
+(text :id "p2-trace1-content"
+      :x (+ p2-x 140) :y (+ p2-y 75)
+      :content "{\"a\": f32[], \"b\": f32[]}"
+      :font-size 10 :font-family "monospace"
+      :text-anchor "middle" :fill "#475569")
+
+; Arrow down
+(path :id "p2-arrow"
+      :points (list (point (+ p2-x 140) (+ p2-y 110)) 
+                    (point (+ p2-x 140) (+ p2-y 135)))
+      :stroke "#64748b" :stroke-width 1.5
+      :marker-end "url(#arrowhead)")
+
+; Arrowhead marker (defined later, using simple path for now)
+(path :id "p2-arrow-tip"
+      :points (list (point (+ p2-x 135) (+ p2-y 130))
+                    (point (+ p2-x 140) (+ p2-y 135))
+                    (point (+ p2-x 145) (+ p2-y 130)))
+      :stroke "#64748b" :stroke-width 1.5 :fill "none")
+
+; Bottom trace box (vectorized trace)
+(rect :id "p2-trace2"
+      :x (+ p2-x 40) :y (+ p2-y 145)
+      :width 200 :height 60
+      :rx 3 :ry 3
+      :fill "#f1f5f9" :stroke "#64748b" :stroke-width 1)
+
+(text :id "p2-trace2-label"
+      :x (+ p2-x 50) :y (+ p2-y 135)
+      :content "trace ~ vmap{P}"
+      :font-size 10 :font-weight "bold"
+      :font-family "system-ui, sans-serif" :fill "#334155")
+
+(text :id "p2-trace2-content"
+      :x (+ p2-x 140) :y (+ p2-y 180)
+      :content "{\"a\": f32[N], \"b\": f32[N]}"
+      :font-size 10 :font-family "monospace"
+      :text-anchor "middle" :fill "#475569")
+
+; Panel 2 title
+(text :id "p2-title"
+      :x (+ p2-x 140) :y (+ p2-y 225)
+      :content "Vectorized Traces"
+      :font-size 13 :font-weight "bold" :text-anchor "middle"
+      :font-family "system-ui, sans-serif" :fill "#1e293b")
+
+; Panel 2 subtitle
+(text :id "p2-subtitle"
+      :x (+ p2-x 140) :y (+ p2-y 245)
+      :content "Struct-of-arrays memory layout"
+      :font-size 10 :text-anchor "middle"
+      :font-family "system-ui, sans-serif" :fill "#64748b")
+
+; === Panel 3: Stochastic Branching ===
+(define p3-x (+ start-x (* 2 (+ panel-w margin-x))))
+(define p3-y start-y)
+
+; Start node (green)
+(circle :id "p3-start" 
+        :cx (+ p3-x 140) :cy (+ p3-y 50) :r 10
+        :fill "#86efac" :stroke "#22c55e" :stroke-width 1.5)
+
+; Decision diamond (yellow)
+(path :id "p3-diamond"
+      :points (list (point (+ p3-x 140) (+ p3-y 85))    ; top
+                    (point (+ p3-x 165) (+ p3-y 110))  ; right
+                    (point (+ p3-x 140) (+ p3-y 135))  ; bottom
+                    (point (+ p3-x 115) (+ p3-y 110))) ; left
+      :closed #t :fill "#fef08a" :stroke "#eab308" :stroke-width 1.5)
+
+(text :id "p3-diamond-label"
+      :x (+ p3-x 140) :y (+ p3-y 115)
+      :content "X"
+      :font-size 12 :font-weight "bold" :text-anchor "middle"
+      :font-family "system-ui, sans-serif" :fill "#854d0e")
+
+; Top to diamond line
+(path :id "p3-line1"
+      :points (list (point (+ p3-x 140) (+ p3-y 60))
+                    (point (+ p3-x 140) (+ p3-y 85)))
+      :stroke "#475569" :stroke-width 1.5)
+
+; Left branch (p)
+(path :id "p3-left-branch"
+      :points (list (point (+ p3-x 128) (+ p3-y 122))
+                    (point (+ p3-x 100) (+ p3-y 160)))
+      :stroke "#475569" :stroke-width 1.5)
+
+; Right branch (1-p)
+(path :id "p3-right-branch"
+      :points (list (point (+ p3-x 152) (+ p3-y 122))
+                    (point (+ p3-x 180) (+ p3-y 160)))
+      :stroke "#475569" :stroke-width 1.5)
+
+; End nodes (red)
+(circle :id "p3-end1"
+        :cx (+ p3-x 100) :cy (+ p3-y 165) :r 8
+        :fill "#fca5a5" :stroke "#ef4444" :stroke-width 1.5)
+
+(circle :id "p3-end2"
+        :cx (+ p3-x 180) :cy (+ p3-y 165) :r 8
+        :fill "#fca5a5" :stroke "#ef4444" :stroke-width 1.5)
+
+; Branch labels
+(text :id "p3-label-p"
+      :x (+ p3-x 110) :y (+ p3-y 140)
+      :content "p"
+      :font-size 10 :font-family "system-ui, sans-serif" :fill "#475569")
+
+(text :id "p3-label-1p"
+      :x (+ p3-x 170) :y (+ p3-y 140)
+      :content "1-p"
+      :font-size 10 :font-family "system-ui, sans-serif" :fill "#475569")
+
+; Panel 3 title
+(text :id "p3-title"
+      :x (+ p3-x 140) :y (+ p3-y 225)
+      :content "Stochastic Branching"
+      :font-size 13 :font-weight "bold" :text-anchor "middle"
+      :font-family "system-ui, sans-serif" :fill "#1e293b")
+
+; Panel 3 subtitle
+(text :id "p3-subtitle"
+      :x (+ p3-x 140) :y (+ p2-y 245)
+      :content "Branches on random values preserved"
+      :font-size 10 :text-anchor "middle"
+      :font-family "system-ui, sans-serif" :fill "#64748b")
+
+(solve)
