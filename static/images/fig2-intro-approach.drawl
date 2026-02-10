@@ -5,12 +5,12 @@
 (define height 320)
 
 ; === Left Panel: Commutative Diagram ===
-(define left-x 50)
+(define left-x 40)
 (define left-y 50)
-(define box-w 170)
-(define box-h 60)
-(define gap-x 200)
-(define gap-y 110)
+(define box-w 150)
+(define box-h 55)
+(define gap-x 230)
+(define gap-y 120)
 
 ; Title for left panel
 (text :id "left-title"
@@ -73,83 +73,83 @@
 
 ; Horizontal arrow: vmap (top)
 (path :id "arrow-top-h"
-      :points (list (point (+ left-x box-w 8) (+ left-y (/ box-h 2)))
-                    (point (+ left-x gap-x 2) (+ left-y (/ box-h 2))))
+      :points (list (point (+ left-x box-w 4) (+ left-y (/ box-h 2)))
+                    (point (- (+ left-x gap-x) 4) (+ left-y (/ box-h 2))))
       :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-top-tip"
-      :points (list (point (+ left-x gap-x 2) (- (+ left-y (/ box-h 2)) 4))
-                    (point (+ left-x gap-x 8) (+ left-y (/ box-h 2)))
-                    (point (+ left-x gap-x 2) (+ (+ left-y (/ box-h 2)) 4)))
+      :points (list (point (- (+ left-x gap-x) 10) (- (+ left-y (/ box-h 2)) 4))
+                    (point (- (+ left-x gap-x) 4) (+ left-y (/ box-h 2)))
+                    (point (- (+ left-x gap-x) 10) (+ (+ left-y (/ box-h 2)) 4)))
       :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-vmap-top"
-      :x (+ left-x (/ box-w 2) 100) :y (- (+ left-y (/ box-h 2)) 8)
+      :x (+ left-x box-w (/ (- gap-x box-w) 2) -12) :y (- (+ left-y (/ box-h 2)) 8)
       :content "vmap"
       :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Horizontal arrow: vmap (bottom)
 (path :id "arrow-bottom-h"
-      :points (list (point (+ left-x box-w 8) (+ left-y gap-y (/ box-h 2)))
-                    (point (+ left-x gap-x 2) (+ left-y gap-y (/ box-h 2))))
+      :points (list (point (+ left-x box-w 4) (+ left-y gap-y (/ box-h 2)))
+                    (point (- (+ left-x gap-x) 4) (+ left-y gap-y (/ box-h 2))))
       :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-bottom-tip"
-      :points (list (point (+ left-x gap-x 2) (- (+ left-y gap-y (/ box-h 2)) 4))
-                    (point (+ left-x gap-x 8) (+ left-y gap-y (/ box-h 2)))
-                    (point (+ left-x gap-x 2) (+ (+ left-y gap-y (/ box-h 2)) 4)))
+      :points (list (point (- (+ left-x gap-x) 10) (- (+ left-y gap-y (/ box-h 2)) 4))
+                    (point (- (+ left-x gap-x) 4) (+ left-y gap-y (/ box-h 2)))
+                    (point (- (+ left-x gap-x) 10) (+ (+ left-y gap-y (/ box-h 2)) 4)))
       :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-vmap-bottom"
-      :x (+ left-x (/ box-w 2) 100) :y (- (+ left-y gap-y (/ box-h 2)) 8)
+      :x (+ left-x box-w (/ (- gap-x box-w) 2) -12) :y (- (+ left-y gap-y (/ box-h 2)) 8)
       :content "vmap"
       :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Vertical arrow: inference interfaces (left)
 (path :id "arrow-left-v"
-      :points (list (point (+ left-x (/ box-w 2)) (+ left-y box-h 5))
-                    (point (+ left-x (/ box-w 2)) (+ left-y gap-y 2)))
+      :points (list (point (+ left-x (/ box-w 2)) (+ left-y box-h 4))
+                    (point (+ left-x (/ box-w 2)) (- (+ left-y gap-y) 4)))
       :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-left-tip"
-      :points (list (point (- (+ left-x (/ box-w 2)) 4) (+ left-y gap-y 2))
-                    (point (+ left-x (/ box-w 2)) (+ left-y gap-y 8))
-                    (point (+ (+ left-x (/ box-w 2)) 4) (+ left-y gap-y 2)))
+      :points (list (point (- (+ left-x (/ box-w 2)) 4) (- (+ left-y gap-y) 10))
+                    (point (+ left-x (/ box-w 2)) (- (+ left-y gap-y) 4))
+                    (point (+ (+ left-x (/ box-w 2)) 4) (- (+ left-y gap-y) 10)))
       :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-inf-left"
-      :x (- left-x 5) :y (+ left-y (/ gap-y 2) 8)
+      :x (- left-x 5) :y (+ left-y (/ (+ box-h gap-y) 2) 5)
       :content "GFI"
       :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Vertical arrow: inference interfaces (right)
 (path :id "arrow-right-v"
-      :points (list (point (+ left-x gap-x (/ box-w 2)) (+ left-y box-h 5))
-                    (point (+ left-x gap-x (/ box-w 2)) (+ left-y gap-y 2)))
+      :points (list (point (+ left-x gap-x (/ box-w 2)) (+ left-y box-h 4))
+                    (point (+ left-x gap-x (/ box-w 2)) (- (+ left-y gap-y) 4)))
       :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-right-tip"
-      :points (list (point (- (+ left-x gap-x (/ box-w 2)) 4) (+ left-y gap-y 2))
-                    (point (+ left-x gap-x (/ box-w 2)) (+ left-y gap-y 8))
-                    (point (+ (+ left-x gap-x (/ box-w 2)) 4) (+ left-y gap-y 2)))
+      :points (list (point (- (+ left-x gap-x (/ box-w 2)) 4) (- (+ left-y gap-y) 10))
+                    (point (+ left-x gap-x (/ box-w 2)) (- (+ left-y gap-y) 4))
+                    (point (+ (+ left-x gap-x (/ box-w 2)) 4) (- (+ left-y gap-y) 10)))
       :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-inf-right"
-      :x (+ left-x gap-x box-w 8) :y (+ left-y (/ gap-y 2) 8)
+      :x (+ left-x gap-x box-w 8) :y (+ left-y (/ (+ box-h gap-y) 2) 5)
       :content "GFI"
       :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
-; Key insight box
+; Key insight box — centered under diagram
 (rect :id "insight-box"
       :x (- left-x 10) :y (+ left-y gap-y box-h 20)
-      :width (+ (* 2 gap-x) 20) :height 38
+      :width (+ gap-x box-w 20) :height 38
       :rx 2 :ry 2
       :fill "#fff5b1" :stroke "#d9a300" :stroke-width 0.5)
 
 (text :id "insight-text"
-      :x (+ left-x gap-x (/ box-w 2) 15) :y (+ left-y gap-y box-h 44)
+      :x (+ left-x (/ (+ gap-x box-w) 2)) :y (+ left-y gap-y box-h 44)
       :content "Inference ∘ vmap = vmap ∘ Inference"
       :font-size 11 :font-weight "600" :text-anchor "middle"
       :font-family "'Source Code Pro', monospace" :fill "#735c0f")
 
 ; === Right Panel: Feature Table ===
-(define right-x 480)
+(define right-x 470)
 (define right-y 40)
 (define col1-w 175)
 (define col2-w 175)

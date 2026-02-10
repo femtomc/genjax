@@ -56,14 +56,22 @@
       :font-family "'Source Sans 3', sans-serif"
       :fill "#0366d6")
 
-; Blue dots representing vectorized operations (arranged in grid)
-(circle :id "p1-dot1" :cx (+ p1-x 95) :cy (+ p1-y 135) :r 5 :fill "#0366d6" :opacity 0.8)
-(circle :id "p1-dot2" :cx (+ p1-x 120) :cy (+ p1-y 135) :r 5 :fill "#0366d6" :opacity 0.8)
-(circle :id "p1-dot3" :cx (+ p1-x 145) :cy (+ p1-y 135) :r 5 :fill "#0366d6" :opacity 0.8)
-(circle :id "p1-dot4" :cx (+ p1-x 170) :cy (+ p1-y 135) :r 5 :fill "#0366d6" :opacity 0.8)
-(circle :id "p1-dot5" :cx (+ p1-x 107) :cy (+ p1-y 150) :r 5 :fill "#0366d6" :opacity 0.6)
-(circle :id "p1-dot6" :cx (+ p1-x 132) :cy (+ p1-y 150) :r 5 :fill "#0366d6" :opacity 0.6)
-(circle :id "p1-dot7" :cx (+ p1-x 157) :cy (+ p1-y 150) :r 5 :fill "#0366d6" :opacity 0.6)
+; Blue dots representing vectorized operations (4x3 grid)
+(circle :id "p1-dot1"  :cx (+ p1-x 90)  :cy (+ p1-y 125) :r 4.5 :fill "#0366d6" :opacity 0.85)
+(circle :id "p1-dot2"  :cx (+ p1-x 115) :cy (+ p1-y 125) :r 4.5 :fill "#0366d6" :opacity 0.85)
+(circle :id "p1-dot3"  :cx (+ p1-x 140) :cy (+ p1-y 125) :r 4.5 :fill "#0366d6" :opacity 0.85)
+(circle :id "p1-dot4"  :cx (+ p1-x 165) :cy (+ p1-y 125) :r 4.5 :fill "#0366d6" :opacity 0.85)
+(circle :id "p1-dot5"  :cx (+ p1-x 190) :cy (+ p1-y 125) :r 4.5 :fill "#0366d6" :opacity 0.85)
+(circle :id "p1-dot6"  :cx (+ p1-x 90)  :cy (+ p1-y 140) :r 4.5 :fill "#0366d6" :opacity 0.65)
+(circle :id "p1-dot7"  :cx (+ p1-x 115) :cy (+ p1-y 140) :r 4.5 :fill "#0366d6" :opacity 0.65)
+(circle :id "p1-dot8"  :cx (+ p1-x 140) :cy (+ p1-y 140) :r 4.5 :fill "#0366d6" :opacity 0.65)
+(circle :id "p1-dot9"  :cx (+ p1-x 165) :cy (+ p1-y 140) :r 4.5 :fill "#0366d6" :opacity 0.65)
+(circle :id "p1-dot10" :cx (+ p1-x 190) :cy (+ p1-y 140) :r 4.5 :fill "#0366d6" :opacity 0.65)
+(circle :id "p1-dot11" :cx (+ p1-x 90)  :cy (+ p1-y 155) :r 4.5 :fill "#0366d6" :opacity 0.45)
+(circle :id "p1-dot12" :cx (+ p1-x 115) :cy (+ p1-y 155) :r 4.5 :fill "#0366d6" :opacity 0.45)
+(circle :id "p1-dot13" :cx (+ p1-x 140) :cy (+ p1-y 155) :r 4.5 :fill "#0366d6" :opacity 0.45)
+(circle :id "p1-dot14" :cx (+ p1-x 165) :cy (+ p1-y 155) :r 4.5 :fill "#0366d6" :opacity 0.45)
+(circle :id "p1-dot15" :cx (+ p1-x 190) :cy (+ p1-y 155) :r 4.5 :fill "#0366d6" :opacity 0.45)
 
 ; Panel 1 title
 (text :id "p1-title"

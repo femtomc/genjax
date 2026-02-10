@@ -1,47 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="800.0000" height="261.8000" viewBox="40.0000 16.2000 800.0000 261.8000" role="img" shape-rendering="geometricPrecision">
-  <text id="left-title" x="235.0000" y="25.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(a) Commutativity of vmap and Inference</text>
-  <rect id="model-box" x="50.0000" y="50.0000" width="170.0000" height="60.0000" fill="#ffffff" stroke="#24292e" stroke-width="1.5000"/>
-  <text id="model-text" x="135.0000" y="85.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#24292e">Model</text>
-  <rect id="vmodel-box" x="250.0000" y="50.0000" width="170.0000" height="60.0000" fill="#f1f8ff" stroke="#0366d6" stroke-width="1.5000"/>
-  <text id="vmodel-text" x="335.0000" y="85.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#0366d6">vmap(Model)</text>
-  <rect id="inf-box" x="50.0000" y="160.0000" width="170.0000" height="60.0000" fill="#ffffff" stroke="#24292e" stroke-width="1.5000"/>
-  <text id="inf-text" x="135.0000" y="195.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#24292e">Inference</text>
-  <rect id="vinf-box" x="250.0000" y="160.0000" width="170.0000" height="60.0000" fill="#f1f8ff" stroke="#0366d6" stroke-width="1.5000"/>
-  <text id="vinf-text" x="335.0000" y="195.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#0366d6">vmap(Inference)</text>
-  <path id="arrow-top-h" d="M 228.0000 80.0000 L 252.0000 80.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <path id="arrow-top-tip" d="M 252.0000 76.0000 L 258.0000 80.0000 L 252.0000 84.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <text id="label-vmap-top" x="235.0000" y="72.0000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">vmap</text>
-  <path id="arrow-bottom-h" d="M 228.0000 190.0000 L 252.0000 190.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <path id="arrow-bottom-tip" d="M 252.0000 186.0000 L 258.0000 190.0000 L 252.0000 194.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <text id="label-vmap-bottom" x="235.0000" y="182.0000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">vmap</text>
-  <path id="arrow-left-v" d="M 135.0000 115.0000 L 135.0000 162.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <path id="arrow-left-tip" d="M 131.0000 162.0000 L 135.0000 168.0000 L 139.0000 162.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <text id="label-inf-left" x="45.0000" y="113.0000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">GFI</text>
-  <path id="arrow-right-v" d="M 335.0000 115.0000 L 335.0000 162.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <path id="arrow-right-tip" d="M 331.0000 162.0000 L 335.0000 168.0000 L 339.0000 162.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <text id="label-inf-right" x="428.0000" y="113.0000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">GFI</text>
-  <rect id="insight-box" x="40.0000" y="240.0000" width="420.0000" height="38.0000" fill="#fff5b1" stroke="#d9a300" stroke-width="0.5000"/>
-  <text id="insight-text" x="350.0000" y="264.0000" font-size="11.0000" font-family="&apos;Source Code Pro&apos;, monospace" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#735c0f">Inference ∘ vmap = vmap ∘ Inference</text>
-  <text id="features-title" x="660.0000" y="40.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#586069">(b) GenJAX Features</text>
-  <rect id="t1-header" x="480.0000" y="70.0000" width="175.0000" height="34.0000" fill="#24292e" stroke="#24292e" stroke-width="1.0000"/>
-  <text id="t1-header-text" x="492.0000" y="92.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#ffffff">Modeling &amp; Inference</text>
-  <rect id="t1-r1" x="480.0000" y="104.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t1-r1-text" x="492.0000" y="126.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Stochastic branching</text>
-  <rect id="t1-r2" x="480.0000" y="138.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t1-r2-text" x="492.0000" y="160.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Programmable SMC</text>
-  <rect id="t1-r3" x="480.0000" y="172.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t1-r3-text" x="492.0000" y="194.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Programmable MCMC</text>
-  <rect id="t1-r4" x="480.0000" y="206.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t1-r4-text" x="492.0000" y="228.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Custom proposals</text>
-  <rect id="t2-header" x="665.0000" y="70.0000" width="175.0000" height="34.0000" fill="#24292e" stroke="#24292e" stroke-width="1.0000"/>
-  <text id="t2-header-text" x="677.0000" y="92.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#ffffff">Performance</text>
-  <rect id="t2-r1" x="665.0000" y="104.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t2-r1-text" x="677.0000" y="126.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Struct-of-array traces</text>
-  <rect id="t2-r2" x="665.0000" y="138.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t2-r2-text" x="677.0000" y="160.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">GPU acceleration</text>
-  <rect id="t2-r3" x="665.0000" y="172.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t2-r3-text" x="677.0000" y="194.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">JIT compilation</text>
-  <rect id="t2-r4" x="665.0000" y="206.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
-  <text id="t2-r4-text" x="677.0000" y="228.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Zero-cost abstractions</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="800.0000" height="266.8000" viewBox="30.0000 16.2000 800.0000 266.8000" role="img" shape-rendering="geometricPrecision">
+  <text id="left-title" x="225.0000" y="25.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(a) Commutativity of vmap and Inference</text>
+  <rect id="model-box" x="40.0000" y="50.0000" width="150.0000" height="55.0000" rx="2" ry="2" fill="#ffffff" stroke="#24292e" stroke-width="1.5000"/>
+  <text id="model-text" x="115.0000" y="82.5000" font-size="11.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#24292e">Model</text>
+  <rect id="vmodel-box" x="270.0000" y="50.0000" width="150.0000" height="55.0000" rx="2" ry="2" fill="#f1f8ff" stroke="#0366d6" stroke-width="1.5000"/>
+  <text id="vmodel-text" x="345.0000" y="82.5000" font-size="11.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#0366d6">vmap(Model)</text>
+  <rect id="inf-box" x="40.0000" y="170.0000" width="150.0000" height="55.0000" rx="2" ry="2" fill="#ffffff" stroke="#24292e" stroke-width="1.5000"/>
+  <text id="inf-text" x="115.0000" y="202.5000" font-size="11.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#24292e">Inference</text>
+  <rect id="vinf-box" x="270.0000" y="170.0000" width="150.0000" height="55.0000" rx="2" ry="2" fill="#f1f8ff" stroke="#0366d6" stroke-width="1.5000"/>
+  <text id="vinf-text" x="345.0000" y="202.5000" font-size="11.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#0366d6">vmap(Inference)</text>
+  <path id="arrow-top-h" d="M 194.0000 77.5000 L 266.0000 77.5000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <path id="arrow-top-tip" d="M 260.0000 73.5000 L 266.0000 77.5000 L 260.0000 81.5000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <text id="label-vmap-top" x="218.0000" y="69.5000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">vmap</text>
+  <path id="arrow-bottom-h" d="M 194.0000 197.5000 L 266.0000 197.5000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <path id="arrow-bottom-tip" d="M 260.0000 193.5000 L 266.0000 197.5000 L 260.0000 201.5000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <text id="label-vmap-bottom" x="218.0000" y="189.5000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">vmap</text>
+  <path id="arrow-left-v" d="M 115.0000 109.0000 L 115.0000 166.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <path id="arrow-left-tip" d="M 111.0000 160.0000 L 115.0000 166.0000 L 119.0000 160.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <text id="label-inf-left" x="35.0000" y="142.5000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">GFI</text>
+  <path id="arrow-right-v" d="M 345.0000 109.0000 L 345.0000 166.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <path id="arrow-right-tip" d="M 341.0000 160.0000 L 345.0000 166.0000 L 349.0000 160.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
+  <text id="label-inf-right" x="428.0000" y="142.5000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">GFI</text>
+  <rect id="insight-box" x="30.0000" y="245.0000" width="400.0000" height="38.0000" rx="2" ry="2" fill="#fff5b1" stroke="#d9a300" stroke-width="0.5000"/>
+  <text id="insight-text" x="230.0000" y="269.0000" font-size="11.0000" font-weight="600" font-family="&apos;Source Code Pro&apos;, monospace" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#735c0f">Inference ∘ vmap = vmap ∘ Inference</text>
+  <text id="features-title" x="650.0000" y="40.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.4000)" fill="#586069">(b) GenJAX Features</text>
+  <rect id="t1-header" x="470.0000" y="70.0000" width="175.0000" height="34.0000" rx="3" ry="3" fill="#24292e" stroke="#24292e" stroke-width="1.0000"/>
+  <text id="t1-header-text" x="482.0000" y="92.0000" font-size="10.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#ffffff">Modeling &amp; Inference</text>
+  <rect id="t1-r1" x="470.0000" y="104.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t1-r1-text" x="482.0000" y="126.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Stochastic branching</text>
+  <rect id="t1-r2" x="470.0000" y="138.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t1-r2-text" x="482.0000" y="160.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Programmable SMC</text>
+  <rect id="t1-r3" x="470.0000" y="172.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t1-r3-text" x="482.0000" y="194.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Programmable MCMC</text>
+  <rect id="t1-r4" x="470.0000" y="206.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t1-r4-text" x="482.0000" y="228.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Custom proposals</text>
+  <rect id="t2-header" x="655.0000" y="70.0000" width="175.0000" height="34.0000" rx="3" ry="3" fill="#24292e" stroke="#24292e" stroke-width="1.0000"/>
+  <text id="t2-header-text" x="667.0000" y="92.0000" font-size="10.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#ffffff">Performance</text>
+  <rect id="t2-r1" x="655.0000" y="104.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t2-r1-text" x="667.0000" y="126.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Struct-of-array traces</text>
+  <rect id="t2-r2" x="655.0000" y="138.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t2-r2-text" x="667.0000" y="160.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">GPU acceleration</text>
+  <rect id="t2-r3" x="655.0000" y="172.0000" width="175.0000" height="34.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t2-r3-text" x="667.0000" y="194.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">JIT compilation</text>
+  <rect id="t2-r4" x="655.0000" y="206.0000" width="175.0000" height="34.0000" fill="#ffffff" stroke="#e1e4e8" stroke-width="0.5000"/>
+  <text id="t2-r4-text" x="667.0000" y="228.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">Zero-cost abstractions</text>
 </svg>

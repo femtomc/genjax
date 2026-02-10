@@ -1,24 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="920.0000" height="270.0000" viewBox="35.0000 35.0000 920.0000 270.0000" role="img" shape-rendering="geometricPrecision">
-  <rect id="p1-bg" x="35.0000" y="35.0000" width="290.0000" height="270.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
-  <text id="p1-label" x="47.0000" y="55.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, &apos;Source Sans Pro&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(a)</text>
-  <rect id="p1-outer" x="70.0000" y="80.0000" width="220.0000" height="140.0000" fill="#f6f8fa" stroke="#24292e" stroke-width="1.5000"/>
+  <rect id="p1-bg" x="35.0000" y="35.0000" width="290.0000" height="270.0000" rx="2" ry="2" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
+  <text id="p1-label" x="47.0000" y="55.0000" font-size="11.0000" font-weight="bold" font-family="&apos;Source Sans 3&apos;, &apos;Source Sans Pro&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(a)</text>
+  <rect id="p1-outer" x="70.0000" y="80.0000" width="220.0000" height="140.0000" rx="3" ry="3" fill="#f6f8fa" stroke="#24292e" stroke-width="1.5000"/>
   <text id="p1-outer-label" x="80.0000" y="100.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#24292e">vmap(simulate(·))</text>
-  <rect id="p1-inner" x="100.0000" y="125.0000" width="160.0000" height="70.0000" fill="#ffffff" stroke="#0366d6" stroke-width="1.5000"/>
+  <rect id="p1-inner" x="100.0000" y="125.0000" width="160.0000" height="70.0000" rx="2" ry="2" fill="#ffffff" stroke="#0366d6" stroke-width="1.5000"/>
   <text id="p1-inner-label" x="110.0000" y="145.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#0366d6">vmap(model)</text>
-  <circle id="p1-dot1" cx="130.0000" cy="170.0000" r="5.0000" fill="#0366d6" opacity="0.8000"/>
-  <circle id="p1-dot2" cx="155.0000" cy="170.0000" r="5.0000" fill="#0366d6" opacity="0.8000"/>
-  <circle id="p1-dot3" cx="180.0000" cy="170.0000" r="5.0000" fill="#0366d6" opacity="0.8000"/>
-  <circle id="p1-dot4" cx="205.0000" cy="170.0000" r="5.0000" fill="#0366d6" opacity="0.8000"/>
-  <circle id="p1-dot5" cx="142.0000" cy="185.0000" r="5.0000" fill="#0366d6" opacity="0.6000"/>
-  <circle id="p1-dot6" cx="167.0000" cy="185.0000" r="5.0000" fill="#0366d6" opacity="0.6000"/>
-  <circle id="p1-dot7" cx="192.0000" cy="185.0000" r="5.0000" fill="#0366d6" opacity="0.6000"/>
-  <text id="p1-title" x="180.0000" y="245.0000" font-size="12.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Compositional Vectorization</text>
+  <circle id="p1-dot1" cx="125.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
+  <circle id="p1-dot2" cx="150.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
+  <circle id="p1-dot3" cx="175.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
+  <circle id="p1-dot4" cx="200.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
+  <circle id="p1-dot5" cx="225.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
+  <circle id="p1-dot6" cx="125.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
+  <circle id="p1-dot7" cx="150.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
+  <circle id="p1-dot8" cx="175.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
+  <circle id="p1-dot9" cx="200.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
+  <circle id="p1-dot10" cx="225.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
+  <circle id="p1-dot11" cx="125.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
+  <circle id="p1-dot12" cx="150.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
+  <circle id="p1-dot13" cx="175.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
+  <circle id="p1-dot14" cx="200.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
+  <circle id="p1-dot15" cx="225.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
+  <text id="p1-title" x="180.0000" y="245.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Compositional Vectorization</text>
   <text id="p1-subtitle" x="180.0000" y="265.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.0000)" fill="#586069">Models and inference interfaces</text>
-  <rect id="p2-bg" x="350.0000" y="35.0000" width="290.0000" height="270.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
-  <text id="p2-label" x="362.0000" y="55.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(b)</text>
-  <rect id="p2-trace1" x="395.0000" y="85.0000" width="200.0000" height="55.0000" fill="#ffffff" stroke="#24292e" stroke-width="1.0000"/>
-  <text id="p2-trace1-label" x="405.0000" y="77.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">trace ~ P</text>
+  <rect id="p2-bg" x="350.0000" y="35.0000" width="290.0000" height="270.0000" rx="2" ry="2" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
+  <text id="p2-label" x="362.0000" y="55.0000" font-size="11.0000" font-weight="bold" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(b)</text>
+  <rect id="p2-trace1" x="395.0000" y="85.0000" width="200.0000" height="55.0000" rx="2" ry="2" fill="#ffffff" stroke="#24292e" stroke-width="1.0000"/>
+  <text id="p2-trace1-label" x="405.0000" y="77.0000" font-size="10.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">trace ~ P</text>
   <rect id="p2-addr1-bg" x="410.0000" y="97.0000" width="50.0000" height="18.0000" fill="#e1e4e8"/>
   <text id="p2-addr1" x="415.0000" y="109.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#24292e">a</text>
   <text id="p2-val1" x="445.0000" y="109.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#586069">f32[]</text>
@@ -29,21 +37,21 @@
   <path id="p2-arrow-head1" d="M 491.0000 155.0000 L 495.0000 150.0000 L 499.0000 155.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
   <path id="p2-arrow-head2" d="M 491.0000 170.0000 L 495.0000 175.0000 L 499.0000 170.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
   <text id="p2-vmap-label" x="515.0000" y="165.0000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">vmap</text>
-  <rect id="p2-trace2" x="395.0000" y="185.0000" width="200.0000" height="55.0000" fill="#f1f8ff" stroke="#0366d6" stroke-width="1.5000"/>
-  <text id="p2-trace2-label" x="405.0000" y="177.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#0366d6">trace ~ vmap{P}</text>
+  <rect id="p2-trace2" x="395.0000" y="185.0000" width="200.0000" height="55.0000" rx="2" ry="2" fill="#f1f8ff" stroke="#0366d6" stroke-width="1.5000"/>
+  <text id="p2-trace2-label" x="405.0000" y="177.0000" font-size="10.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#0366d6">trace ~ vmap{P}</text>
   <rect id="p2-addr3-bg" x="410.0000" y="197.0000" width="50.0000" height="18.0000" fill="#dbedff"/>
   <text id="p2-addr3" x="415.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">a</text>
   <text id="p2-val3" x="445.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">f32[N]</text>
   <rect id="p2-addr4-bg" x="490.0000" y="197.0000" width="50.0000" height="18.0000" fill="#dbedff"/>
   <text id="p2-addr4" x="495.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">b</text>
   <text id="p2-val4" x="525.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">f32[N]</text>
-  <text id="p2-title" x="495.0000" y="265.0000" font-size="12.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Vectorized Traces</text>
+  <text id="p2-title" x="495.0000" y="265.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Vectorized Traces</text>
   <text id="p2-subtitle" x="495.0000" y="283.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.0000)" fill="#586069">Struct-of-arrays layout</text>
-  <rect id="p3-bg" x="665.0000" y="35.0000" width="290.0000" height="270.0000" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
-  <text id="p3-label" x="677.0000" y="55.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(c)</text>
+  <rect id="p3-bg" x="665.0000" y="35.0000" width="290.0000" height="270.0000" rx="2" ry="2" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
+  <text id="p3-label" x="677.0000" y="55.0000" font-size="11.0000" font-weight="bold" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(c)</text>
   <circle id="p3-start" cx="810.0000" cy="90.0000" r="10.0000" fill="#28a745" stroke="#22863a" stroke-width="2.0000"/>
   <path id="p3-diamond" d="M 810.0000 130.0000 L 835.0000 155.0000 L 810.0000 180.0000 L 785.0000 155.0000 Z " fill="#fff5b1" stroke="#d9a300" stroke-width="1.5000"/>
-  <text id="p3-diamond-label" x="810.0000" y="160.0000" font-size="12.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#735c0f">X</text>
+  <text id="p3-diamond-label" x="810.0000" y="160.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#735c0f">X</text>
   <path id="p3-line1" d="M 810.0000 100.0000 L 810.0000 130.0000 " fill="none" stroke="#24292e" stroke-width="1.5000"/>
   <path id="p3-left-branch" d="M 798.0000 167.0000 L 740.0000 205.0000 " fill="none" stroke="#24292e" stroke-width="1.5000"/>
   <path id="p3-right-branch" d="M 822.0000 167.0000 L 880.0000 205.0000 " fill="none" stroke="#24292e" stroke-width="1.5000"/>
@@ -51,6 +59,6 @@
   <circle id="p3-end2" cx="880.0000" cy="210.0000" r="8.0000" fill="#d73a49" stroke="#cb2431" stroke-width="1.5000"/>
   <text id="p3-label-p" x="760.0000" y="180.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#586069">p</text>
   <text id="p3-label-1p" x="860.0000" y="180.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#586069">1−p</text>
-  <text id="p3-title" x="810.0000" y="245.0000" font-size="12.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Stochastic Branching</text>
+  <text id="p3-title" x="810.0000" y="245.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Stochastic Branching</text>
   <text id="p3-subtitle" x="810.0000" y="265.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.0000)" fill="#586069">Branches on random values</text>
 </svg>

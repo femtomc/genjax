@@ -393,7 +393,7 @@
       <div class="figure-row two-col">
         <div class="code-block">
           <div class="code-header">generative_functions.py</div>
-          <pre><code>@gen
+          <pre><code class="language-python">@gen
 def polynomial():
     a = normal(0.0, 1.0) @ "a"
     b = normal(0.0, 1.0) @ "b"
@@ -409,7 +409,7 @@ def point(x, coeffs):
         </div>
         <div class="code-block">
           <div class="code-header">vectorized_model.py</div>
-          <pre><code>@gen
+          <pre><code class="language-python">@gen
 def npoint_curve(xs):
     coeffs = polynomial() @ "curve"
     ys = vmap(point, in_axes=(0, None))(xs, coeffs) @ "ys"
@@ -468,7 +468,7 @@ densities, retvals = vmap(assess(npoint_curve), args_mapped=0)(traces, xs)</code
       <div class="figure-row two-col">
         <div class="code-block">
           <div class="code-header">single_particle.py</div>
-          <pre><code># Single-particle importance sampling
+          <pre><code class="language-python"># Single-particle importance sampling
 def importance_sample(model, obs, key):
     trace = model.simulate(key)
     weight = model.assess(trace, obs)
@@ -476,7 +476,7 @@ def importance_sample(model, obs, key):
         </div>
         <div class="code-block">
           <div class="code-header">vectorized.py</div>
-          <pre><code># Vectorize to N particles via vmap
+          <pre><code class="language-python"># Vectorize to N particles via vmap
 vectorized_is = vmap(importance_sample,
                      in_axes=(None, None, 0))
 
@@ -516,7 +516,7 @@ traces, weights = vectorized_is(model, obs, keys)</code></pre>
     <figure class="figure">
       <div class="code-block">
         <div class="code-header">outlier_model.py</div>
-        <pre><code>@gen
+        <pre><code class="language-python">@gen
 def point_with_outlier(x, coeffs):
     """Point model with outlier detection."""
     a, b, c = coeffs
@@ -577,7 +577,7 @@ def point_with_outlier(x, coeffs):
       <div class="figure-row two-col">
         <div class="code-block">
           <div class="code-header">gibbs_single.py</div>
-          <pre><code>def gibbs_outlier(subtrace):
+          <pre><code class="language-python">def gibbs_outlier(subtrace):
     def assess_flag(flag):
         x, a, b, c = subtrace.args()
         chm = {"outlier": flag,
@@ -590,7 +590,7 @@ def point_with_outlier(x, coeffs):
         </div>
         <div class="code-block">
           <div class="code-header">gibbs_vectorized.py</div>
-          <pre><code># `trace` stores batched values in struct-of-arrays form
+          <pre><code class="language-python"># `trace` stores batched values in struct-of-arrays form
 def enumerative_gibbs(trace):
     subtrace = trace.get_subtrace("ys")
     new_outliers = vmap(gibbs_outlier)(subtrace)
@@ -1279,7 +1279,7 @@ def enumerative_gibbs(trace):
   
   <div class="code-block">
     <div class="code-header">Installation</div>
-    <pre><code># Install from PyPI (recommended)
+    <pre><code class="language-bash"># Install from PyPI (recommended)
 pip install genjax
 
 # Or install from source for development
@@ -1293,7 +1293,7 @@ python -c "import genjax; print(genjax.__version__)"</code></pre>
   
   <div class="code-block">
     <div class="code-header">Your First GenJAX Program</div>
-    <pre><code>import jax
+    <pre><code class="language-python">import jax
 import genjax
 from genjax import gen, normal, vmap
 

@@ -27,6 +27,15 @@
     
     // Mark JS as enabled for CSS styling
     document.body.classList.add('js-enabled');
+
+    // Create aria-live region for track change announcements
+    const liveRegion = document.createElement('div');
+    liveRegion.setAttribute('aria-live', 'polite');
+    liveRegion.setAttribute('role', 'status');
+    liveRegion.className = 'sr-only';
+    liveRegion.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0';
+    liveRegion.id = 'track-announce';
+    document.body.appendChild(liveRegion);
     
     loadTrackPreference();
     const hashTrack = getTrackFromHash();
@@ -39,15 +48,22 @@
     setupActiveSectionHighlight();
     setupKeyboardNavigation();
     setupBibTexCopy();
+    setupCodeBlockCopy();
     setupSectionAnchors();
     setupMathJaxTypeset();
     setupSyntaxHighlighting();
     
     // Apply initial track
     applyTrack(currentTrack, false);
-    
+
+    // Scroll to hash target if present (after track is applied)
+    if (window.location.hash) {
+      requestAnimationFrame(() => {
+        scrollToAnchor(window.location.hash, { switchTrack: false, focus: false, updateHistory: false });
+      });
+    }
+
     isInitialized = true;
-    console.log('GenJAX website initialized');
   }
 
   /**
@@ -97,6 +113,11 @@
       bib: 'bibtex'
     };
 
+    const headerHints = {
+      'installation': 'bash',
+      'your first genjax program': 'python'
+    };
+
     document.querySelectorAll('.code-block').forEach(block => {
       const header = block.querySelector('.code-header');
       const code = block.querySelector('pre > code');
@@ -105,16 +126,17 @@
       const label = header ? header.textContent.trim() : '';
       const lower = label.toLowerCase();
 
-      let language = null;
-      if (lower === 'installation') {
-        language = 'bash';
-      } else if (lower === 'your first genjax program') {
-        language = 'python';
-      } else {
-        const match = lower.match(/\\.([a-z0-9]+)$/);
+      let language = headerHints[lower] || null;
+
+      if (!language) {
+        const match = lower.match(/\.([a-z0-9]+)$/);
         if (match) {
           language = extensionMap[match[1]] || null;
         }
+      }
+
+      if (!language && code.textContent.match(/^\s*(import |from |@gen|def |class )/m)) {
+        language = 'python';
       }
 
       if (language) {
@@ -210,9 +232,16 @@
     // Track preference is stored in localStorage only
     
     // Dispatch custom event
-    document.dispatchEvent(new CustomEvent('trackchange', { 
-      detail: { track: track } 
+    document.dispatchEvent(new CustomEvent('trackchange', {
+      detail: { track: track }
     }));
+
+    // Announce track change for screen readers
+    const announce = document.getElementById('track-announce');
+    if (announce) {
+      const label = track === 'tutorial' ? 'Tutorial' : track === 'theory' ? 'Theory' : 'All tracks';
+      announce.textContent = `Switched to ${label} view`;
+    }
   }
 
   /**
@@ -466,6 +495,37 @@
         copyBtn.textContent = 'Failed';
         setTimeout(() => copyBtn.textContent = 'Copy', 2000);
       }
+    });
+  }
+
+  /**
+   * Setup copy-to-clipboard buttons for all code blocks
+   */
+  function setupCodeBlockCopy() {
+    document.querySelectorAll('.code-block').forEach(block => {
+      const code = block.querySelector('pre > code') || block.querySelector('pre');
+      if (!code) return;
+
+      const btn = document.createElement('button');
+      btn.className = 'code-copy-btn';
+      btn.textContent = 'Copy';
+      btn.setAttribute('aria-label', 'Copy code to clipboard');
+      block.appendChild(btn);
+
+      btn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(code.textContent);
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+          }, 2000);
+        } catch (err) {
+          btn.textContent = 'Failed';
+          setTimeout(() => btn.textContent = 'Copy', 2000);
+        }
+      });
     });
   }
 

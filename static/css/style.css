@@ -56,6 +56,7 @@
   --max-width: 980px;
   --max-width-wide: 1200px;
   --sidebar-width: 240px;
+  --nav-height: 80px;
   
   /* Shadows - subtle for academic feel */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
@@ -714,26 +715,30 @@ section:first-child h2 {
 
 /* Code Blocks - Enhanced */
 .code-block {
+  position: relative;
   margin: var(--space-xl) 0;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-bg-warm);
   box-shadow: var(--shadow-sm);
 }
 
 .code-block pre {
   margin: 0;
   border: none;
-  background: transparent;
-  padding: var(--space-md) var(--space-lg);
+  border-radius: 0;
+  background: var(--color-bg-warm);
+  padding: var(--space-lg);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .code-header {
   background: var(--color-bg-tertiary);
   padding: var(--space-sm) var(--space-md);
   font-family: var(--font-sans);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   color: var(--color-text-muted);
   font-weight: 500;
   display: flex;
@@ -742,12 +747,50 @@ section:first-child h2 {
   border-bottom: 1px solid var(--color-border);
 }
 
-.code-block pre {
-  margin: 0;
-  border: none;
-  border-radius: 0;
-  background: #fafafa;
-  padding: var(--space-lg);
+.code-header::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-border-accent);
+  margin-right: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 5px;
+  right: var(--space-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px var(--space-sm);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  z-index: 1;
+  line-height: 1.4;
+}
+
+.code-block:hover .code-copy-btn {
+  opacity: 1;
+}
+
+.code-copy-btn:hover {
+  background: var(--color-link);
+  color: white;
+  border-color: var(--color-link);
+}
+
+.code-copy-btn.copied {
+  background: var(--color-tutorial);
+  color: white;
+  border-color: var(--color-tutorial);
+  opacity: 1;
 }
 
 /* Math Blocks */
@@ -907,6 +950,11 @@ li p {
 }
 
 /* Tables - Academic style */
+.table-wrapper {
+  overflow-x: auto;
+  margin: var(--space-xl) 0;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -935,8 +983,9 @@ tr:last-child td {
 /* Sidebar TOC */
 .sidebar {
   position: sticky;
-  top: 80px;
-  height: fit-content;
+  top: var(--nav-height);
+  max-height: calc(100vh - var(--nav-height) - 2rem);
+  overflow-y: auto;
   font-family: var(--font-sans);
   font-size: 0.82rem;
   grid-area: sidebar;
@@ -1281,33 +1330,61 @@ h3:hover .section-anchor {
   }
 }
 
-/* Responsive adjustments */
+/* Responsive — tablet */
+@media (max-width: 1024px) {
+  .container {
+    padding: 0 var(--space-lg);
+  }
+
+  .figure-row.two-col {
+    gap: var(--space-md);
+  }
+
+  .code-block pre {
+    font-size: 0.76rem;
+  }
+}
+
+/* Responsive — mobile */
 @media (max-width: 768px) {
   html {
     font-size: 15px;
   }
-  
+
+  .container {
+    padding: 0 var(--space-md);
+  }
+
   .paper-header h1 {
     font-size: 1.7rem;
   }
-  
+
   .track-switcher {
     flex-direction: column;
   }
-  
+
   .track-btn {
     flex-direction: row;
     text-align: left;
     padding: var(--space-sm) var(--space-md);
   }
-  
+
   .track-btn .track-icon {
     margin-bottom: 0;
     font-size: 1.2rem;
   }
-  
+
   .track-btn .track-desc {
     display: none;
+  }
+
+  body.all-mode .track-content + .track-content {
+    margin-top: 2.5rem;
+    padding-top: 2.5rem;
+  }
+
+  .figure {
+    margin: var(--space-xl) 0;
   }
 
   .math-block {
@@ -1317,13 +1394,23 @@ h3:hover .section-anchor {
   .math-block mjx-container[jax="SVG"] {
     font-size: 0.95em;
   }
-  
+
   .authors {
     font-size: 0.9rem;
   }
-  
+
   .nav-links {
     flex-wrap: wrap;
     justify-content: center;
+    gap: var(--space-xs);
+  }
+
+  .code-block pre {
+    font-size: 0.74rem;
+    padding: var(--space-md);
+  }
+
+  table {
+    font-size: 0.85rem;
   }
 }
