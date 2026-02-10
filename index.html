@@ -980,6 +980,16 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
     ($2^{N \times N}$ possible states for an $N \times N$ board).
   </p>
   
+  <div class="figure">
+    <img src="static/images/conway_gol.png"
+         alt="Conway's Game of Life evolution rules"
+         loading="lazy" />
+    <p class="fig-caption"><strong>Figure 18 (Paper).</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
+    We add a uniform prior over board state and probabilistic Bernoulli noise on top of the deterministic rules
+    to construct a Game of Life generative function. We then condition on the observed next state to construct
+    an inference problem whose solutions correspond to approximate inversions of the dynamics.</p>
+  </div>
+  
   <p>
     We introduce probabilistic noise into the dynamics: from an initial state, we evolve forward using 
     deterministic rules, then sample with Bernoulli noise around the true value of each cell. This 
