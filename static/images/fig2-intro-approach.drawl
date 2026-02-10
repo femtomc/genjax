@@ -1,177 +1,166 @@
 ; Figure 2: Design Overview - Commutative diagram + feature table
-; Two-panel diagram for GenJAX website
+; SIGGRAPH-quality academic figure
 
-(define width 800)
-(define height 280)
+(define width 900)
+(define height 320)
 
 ; === Left Panel: Commutative Diagram ===
-(define left-x 40)
-(define left-y 40)
-(define box-w 160)
-(define box-h 55)
-(define gap-x 180)
-(define gap-y 100)
+(define left-x 50)
+(define left-y 50)
+(define box-w 170)
+(define box-h 60)
+(define gap-x 200)
+(define gap-y 110)
+
+; Title for left panel
+(text :id "left-title"
+      :x (+ left-x 185) :y (- left-y 25)
+      :content "(a) Commutativity of vmap and Inference"
+      :font-size 11 :font-weight "600"
+      :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Top-left: Model
 (rect :id "model-box"
       :x left-x :y left-y
       :width box-w :height box-h
-      :rx 3 :ry 3
-      :fill "#f8fafc" :stroke "#334155" :stroke-width 1.5)
+      :rx 2 :ry 2
+      :fill "#ffffff" :stroke "#24292e" :stroke-width 1.5)
 
 (text :id "model-text"
       :x (+ left-x (/ box-w 2)) :y (+ left-y (/ box-h 2) 5)
-      :content "Generative model code"
-      :font-size 11 :font-weight "bold" :text-anchor "middle"
-      :font-family "system-ui, sans-serif" :fill "#1e293b")
+      :content "Model"
+      :font-size 11 :font-weight "600" :text-anchor "middle"
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 ; Top-right: Vectorized Model
 (rect :id "vmodel-box"
       :x (+ left-x gap-x) :y left-y
       :width box-w :height box-h
-      :rx 3 :ry 3
-      :fill "#f8fafc" :stroke "#334155" :stroke-width 1.5)
+      :rx 2 :ry 2
+      :fill "#f1f8ff" :stroke "#0366d6" :stroke-width 1.5)
 
 (text :id "vmodel-text"
       :x (+ left-x gap-x (/ box-w 2)) :y (+ left-y (/ box-h 2) 5)
-      :content "Generative model code"
-      :font-size 11 :font-weight "bold" :text-anchor "middle"
-      :font-family "system-ui, sans-serif" :fill "#1e293b")
+      :content "vmap(Model)"
+      :font-size 11 :font-weight "600" :text-anchor "middle"
+      :font-family "'Source Sans 3', sans-serif" :fill "#0366d6")
 
 ; Bottom-left: Inference
 (rect :id "inf-box"
       :x left-x :y (+ left-y gap-y)
       :width box-w :height box-h
-      :rx 3 :ry 3
-      :fill "#f8fafc" :stroke "#334155" :stroke-width 1.5)
+      :rx 2 :ry 2
+      :fill "#ffffff" :stroke "#24292e" :stroke-width 1.5)
 
 (text :id "inf-text"
       :x (+ left-x (/ box-w 2)) :y (+ left-y gap-y (/ box-h 2) 5)
-      :content "Inference code"
-      :font-size 11 :font-weight "bold" :text-anchor "middle"
-      :font-family "system-ui, sans-serif" :fill "#1e293b")
+      :content "Inference"
+      :font-size 11 :font-weight "600" :text-anchor "middle"
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 ; Bottom-right: Vectorized Inference
 (rect :id "vinf-box"
       :x (+ left-x gap-x) :y (+ left-y gap-y)
       :width box-w :height box-h
-      :rx 3 :ry 3
-      :fill "#f8fafc" :stroke "#334155" :stroke-width 1.5)
+      :rx 2 :ry 2
+      :fill "#f1f8ff" :stroke "#0366d6" :stroke-width 1.5)
 
 (text :id "vinf-text"
       :x (+ left-x gap-x (/ box-w 2)) :y (+ left-y gap-y (/ box-h 2) 5)
-      :content "Inference code"
-      :font-size 11 :font-weight "bold" :text-anchor "middle"
-      :font-family "system-ui, sans-serif" :fill "#1e293b")
+      :content "vmap(Inference)"
+      :font-size 11 :font-weight "600" :text-anchor "middle"
+      :font-family "'Source Sans 3', sans-serif" :fill "#0366d6")
 
 ; Horizontal arrow: vmap (top)
 (path :id "arrow-top-h"
-      :points (list (point (+ left-x box-w 10) (+ left-y (/ box-h 2)))
-                    (point (+ left-x gap-x 10) (+ left-y (/ box-h 2))))
-      :stroke "#475569" :stroke-width 1.5
-      :marker-end "url(#arrowhead)")
-
-; Arrowhead for top
+      :points (list (point (+ left-x box-w 8) (+ left-y (/ box-h 2)))
+                    (point (+ left-x gap-x 2) (+ left-y (/ box-h 2))))
+      :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-top-tip"
-      :points (list (point (+ left-x gap-x 5) (+ left-y (/ box-h 2) -4))
-                    (point (+ left-x gap-x 10) (+ left-y (/ box-h 2)))
-                    (point (+ left-x gap-x 5) (+ left-y (/ box-h 2) 4)))
-      :stroke "#475569" :stroke-width 1.5 :fill "none")
+      :points (list (point (+ left-x gap-x 2) (- (+ left-y (/ box-h 2)) 4))
+                    (point (+ left-x gap-x 8) (+ left-y (/ box-h 2)))
+                    (point (+ left-x gap-x 2) (+ (+ left-y (/ box-h 2)) 4)))
+      :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-vmap-top"
-      :x (+ left-x (/ box-w 2) 95) :y (- (+ left-y (/ box-h 2)) 8)
+      :x (+ left-x (/ box-w 2) 100) :y (- (+ left-y (/ box-h 2)) 8)
       :content "vmap"
-      :font-size 9 :font-family "system-ui, sans-serif" :fill "#64748b")
+      :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Horizontal arrow: vmap (bottom)
 (path :id "arrow-bottom-h"
-      :points (list (point (+ left-x box-w 10) (+ left-y gap-y (/ box-h 2)))
-                    (point (+ left-x gap-x 10) (+ left-y gap-y (/ box-h 2))))
-      :stroke "#475569" :stroke-width 1.5)
-
-; Arrowhead for bottom
+      :points (list (point (+ left-x box-w 8) (+ left-y gap-y (/ box-h 2)))
+                    (point (+ left-x gap-x 2) (+ left-y gap-y (/ box-h 2))))
+      :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-bottom-tip"
-      :points (list (point (+ left-x gap-x 5) (+ left-y gap-y (/ box-h 2) -4))
-                    (point (+ left-x gap-x 10) (+ left-y gap-y (/ box-h 2)))
-                    (point (+ left-x gap-x 5) (+ left-y gap-y (/ box-h 2) 4)))
-      :stroke "#475569" :stroke-width 1.5 :fill "none")
+      :points (list (point (+ left-x gap-x 2) (- (+ left-y gap-y (/ box-h 2)) 4))
+                    (point (+ left-x gap-x 8) (+ left-y gap-y (/ box-h 2)))
+                    (point (+ left-x gap-x 2) (+ (+ left-y gap-y (/ box-h 2)) 4)))
+      :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-vmap-bottom"
-      :x (+ left-x (/ box-w 2) 95) :y (+ left-y gap-y (- (/ box-h 2) 8))
+      :x (+ left-x (/ box-w 2) 100) :y (- (+ left-y gap-y (/ box-h 2)) 8)
       :content "vmap"
-      :font-size 9 :font-family "system-ui, sans-serif" :fill "#64748b")
+      :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Vertical arrow: inference interfaces (left)
 (path :id "arrow-left-v"
-      :points (list (point (+ left-x (/ box-w 2)) (+ left-y box-w -45))
-                    (point (+ left-x (/ box-w 2)) (+ left-y gap-y -5)))
-      :stroke "#475569" :stroke-width 1.5)
-
-; Arrowhead for left
+      :points (list (point (+ left-x (/ box-w 2)) (+ left-y box-h 5))
+                    (point (+ left-x (/ box-w 2)) (+ left-y gap-y 2)))
+      :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-left-tip"
-      :points (list (point (- (+ left-x (/ box-w 2)) 4) (+ left-y gap-y -10))
-                    (point (+ left-x (/ box-w 2)) (+ left-y gap-y -5))
-                    (point (+ (+ left-x (/ box-w 2)) 4) (+ left-y gap-y -10)))
-      :stroke "#475569" :stroke-width 1.5 :fill "none")
+      :points (list (point (- (+ left-x (/ box-w 2)) 4) (+ left-y gap-y 2))
+                    (point (+ left-x (/ box-w 2)) (+ left-y gap-y 8))
+                    (point (+ (+ left-x (/ box-w 2)) 4) (+ left-y gap-y 2)))
+      :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-inf-left"
-      :x (- left-x 5) :y (+ left-y (/ gap-y 2) 15)
-      :content "inference"
-      :font-size 9 :font-family "system-ui, sans-serif" :fill "#64748b")
-
-(text :id "label-inf-left2"
-      :x (- left-x 5) :y (+ left-y (/ gap-y 2) 27)
-      :content "interfaces"
-      :font-size 9 :font-family "system-ui, sans-serif" :fill "#64748b")
+      :x (- left-x 5) :y (+ left-y (/ gap-y 2) 8)
+      :content "GFI"
+      :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Vertical arrow: inference interfaces (right)
 (path :id "arrow-right-v"
-      :points (list (point (+ left-x gap-x (/ box-w 2)) (+ left-y box-w -45))
-                    (point (+ left-x gap-x (/ box-w 2)) (+ left-y gap-y -5)))
-      :stroke "#475569" :stroke-width 1.5)
-
-; Arrowhead for right
+      :points (list (point (+ left-x gap-x (/ box-w 2)) (+ left-y box-h 5))
+                    (point (+ left-x gap-x (/ box-w 2)) (+ left-y gap-y 2)))
+      :stroke "#586069" :stroke-width 1.5)
 (path :id "arrow-right-tip"
-      :points (list (point (- (+ left-x gap-x (/ box-w 2)) 4) (+ left-y gap-y -10))
-                    (point (+ left-x gap-x (/ box-w 2)) (+ left-y gap-y -5))
-                    (point (+ (+ left-x gap-x (/ box-w 2)) 4) (+ left-y gap-y -10)))
-      :stroke "#475569" :stroke-width 1.5 :fill "none")
+      :points (list (point (- (+ left-x gap-x (/ box-w 2)) 4) (+ left-y gap-y 2))
+                    (point (+ left-x gap-x (/ box-w 2)) (+ left-y gap-y 8))
+                    (point (+ (+ left-x gap-x (/ box-w 2)) 4) (+ left-y gap-y 2)))
+      :stroke "#586069" :stroke-width 1.5 :fill "none")
 
 (text :id "label-inf-right"
-      :x (+ left-x gap-x box-w 5) :y (+ left-y (/ gap-y 2) 15)
-      :content "inference"
-      :font-size 9 :font-family "system-ui, sans-serif" :fill "#64748b")
+      :x (+ left-x gap-x box-w 8) :y (+ left-y (/ gap-y 2) 8)
+      :content "GFI"
+      :font-size 9 :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
-(text :id "label-inf-right2"
-      :x (+ left-x gap-x box-w 5) :y (+ left-y (/ gap-y 2) 27)
-      :content "interfaces"
-      :font-size 9 :font-family "system-ui, sans-serif" :fill "#64748b")
-
-; Key insight box (gray background)
+; Key insight box
 (rect :id "insight-box"
-      :x (- left-x 10) :y (+ left-y gap-y box-h 15)
-      :width (+ (* 2 gap-x) 20) :height 35
+      :x (- left-x 10) :y (+ left-y gap-y box-h 20)
+      :width (+ (* 2 gap-x) 20) :height 38
       :rx 2 :ry 2
-      :fill "#f1f5f9" :stroke "none")
+      :fill "#fff5b1" :stroke "#d9a300" :stroke-width 0.5)
 
 (text :id "insight-text"
-      :x (+ left-x gap-x (/ box-w 2) 10) :y (+ left-y gap-y box-h 37)
-      :content "Inference on vectorized models = vectorizing inference"
-      :font-size 10 :text-anchor "middle" :font-style "italic"
-      :font-family "system-ui, sans-serif" :fill "#475569")
+      :x (+ left-x gap-x (/ box-w 2) 15) :y (+ left-y gap-y box-h 44)
+      :content "Inference ∘ vmap = vmap ∘ Inference"
+      :font-size 11 :font-weight "600" :text-anchor "middle"
+      :font-family "'Source Code Pro', monospace" :fill "#735c0f")
 
 ; === Right Panel: Feature Table ===
-(define right-x 460)
-(define right-y 30)
-(define col-w 155)
-(define row-h 32)
+(define right-x 480)
+(define right-y 40)
+(define col1-w 175)
+(define col2-w 175)
+(define row-h 34)
 
 ; Title
 (text :id "features-title"
-      :x (+ right-x col-w) :y right-y
-      :content "GenJAX Features"
-      :font-size 13 :font-weight "bold" :text-anchor "middle"
-      :font-family "system-ui, sans-serif" :fill "#1e293b")
+      :x (+ right-x (/ (+ col1-w col2-w 10) 2)) :y right-y
+      :content "(b) GenJAX Features"
+      :font-size 11 :font-weight "600" :text-anchor "middle"
+      :font-family "'Source Sans 3', sans-serif" :fill "#586069")
 
 ; Table 1: Modeling & Inference
 (define t1-y (+ right-y 30))
@@ -179,100 +168,126 @@
 ; Header
 (rect :id "t1-header"
       :x right-x :y t1-y
-      :width col-w :height row-h
-      :fill "#334155" :stroke "#334155" :stroke-width 1)
+      :width col1-w :height row-h
+      :rx 1 :ry 1
+      :fill "#24292e" :stroke "#24292e" :stroke-width 1)
 
 (text :id "t1-header-text"
-      :x (+ right-x 10) :y (+ t1-y 21)
-      :content "Modeling & inference"
-      :font-size 10 :font-weight "bold"
-      :font-family "system-ui, sans-serif" :fill "#ffffff")
+      :x (+ right-x 12) :y (+ t1-y 22)
+      :content "Modeling & Inference"
+      :font-size 10 :font-weight "600"
+      :font-family "'Source Sans 3', sans-serif" :fill "#ffffff")
 
 ; Row 1
 (rect :id "t1-r1"
       :x right-x :y (+ t1-y row-h)
-      :width col-w :height row-h
-      :fill "#f8fafc" :stroke "#cbd5e1" :stroke-width 0.5)
+      :width col1-w :height row-h
+      :fill "#fafbfc" :stroke "#e1e4e8" :stroke-width 0.5)
 
 (text :id "t1-r1-text"
-      :x (+ right-x 10) :y (+ t1-y row-h 21)
+      :x (+ right-x 12) :y (+ t1-y row-h 22)
       :content "Stochastic branching"
-      :font-size 9
-      :font-family "system-ui, sans-serif" :fill "#334155")
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 ; Row 2
 (rect :id "t1-r2"
       :x right-x :y (+ t1-y (* 2 row-h))
-      :width col-w :height row-h
-      :fill "#ffffff" :stroke "#cbd5e1" :stroke-width 0.5)
+      :width col1-w :height row-h
+      :fill "#ffffff" :stroke "#e1e4e8" :stroke-width 0.5)
 
 (text :id "t1-r2-text"
-      :x (+ right-x 10) :y (+ t1-y (* 2 row-h) 21)
+      :x (+ right-x 12) :y (+ t1-y (* 2 row-h) 22)
       :content "Programmable SMC"
-      :font-size 9
-      :font-family "system-ui, sans-serif" :fill "#334155")
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 ; Row 3
 (rect :id "t1-r3"
       :x right-x :y (+ t1-y (* 3 row-h))
-      :width col-w :height row-h
-      :fill "#f8fafc" :stroke "#cbd5e1" :stroke-width 0.5)
+      :width col1-w :height row-h
+      :fill "#fafbfc" :stroke "#e1e4e8" :stroke-width 0.5)
 
 (text :id "t1-r3-text"
-      :x (+ right-x 10) :y (+ t1-y (* 3 row-h) 21)
+      :x (+ right-x 12) :y (+ t1-y (* 3 row-h) 22)
       :content "Programmable MCMC"
-      :font-size 9
-      :font-family "system-ui, sans-serif" :fill "#334155")
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
+
+; Row 4
+(rect :id "t1-r4"
+      :x right-x :y (+ t1-y (* 4 row-h))
+      :width col1-w :height row-h
+      :fill "#ffffff" :stroke "#e1e4e8" :stroke-width 0.5)
+
+(text :id "t1-r4-text"
+      :x (+ right-x 12) :y (+ t1-y (* 4 row-h) 22)
+      :content "Custom proposals"
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 ; Table 2: Performance
-(define t2-x (+ right-x col-w 10))
+(define t2-x (+ right-x col1-w 10))
 
 ; Header
 (rect :id "t2-header"
       :x t2-x :y t1-y
-      :width col-w :height row-h
-      :fill "#334155" :stroke "#334155" :stroke-width 1)
+      :width col2-w :height row-h
+      :rx 1 :ry 1
+      :fill "#24292e" :stroke "#24292e" :stroke-width 1)
 
 (text :id "t2-header-text"
-      :x (+ t2-x 10) :y (+ t1-y 21)
+      :x (+ t2-x 12) :y (+ t1-y 22)
       :content "Performance"
-      :font-size 10 :font-weight "bold"
-      :font-family "system-ui, sans-serif" :fill "#ffffff")
+      :font-size 10 :font-weight "600"
+      :font-family "'Source Sans 3', sans-serif" :fill "#ffffff")
 
 ; Row 1
 (rect :id "t2-r1"
       :x t2-x :y (+ t1-y row-h)
-      :width col-w :height row-h
-      :fill "#f8fafc" :stroke "#cbd5e1" :stroke-width 0.5)
+      :width col2-w :height row-h
+      :fill "#fafbfc" :stroke "#e1e4e8" :stroke-width 0.5)
 
 (text :id "t2-r1-text"
-      :x (+ t2-x 10) :y (+ t1-y row-h 21)
+      :x (+ t2-x 12) :y (+ t1-y row-h 22)
       :content "Struct-of-array traces"
-      :font-size 9
-      :font-family "system-ui, sans-serif" :fill "#334155")
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 ; Row 2
 (rect :id "t2-r2"
       :x t2-x :y (+ t1-y (* 2 row-h))
-      :width col-w :height row-h
-      :fill "#ffffff" :stroke "#cbd5e1" :stroke-width 0.5)
+      :width col2-w :height row-h
+      :fill "#ffffff" :stroke "#e1e4e8" :stroke-width 0.5)
 
 (text :id "t2-r2-text"
-      :x (+ t2-x 10) :y (+ t1-y (* 2 row-h) 21)
+      :x (+ t2-x 12) :y (+ t1-y (* 2 row-h) 22)
       :content "GPU acceleration"
-      :font-size 9
-      :font-family "system-ui, sans-serif" :fill "#334155")
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 ; Row 3
 (rect :id "t2-r3"
       :x t2-x :y (+ t1-y (* 3 row-h))
-      :width col-w :height row-h
-      :fill "#f8fafc" :stroke "#cbd5e1" :stroke-width 0.5)
+      :width col2-w :height row-h
+      :fill "#fafbfc" :stroke "#e1e4e8" :stroke-width 0.5)
 
 (text :id "t2-r3-text"
-      :x (+ t2-x 10) :y (+ t1-y (* 3 row-h) 21)
-      :content "Efficient abstractions"
-      :font-size 9
-      :font-family "system-ui, sans-serif" :fill "#334155")
+      :x (+ t2-x 12) :y (+ t1-y (* 3 row-h) 22)
+      :content "JIT compilation"
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
+
+; Row 4
+(rect :id "t2-r4"
+      :x t2-x :y (+ t1-y (* 4 row-h))
+      :width col2-w :height row-h
+      :fill "#ffffff" :stroke "#e1e4e8" :stroke-width 0.5)
+
+(text :id "t2-r4-text"
+      :x (+ t2-x 12) :y (+ t1-y (* 4 row-h) 22)
+      :content "Zero-cost abstractions"
+      :font-size 10
+      :font-family "'Source Sans 3', sans-serif" :fill "#24292e")
 
 (solve)

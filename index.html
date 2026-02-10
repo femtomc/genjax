@@ -166,10 +166,14 @@
          alt="Essential capabilities for vectorized probabilistic programming"
          loading="lazy" />
     <figcaption class="caption">
-      <strong>Figure 1.</strong> Essential capabilities for vectorized probabilistic programming.
-      <strong>Left:</strong> Vectorization applies compositionally to both models and inference interfaces.
-      <strong>Center:</strong> Traces transform from array-of-structs to struct-of-arrays under <code>vmap</code>.
-      <strong>Right:</strong> Stochastic branching on random values is preserved under vectorization.
+      <strong>Figure 1.</strong> Computational patterns in vectorizable probabilistic programs.
+      <strong>(a)</strong> Within models, vectorization can be used to parallelize conditionally independent computations.
+      Within inference, vectorization can be used to simulate multiple particles in parallel.
+      <strong>(b)</strong> Traces are records used to represent samples from probabilistic programs.
+      Both vectorized models and vectorized inference algorithms are designed to work with
+      vectorized (struct-of-array) traces.
+      <strong>(c)</strong> Probabilistic programs can branch on random values, and <code>vmap</code> of probabilistic programs
+      preserves this capability.
     </figcaption>
   </figure>
 </section>
@@ -207,9 +211,13 @@
          alt="Design overview and feature table for GenJAX"
          loading="lazy" />
     <figcaption class="fig-caption">
-      <strong>Figure 2.</strong> The design of GenJAX. <strong>Left:</strong> A commutative diagram showing that
-      inference on vectorized models equals vectorized inference. <strong>Right:</strong> Key features supported
-      by our language and compiler.
+      <strong>Figure 2.</strong> The design and implementation of GenJAX.
+      <strong>(a)</strong> GenJAX extends <code>vmap</code> to apply to both generative models and inference algorithms.
+      Our system implements inference on a vectorized model by vectorizing inference applied to the model,
+      justified by Corollary 3.4.
+      <strong>(b)</strong> Survey of features in our language and compiler:
+      usage of these features is illustrated in Section 2 and Section 7,
+      implementation discussed in Section 6.
     </figcaption>
   </figure>
 
