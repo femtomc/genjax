@@ -947,6 +947,11 @@ tr:last-child td {
   margin-bottom: 0;
 }
 
+.js-enabled body[data-track="tutorial"] .toc-nav li[data-track="theory"],
+.js-enabled body[data-track="theory"] .toc-nav li[data-track="tutorial"] {
+  display: none;
+}
+
 /* Step/Tutorial styling */
 .tutorial-step {
   margin: var(--space-2xl) 0;

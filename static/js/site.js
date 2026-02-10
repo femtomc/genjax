@@ -162,6 +162,7 @@
     // Handle "all" mode
     if (track === 'all') {
       body.classList.add('all-mode');
+      body.dataset.track = 'all';
       
       // Update all buttons
       buttons.forEach(btn => {
@@ -183,6 +184,7 @@
     
     // Normal single-track mode
     body.classList.remove('all-mode');
+    body.dataset.track = track;
     
     // Update buttons
     buttons.forEach(btn => {

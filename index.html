@@ -554,13 +554,13 @@ densities, retvals = vmap(assess(npoint_curve), args_mapped=0)(traces, xs)</code
       </p>
     </div>
     
-    <div class="figure">
+    <figure class="figure">
       <img src="static/images/curvefit_prior_multipoint_traces_density.svg"
            alt="Vectorized traces from vmap(simulate)"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 4.</strong> Vectorized traces. <code>vmap(simulate)</code> preserves
-      trace structure while batching random choices into arrays, yielding efficient struct-of-arrays traces.</p>
-    </div>
+      <figcaption class="fig-caption"><strong>Figure 4.</strong> Vectorized traces. <code>vmap(simulate)</code> preserves
+      trace structure while batching random choices into arrays, yielding efficient struct-of-arrays traces.</figcaption>
+    </figure>
   </section>
   
   <section id="tutorial-step-2" class="tutorial-step" aria-labelledby="tutorial-step-2-heading">
@@ -1027,6 +1027,15 @@ def enumerative_gibbs(trace):
       while enabling efficient vectorized execution on modern accelerators.
     </p>
   </section>
+  
+  <div class="info-box" style="margin-top: var(--space-xl);">
+    <div class="info-box-title">Next Steps</div>
+    <p>
+      Continue to the <a href="#evaluation">Evaluation</a> section for benchmarks and case studies,
+      or return to the <strong>Tutorial Track</strong> for worked examples that mirror the formal
+      transformations above.
+    </p>
+  </div>
 </section>
 
 </div><!-- end theory track -->
@@ -1039,7 +1048,7 @@ def enumerative_gibbs(trace):
     <ul>
       <li><a href="#abstract" class="toc-h2">Abstract</a></li>
       <li><a href="#overview" class="toc-h2">Overview</a></li>
-      <li><a href="#tutorial" class="toc-h2">Tutorial Track</a>
+      <li data-track="tutorial"><a href="#tutorial" class="toc-h2">Tutorial Track</a>
         <ul>
           <li><a href="#tutorial-core" class="toc-h3">Core Concepts</a></li>
           <li><a href="#tutorial-step-1" class="toc-h3">Step 1: Model</a></li>
@@ -1048,7 +1057,7 @@ def enumerative_gibbs(trace):
           <li><a href="#tutorial-step-4" class="toc-h3">Step 4: Gibbs + HMC</a></li>
         </ul>
       </li>
-      <li><a href="#theory" class="toc-h2">Theory Track</a>
+      <li data-track="theory"><a href="#theory" class="toc-h2">Theory Track</a>
         <ul>
           <li><a href="#theory-syntax" class="toc-h3">Syntax &amp; Types</a></li>
           <li><a href="#theory-semantics" class="toc-h3">Semantics</a></li>
@@ -1174,14 +1183,14 @@ def enumerative_gibbs(trace):
       ($2^{N \times N}$ possible states for an $N \times N$ board).
     </p>
   
-  <div class="figure">
+  <figure class="figure">
     <img src="static/images/conway_gol.svg"
          alt="Conway's Game of Life evolution rules"
          loading="lazy" />
-    <p class="fig-caption"><strong>Figure 18.</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
+    <figcaption class="fig-caption"><strong>Figure 18.</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
     We add a uniform prior over board state and probabilistic Bernoulli noise on top of the deterministic rules
-    to construct a probabilistic inversion problem.</p>
-  </div>
+    to construct a probabilistic inversion problem.</figcaption>
+  </figure>
   
   <p>
     We introduce probabilistic noise into the dynamics: from an initial state, we evolve forward using 
