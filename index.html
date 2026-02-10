@@ -25,7 +25,10 @@
           simulate: "\\text{simulate}",
           assess: "\\text{assess}",
           sem: ["\\left[\\!\\left[ #1 \\right]\\!\\right]", 1],
-          doubleplus: "\\mathbin{+\\!+}"
+          doubleplus: "\\mathbin{+\\!+}",
+          Pm: ["\\mathbf{P}\\,#1", 1],
+          Dm: ["\\mathbf{D}\\,#1", 1],
+          Gm: ["\\mathbf{G}_{#1}\\,#2", 2]
         }
       },
       svg: { fontCache: 'global' },
@@ -620,6 +623,19 @@ tr_, w, discard = update(npoint_curve)(
       (2) a graded monad of generative functions, or traced probabilistic programs. Generative functions can be automatically compiled to the density functions and stochastic
       traced simulation procedures necessary for inference.
     </p>
+    <figure class="figure figure--math">
+      <div class="math-block">
+        $$
+        \begin{aligned}
+        B &::= \mathbb{B} \mid \mathbb{R} \mid \mathbb{R}_{>0} \\
+        T &::= B \mid T[n] \\
+        \eta &::= 1 \mid T \mid \eta_1 \times \eta_2 \mid \{k_1 : \eta_1, \ldots, k_n : \eta_n\} \\
+        \tau &::= \eta \mid \tau_1 \rightarrow \tau_2 \mid \tau_1 \times \tau_2 \mid \Dm{\eta} \mid \Pm{\eta} \mid \Gm{\gamma}{\eta}
+        \end{aligned}
+        $$
+      </div>
+      <figcaption class="fig-caption"><strong>Figure.</strong> Core type grammar for $\gen$: base types, batched types, ground types, and computation types.</figcaption>
+    </figure>
   </section>
 
   <section id="theory-semantics" aria-labelledby="theory-semantics-heading">
