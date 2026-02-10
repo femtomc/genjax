@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="GenJAX">
+  <rect x="3" y="3" width="58" height="58" rx="12" fill="#fdfcfa" stroke="#1a5276" stroke-width="3"/>
+  <path d="M42 22a14 14 0 1 0 0 20h-9" fill="none" stroke="#1a5276" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 32h12" fill="none" stroke="#1a5276" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="22" cy="44" r="3" fill="#8b4513"/>
+</svg>

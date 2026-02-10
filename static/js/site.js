@@ -35,12 +35,30 @@
     setupKeyboardNavigation();
     setupBibTexCopy();
     setupSectionAnchors();
+    setupMathJaxTypeset();
     
     // Apply initial track
     applyTrack(currentTrack, false);
     
     isInitialized = true;
     console.log('GenJAX website initialized');
+  }
+
+  /**
+   * Ensure MathJax typesets non-track content on load.
+   */
+  function setupMathJaxTypeset() {
+    const typesetAll = () => {
+      if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+        MathJax.typesetPromise().catch(console.error);
+      }
+    };
+
+    if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
+      MathJax.startup.promise.then(typesetAll).catch(console.error);
+    } else {
+      document.addEventListener('mathjax:ready', typesetAll, { once: true });
+    }
   }
 
   /**
