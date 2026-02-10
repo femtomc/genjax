@@ -229,42 +229,62 @@
   }
 
   /**
+   * Scroll to a section anchor with sticky-nav offset and optional track switching.
+   */
+  function scrollToAnchor(href, options = {}) {
+    if (!href || href === '#') return;
+    const target = document.querySelector(href);
+    if (!target) return;
+
+    const { switchTrack: shouldSwitchTrack = true, focus = true, updateHistory = true } = options;
+    const trackSection = target.closest('.track-content');
+    const targetTrack = trackSection ? trackSection.id.replace('track-', '') : null;
+
+    if (
+      shouldSwitchTrack &&
+      targetTrack &&
+      targetTrack !== 'all' &&
+      currentTrack !== 'all' &&
+      targetTrack !== currentTrack
+    ) {
+      switchTrack(targetTrack);
+    }
+
+    requestAnimationFrame(() => {
+      const offset = 80; // Account for sticky nav
+      const top = target.getBoundingClientRect().top + window.scrollY - offset;
+
+      window.scrollTo({
+        top: top,
+        behavior: 'smooth'
+      });
+
+      if (focus) {
+        target.setAttribute('tabindex', '-1');
+        target.focus({ preventScroll: true });
+      }
+
+      if (updateHistory) {
+        history.pushState(null, null, href);
+      }
+    });
+  }
+
+  /**
    * Setup smooth scroll for anchor links
    */
   function setupSmoothScroll() {
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
       anchor.addEventListener('click', function(e) {
+        if (this.classList.contains('section-anchor')) {
+          return;
+        }
         const href = this.getAttribute('href');
         
         // Handle section links
         if (href !== '#') {
           e.preventDefault();
-          const target = document.querySelector(href);
-          if (target) {
-            const trackSection = target.closest('.track-content');
-            const targetTrack = trackSection ? trackSection.id.replace('track-', '') : null;
-            
-            if (targetTrack && targetTrack !== 'all' && currentTrack !== 'all' && targetTrack !== currentTrack) {
-              switchTrack(targetTrack);
-            }
-            
-            requestAnimationFrame(() => {
-              const offset = 80; // Account for sticky nav
-              const top = target.getBoundingClientRect().top + window.scrollY - offset;
-              
-              window.scrollTo({
-                top: top,
-                behavior: 'smooth'
-              });
-              
-              // Update focus for accessibility
-              target.setAttribute('tabindex', '-1');
-              target.focus({ preventScroll: true });
-              
-              // Update URL
-              history.pushState(null, null, href);
-            });
-          }
+          scrollToAnchor(href, { switchTrack: true, focus: true, updateHistory: true });
         }
       });
     });
@@ -396,12 +416,8 @@
         const fullUrl = window.location.origin + window.location.pathname + href;
         navigator.clipboard.writeText(fullUrl).catch(() => {});
         
-        // Navigate to section
-        const target = document.querySelector(href);
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          history.pushState(null, null, href);
-        }
+        // Navigate to section (single handler for scroll + history)
+        scrollToAnchor(href, { switchTrack: true, focus: true, updateHistory: true });
       });
     });
   }
