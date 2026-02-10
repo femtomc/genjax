@@ -151,10 +151,10 @@
       inference interfaces for writing custom probabilistic inference algorithms.
       We formalize vectorization as a source-to-source program transformation on a core calculus for
       probabilistic programming ($\gen$), and prove that it correctly vectorizes both modeling and inference operations.
-      We have implemented our approach in the GenJAX language and compiler, and have empirically evaluated
-      this implementation on several benchmarks and case studies. Our results show that our implementation
-      supports a wide and expressive set of programmable inference patterns and delivers performance
-      comparable to hand-optimized JAX code.
+      We have implemented our approach in <a href="https://github.com/femtomc/genjax">the GenJAX language and
+      compiler</a>, and have empirically evaluated this implementation on several benchmarks and case studies.
+      Our results show that our implementation supports a wide and expressive set of programmable inference
+      patterns and delivers performance comparable to hand-optimized JAX code.
     </p>
   </div>
 </section>
@@ -223,21 +223,26 @@
 
   <h3>Contributions</h3>
   <ol class="contributions">
-    <li><strong>GenJAX: High-Performance Compiler.</strong> An open-source compiler that extends JAX and
+    <li><strong>GenJAX: High-Performance Compiler (Section 6).</strong> An open-source compiler that extends JAX and
       <code>vmap</code> to support programmable probabilistic inference. Probabilistic programs can be
-      systematically transformed to exploit vectorization opportunities in both modeling and inference.
-      Our compiler uses lightweight effect handlers and JAX's tracing to partially evaluate inference
-      logic at compile time, leaving only optimized array operations.</li>
-    <li><strong>Formal Model.</strong> We develop $\gen$, a calculus for probabilistic programming
+      systematically transformed to take advantage of vectorization opportunities in both modeling and inference.
+      Our compiler uses lightweight effect handlers and JAX's program tracing to partially evaluate inference
+      logic at compile time, leaving only optimized array operations. Our design maintains full compatibility
+      with JAX's ecosystem for automatic differentiation and CPU/GPU/TPU compilation.</li>
+    <li><strong>Formal Model (Section 3).</strong> We develop $\gen$, a calculus for probabilistic programming
       and programmable inference, on top of a core probabilistic array language. We define
       <code>vmap</code> as a source-to-source program transformation, prove its correctness, and show
-      how it interacts with programmable inference interfaces.</li>
-    <li><strong>Empirical Evaluation.</strong> We evaluate on benchmarks and case studies:
+      how it interacts with programmable inference interfaces to support vectorization
+      of probabilistic computations and traces.</li>
+    <li><strong>Empirical Evaluation (Section 7).</strong> We evaluate on benchmarks and case studies:
       <ul>
-        <li><strong>Performance:</strong> GenJAX achieves near-handcoded JAX performance (100.1% relative time
-          on Beta-Bernoulli), outperforming existing vectorized PPLs.</li>
-        <li><strong>High-dimensional inference:</strong> We develop vectorized inference for probabilistic
-          Game of Life inversion and robot localization with simulated LIDAR.</li>
+        <li><strong>Performance comparison:</strong> GenJAX achieves near-handcoded JAX performance (100.1% relative time
+          on Beta-Bernoulli), outperforming existing vectorized PPLs and array frameworks
+          (JAX, PyTorch, Pyro, NumPyro, and Gen).</li>
+        <li><strong>High-dimensional inference:</strong> We explore performance vs. expressivity tradeoffs
+          on Game of Life inversion (512×512 board states) and sequential 2D robot localization with
+          simulated LIDAR. Our algorithms achieve high approximation accuracy and run in milliseconds
+          on consumer-grade GPUs.</li>
       </ul>
     </li>
   </ol>
@@ -1188,20 +1193,28 @@ def enumerative_gibbs(trace):
   <h2 id="conclusion-heading">Conclusion <a href="#conclusion" class="section-anchor" aria-label="Link to Conclusion">#</a></h2>
 
   <p>
-    GenJAX integrates <code>vmap</code> with programmable inference to deliver vectorized probabilistic
-    programming on modern accelerators. By extending vectorization to generative functions, traces,
-    stochastic branching, and inference interfaces, GenJAX achieves low overhead relative to
-    hand-optimized JAX while preserving expressivity.
+    This work presents GenJAX, a language and compiler for vectorized probabilistic programming with
+    programmable inference. Our system integrates <code>vmap</code> with programmable inference features:
+    we extend <code>vmap</code> support to generative functions, including support for vectorization using
+    <code>vmap</code> of probabilistic program traces, stochastic branching, and programmable inference
+    interfaces. Benchmarks show this approach yields low overhead relative to hand-optimized JAX,
+    and simultaneously delivers greater expressiveness and competitive performance with other
+    probabilistic programming systems targeting modern accelerators.
   </p>
 
   <h3>Future Work</h3>
   <ul>
-    <li><strong>Vectorized inference diagnostics.</strong> Automating nested Monte Carlo estimators for
-      information-theoretic quantities (e.g., KL divergence, conditional mutual information) could
-      make diagnostics practical at scale when paired with GPU execution.</li>
-    <li><strong>Spatial and geometric probabilistic programs.</strong> GenJAX's array-oriented design and
-      vectorized inference are well-suited to robotics, navigation, computational imaging, and other
-      domains with high-dimensional spatial data.</li>
+    <li><strong>Vectorized inference diagnostics.</strong> By automating the vectorized implementation
+      of nested models and inference algorithms, GenJAX makes it easy to experiment with parallel
+      implementations of custom Monte Carlo estimators for information-theoretic quantities
+      (KL divergence, conditional mutual information). Although computationally intensive on CPUs,
+      these estimators may become more practical given suitable automation and GPU execution.</li>
+    <li><strong>Spatial and geometric probabilistic programs.</strong> GenJAX's support for array
+      programming and programmable inference is well-suited for spatial computing applications.
+      Domains such as robotics, autonomous navigation, computational imaging, and scientific simulation
+      increasingly require sophisticated probabilistic reasoning over high-dimensional spatial data.
+      GenJAX's design is uniquely suited to support practitioners writing these types of probabilistic
+      programs, providing useful vectorization automation and compilation to efficient GPU implementations.</li>
   </ul>
 </section>
 
