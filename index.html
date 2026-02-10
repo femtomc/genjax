@@ -384,19 +384,37 @@
     <div class="track-switcher" role="tablist" aria-label="Content tracks">
       <button class="track-btn tutorial-track active" id="btn-tutorial" 
               role="tab" aria-selected="true" aria-controls="track-tutorial" tabindex="0">
-        <span class="track-icon">📚</span>
+        <span class="track-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M12 6v14"/>
+            <path d="M4 6h6a2 2 0 0 1 2 2v12H6a2 2 0 0 0-2 2V6z"/>
+            <path d="M20 6h-6a2 2 0 0 0-2 2v12h6a2 2 0 0 1 2 2V6z"/>
+          </svg>
+        </span>
         <span class="track-label">Tutorial</span>
         <span class="track-desc">Progressive examples &amp; intuitive explanations</span>
       </button>
       <button class="track-btn theory-track" id="btn-theory"
               role="tab" aria-selected="false" aria-controls="track-theory" tabindex="-1">
-        <span class="track-icon">🔬</span>
+        <span class="track-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M9 2h6"/>
+            <path d="M10 2v6l-5.5 9.5a3 3 0 0 0 2.6 4.5h9.8a3 3 0 0 0 2.6-4.5L14 8V2"/>
+            <path d="M8 12h8"/>
+          </svg>
+        </span>
         <span class="track-label">Theory</span>
         <span class="track-desc">Formal model, type systems &amp; proofs</span>
       </button>
       <button class="track-btn all-track" id="btn-all"
               role="tab" aria-selected="false" aria-controls="track-all" tabindex="-1">
-        <span class="track-icon">📚🔬</span>
+        <span class="track-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M12 3l9 5-9 5-9-5 9-5z"/>
+            <path d="M3 12l9 5 9-5"/>
+            <path d="M3 16l9 5 9-5"/>
+          </svg>
+        </span>
         <span class="track-label">All</span>
         <span class="track-desc">Show all content from both tracks</span>
       </button>
@@ -1197,24 +1215,49 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     All experiments in the paper are reproducible from this artifact, which includes:
   </p>
   
-  <div class="artifact-grid">
-    <div class="artifact-card">
-      <div class="artifact-icon">⚡</div>
+    <div class="artifact-grid">
+      <div class="artifact-card">
+      <div class="artifact-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M13 2L3 14h7l-1 8 10-12h-7z"/>
+        </svg>
+      </div>
       <h4>Compiler & Runtime</h4>
       <p>Complete GenJAX implementation with JAX integration, effect handlers, and GPU/TPU support.</p>
     </div>
     <div class="artifact-card">
-      <div class="artifact-icon">📊</div>
+      <div class="artifact-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M3 20h18"/>
+          <path d="M6 20V10"/>
+          <path d="M12 20V4"/>
+          <path d="M18 20v-6"/>
+        </svg>
+      </div>
       <h4>Benchmarks</h4>
       <p>Performance comparison scripts for all frameworks and models.</p>
     </div>
     <div class="artifact-card">
-      <div class="artifact-icon">🔬</div>
+      <div class="artifact-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z"/>
+          <path d="M9 4v14"/>
+          <path d="M15 6v14"/>
+        </svg>
+      </div>
       <h4>Case Studies</h4>
       <p>Full implementations: Game of Life inversion, robot localization, polynomial regression.</p>
     </div>
     <div class="artifact-card">
-      <div class="artifact-icon">📓</div>
+      <div class="artifact-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M6 4h12a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z"/>
+          <path d="M8 4v16"/>
+          <path d="M11 8h6"/>
+          <path d="M11 12h6"/>
+          <path d="M11 16h6"/>
+        </svg>
+      </div>
       <h4>Notebooks</h4>
       <p>Jupyter notebooks reproducing every figure and result from the paper.</p>
     </div>
@@ -1341,7 +1384,7 @@ traces = jax.jit(batched_model.simulate)(key, (xs,))</code></pre>
       <a href="https://probcomp.csail.mit.edu/">MIT Probabilistic Computing Project</a>.
     </p>
     <p>
-      © 2026 The Authors. Published in PACMPL.
+      Copyright 2026 The Authors. Published in PACMPL.
     </p>
   </div>
 </footer>

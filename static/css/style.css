@@ -412,8 +412,21 @@ pre code {
 }
 
 .track-btn .track-icon {
-  font-size: 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: var(--space-xs);
+}
+
+.track-btn .track-icon svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .track-btn .track-label {
@@ -996,8 +1009,21 @@ tr:last-child td {
 }
 
 .artifact-card .artifact-icon {
-  font-size: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: var(--space-sm);
+}
+
+.artifact-card .artifact-icon svg {
+  width: 2rem;
+  height: 2rem;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .artifact-card h4 {
