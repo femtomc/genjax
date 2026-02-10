@@ -43,14 +43,14 @@
   --font-mono: "Source Code Pro", "SF Mono", "Monaco", "Inconsolata", "Fira Code", monospace;
   
   /* Spacing scale - tighter for paper-like density */
-  --space-xs: 0.12rem;
-  --space-sm: 0.24rem;
-  --space-md: 0.4rem;
-  --space-lg: 0.6rem;
-  --space-xl: 0.85rem;
-  --space-2xl: 1.2rem;
-  --space-3xl: 1.6rem;
-  --space-4xl: 2.2rem;
+  --space-xs: 0.1rem;
+  --space-sm: 0.2rem;
+  --space-md: 0.34rem;
+  --space-lg: 0.52rem;
+  --space-xl: 0.75rem;
+  --space-2xl: 1.05rem;
+  --space-3xl: 1.4rem;
+  --space-4xl: 2rem;
   
   /* Layout */
   --max-width: 1040px;
@@ -59,8 +59,8 @@
   --nav-height: 52px;
 
   /* Figure sizing */
-  --figure-max-width: 860px;
-  --figure-max-width-wide: 1000px;
+  --figure-max-width: 800px;
+  --figure-max-width-wide: 920px;
   
   /* Shadows - subtle for academic feel */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
@@ -84,7 +84,7 @@ html {
 body {
   font-family: var(--font-serif);
   font-size: 1rem;
-  line-height: 1.65;
+  line-height: 1.6;
   color: var(--color-text);
   background: var(--color-bg-warm);
   color-scheme: light;
@@ -570,7 +570,7 @@ main {
 
 /* Section Styling */
 section {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
 section:first-child h2 {
@@ -596,7 +596,7 @@ section:first-child h2 {
 
 .abstract {
   font-size: 0.98rem;
-  line-height: 1.75;
+  line-height: 1.62;
 }
 
 .abstract p {
@@ -609,7 +609,7 @@ section:first-child h2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-xs);
-  margin: var(--space-sm) 0;
+  margin: var(--space-xs) 0;
 }
 
 .link-btn {
