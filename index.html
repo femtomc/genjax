@@ -6,7 +6,7 @@
   <meta name="description" content="GenJAX — a language and compiler for vectorized programmable probabilistic inference, built on JAX. POPL 2026." />
   <meta name="theme-color" content="#fdfcfa" />
   <meta name="color-scheme" content="light" />
-  <title>GenJAX: Probabilistic Programming with Vectorized Programmable Inference</title>
+  <title>Probabilistic Programming with Vectorized Programmable Inference</title>
   <link rel="stylesheet" href="static/css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
   <link rel="icon" type="image/svg+xml" href="static/images/logo.svg" />
@@ -87,7 +87,7 @@
   <div class="container">
     <img src="static/images/logo.png" alt="GenJAX" class="paper-logo" />
     <h1>Probabilistic Programming with<br>Vectorized Programmable Inference</h1>
-    <p class="venue">POPL 2026 · Proceedings of the ACM on Programming Languages (PACMPL), Vol. 10, Article 87</p>
+    <p class="venue">POPL 2026 · Proceedings of the ACM on Programming Languages (PACMPL), Vol. 10, No. POPL, Article 87</p>
   </div>
 </header>
 
@@ -128,11 +128,11 @@
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1a2 2 0 0 0 2 2v1.93zm6.9-2.54A1.99 1.99 0 0 0 16 16h-1v-3a1 1 0 0 0-1-1H8v-2h2a1 1 0 0 0 1-1V7h2a2 2 0 0 0 2-2v-.41A7.997 7.997 0 0 1 20 12c0 2.08-.8 3.97-2.1 5.39z"/></svg>
       ACM Digital Library
     </a>
-    <a href="https://github.com/femtomc/genjax" class="link-btn">
+    <a href="https://github.com/probcomp/genjax" class="link-btn">
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
       Source Code
     </a>
-    <a href="https://doi.org/10.5281/zenodo.17342547" class="link-btn">
+    <a href="https://doi.org/10.5281/zenodo.17594132" class="link-btn">
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l7 3.5v7.64l-7 3.5-7-3.5V7.68l7-3.5z"/></svg>
       Zenodo Artifact
     </a>
@@ -146,15 +146,13 @@
     <p>
       We present GenJAX, a new language and compiler for vectorized programmable probabilistic inference.
       GenJAX integrates the vectorizing map (<code>vmap</code>) operation from array programming frameworks such as JAX
-      into the programmable inference paradigm, enabling compositional vectorization of features such as
-      probabilistic program traces, stochastic branching (for expressing mixture models), and programmable
-      inference interfaces for writing custom probabilistic inference algorithms.
-      We formalize vectorization as a source-to-source program transformation on a core calculus for
-      probabilistic programming ($\gen$), and prove that it correctly vectorizes both modeling and inference operations.
-      We have implemented our approach in <a href="https://github.com/femtomc/genjax">the GenJAX language and
-      compiler</a>, and have empirically evaluated this implementation on several benchmarks and case studies.
-      Our results show that our implementation supports a wide and expressive set of programmable inference
-      patterns and delivers performance comparable to hand-optimized JAX code.
+      into the programmable inference paradigm, enabling compositional vectorization of features such as probabilistic program traces,
+      stochastic branching (for expressing mixture models), and programmable inference interfaces for writing custom probabilistic inference algorithms.
+      We formalize vectorization as a source-to-source program transformation on a core calculus for probabilistic programming ($\gen$), and
+      prove that it correctly vectorizes both modeling and inference operations.
+      We have implemented our approach in <a href="https://github.com/probcomp/genjax">the GenJAX language and compiler</a>,
+      and have empirically evaluated this implementation on several benchmarks and case studies. Our results show that our implementation
+      supports a wide and expressive set of programmable inference patterns and delivers performance comparable to hand-optimized JAX code.
     </p>
   </div>
 </section>
@@ -162,54 +160,79 @@
 <!-- Introduction Section (Common to both tracks) -->
 <section id="introduction" data-nav-section aria-labelledby="introduction-heading">
   <h2 id="introduction-heading">Introduction <a href="#introduction" class="section-anchor" aria-label="Link to Introduction">#</a></h2>
-  
+
   <p>
-    Probabilistic programming has demonstrated remarkable effectiveness in applications ranging from
-    3D perception and robotics to automated data analysis, particle physics, and cognitive modeling.
-    These applications require sophisticated probabilistic reasoning and rely on
-    <em>programmable inference</em> — the ability to customize inference algorithms through proposals,
-    kernels, and variational families. But fully realizing these benefits often requires substantial
-    computational resources, as inference scales by increasing particles, chains, or likelihood evaluations.
+    In recent years, probabilistic programming has demonstrated remarkable effectiveness in a range of application domains, including
+    3D perception and scene understanding, probabilistic robotics, automated data cleaning and analysis, particle physics, time series
+    structure discovery, test-time control of large language models, and cognitive modeling of theory of mind. All of these applications
+    require sophisticated probabilistic reasoning over complex, structured data and rely on probabilistic programming languages (PPLs) with
+    programmable inference — the ability to customize probabilistic inference algorithms through proposals, kernels, and variational families —
+    to improve the quality of posterior approximation. But fully realizing the benefits that probabilistic programming can deliver often requires
+    substantial computational resources, as probabilistic inference scales by increasing the number of likelihood evaluations, sequential Monte Carlo
+    particles, or Markov chain Monte Carlo chains.
   </p>
-  
+
   <p>
-    GenJAX addresses this by integrating <code>vmap</code> from JAX into probabilistic programming with
-    programmable inference, enabling compositional vectorization of three key features:
+    We present GenJAX, a new language and compiler for vectorized programmable probabilistic inference.
+    GenJAX integrates the vectorizing map (<code>vmap</code>) operation from array programming frameworks such as JAX
+    into the context of probabilistic programming with programmable inference, enabling the compositional vectorization of features such as
+    probabilistic program traces, stochastic branching (for expressing mixture models), and programmable inference interfaces. This vectorization
+    enables the implementation of compute-intensive probabilistic programming and probabilistic inference operations on modern GPUs, making it
+    possible to deploy the substantial computational resources that GPUs provide to accelerate large-scale probabilistic inference.
   </p>
-  
+
+  <h3>Design Considerations</h3>
+  <p>
+    GenJAX is designed around the interaction between <code>vmap</code> and several probabilistic programming features that support the
+    implementation of sophisticated models and inference algorithms:
+  </p>
+
   <ul>
-    <li><strong>Compositional vectorization</strong> of both modeling code (e.g., computing likelihoods over many datapoints)
-      and inference code (e.g., evolving particle collections or MCMC chains in parallel).</li>
-    <li><strong>Vectorized traces</strong> — structured records of random choices that maintain an efficient
-      struct-of-array layout under <code>vmap</code>, serving as the data lingua franca for Monte Carlo and variational inference.</li>
-    <li><strong>Vectorized stochastic branching</strong> — mixture models and regime-switching dynamics
-      that maintain vectorization even when different elements take different branches.</li>
+    <li><strong>Compositional vectorization.</strong> Our target class of probabilistic programs features multiple vectorizable computational patterns.
+      Examples include computing likelihoods simultaneously on many pieces of data (as part of modeling) and evolving collections of particles or chains
+      (as part of inference). Our integration of <code>vmap</code> therefore supports vectorization of both modeling and inference code.</li>
+    <li><strong>Vectorization of probabilistic program traces.</strong> Traces are structured record objects used to represent samples. They are a data lingua franca
+      for Monte Carlo and variational inference. Under vectorization by <code>vmap</code>, traces support an efficient struct-of-array representation.</li>
+    <li><strong>Vectorized stochastic branching.</strong> Probabilistic mixture models, regime-switching dynamics models, and adaptive inference algorithms require
+      stochastic branching using random values. GenJAX supports stochastic branching while maintaining vectorization.</li>
   </ul>
-  
+
+  <figure class="figure">
+    <img src="static/images/fig1-essential-capabilities.svg" alt="Essential capabilities for vectorized probabilistic programs" loading="lazy" />
+    <figcaption class="fig-caption"><strong>Figure.</strong> Computational patterns in vectorizable probabilistic programs.
+      Left: Within models, vectorization can be used to parallelize conditionally independent computations. Within inference, vectorization can be used to
+      simulate multiple particles in parallel. <code>vmap</code> should be applicable in both settings. Center: Traces are records used to represent samples
+      from probabilistic programs. Both vectorized models and vectorized inference algorithms are designed to work with vectorized (struct-of-array) traces.
+      Right: Probabilistic programs can branch on random values, and <code>vmap</code> of probabilistic programs should preserve this capability.</figcaption>
+  </figure>
+
+  <figure class="figure">
+    <img src="static/images/fig2-intro-approach.svg" alt="GenJAX design overview" loading="lazy" />
+    <figcaption class="fig-caption"><strong>Figure.</strong> The design and implementation of GenJAX.
+      Left: GenJAX extends <code>vmap</code> to apply to both generative models and inference algorithms. Our system implements inference on a vectorized model by
+      vectorizing inference applied to the model, which is justified by the commutativity corollary in the paper. Right: Survey of features in our language and compiler:
+      usage of these features is illustrated in Section 2 and Section 7, and implementation is discussed in Section 6.</figcaption>
+  </figure>
+
   <h3>Contributions</h3>
   <ol class="contributions">
-    <li><strong>GenJAX: High-Performance Compiler (Section 6).</strong> An open-source compiler that extends JAX and
-      <code>vmap</code> to support programmable probabilistic inference. Probabilistic programs can be
-      systematically transformed to take advantage of vectorization opportunities in both modeling and inference.
-      Our compiler uses lightweight effect handlers and JAX's program tracing to partially evaluate inference
-      logic at compile time, leaving only optimized array operations. Our design maintains full compatibility
-      with JAX's ecosystem for automatic differentiation and CPU/GPU/TPU compilation.</li>
-    <li><strong>Formal Model (Section 3).</strong> We develop $\gen$, a calculus for probabilistic programming
-      and programmable inference, on top of a core probabilistic array language. We define
-      <code>vmap</code> as a source-to-source program transformation, prove its correctness, and show
-      how it interacts with programmable inference interfaces to support vectorization
-      of probabilistic computations and traces.</li>
-    <li><strong>Empirical Evaluation (Section 7).</strong> We evaluate on benchmarks and case studies:
-      <ul>
-        <li><strong>Performance comparison:</strong> GenJAX achieves near-handcoded JAX performance (100.1% relative time
-          on Beta-Bernoulli), outperforming existing vectorized PPLs and array frameworks
-          (JAX, PyTorch, Pyro, NumPyro, and Gen).</li>
-        <li><strong>High-dimensional inference:</strong> We explore performance vs. expressivity tradeoffs
-          on Game of Life inversion (512×512 board states) and sequential 2D robot localization with
-          simulated LIDAR. Our algorithms achieve high approximation accuracy and run in milliseconds
-          on consumer-grade GPUs.</li>
-      </ul>
-    </li>
+    <li><strong>GenJAX: high-performance compiler (Section 6).</strong> GenJAX is an open-source compiler that extends JAX and <code>vmap</code> to support
+      programmable probabilistic inference. Probabilistic programs in GenJAX can be systematically transformed to take advantage of opportunities for
+      vectorization in both modeling and inference. Our compiler also eliminates the overhead present in many libraries for programmable inference: we implement
+      simulation and density interfaces using lightweight effect handlers, and exploit JAX's support for program tracing to partially evaluate inference logic away at
+      compile time, leaving only optimized array operations. Our design maintains full compatibility with JAX's underlying ecosystem for automatic differentiation and
+      CPU/GPU/TPU compilation.</li>
+    <li><strong>Formal model: interaction between <code>vmap</code> and programmable inference features (Section 3).</strong> We develop a formal model
+      characterizing how <code>vmap</code> interacts with probabilistic program traces and programmable inference interfaces. We introduce $\gen$, a calculus for
+      probabilistic programming and programmable inference, on top of a core probabilistic array language for stochastic parallel computations. We define <code>vmap</code>
+      as a program transformation, prove its correctness, and show how it interacts with programmable inference interfaces to support vectorization of probabilistic
+      computations and traces.</li>
+    <li><strong>Empirical evaluation (Section 7).</strong> We evaluate our design and implementation through a series of benchmarks and case studies: performance
+      comparison, where GenJAX achieves near-handcoded JAX performance and can outperform existing vectorized and high-performance PPLs and array programming
+      frameworks (JAX, PyTorch, Pyro, NumPyro, and Gen); and high-dimensional vectorized inference, where we study approximate Game of Life inversion (find the previous
+      512 x 512 board state which leads to the observed state) and sequential 2D robot localization with simulated LIDAR measurements. In both case studies, we use
+      GenJAX to develop sophisticated vectorized inference algorithms, including vectorized Gibbs sampling and sequential Monte Carlo with vectorized proposals. Our final
+      GenJAX programs exhibit high approximation accuracy and run in milliseconds on consumer-grade GPUs.</li>
   </ol>
 </section>
 
@@ -271,183 +294,133 @@
 
 <section id="tutorial" data-nav-section aria-labelledby="tutorial-heading">
   <h2 id="tutorial-heading">Overview (Tutorial): Vectorized Probabilistic Programming <a href="#tutorial" class="section-anchor" aria-label="Link to Overview (Tutorial)">#</a></h2>
-  
+
   <p>
-    Probabilistic programming enables Bayesian inference over complex models, but scaling inference
-    to large datasets and complex posteriors requires exploiting parallel hardware. This tutorial
-    introduces GenJAX through a running example—polynomial regression with outlier detection—
-    showing how vectorization with <code>vmap</code> enables efficient inference on GPU.
+    To introduce our language, consider the task of polynomial regression: given a dataset of pairs $(x_i, y_i) \in \mathbb{R}^2$
+    for $1 \leq i \leq n$, we wish to infer a polynomial relating $x$ and $y$. In the following sections, we illustrate how to solve
+    this problem using generative functions and programmable inference in GenJAX.
   </p>
 
-  <div class="info-box">
-    <div class="info-box-title">Tutorial Roadmap</div>
-    <p>
-      This track mirrors Section 2 (Overview) of the paper and follows the running example:
-      modeling, vectorization, stochastic branching, and programmable inference.
-    </p>
-    <ol class="roadmap-list">
-      <li>Define the polynomial regression model and trace structure.</li>
-      <li>Vectorize importance sampling with <code>vmap</code> and struct-of-arrays traces.</li>
-      <li>Add stochastic branching for outliers while preserving vectorization.</li>
-      <li>Compose custom Gibbs + HMC kernels via the generative function interface.</li>
-    </ol>
-  </div>
-  
   <section id="tutorial-core" class="tutorial-subsection" aria-labelledby="tutorial-core-heading">
-    <h3 id="tutorial-core-heading">Core Concepts</h3>
-    
+    <h3 id="tutorial-core-heading">Vectorizing Generative Functions with <code>vmap</code></h3>
+
     <p>
-      GenJAX is built around four key abstractions that work together to enable composable,
-      vectorizable probabilistic computation:
+      The first figure depicts a generative model for quadratic regression. The ultimate goal is to, given a noisy dataset
+      $(x_i, y_i)_{1 \leq i \leq n}$, infer a quadratic function that plausibly governs the relationship between $x$ and $y$.
+      Our model for this task is defined by composing generative functions, each defined as a <code>@gen</code>-decorated Python function.
+      A key feature of GenJAX is that each random choice is assigned a string-valued name using the syntax <code>dist @ "name"</code>.
+      The <code>polynomial</code> generative function describes a prior distribution on the coefficients (a, b, c) of the underlying quadratic function.
+      The <code>point</code> generative function models how an individual datapoint is generated based on those coefficients. Finally, <code>npoint_curve</code>
+      calls <code>polynomial</code> to generate coefficients and maps the <code>point</code> generative function over a vector of inputs.
     </p>
-    
-    <dl class="concept-list">
-    <dt>Generative Functions</dt>
-    <dd>
-      Python functions decorated with <code>@gen</code> that define probabilistic computations.
-      They represent probability distributions over both return values and internal random choices.
-    </dd>
-    
-    <dt>Addresses</dt>
-    <dd>
-      String-valued names assigned to random choices via the syntax <code>dist @ "name"</code>.
-      Addresses create a namespace for random variables, enabling trace manipulation and conditioning.
-    </dd>
-    
-    <dt>Traces</dt>
-    <dd>
-      Structured records of all random choices made during execution of a generative function.
-      Traces are the data lingua franca of programmable inference, enabling operations like
-      scoring, updating, and projecting to subsets of variables.
-    </dd>
-    
-    <dt>The Generative Function Interface (GFI)</dt>
-    <dd>
-      A standardized set of methods that every compiled generative function implements:
-      <code>simulate</code> (run forward), <code>assess</code> (compute density),
-      <code>update</code> (modify traces), and <code>project</code> (extract subsets).
-    </dd>
-    </dl>
-  </section>
-  
-  <section id="tutorial-step-1" class="tutorial-step" aria-labelledby="tutorial-step-1-heading">
-    <h3 id="tutorial-step-1-heading">Step 1: A Simple Polynomial Model</h3>
-    
+
     <p>
-      We begin with polynomial regression: given noisy datapoints $(x_i, y_i)$,
-      we wish to infer the quadratic coefficients $(a, b, c)$ relating $x$ and $y$.
-      Our model has three components:
-    </p>
-    
-    <ul>
-      <li><strong>Prior:</strong> A generative function <code>polynomial</code> that samples
-        coefficients from standard normal distributions.</li>
-      <li><strong>Likelihood:</strong> A generative function <code>point</code> that generates
-        a noisy observation given a specific $x$ value and coefficients.</li>
-      <li><strong>Dataset model:</strong> A generative function <code>npoint_curve</code> that
-        generates an entire dataset by mapping <code>point</code> over a vector of $x$ values.</li>
-    </ul>
-    
-    <p>
-      The <code>vmap</code> transformation exploits <em>conditional independence</em>: given the
-      coefficients, each datapoint is generated independently. This allows GenJAX to generate
-      all $n$ points in parallel rather than sequentially.
+      This is our first use of <code>vmap</code>: we use it to generate multiple y values in parallel, exploiting the fact that datapoints are generated
+      conditionally independently of one another, given the coefficients. This is an instance of a general pattern that appears in many probabilistic programs,
+      and is one key place where vectorization can yield significant speed-ups when parts of the generative model can be parallelized.
     </p>
 
     <figure class="figure">
       <div class="figure-row two-col">
         <div class="code-block">
-          <div class="code-header">generative_functions.py</div>
-          <pre><code class="language-python">@gen
-def polynomial():
-    a = normal(0.0, 1.0) @ "a"
-    b = normal(0.0, 1.0) @ "b"
-    c = normal(0.0, 1.0) @ "c"
-    return (a, b, c)
-
+          <div class="code-header">Generative functions</div>
+          <pre><code class="language-python"># Basic polynomial model
 @gen
-def point(x, coeffs):
-    a, b, c = coeffs
-    y_mean = a + b * x + c * x**2
-    y = normal(y_mean, 0.2) @ "obs"
-    return y</code></pre>
+def polynomial():
+  # @ denotes introduction of
+  # random choices
+  a = normal(0, 1) @ "a"
+  b = normal(0, 1) @ "b"
+  c = normal(0, 1) @ "c"
+  return (a, b, c)
+
+# Point model with noise
+@gen
+def point(x, a, b, c):
+  y_mean = a + b * x + c * x ** 2
+  y = normal(y_mean, 0.2) @ "obs"
+  return y</code></pre>
         </div>
         <div class="code-block">
-          <div class="code-header">vectorized_model.py</div>
+          <div class="code-header">Vectorization with <code>vmap</code></div>
           <pre><code class="language-python">@gen
 def npoint_curve(xs):
-    coeffs = polynomial() @ "curve"
-    ys = vmap(point, in_axes=(0, None))(xs, coeffs) @ "ys"
-    return coeffs, ys
+  (a, b, c) = polynomial() @ "curve"
+  # Vectorization for modeling: here, over data points
+  ys = point.vmap(args_mapped=0)(xs, a, b, c) @ "ys"
+  return (a, b, c), ys
 
+# Vectorized sampling from the generative function
+# using the simulate interface.
 xs = array([0.1, 0.3, 0.4, 0.6])
 traces = vmap(simulate(npoint_curve), repeat=4)(xs)
-densities, retvals = vmap(assess(npoint_curve), args_mapped=0)(traces, xs)</code></pre>
+
+# Vectorized evaluation of the pointwise density
+# using the assess interface.
+xs = traces.get_args()
+densities, retvals = (
+    vmap(assess(npoint_curve), args_mapped=0)(
+        traces, xs
+    )
+)</code></pre>
         </div>
       </div>
-      <figcaption class="fig-caption"><strong>Figure 3.</strong> Vectorization of generative functions.
-        Left: prior and likelihood code for polynomial regression. Right: <code>vmap</code> lifts the model to
-        batches and vectorizes <code>simulate</code> and <code>assess</code>.</figcaption>
+      <figcaption class="fig-caption"><strong>Figure.</strong> Vectorization of generative functions.
+        Left: Probabilistic programs encoding a prior over quadratic functions, and a single-datapoint likelihood.
+        Right: <code>vmap</code> can be used to parallelize the likelihood: the same program that works for single points works for many points via <code>vmap</code>.
+        Inference operations are also compatible with <code>vmap</code>.</figcaption>
     </figure>
-    
-    <div class="info-box tip">
-      <div class="info-box-title">Key Mechanism: Trace Vectorization</div>
-      <p>
-        When <code>vmap</code> transforms a generative function, it transforms the trace structure too:
-        from <em>array-of-structs</em> (one trace object per execution) to <em>struct-of-arrays</em>
-        (each address contains a vector of values). This memory layout enables efficient GPU computation.
-      </p>
-    </div>
-    
-    <figure class="figure">
-      <img src="static/images/curvefit_prior_multipoint_traces_density.svg"
-           alt="Vectorized traces from vmap(simulate)"
-           loading="lazy" />
-      <figcaption class="fig-caption"><strong>Figure 4.</strong> Vectorized traces. <code>vmap(simulate)</code> preserves
-      trace structure while batching random choices into arrays, yielding efficient struct-of-arrays traces.</figcaption>
-    </figure>
+
+    <p>
+      When <code>vmap</code> transforms a generative function, it induces a transformation on the values in the trace, preserving the structure of the trace while
+      converting scalars to arrays and returning a trace in struct-of-array representation.
+    </p>
   </section>
-  
-  <section id="tutorial-step-2" class="tutorial-step" aria-labelledby="tutorial-step-2-heading">
-    <h3 id="tutorial-step-2-heading">Step 2: Vectorized Importance Sampling</h3>
-    
+
+  <section id="tutorial-step-1" class="tutorial-step" aria-labelledby="tutorial-step-1-heading">
+    <h3 id="tutorial-step-1-heading">Vectorized Programmable Inference</h3>
+
     <p>
-      To perform inference, we use the GFI methods. <code>simulate</code> runs the program forward
-      and returns a trace; <code>assess</code> computes the log-probability of a trace.
-      These primitives compose to implement inference algorithms.
+      Generative functions are compiled to implementations of the generative function interface, which includes methods like <code>simulate</code> and <code>assess</code>.
+      The <code>simulate</code> method runs a generative function and yields an execution trace, and <code>assess</code> computes the probability density of a generative
+      function at a given trace. These methods can be composed to implement inference algorithms. For example, likelihood weighting involves simulating many possible
+      traces from the prior, and assessing them under the likelihood.
     </p>
-    
+
     <p>
-      Importance sampling is the simplest algorithm: sample many possible explanations (traces)
-      from the prior, weight each by how well it explains the observed data (likelihood ratio),
-      and use the weighted samples to approximate the posterior.
-    </p>
-    
-    <p>
-      By vectorizing both <code>simulate</code> and <code>assess</code>, we scale to thousands
-      of particles that execute simultaneously on GPU. The vectorization is compositional:
-      <code>vmap</code> of a GFI method is itself a GFI method operating on vectorized traces.
+      By vectorizing the compiled <code>simulate</code> and <code>assess</code> methods, we can generate or assess many traces at once. We can use <code>vmap</code> to scale
+      the number of guesses, automatically transforming single-particle code into a many-particle vectorized version. If the algorithm is executed in parallel on a GPU,
+      the number of particles can be freely increased as long as the GPU has free memory. The time remains near constant as we increase the number of particles, and the
+      accuracy improves to convergence.
     </p>
 
     <figure class="figure">
       <div class="figure-row two-col">
         <div class="code-block">
-          <div class="code-header">single_particle.py</div>
-          <pre><code class="language-python"># Single-particle importance sampling
-def importance_sample(model, obs, key):
-    trace = model.simulate(key)
-    weight = model.assess(trace, obs)
-    return trace, weight</code></pre>
+          <div class="code-header">Single particle importance sampling</div>
+          <pre><code class="language-python"># Single particle importance sampling.
+def importance_sampling(ys, xs):
+  trace = simulate(default_proposal)(xs)
+  logp, _ = assess(npoint_curve)(
+      {"ys" : {"obs" : ys}},
+      xs
+  )
+  w = logp - trace.get_score()
+  return (trace, w)</code></pre>
         </div>
         <div class="code-block">
-          <div class="code-header">vectorized.py</div>
-          <pre><code class="language-python"># Vectorize to N particles via vmap
-vectorized_is = vmap(importance_sample,
-                     in_axes=(None, None, 0))
+          <div class="code-header">Vectorized over N particles</div>
+          <pre><code class="language-python"># Vectorized over N particles.
+def vectorized_importance_sampling(ys, xs, N):
+  # vmap automatically batches over n copies
+  return vmap(
+      importance_sampling,
+      repeat=N
+  )(ys, xs)
 
-# Run with 10,000 particles in parallel
-keys = split(key, 10000)
-traces, weights = vectorized_is(model, obs, keys)</code></pre>
+# Compute log marginal likelihood estimate.
+def lmle(ws, N):
+  return logsumexp(ws) - log(N)</code></pre>
         </div>
       </div>
       <img src="static/images/curvefit_scaling_performance.svg"
@@ -456,187 +429,175 @@ traces, weights = vectorized_is(model, obs, keys)</code></pre>
       <img src="static/images/curvefit_posterior_scaling_combined.svg"
            alt="Posterior approximations at different particle counts"
            loading="lazy" />
-      <figcaption class="fig-caption"><strong>Figure 5.</strong> Vectorized programmable inference.
-        Top: single-particle importance sampling and its vectorized form. Middle: GPU scaling is near
-        constant until memory saturation. Bottom: posterior approximations converge as particle count grows.</figcaption>
+      <figcaption class="fig-caption"><strong>Figure.</strong> Vectorized programmable inference.
+        Top left: Single-particle importance sampling with a proposal (the default proposal is the prior in the <code>npoint_curve</code> model, excluding the <code>"obs"</code>
+        random variable) implemented using generative function interface methods (<code>simulate</code> and <code>assess</code>). Top right: Using <code>vmap</code>, we can automatically
+        transform the single-particle version into a many-particle vectorized version. Middle: The vectorized version runs in parallel on GPUs; the runtime is nearly constant
+        as long as the GPU has memory to spare. Increasing the number of particles increases accuracy. Bottom: Posterior approximations for different numbers of particles N.</figcaption>
     </figure>
   </section>
-  
-  <section id="tutorial-step-3" class="tutorial-step" aria-labelledby="tutorial-step-3-heading">
-    <h3 id="tutorial-step-3-heading">Step 3: Stochastic Branching for Outlier Detection</h3>
-    
+
+  <section id="tutorial-step-2" class="tutorial-step" aria-labelledby="tutorial-step-2-heading">
+    <h3 id="tutorial-step-2-heading">Improving Robustness Using Stochastic Branching</h3>
+
     <p>
-      The simple model assumes all data follows the same noise distribution. Real data often
-      violates this assumption. We enrich the model to handle outliers using
-      <em>stochastic branching</em>.
+      In real-world data, the assumptions of simple polynomial regression are often violated. Our polynomial model assumes every data point follows the same noise model —
+      but what if 10% of our measurements follow a different distribution? We can improve robustness by using stochastic branching, which allows us to account for outlier
+      observations through heterogeneous mixture modeling. Each data point gets a latent outlier flag. If the flag is true, the observation comes from a uniform distribution;
+      if false, it follows the noisy polynomial curve.
     </p>
-    
-    <p>
-      Each datapoint now has a latent "outlier flag" sampled from a Bernoulli distribution.
-      If the flag is true, the observation comes from a broad uniform distribution (outlier);
-      otherwise, it follows our precise polynomial model (inlier). The <code>Cond</code> combinator
-      implements this branching while maintaining full vectorization.
-    </p>
-    
+
     <figure class="figure">
-      <div class="code-block">
-        <div class="code-header">outlier_model.py</div>
-        <pre><code class="language-python">@gen
-def point_with_outlier(x, coeffs):
-    """Point model with outlier detection."""
-    a, b, c = coeffs
-
-    # Latent outlier flag
-    is_outlier = bernoulli(0.1) @ "outlier"
-
-    # Branch based on the random flag
-    y = Cond(is_outlier,
-        # Outlier: broad uniform distribution
-        lambda: uniform(-10, 10) @ "y",
-        # Inlier: precise polynomial with noise
-        lambda: normal(a*x**2 + b*x + c, 0.3) @ "y"
-    )
-    return y</code></pre>
+      <div class="figure-row two-col">
+        <div class="code-block">
+          <div class="code-header">Outlier-robust observation model</div>
+          <pre><code class="language-python"># Outlier-robust observation model
+@gen
+def point_with_outliers(x, a, b, c):
+  outlier_flag = bernoulli(0.1) @ "outlier"
+  y_mean = a + b * x + c * x ** 2
+  return cond(outlier_flag,
+    lambda x: uniform(-2.0, 2.0),
+    lambda x: trunc_norm(x, 0.05, 2.0),
+    y_mean,
+  ) @ "obs"</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">Vectorized curve model with outliers</div>
+          <pre><code class="language-python"># Vectorized curve model with outliers
+@gen
+def npoint_curve_with_outliers(xs):
+  (a, b, c) = polynomial() @ "curve"
+  ys = point_with_outliers.vmap(
+        args_mapped=0,
+    )(xs, a, b, c) @ "ys"
+  return ys</code></pre>
+        </div>
       </div>
       <img src="static/images/curvefit_outlier_detection_comparison.svg"
            alt="Outlier detection comparison"
            loading="lazy" />
-      <figcaption class="fig-caption"><strong>Figure 6.</strong> Robust modeling with stochastic branching.
-        Stochastic branching enables mixture models with outliers. (Left) Importance sampling on the
-        simple model underfits; (Center) the outlier model is harder to fit with generic inference;
-        (Right) a custom Gibbs + HMC kernel yields accurate posterior samples.</figcaption>
+      <figcaption class="fig-caption"><strong>Figure.</strong> Robust modeling with stochastic branching.
+        Stochastic branching allows us to extend our models to explain more complex data, including data with outliers. Circle markers depict observed data points; the shading
+        of the marker denotes the estimated posterior probability that the point is an outlier. Bottom, left: Using importance sampling to construct a posterior in our original
+        model results in a poor explanation of the data. Bottom, middle: Extending the model to explicitly represent outliers as random variables should allow us to produce better
+        explanations, but results in a harder inference problem which importance sampling cannot effectively solve. Bottom, right: Changing inference to vectorized MCMC using Gibbs
+        sampling (to infer outliers) and Hamiltonian Monte Carlo (to infer continuous parameters) finds better explanations of the data, i.e., more accurate posterior approximations.</figcaption>
     </figure>
-    
-    <p>
-      Stochastic branching maintains vectorization even when different elements take different
-      branches. The <code>Cond</code> combinator evaluates both branches and selects elements
-      based on the condition, enabling mixture models and regime-switching dynamics.
-    </p>
-    
-    <div class="info-box warning">
-      <div class="info-box-title">Inference Challenge</div>
-      <p>
-        The outlier model is more expressive but harder to fit. Importance sampling can identify
-        likely outliers, but posterior uncertainty remains high even with $10^5$ particles—a form
-        of underfitting caused by the added latent variables.
-      </p>
-    </div>
   </section>
-  
-  <section id="tutorial-step-4" class="tutorial-step" aria-labelledby="tutorial-step-4-heading">
-    <h3 id="tutorial-step-4-heading">Step 4: Programmable Inference with Gibbs + HMC</h3>
-    
+
+  <section id="tutorial-step-3" class="tutorial-step" aria-labelledby="tutorial-step-3-heading">
+    <h3 id="tutorial-step-3-heading">Improving Inference Accuracy Using Programmable Inference</h3>
+
     <p>
-      When generic inference fails, GenJAX enables custom algorithms tailored to the model structure.
-      We design a hybrid algorithm combining two techniques:
+      Even when a model's assumptions are sensible, inference can fail to find good explanations of a given dataset. Importance sampling applied to the outlier model identifies
+      likely outliers, but has wide uncertainty over the possible curves, and several curves do not seem to explain the data well. This is a kind of underfitting: by adding new
+      latent variables to our model, we have made inference more challenging, and the "guess and check" approach of importance sampling runs into limitations, even with $N = 10^5$
+      particles — the limit where our GPU memory begins to saturate.
     </p>
-    
-    <ul>
-      <li><strong>Gibbs sampling</strong> for the discrete outlier flags, exploiting conditional
-        independence to update all flags in parallel.</li>
-      <li><strong>Hamiltonian Monte Carlo (HMC)</strong> for the continuous polynomial coefficients,
-        using gradient information to explore the posterior efficiently.</li>
-    </ul>
-    
+
+    <p>
+      The right panel of the outlier figure illustrates the results of a custom hybrid algorithm, which combines Gibbs sampling and Hamiltonian Monte Carlo (HMC). The algorithm
+      uses Gibbs sampling to identify which points are outliers, and HMC to sample from the posterior distribution over curves, given the inliers. This algorithm generates much
+      more accurate posterior samples that explain the data well.
+    </p>
+  </section>
+
+  <section id="tutorial-step-4" class="tutorial-step" aria-labelledby="tutorial-step-4-heading">
+    <h3 id="tutorial-step-4-heading">Vectorized Gibbs Sampling and the Generative Function Interface</h3>
+
+    <p>
+      We present the GenJAX implementation of the Gibbs sampling step of our hybrid algorithm. Our implementation highlights generative function interface methods, including
+      trace manipulation and getter methods. In our outlier model, we apply Gibbs sampling to update the vector of outlier choices, keeping other random choices constant. As each
+      outlier choice is conditionally independent from the others (given all the non-outlier choices), the outlier updates can be vectorized. For each element, we enumerate the
+      unnormalized posterior density for the possible values for the outlier value, and then sample a new value from a categorical distribution.
+    </p>
+
     <figure class="figure">
       <div class="figure-row two-col">
         <div class="code-block">
-          <div class="code-header">gibbs_single.py</div>
+          <div class="code-header">Enumerative Gibbs update for single point</div>
           <pre><code class="language-python">def gibbs_outlier(subtrace):
-    def assess_flag(flag):
-        x, a, b, c = subtrace.args()
-        chm = {"outlier": flag,
-               "obs": subtrace["obs"]}
-        logp, _ = assess(point_with_outliers)(chm, x, a, b, c)
-        return logp
+  def _assess(v):
+    (x, a, b, c) = subtrace.args()
+    chm = {"outlier": v,
+           "obs": subtrace["obs"]}
+    log_prob, _ = assess(point_with_outliers)(
+      chm, x, a, b, c
+    )
+    return log_prob
 
-    log_probs = vmap(assess_flag)(array([False, True]))
-    return categorical(log_probs) == 1</code></pre>
+  log_probs = vmap(_assess)(
+    array([False, True])
+  )
+  return categorical(log_probs) == 1</code></pre>
         </div>
         <div class="code-block">
-          <div class="code-header">gibbs_vectorized.py</div>
-          <pre><code class="language-python"># `trace` stores batched values in struct-of-arrays form
+          <div class="code-header">Vectorized enumerative Gibbs</div>
+          <pre><code class="language-python"># `trace` is a single trace object
+# whose fields store batched values.
 def enumerative_gibbs(trace):
-    subtrace = trace.get_subtrace("ys")
-    new_outliers = vmap(gibbs_outlier)(subtrace)
-    new_trace, weight, _ = update(
-        trace, {"ys": {"outlier": new_outliers}}
-    )
-    return new_trace</code></pre>
+  xs  = trace.get_args()
+  # `subtrace` refers to the struct-of-arrays
+  # view for the "ys" addresses.
+  subtrace = trace.get_subtrace("ys")
+  new_outliers = vmap(gibbs_outlier)(subtrace)
+  # `update` applies the generative function
+  # interface method that edits a trace.
+  new_trace, weight, _ = update(
+    trace,
+    {"ys": {"outlier": new_outliers}},
+  )
+  return new_trace</code></pre>
         </div>
       </div>
-      <figcaption class="fig-caption"><strong>Figure 7.</strong> Vectorized enumerative Gibbs sampling for outlier detection.
-        Left: single-point Gibbs update by enumerating outlier flags. Right: <code>vmap</code> lifts the update
-        across all datapoints, then applies a trace update.</figcaption>
+      <figcaption class="fig-caption"><strong>Figure.</strong> Vectorized enumerative Gibbs sampling for outlier detection.
+        Left: Enumerative Gibbs update for a single data point's outlier indicator. For each possible value (inlier/outlier), we compute the log probability under the model
+        (proportional to the unnormalized posterior) and sample a new indicator using categorical sampling. Right: Vectorized Gibbs sampling step that applies the single-point
+        update across all data points using <code>vmap</code>, then updates the trace with the new outlier indicators.</figcaption>
     </figure>
-
-    <p>
-      These updates rely on the generative function interface (GFI), a small set of methods that enable
-      programmable inference by composing sampling, scoring, and trace manipulation.
-    </p>
 
     <figure class="figure">
-      <table class="comparison-table">
-        <thead>
-          <tr>
-            <th>Method</th>
-            <th>Role</th>
-            <th>Used For</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>simulate</code></td>
-            <td>Unconstrained sampling</td>
-            <td>Prior sampling, SMC proposals</td>
-          </tr>
-          <tr>
-            <td><code>assess</code></td>
-            <td>Density evaluation</td>
-            <td>Importance weights, diagnostics</td>
-          </tr>
-          <tr>
-            <td><code>generate</code></td>
-            <td>Constrained sampling</td>
-            <td>Importance sampling with observations</td>
-          </tr>
-          <tr>
-            <td><code>update</code></td>
-            <td>Trace modification</td>
-            <td>Gibbs, MCMC, local proposals</td>
-          </tr>
-        </tbody>
-      </table>
-      <figcaption class="fig-caption"><strong>Figure 8.</strong> Generative function interface methods for programmable inference.
-        These interfaces compose to build custom algorithms, from importance sampling to MCMC kernels.</figcaption>
+      <div class="figure-row two-col">
+        <div class="code-block">
+          <div class="code-header">simulate: sampling</div>
+          <pre><code class="language-python"># Unconstrained sampling of a trace
+tr = simulate(npoint_curve)(xs)</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">assess: density evaluation</div>
+          <pre><code class="language-python"># Evaluate log density at traced sample
+chm = get_choices(tr)
+logp, retval = assess(npoint_curve)(chm, xs)</code></pre>
+        </div>
+      </div>
+      <div class="figure-row two-col">
+        <div class="code-block">
+          <div class="code-header">generate: importance sampling</div>
+          <pre><code class="language-python"># Constrained sampling of a trace
+partial_chm = {"ys": {"obs": data}}
+tr_, weight = generate(npoint_curve)(
+    partial_chm, xs
+)</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">update: trace modification</div>
+          <pre><code class="language-python"># Modify a trace given constraints
+new_chm = {"curve": {"a": 1.0}}
+tr_, w, discard = update(npoint_curve)(
+    tr, new_chm, xs
+)</code></pre>
+        </div>
+      </div>
+      <figcaption class="fig-caption"><strong>Figure.</strong> Generative function interface methods.
+        GenJAX's generative functions provide several methods for programmable inference — a way to extend the system with new variants of inference using high-level interfaces.
+        For authoring programmable algorithms which use proposal distributions (like sequential Monte Carlo), the <code>simulate</code> method performs unconstrained sampling and
+        reciprocal density evaluation. For density evaluation, <code>assess</code> evaluates the log joint density of a generative function on traced samples. The <code>generate</code>
+        interface performs constrained sampling (using importance weighting), allowing construction of a trace with observation constraints. The <code>update</code> method modifies a
+        trace with provided choices, returning an updated trace and an incremental importance weight, and is used by algorithms like Gibbs sampling or Hamiltonian Monte Carlo to
+        modify traces.</figcaption>
     </figure>
-
-    <p>
-      We then compose the Gibbs updates with HMC moves over continuous parameters, yielding a hybrid
-      kernel that is both expressive and efficient.
-    </p>
-    
-    <div class="info-box tip">
-      <div class="info-box-title">Key Insight: Three Levels of Vectorization</div>
-      <p>
-        GenJAX enables vectorization at three levels: <strong>(1)</strong> in the model
-        (e.g., <code>vmap(point)</code> over datapoints), <strong>(2)</strong> in proposals
-        (e.g., enumerative grids), and <strong>(3)</strong> across particles or chains
-        (e.g., $10^4$ parallel MCMC chains). Every opportunity for parallelism is expressed
-        with <code>vmap</code>, leading to highly efficient inference on GPU.
-      </p>
-    </div>
   </section>
-  
-  <div class="info-box" style="margin-top: var(--space-xl);">
-    <div class="info-box-title">Next Steps</div>
-    <p>
-      Continue to the <strong>Theory Track</strong> for the formal semantics of $\gen$,
-      including the denotational semantics, program transformations, and correctness proofs.
-      Or explore the <a href="#evaluation">Evaluation</a> section for benchmark results
-      and case studies.
-    </p>
-  </div>
 </section>
 
 </div><!-- end tutorial track -->
@@ -646,249 +607,54 @@ def enumerative_gibbs(trace):
 
 <section id="theory" data-nav-section aria-labelledby="theory-heading">
   <h2 id="theory-heading">Formal Model (Theory): $\gen$ — A Core Calculus <a href="#theory" class="section-anchor" aria-label="Link to Formal Model (Theory)">#</a></h2>
-  
+
   <p>
-    This section presents the formal foundations of GenJAX. We introduce $\gen$,
-    a simply-typed lambda calculus for probabilistic programming with programmable inference,
-    define vectorization as a source-to-source transformation, and prove correctness.
+    In this section, we give the syntax and semantics of a core calculus for traced probabilistic programming with vectors, and formalize a program transformation that
+    vectorizes probabilistic programs. The formal model distills key ideas from our actual implementation in JAX, described in Section 6.
   </p>
 
-  <div class="info-box">
-    <div class="info-box-title">Paper Cross-Reference</div>
-    <p>
-      This track follows Section 3 (Formal Model) and Section 6 (Compiler) of the paper.
-      Figures 9–16 present the full formal syntax, semantics, and compiler diagrams.
-      The equations and summaries below track those results in compressed form; see the PDF for
-      the full figure set.
-    </p>
-    <ol class="roadmap-list">
-      <li>Syntax and types for the core calculus.</li>
-      <li>Denotational semantics in quasi-Borel spaces.</li>
-      <li>Programmable inference transformations.</li>
-      <li>Vectorization as a type-directed program transform.</li>
-      <li>Compiler architecture and implementation pipeline.</li>
-    </ol>
-  </div>
-  
   <section id="theory-syntax" aria-labelledby="theory-syntax-heading">
-    <h3 id="theory-syntax-heading">Syntax and Types</h3>
-    
+    <h3 id="theory-syntax-heading">Syntax of $\gen$</h3>
     <p>
-      $\gen$ extends a standard array programming calculus in two main ways:
-      a <strong>probability monad</strong> $\mathbb{P}$ for stochastic computations, and
-      a <strong>graded monad</strong> $\mathbb{G}^\gamma$ of <em>generative functions</em>
-      (traced probabilistic programs). The grading $\gamma$ tracks the address structure
-      of random choices.
+      $\gen$ is a simply-typed lambda calculus which extends a standard array programming calculus in two main ways: (1) a probability monad for stochastic computations; and
+      (2) a graded monad of generative functions, or traced probabilistic programs. Generative functions can be automatically compiled to the density functions and stochastic
+      traced simulation procedures necessary for inference.
     </p>
-  
-  <div class="math-block">
-    $$\begin{aligned}
-    \text{Base types } B &::= \mathbb{B} \mid \mathbb{R} \mid \mathbb{R}_{>0} \\
-    \text{Batched types } T &::= B \mid T[n] \\
-    \text{Ground types } \eta &::= 1 \mid T \mid \eta_1 \times \eta_2 
-      \mid \{k_1 : \eta_1, \ldots, k_n : \eta_n\} \\
-    \text{Types } \tau &::= \eta \mid \tau_1 \to \tau_2 \mid \tau_1 \times \tau_2 \\
-      &\quad \mid \mathbb{D}\{\eta\} \mid \mathbb{P}\{\eta\} 
-      \mid \mathbb{G}^\gamma\{\eta\}
-    \end{aligned}$$
-  </div>
-  
-  <p>
-    The type $\mathbb{D}\{\eta\}$ represents density-carrying distributions over $\eta$.
-    The graded monad $\mathbb{G}^\gamma\{\eta\}$ records addresses via the grading
-    $\gamma = \{k_1 : \eta_1, \ldots, k_n : \eta_n\}$. We equip gradings with a monoid
-    structure $\doubleplus$ for concatenation, with unit $\{\}$.
-  </p>
-  
-  <h4>Terms</h4>
-  
-  <div class="math-block">
-    $$\begin{aligned}
-    \text{Terms } t &::= () \mid c \mid p \mid x \mid (t_1, t_2) \mid \pi_i t \\
-      &\quad \mid t[k] \mid \{k_1 : t_1, \ldots, k_n : t_n\} \\
-      &\quad \mid t_1~t_2 \mid \lambda x.t \mid \textbf{let}~x = t_1~\textbf{in}~t_2 \\
-      &\quad \mid \textbf{select}(t_1, t_2, t_3) \mid \textbf{trace}_k\{t\} \\
-      &\quad \mid \textbf{return}_\mathbb{G}\{t\} \mid \textbf{return}_\mathbb{P}\{t\} \\
-      &\quad \mid \textbf{do}_\mathbb{G}\{m\} \mid \textbf{do}_\mathbb{P}\{m\} \mid \textbf{sample}~t
-    \end{aligned}$$
-  </div>
-  
-    <table class="comparison-table">
-    <thead>
-      <tr>
-        <th>Construct</th>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>$\mathtt{sample}\ t$</td>
-        <td>$\mathbb{P}\{\eta\}$</td>
-        <td>Sample from distribution $t : \mathbb{D}\{\eta\}$</td>
-      </tr>
-      <tr>
-        <td>$\mathtt{trace}_k\ t$</td>
-        <td>$\mathbb{G}^{\{k:\gamma\}}\{\eta\}$</td>
-        <td>Name generative function at address $k$</td>
-      </tr>
-      <tr>
-        <td>$\mathtt{do}_{\mathbb{G}}\{x \leftarrow t; m\}$</td>
-        <td>$\mathbb{G}^{\gamma \doubleplus \gamma'}\{\eta'\}$</td>
-        <td>Sequence generative functions (disjoint addresses)</td>
-      </tr>
-      <tr>
-        <td>$\mathtt{select}(c, t_1, t_2)$</td>
-        <td>$T^s$</td>
-        <td>Batched conditional selection</td>
-      </tr>
-    </tbody>
-    </table>
   </section>
-  
+
   <section id="theory-semantics" aria-labelledby="theory-semantics-heading">
     <h3 id="theory-semantics-heading">Denotational Semantics</h3>
-    
     <p>
-      We give a denotational semantics for $\gen$ using <strong>quasi-Borel spaces</strong> (QBS),
-      a convenient category for higher-order probabilistic programming. QBS supports function spaces,
-      products, and a probability monad while properly handling measure-theoretic concerns.
-    </p>
-  
-  <div class="math-block">
-    $$\begin{aligned}
-    \sem{\mathbb{B}} &= \mathbb{B} \quad \sem{\mathbb{R}} = \mathbb{R} \\
-    \sem{T[n]} &= \sem{T}^n \quad 
-    \sem{\eta_1 \times \eta_2} = \sem{\eta_1} \times \sem{\eta_2} \\
-    \sem{\tau_1 \to \tau_2} &= [\sem{\tau_1}, \sem{\tau_2}] \\
-    \sem{\mathbb{P}\{\eta\}} &= \mathcal{P}\sem{\eta} \\
-    \sem{\mathbb{G}^\gamma\{\eta\}} &= \mathcal{P}_{\ll}\sem{\gamma} \times [\sem{\gamma}, \sem{\eta}]
-    \end{aligned}$$
-  </div>
-  
-    <p>
-      A generative function denotes a pair: a measure on traces (absolutely continuous w.r.t.
-      the stock measure), and a return value function $\sem{\gamma} \to \sem{\eta}$ that
-      computes the program's output given values for all random choices.
+      We give a denotational semantics for $\gen$ using quasi-Borel spaces (QBS), a standard mathematical framework for higher-order probabilistic programming. We assign to
+      each type a space and to each term a map from the interpretation of the environment to the interpretation of its return type. A generative function is interpreted as a
+      pair of a measure on traces and a return value function that computes the program's output given values for all random choices.
     </p>
   </section>
-  
+
   <section id="theory-inference" aria-labelledby="theory-inference-heading">
     <h3 id="theory-inference-heading">Programmable Inference Transformations</h3>
-    
     <p>
-      Generative functions support two fundamental operations implemented as source-to-source
-      program transformations:
+      The formal model characterizes how generative functions support programmable inference by compiling to simulation and density-evaluation procedures. These transformations
+      provide the foundation for implementing inference algorithms via high-level interfaces such as <code>simulate</code>, <code>assess</code>, <code>generate</code>, and
+      <code>update</code>, which we use throughout the system.
     </p>
-  
-  <div class="math-block">
-    $$\begin{aligned}
-    \text{simulate} : \mathbb{G}^\gamma\{\eta\} &\to \mathbb{P}\{(\gamma \times \eta \times \mathbb{R})\} \\
-    \text{assess} : \mathbb{G}^\gamma\{\eta\} &\to \gamma \to (\eta \times \mathbb{R})
-    \end{aligned}$$
-  </div>
-  
-  <p>
-    <strong>Simulate</strong> runs the program forward, collecting a trace, return value, and joint density.
-    <strong>Assess</strong> computes the density of a given trace by replaying the program with
-    constrained values.
-  </p>
-  
-    <div class="theorem-box">
-      <div class="theorem-title">Proposition (Correctness of Simulate and Assess)</div>
-      <p>
-        Let $\vdash t : \mathbb{G}^\gamma\{\eta\}$ with denotation $(\mu, f) = \sem{t}$
-        and let $\nu$ be the stock measure on $\gamma$. Then:
-      </p>
-      <ul>
-        <li>$\sem{\text{simulate}\{t\}} = \langle \text{id}, f, \frac{d\mu}{d\nu}\rangle_*\mu$ — 
-          simulate faithfully generates traces from $\mu$ with their densities.</li>
-        <li>$\sem{\text{assess}\{t\}} = \langle f, \frac{d\mu}{d\nu}\rangle$ — 
-          assess faithfully computes return values and densities at given traces.</li>
-      </ul>
-    </div>
   </section>
-  
+
   <section id="theory-vectorization" aria-labelledby="theory-vectorization-heading">
     <h3 id="theory-vectorization-heading">Vectorization as Program Transformation</h3>
-    
     <p>
-      We define $\text{vmap}_n$ as a type-directed program transformation that takes a term
-      of type $\tau$ and produces a vectorized term of type $\tau[n]$.
+      We introduce <code>vmap</code> as a program transform for vectorization and prove its correctness for deterministic, probabilistic, and generative computations. The proofs
+      show how vectorization preserves distributions and trace structure and how it interacts with programmable inference interfaces.
     </p>
-  
-  <div class="math-block">
-    $$\begin{aligned}
-    (\mathbb{D}\{\eta\})[n] &::= \mathbb{D}\{\eta[n]\} \\
-    (\mathbb{G}^\gamma\{\eta\})[n] &::= \mathbb{G}^{\gamma[n]}\{\eta[n]\} \\
-    \{k_1 : \eta_1, \ldots\}[n] &::= \{k_1 : \eta_1[n], \ldots\}
-    \end{aligned}$$
-  </div>
-  
-  <div class="theorem-box">
-    <div class="theorem-title">Theorem (Correctness of Vectorization)</div>
-    <p>
-      For closed $\vdash t : T \to \tau$ and input $v$ of type $T[n]$:
-    </p>
-    <ul>
-      <li><strong>Deterministic:</strong> If $\tau = \eta$, then
-        $\sem{\text{vmap}_n\{t\}}(v) = \text{zip}_\eta(\sem{t}(v[1]), \ldots, \sem{t}(v[n]))$.</li>
-      <li><strong>Probabilistic:</strong> If $\tau = \mathbb{P}\{\eta\}$, then
-        $\sem{\text{vmap}_n\{t\}}(v) = \text{zip}_{\eta*}\bigotimes_{i=1}^n \sem{t}(v[i])$.</li>
-      <li><strong>Generative:</strong> If $\tau = \mathbb{G}^\gamma\{\eta\}$, both trace
-        distributions and return value maps vectorize correctly.</li>
-    </ul>
-  </div>
-  
-    <div class="theorem-box">
-      <div class="theorem-title">Corollary (Commutativity of vmap and Inference)</div>
-      <p>
-        Vectorization commutes with programmable inference operations:
-      </p>
-      <ul>
-        <li>$\sem{\text{simulate}\{\text{vmap}_n\{t\}\}} = 
-          \langle \text{id}, \text{id}, v \mapsto \prod_i v[i]\rangle_*\sem{\text{vmap}_n\{\text{simulate}\{t\}\}}$</li>
-      </ul>
-      <p style="margin-top: var(--space-sm);">
-        This justifies our implementation strategy: inference on vectorized models can be
-        implemented by vectorizing inference applied to the model.
-      </p>
-    </div>
   </section>
-  
+
   <section id="theory-compiler" aria-labelledby="theory-compiler-heading">
-    <h3 id="theory-compiler-heading">Compiler Architecture</h3>
-    
+    <h3 id="theory-compiler-heading">Compiler Connection</h3>
     <p>
-      The GenJAX compiler translates Python with <code>@gen</code> decorators to JAX-compatible
-      code through several stages:
-    </p>
-  
-  <ol>
-    <li><strong>Tracing:</strong> Python control flow is staged via JAX tracing, capturing
-      the computational graph.</li>
-    <li><strong>Effect Handling:</strong> Random choices are reified as effect operations,
-      routed to struct-of-array trace data structures.</li>
-    <li><strong>Partial Evaluation:</strong> Inference logic is evaluated at compile time
-      where possible, leaving only optimized array operations.</li>
-    <li><strong>Code Generation:</strong> JAX primitives with efficient memory layout,
-      supporting automatic differentiation and TPU/GPU compilation.</li>
-  </ol>
-  
-    <p>
-      The formal results above guarantee that these compiler transformations preserve semantics
-      while enabling efficient vectorized execution on modern accelerators.
+      The formal results justify the implementation strategy in the compiler section: inference on a vectorized model can be implemented by vectorizing inference applied to the
+      model. Section 6 describes the compiler architecture and how these ideas are realized in a JAX-based implementation.
     </p>
   </section>
-  
-  <div class="info-box" style="margin-top: var(--space-xl);">
-    <div class="info-box-title">Next Steps</div>
-    <p>
-      Continue to the <a href="#evaluation">Evaluation</a> section for benchmarks and case studies,
-      or return to the <strong>Tutorial Track</strong> for worked examples that mirror the formal
-      transformations above.
-    </p>
-  </div>
 </section>
 
 </div><!-- end theory track -->
@@ -903,20 +669,20 @@ def enumerative_gibbs(trace):
       <li><a href="#introduction" class="toc-h2">Introduction</a></li>
       <li data-track="tutorial"><a href="#tutorial" class="toc-h2">Overview (Tutorial)</a>
         <ul>
-          <li><a href="#tutorial-core" class="toc-h3">Core Concepts</a></li>
-          <li><a href="#tutorial-step-1" class="toc-h3">Step 1: Polynomial Model</a></li>
-          <li><a href="#tutorial-step-2" class="toc-h3">Step 2: Vectorized IS</a></li>
-          <li><a href="#tutorial-step-3" class="toc-h3">Step 3: Stochastic Branching</a></li>
-          <li><a href="#tutorial-step-4" class="toc-h3">Step 4: Gibbs + HMC</a></li>
+          <li><a href="#tutorial-core" class="toc-h3">Vectorizing Generative Functions</a></li>
+          <li><a href="#tutorial-step-1" class="toc-h3">Vectorized Inference</a></li>
+          <li><a href="#tutorial-step-2" class="toc-h3">Stochastic Branching</a></li>
+          <li><a href="#tutorial-step-3" class="toc-h3">Programmable Inference</a></li>
+          <li><a href="#tutorial-step-4" class="toc-h3">Vectorized Gibbs + GFI</a></li>
         </ul>
       </li>
       <li data-track="theory"><a href="#theory" class="toc-h2">Formal Model (Theory)</a>
         <ul>
-          <li><a href="#theory-syntax" class="toc-h3">Syntax and Types</a></li>
+          <li><a href="#theory-syntax" class="toc-h3">Syntax of $\gen$</a></li>
           <li><a href="#theory-semantics" class="toc-h3">Denotational Semantics</a></li>
           <li><a href="#theory-inference" class="toc-h3">Inference Transformations</a></li>
           <li><a href="#theory-vectorization" class="toc-h3">Vectorization Transform</a></li>
-          <li><a href="#theory-compiler" class="toc-h3">Compiler Architecture</a></li>
+          <li><a href="#theory-compiler" class="toc-h3">Compiler Connection</a></li>
         </ul>
       </li>
       <li><a href="#evaluation" class="toc-h2">Evaluation</a>
@@ -924,7 +690,6 @@ def enumerative_gibbs(trace):
           <li><a href="#evaluation-performance" class="toc-h3">Performance</a></li>
           <li><a href="#evaluation-gol" class="toc-h3">Game of Life</a></li>
           <li><a href="#evaluation-localization" class="toc-h3">Localization</a></li>
-          <li><a href="#evaluation-summary" class="toc-h3">Summary</a></li>
         </ul>
       </li>
       <li><a href="#conclusion" class="toc-h2">Conclusion</a></li>
@@ -954,202 +719,141 @@ def enumerative_gibbs(trace):
 <!-- EVALUATION (Common section) -->
 <section id="evaluation" data-nav-section aria-labelledby="evaluation-heading">
   <h2 id="evaluation-heading">Evaluation <a href="#evaluation" class="section-anchor" aria-label="Link to Evaluation">#</a></h2>
-  
-  <p>
-    We evaluate GenJAX on benchmarks and case studies designed to assess two key criteria:
-    <strong>performance</strong> (how does our compiler compare to leading PPLs and hand-optimized code?)
-    and <strong>inference quality</strong> (can we construct effective inference for high-dimensional problems?).
-    Our results demonstrate that GenJAX achieves near-zero overhead compared to hand-coded JAX while
-    enabling sophisticated inference algorithms on challenging problems.
-  </p>
-  
-  <section id="evaluation-performance" aria-labelledby="evaluation-performance-heading">
-    <h3 id="evaluation-performance-heading">Performance Survey</h3>
-    
-    <p>
-      We compare GenJAX against NumPyro, Pyro, PyMC, TensorFlow Probability, and hand-coded JAX
-      on two fundamental inference paradigms: importance sampling (embarrassingly parallel) and 
-      Hamiltonian Monte Carlo (iterative, gradient-based).
-    </p>
-    
-    <h4>Beta-Bernoulli Model</h4>
-  
-  <p>
-    The Beta-Bernoulli model infers the bias of a coin from observed flips, using a Beta(1,1) prior 
-    and Bernoulli likelihood. We observe 50 flips and construct a posterior approximation using 
-    importance sampling.
-  </p>
-  
-  <figure class="figure">
-    <img src="static/images/combined_3x2_obs50_samples2000.svg"
-         alt="Beta-Bernoulli model: posterior accuracy and timing comparison"
-         loading="lazy" />
-    <div class="figure-row two-col">
-      <div>
-        <img src="static/images/benchmark_timings_is_all_frameworks.svg"
-             alt="Importance sampling timing comparison"
-             loading="lazy" />
-      </div>
-      <div>
-        <img src="static/images/benchmark_timings_hmc_all_frameworks.svg"
-             alt="HMC timing comparison"
-             loading="lazy" />
-      </div>
-    </div>
-    <figcaption class="fig-caption"><strong>Figure 17.</strong> Performance evaluation across probabilistic programming frameworks.
-      (a) Beta-Bernoulli inference comparing posterior accuracy and execution time for GenJAX, NumPyro, and hand-coded JAX
-      with 50 observations and 2000 samples. (b) Scaling analysis across six frameworks showing GenJAX remains near hand-coded
-      performance for both importance sampling and Hamiltonian Monte Carlo.</figcaption>
-  </figure>
 
-  <h4>Scaling Analysis</h4>
-  
   <p>
-    On the polynomial regression problem, we examine how inference time scales with 
-    problem size. Importance sampling exhibits near-constant wall-clock time as particle count increases 
-    (while GPU memory permits), validating the effectiveness of vectorization. HMC shows linear scaling 
-    in chain length, as expected for iterative algorithms.
+    We evaluate our language and compiler implementation on benchmarks and case studies designed to assess the following criteria:
   </p>
-  
-  <p>
-    The scaling plots in Figure 17 highlight that importance sampling remains near-constant in runtime
-    as particle count grows (until GPU saturation), while HMC scales linearly with chain length.
-  </p>
-  
-    <div class="info-box tip">
-      <div class="info-box-title">Key Result: Zero-Cost Abstractions</div>
-      <p>
-        GenJAX achieves <strong>100.1% relative time</strong> compared to hand-coded JAX on the Beta-Bernoulli model.
-        Our compiler eliminates abstraction overhead through partial evaluation at compile time, 
-        leaving only optimized array operations that execute at native JAX speed.
-      </p>
-    </div>
-  </section>
-  
-  <section id="evaluation-gol" aria-labelledby="evaluation-gol-heading">
-    <h3 id="evaluation-gol-heading">Case Study: Probabilistic Game of Life Inversion</h3>
-    
-    <p>
-      Game of Life (GoL) inversion is the problem of inverting Conway's Game of Life dynamics: given a final state,
-      what is a possible previous state that evolves to it? Brute-force search is intractable
-      ($2^{N \times N}$ possible states for an $N \times N$ board).
-    </p>
-  
-  <figure class="figure">
-    <img src="static/images/conway_gol.svg"
-         alt="Conway's Game of Life evolution rules"
-         loading="lazy" />
-    <figcaption class="fig-caption"><strong>Figure 18.</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
-    We add a uniform prior over board state and probabilistic Bernoulli noise on top of the deterministic rules
-    to construct a probabilistic inversion problem.</figcaption>
-  </figure>
-  
-  <p>
-    We introduce probabilistic noise into the dynamics: from an initial state, we evolve forward using 
-    deterministic rules, then sample with Bernoulli noise around the true value of each cell. This 
-    creates a probabilistic inversion problem amenable to approximate inference.
-  </p>
-  
-  <h4>Vectorized Gibbs Sampling for GoL</h4>
-  
-  <p>
-    Each cell's value is conditionally independent from non-neighboring cells given its eight neighbors.
-    We partition cells into conditionally independent groups (a 2-coloring of the grid) and perform 
-    parallel Gibbs updates — an instance of <strong>chromatic Gibbs sampling</strong>.
-    The vectorized implementation achieves up to 90% inversion accuracy on 1024×1024 grids in seconds.
-  </p>
-  
-  <figure class="figure">
-    <img src="static/images/gol_integrated_showcase_wizards_1024.svg"
-         alt="Game of Life inversion showcase"
-         loading="lazy" />
-    <img src="static/images/gol_gibbs_timing_bar_plot.svg"
-         alt="Game of Life Gibbs sampling throughput"
-         loading="lazy" />
-    <figcaption class="fig-caption"><strong>Figure 19.</strong> Vectorized Gibbs sampling in the <em>Game of Life</em>.
-      Top: probabilistic inversion on a 1024×1024 wizard-book pattern; Bottom: sweep timing across grid sizes
-      comparing CPU and GPU execution.</figcaption>
-  </figure>
-  </section>
-  
-  <section id="evaluation-localization" aria-labelledby="evaluation-localization-heading">
-    <h3 id="evaluation-localization-heading">Case Study: Robot Localization with Sequential Monte Carlo</h3>
-    
-    <p>
-      Simultaneous Localization and Mapping (SLAM) is a fundamental robotics problem: constructing a 
-      representation of the environment and the robot's position within it. When the map is given, 
-      this reduces to the <strong>localization problem</strong>.
-    </p>
-  
-  <p>
-    We model a robot maneuvering through a known 2D space, receiving LIDAR distance measurements.
-    The goal is to maintain a probabilistic belief over the robot's position. Using GenJAX's 
-    programmable inference abstractions, we develop three SMC algorithms:
-  </p>
-  
-  <table class="comparison-table">
-    <thead>
-      <tr>
-        <th>Algorithm</th>
-        <th>Proposal</th>
-        <th>Key Feature</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Bootstrap Filter</td>
-        <td>Model prior</td>
-        <td>Baseline: particles sampled from dynamics</td>
-      </tr>
-      <tr>
-        <td>SMC + HMC</td>
-        <td>Prior + HMC rejuvenation</td>
-        <td>Gradient-based moves after resampling</td>
-      </tr>
-      <tr>
-        <td>SMC + Locally Optimal</td>
-        <td>Vectorized grid enumeration</td>
-        <td>Evaluates grid of positions, selects ML point</td>
-      </tr>
-    </tbody>
-  </table>
-  
-  <p>
-    The locally optimal proposal adds another layer of vectorization <em>within</em> the custom proposal:
-    it enumerates a position grid, evaluates each against the observation likelihood (fully vectorized),
-    selects the maximum likelihood point, and samples around it. Combined with vectorization across 
-    particles and in the LIDAR measurement model, this yields a highly efficient algorithm.
-  </p>
-  
-  <figure class="figure">
-    <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.svg"
-         alt="Robot localization problem"
-         loading="lazy" />
-    <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.svg"
-         alt="SMC methods comparison"
-         loading="lazy" />
-    <figcaption class="fig-caption"><strong>Figure 20.</strong> Robot localization using programmable sequential Monte Carlo.
-      Top: problem setup with LIDAR-based observations. Bottom: comparison of SMC variants showing the locally optimal
-      proposal achieves the best accuracy-efficiency tradeoff.</figcaption>
-  </figure>
-  </section>
-  
-  <section id="evaluation-summary" aria-labelledby="evaluation-summary-heading">
-    <h3 id="evaluation-summary-heading">Summary</h3>
-    
-    <p>
-      Our evaluation demonstrates that GenJAX successfully unifies vectorization and programmable inference:
-    </p>
-  
+
   <ul>
-    <li><strong>Performance:</strong> Zero-cost abstractions match hand-coded JAX; vectorized frameworks 
-      outperform non-vectorized alternatives by orders of magnitude on GPU.</li>
-    <li><strong>Expressivity:</strong> The <code>vmap</code> idiom naturally composes across model, proposal, 
-      and particle dimensions, enabling sophisticated algorithms like chromatic Gibbs and locally optimal SMC.</li>
-    <li><strong>Scalability:</strong> Problems with millions of latent variables (1024×1024 grids) can be 
-      solved efficiently using GPU-accelerated vectorized inference.</li>
+    <li><strong>Performance.</strong> How does the performance of our compiler implementation compare to leading programmable inference systems? Do our abstractions introduce
+      overhead compared to handcoded implementations of inference? We survey the performance properties of GenJAX against open-source PPLs and tensor frameworks on standard
+      modeling and inference tasks, for both embarrassingly-parallel algorithms (importance sampling) and iterative differentiable algorithms (Hamiltonian Monte Carlo).</li>
+    <li><strong>Inference quality.</strong> <code>vmap</code> provides a convenient way to express inference problems over high-dimensional spaces. We study probabilistic Game of
+      Life inversion on large boards using approximate inference and use GenJAX to construct an efficient nested vectorized Gibbs sampler. We also study a probabilistic model of
+      robot localization using simulated LIDAR measurements and construct sequential Monte Carlo algorithms, including an efficient algorithm using proposals with vectorized
+      locally optimal grid approximations.</li>
   </ul>
-</section>
+
+  <section id="evaluation-performance" aria-labelledby="evaluation-performance-heading">
+    <h3 id="evaluation-performance-heading">Performance Survey Evaluation</h3>
+
+    <figure class="figure">
+      <img src="static/images/combined_3x2_obs50_samples2000.svg"
+           alt="Beta-Bernoulli inference accuracy and timing comparison"
+           loading="lazy" />
+      <div class="figure-row two-col">
+        <div>
+          <img src="static/images/benchmark_timings_is_all_frameworks.svg"
+               alt="Importance sampling timing comparison"
+               loading="lazy" />
+        </div>
+        <div>
+          <img src="static/images/benchmark_timings_hmc_all_frameworks.svg"
+               alt="HMC timing comparison"
+               loading="lazy" />
+        </div>
+      </div>
+      <figcaption class="fig-caption"><strong>Figure.</strong> Performance evaluation across probabilistic programming frameworks.
+        (a) Beta-Bernoulli inference comparing posterior accuracy and execution time for GenJAX, NumPyro, and handcoded JAX implementations with 50 observations and 2000 samples,
+        demonstrating importance sampling using GenJAX's programmable inference abstractions is competitive with handcoded performance.
+        (b) Scaling analysis across six frameworks showing GenJAX achieves performance is consistently near handcoded JAX and competitive with other open-source PPLs, for both
+        importance sampling and Hamiltonian Monte Carlo.</figcaption>
+    </figure>
+
+    <p>
+      The top panel examines the runtime characteristics of our compiler on importance sampling in a Beta-Bernoulli model. The model infers the bias of a coin from observed flips,
+      using a Beta(1,1) prior and Bernoulli likelihood. We observe 50 flips and construct a posterior approximation using importance sampling. The results confirm that all frameworks
+      accurately recover the true posterior distribution. GenJAX achieves near-identical performance to handcoded JAX (100.1% relative time).
+    </p>
+
+    <p>
+      The bottom panel presents performance results for importance sampling and Hamiltonian Monte Carlo (HMC) on the polynomial regression problem from the overview. Importance
+      sampling exhibits parallel scaling with the number of particles: vectorized PPLs and tensor frameworks have near constant scaling while the GPU is not saturated. HMC is run
+      iteratively, so scaling is linear in the length of the chain. GenJAX is consistently close to handcoded and optimized JAX, validating that our abstractions for programmable
+      inference introduce minimal overhead.
+    </p>
+  </section>
+
+  <section id="evaluation-gol" aria-labelledby="evaluation-gol-heading">
+    <h3 id="evaluation-gol-heading">Probabilistic Game of Life Inversion</h3>
+
+    <figure class="figure">
+      <img src="static/images/conway_gol.svg"
+           alt="Conway's Game of Life evolution rules"
+           loading="lazy" />
+      <figcaption class="fig-caption"><strong>Figure.</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
+        In our case study, we add a uniform prior over board state and probabilistic Bernoulli noise on top of the deterministic rules to construct a <em>Game of Life</em>
+        generative function. We can then condition the observed next state and construct an inference problem whose solutions correspond to approximate inversions of the
+        Game of Life dynamics.</figcaption>
+    </figure>
+
+    <figure class="figure">
+      <img src="static/images/gol_integrated_showcase_wizards_1024.svg"
+           alt="Game of Life inversion showcase"
+           loading="lazy" />
+      <img src="static/images/gol_gibbs_timing_bar_plot.svg"
+           alt="Game of Life Gibbs sampling throughput"
+           loading="lazy" />
+      <figcaption class="fig-caption"><strong>Figure.</strong> Vectorized Gibbs sampling in the <em>Game of Life</em>.
+        Probabilistic Game of Life inversion on the wizard book cover ($1024 \times 1024$ grid). Top: (1) Previous state (unknown, the target of our inference process);
+        (2) Observed future state (the target pattern); (3) Vectorized Gibbs chain showing states constructed by inference in a progression from t=0 to t=499;
+        (4) One-step deterministic evolution of final inferred state, reconstruction accuracy (measured as discrepancy between bits) is around 90%.
+        Bottom: Benchmark timings of single vectorized Gibbs sweep performance across board sizes, comparing CPU and GPU execution times. GPU execution timings demonstrate the benefit
+        of parallel hardware acceleration for vectorized inference. Overall: the runtime takes about 2.8 seconds for 500 iterations on an RTX 4090 GPU, with about 93% reconstruction
+        accuracy (70,109 bits out of 1,048,576 total bits).</figcaption>
+    </figure>
+
+    <p>
+      Game of Life inversion is the problem of inverting the dynamics of Conway's <em>Game of Life</em>: given a final state, what is a possible previous state that evolves to
+      the final state under the rules of the game? Brute force discrete search is computationally intractable, requiring evaluation of $2^{N \times N}$ states, where $N$ is the linear
+      dimension of a square Game of Life board. In this case study, we introduce probabilistic noise into the dynamics: from an initial state, we evolve forward using the
+      deterministic rules, but then sample with Bernoulli noise around the true value of each pixel. We illustrate approximate inversion using vectorized Gibbs sampling.
+    </p>
+
+    <p>
+      Because each cell's value is conditionally independent from non-neighboring cells' values, given its eight neighbors, we partition the board's cells into conditionally
+      independent groups (given the other groups). Within each group, we can perform parallel Gibbs updates on all the cells, an example of chromatic Gibbs. The result is a highly
+      efficient probabilistic inversion algorithm which can invert Life states with up to 90% accuracy in a few seconds.
+    </p>
+  </section>
+
+  <section id="evaluation-localization" aria-labelledby="evaluation-localization-heading">
+    <h3 id="evaluation-localization-heading">Robot Localization</h3>
+
+    <figure class="figure">
+      <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.svg"
+           alt="Robot localization problem"
+           loading="lazy" />
+      <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.svg"
+           alt="SMC methods comparison"
+           loading="lazy" />
+      <figcaption class="fig-caption"><strong>Figure.</strong> Robot localization using programmable sequential Monte Carlo.
+        (a) Problem setup showing robot trajectory through a multi-room environment with an 8-ray LIDAR sensor model for distance-based localization.
+        (b) Comparison of three SMC variants: Bootstrap filter, SMC+HMC, and SMC+Locally Optimal, showing particle approximation evolution and execution time performance.</figcaption>
+    </figure>
+
+    <p>
+      In robotics, simultaneous mapping and localization (SLAM) refers to the problem of constructing a representation of the map of an environment and the position of the robot
+      within the map based on measurements. If the map is given, the problem is called localization: a robot maneuvers through a known space and receives measurements of distance
+      to the walls. The goal is to construct a probabilistic representation of where the robot is located. In this case study, we use GenJAX to write a model for robot
+      localization, with Gaussian drift dynamics and a simulated LIDAR measurement. Given a sequence of LIDAR measurements over time as observations, we constrain the model to
+      produce a posterior over robot locations.
+    </p>
+
+    <ul>
+      <li><strong>Bootstrap filter.</strong> Sequential Monte Carlo where the prior (from the model) is used as the proposal for the latent position of the robot.</li>
+      <li><strong>SMC + HMC.</strong> Adds HMC moves to the bootstrap filter. These moves are applied to the particle collection after resampling.</li>
+      <li><strong>SMC + Locally Optimal.</strong> Uses a smart proposal based on enumerative grids: enumerate a grid in position space, evaluate each position against the
+        observation likelihood, select the maximum likelihood grid point, and sample from a normal distribution around that point.</li>
+    </ul>
+
+    <p>
+      SMC supports natural vectorization over particles. In our experiments, the best algorithm from the standpoint of efficiency and accuracy is locally optimal SMC, which adds
+      another layer of vectorization within the custom proposal. The likelihood grid evaluations can be fully vectorized, and the model already features vectorization in the LIDAR
+      measurement model. These opportunities for vectorization (in the model, in the locally optimal proposal, and across the particle collection) are convenient to program against
+      with <code>vmap</code> and lead to a highly efficient inference algorithm which can accurately track the 2D robot's location within the map in milliseconds.
+    </p>
+  </section>
 </section>
 
 
@@ -1158,173 +862,34 @@ def enumerative_gibbs(trace):
   <h2 id="conclusion-heading">Conclusion <a href="#conclusion" class="section-anchor" aria-label="Link to Conclusion">#</a></h2>
 
   <p>
-    This work presents GenJAX, a language and compiler for vectorized probabilistic programming with
-    programmable inference. Our system integrates <code>vmap</code> with programmable inference features:
-    we extend <code>vmap</code> support to generative functions, including support for vectorization using
-    <code>vmap</code> of probabilistic program traces, stochastic branching, and programmable inference
-    interfaces. Benchmarks show this approach yields low overhead relative to hand-optimized JAX,
-    and simultaneously delivers greater expressiveness and competitive performance with other
-    probabilistic programming systems targeting modern accelerators.
+    This work presents GenJAX, a language and compiler for vectorized probabilistic programming with programmable inference. This system integrates <code>vmap</code> with
+    programmable inference features: we extend <code>vmap</code> support to generative functions, including support for vectorization using <code>vmap</code> of probabilistic
+    program traces, stochastic branching, and programmable inference interfaces. Benchmarks show this approach yields low overhead relative to hand-optimized JAX, and
+    simultaneously delivers greater expressiveness and competitive performance with other probabilistic programming systems targeting modern accelerators.
   </p>
 
   <h3>Future Work</h3>
   <ul>
-    <li><strong>Vectorized inference diagnostics.</strong> By automating the vectorized implementation
-      of nested models and inference algorithms, GenJAX makes it easy to experiment with parallel
-      implementations of custom Monte Carlo estimators for information-theoretic quantities
-      (KL divergence, conditional mutual information). Although computationally intensive on CPUs,
-      these estimators may become more practical given suitable automation and GPU execution.</li>
-    <li><strong>Spatial and geometric probabilistic programs.</strong> GenJAX's support for array
-      programming and programmable inference is well-suited for spatial computing applications.
-      Domains such as robotics, autonomous navigation, computational imaging, and scientific simulation
-      increasingly require sophisticated probabilistic reasoning over high-dimensional spatial data.
-      GenJAX's design is uniquely suited to support practitioners writing these types of probabilistic
-      programs, providing useful vectorization automation and compilation to efficient GPU implementations.</li>
+    <li><strong>Vectorized inference diagnostics.</strong> By automating the vectorized implementation of nested models and inference algorithms, GenJAX makes it easy to experiment
+      with parallel implementations of custom Monte Carlo estimators of a broad range of information-theoretic quantities derived from probabilistic programs, including KL divergence
+      between inference algorithms and the conditional mutual information among subsets of latent variables. Although computationally intensive on CPUs, these estimators are comprised
+      of nested, massively parallel computations, and may become more practical and widespread given suitable automation.</li>
+    <li><strong>Spatial or geometric probabilistic programs.</strong> We expect that GenJAX's support for array programming and programmable probabilistic inference may be well-suited
+      for spatial computing applications. Domains such as robotics, autonomous navigation, computational imaging, and scientific simulation increasingly require sophisticated
+      probabilistic reasoning over high-dimensional spatial data — including LiDAR point clouds, depth images, and other spatial data types. Probabilistic programming applications in
+      these domains naturally involve computations that manipulate multi-dimensional arrays. GenJAX's design is uniquely suited to support practitioners writing these types of
+      probabilistic programs and provides useful vectorization automation and support for compilation to efficient GPU implementations.</li>
   </ul>
 </section>
 
 <!-- Artifact -->
 <section id="artifact" data-nav-section aria-labelledby="artifact-heading">
-  <h2 id="artifact-heading">Artifact & Reproducibility <a href="#artifact" class="section-anchor" aria-label="Link to Artifact">#</a></h2>
-  
+  <h2 id="artifact-heading">Artifact & Data Availability <a href="#artifact" class="section-anchor" aria-label="Link to Artifact">#</a></h2>
+
   <p>
-    The GenJAX artifact is permanently archived on <a href="https://doi.org/10.5281/zenodo.17342547">Zenodo</a> (DOI: 10.5281/zenodo.17342547).
-    All experiments in the paper are reproducible from this artifact, which includes:
+    The artifact associated with this paper is available on <a href="https://doi.org/10.5281/zenodo.17594132">Zenodo</a>.
+    The source code is available at <a href="https://github.com/probcomp/genjax">https://github.com/probcomp/genjax</a>.
   </p>
-  
-    <div class="artifact-grid">
-      <div class="artifact-card">
-      <div class="artifact-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M13 2L3 14h7l-1 8 10-12h-7z"/>
-        </svg>
-      </div>
-      <h4>Compiler & Runtime</h4>
-      <p>Complete GenJAX implementation with JAX integration, effect handlers, and GPU/TPU support.</p>
-    </div>
-    <div class="artifact-card">
-      <div class="artifact-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M3 20h18"/>
-          <path d="M6 20V10"/>
-          <path d="M12 20V4"/>
-          <path d="M18 20v-6"/>
-        </svg>
-      </div>
-      <h4>Benchmarks</h4>
-      <p>Performance comparison scripts for all frameworks and models.</p>
-    </div>
-    <div class="artifact-card">
-      <div class="artifact-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z"/>
-          <path d="M9 4v14"/>
-          <path d="M15 6v14"/>
-        </svg>
-      </div>
-      <h4>Case Studies</h4>
-      <p>Full implementations: Game of Life inversion, robot localization, polynomial regression.</p>
-    </div>
-    <div class="artifact-card">
-      <div class="artifact-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M6 4h12a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z"/>
-          <path d="M8 4v16"/>
-          <path d="M11 8h6"/>
-          <path d="M11 12h6"/>
-          <path d="M11 16h6"/>
-        </svg>
-      </div>
-      <h4>Notebooks</h4>
-      <p>Jupyter notebooks reproducing every figure and result from the paper.</p>
-    </div>
-  </div>
-  
-  <h3>Quick Start</h3>
-  
-  <div class="code-block">
-    <div class="code-header">Installation</div>
-    <pre><code class="language-bash"># Install from PyPI (recommended)
-pip install genjax
-
-# Or install from source for development
-git clone https://github.com/femtomc/genjax.git
-cd genjax
-pip install -e ".[dev]"
-
-# Verify installation
-python -c "import genjax; print(genjax.__version__)"</code></pre>
-  </div>
-  
-  <div class="code-block">
-    <div class="code-header">Your First GenJAX Program</div>
-    <pre><code class="language-python">import jax
-import genjax
-from genjax import gen, normal, vmap
-
-@gen
-def model(x):
-    slope = normal(0.0, 1.0) @ "slope"
-    intercept = normal(0.0, 1.0) @ "intercept"
-    y = normal(slope * x + intercept, 0.1) @ "y"
-    return y
-
-# Create a vectorized version for batch inference
-batched_model = vmap(model, in_axes=(0,))
-
-# Run with JAX random key
-key = jax.random.key(0)
-xs = jax.numpy.linspace(-3, 3, 100)
-traces = jax.jit(batched_model.simulate)(key, (xs,))</code></pre>
-  </div>
-  
-  <h3>Hardware Requirements</h3>
-  
-  <table class="comparison-table">
-    <thead>
-      <tr>
-        <th>Component</th>
-        <th>Minimum</th>
-        <th>Recommended</th>
-        <th>Used in Paper</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>GPU</td>
-        <td>Any CUDA-capable</td>
-        <td>NVIDIA A100 / H100</td>
-        <td>NVIDIA A100 40GB</td>
-      </tr>
-      <tr>
-        <td>RAM</td>
-        <td>8 GB</td>
-        <td>32 GB</td>
-        <td>40 GB (GPU memory)</td>
-      </tr>
-      <tr>
-        <td>Python</td>
-        <td>3.10</td>
-        <td>3.11+</td>
-        <td>3.11</td>
-      </tr>
-      <tr>
-        <td>JAX</td>
-        <td>0.4.20</td>
-        <td>0.4.30+</td>
-        <td>0.4.30</td>
-      </tr>
-    </tbody>
-  </table>
-  
-  <div class="info-box tip">
-    <div class="info-box-title">Reproducing Paper Results</div>
-    <p>
-      All benchmarks and figures can be reproduced via the provided notebooks.
-      The artifact includes a <code>reproduce.sh</code> script that runs all experiments
-      and generates comparison plots. Expected runtime: ~2 hours on A100 GPU.
-    </p>
-  </div>
 </section>
 
 <!-- Citation -->
