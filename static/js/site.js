@@ -41,6 +41,7 @@
     setupBibTexCopy();
     setupSectionAnchors();
     setupMathJaxTypeset();
+    setupSyntaxHighlighting();
     
     // Apply initial track
     applyTrack(currentTrack, false);
@@ -64,6 +65,71 @@
     } else {
       document.addEventListener('mathjax:ready', typesetAll, { once: true });
     }
+  }
+
+  /**
+   * Setup syntax highlighting for code blocks.
+   */
+  function setupSyntaxHighlighting() {
+    applySyntaxHighlighting();
+    document.addEventListener('trackchange', applySyntaxHighlighting);
+  }
+
+  /**
+   * Apply highlight.js after annotating language hints.
+   */
+  function applySyntaxHighlighting() {
+    annotateCodeBlocks();
+    if (window.hljs && typeof window.hljs.highlightAll === 'function') {
+      window.hljs.highlightAll();
+    }
+  }
+
+  /**
+   * Infer language hints from headers and mark BibTeX blocks.
+   */
+  function annotateCodeBlocks() {
+    const extensionMap = {
+      py: 'python',
+      sh: 'bash',
+      bash: 'bash',
+      zsh: 'bash',
+      bib: 'bibtex'
+    };
+
+    document.querySelectorAll('.code-block').forEach(block => {
+      const header = block.querySelector('.code-header');
+      const code = block.querySelector('pre > code');
+      if (!code || hasLanguageClass(code)) return;
+
+      const label = header ? header.textContent.trim() : '';
+      const lower = label.toLowerCase();
+
+      let language = null;
+      if (lower === 'installation') {
+        language = 'bash';
+      } else if (lower === 'your first genjax program') {
+        language = 'python';
+      } else {
+        const match = lower.match(/\\.([a-z0-9]+)$/);
+        if (match) {
+          language = extensionMap[match[1]] || null;
+        }
+      }
+
+      if (language) {
+        code.classList.add(`language-${language}`);
+      }
+    });
+
+    const bibtexBlock = document.querySelector('.bibtex-block > code');
+    if (bibtexBlock && !hasLanguageClass(bibtexBlock)) {
+      bibtexBlock.classList.add('language-bibtex');
+    }
+  }
+
+  function hasLanguageClass(codeElement) {
+    return Array.from(codeElement.classList).some(cls => cls.startsWith('language-'));
   }
 
   /**

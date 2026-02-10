@@ -53,9 +53,9 @@
   --space-4xl: 5rem;
   
   /* Layout */
-  --max-width: 900px;
-  --max-width-wide: 1100px;
-  --sidebar-width: 220px;
+  --max-width: 980px;
+  --max-width-wide: 1200px;
+  --sidebar-width: 240px;
   
   /* Shadows - subtle for academic feel */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
@@ -173,6 +173,7 @@ pre {
   line-height: 1.6;
   border: 1px solid var(--color-border);
   margin: var(--space-lg) 0;
+  text-align: left;
 }
 
 pre code {
@@ -180,6 +181,11 @@ pre code {
   padding: 0;
   border: none;
   font-size: inherit;
+}
+
+pre code.hljs {
+  background: transparent;
+  padding: 0;
 }
 
 /* Layout Container */
@@ -531,14 +537,23 @@ main {
 .main-content {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "content"
+    "sidebar";
   gap: var(--space-2xl);
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 1200px) {
   .main-content.with-sidebar {
-    grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    grid-template-areas: "sidebar content";
     gap: var(--space-3xl);
   }
+}
+
+.content-area {
+  grid-area: content;
+  min-width: 0;
 }
 
 /* Section Styling */
@@ -705,6 +720,13 @@ section:first-child h2 {
   border: 1px solid var(--color-border);
   background: var(--color-bg);
   box-shadow: var(--shadow-sm);
+}
+
+.code-block pre {
+  margin: 0;
+  border: none;
+  background: transparent;
+  padding: var(--space-md) var(--space-lg);
 }
 
 .code-header {
@@ -917,6 +939,14 @@ tr:last-child td {
   height: fit-content;
   font-family: var(--font-sans);
   font-size: 0.82rem;
+  grid-area: sidebar;
+}
+
+@media (min-width: 1200px) {
+  .sidebar {
+    padding-right: var(--space-lg);
+    border-right: 1px solid var(--color-border);
+  }
 }
 
 .toc-title {
