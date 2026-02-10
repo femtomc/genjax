@@ -72,6 +72,8 @@ html {
   scroll-behavior: smooth;
   font-size: 16.5px;
   -webkit-text-size-adjust: 100%;
+  background: var(--color-bg-warm);
+  color-scheme: light;
 }
 
 body {
@@ -80,6 +82,7 @@ body {
   line-height: 1.75;
   color: var(--color-text);
   background: var(--color-bg-warm);
+  color-scheme: light;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
