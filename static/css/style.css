@@ -44,17 +44,17 @@
   
   /* Spacing scale - refined for academic feel */
   --space-xs: 0.2rem;
-  --space-sm: 0.4rem;
-  --space-md: 0.6rem;
-  --space-lg: 0.9rem;
-  --space-xl: 1.35rem;
-  --space-2xl: 1.9rem;
-  --space-3xl: 2.6rem;
-  --space-4xl: 3.5rem;
+  --space-sm: 0.35rem;
+  --space-md: 0.55rem;
+  --space-lg: 0.8rem;
+  --space-xl: 1.15rem;
+  --space-2xl: 1.6rem;
+  --space-3xl: 2.2rem;
+  --space-4xl: 3rem;
   
   /* Layout */
   --max-width: 1040px;
-  --max-width-wide: 1360px;
+  --max-width-wide: 1440px;
   --sidebar-width: 220px;
   --nav-height: 64px;
   
@@ -166,14 +166,14 @@ code {
 
 pre {
   background: #fafafa;
-  padding: var(--space-md);
+  padding: var(--space-sm);
   border-radius: 4px;
   overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.6;
   border: 1px solid var(--color-border);
-  margin: var(--space-lg) 0;
+  margin: var(--space-md) 0;
   text-align: left;
 }
 
@@ -219,7 +219,7 @@ pre code.hljs {
 /* Header & Title Section */
 .paper-header {
   text-align: center;
-  padding: var(--space-2xl) 0 var(--space-lg);
+  padding: var(--space-xl) 0 var(--space-md);
   background: linear-gradient(to bottom, var(--color-bg), var(--color-bg-warm));
   border-bottom: 1px solid var(--color-border);
 }
@@ -228,13 +228,13 @@ pre code.hljs {
   display: block;
   max-width: 280px;
   height: auto;
-  margin: 0 auto var(--space-lg);
+  margin: 0 auto var(--space-md);
 }
 
 .paper-header h1 {
   font-size: 2rem;
   font-weight: 700;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   line-height: 1.25;
   letter-spacing: -0.01em;
   max-width: 850px;
@@ -253,7 +253,7 @@ pre code.hljs {
 /* Authors Section */
 .authors-section {
   text-align: center;
-  padding: var(--space-lg) 0;
+  padding: var(--space-md) 0;
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border-light);
 }
@@ -351,7 +351,7 @@ pre code.hljs {
 /* Track Switcher - Dual Path Navigation */
 .track-switcher-section {
   background: var(--color-bg);
-  padding: var(--space-xl) 0;
+  padding: var(--space-lg) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -368,7 +368,7 @@ pre code.hljs {
   color: var(--color-text-muted);
   font-family: var(--font-sans);
   font-size: 0.92rem;
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
   max-width: 700px;
   margin-left: auto;
   margin-right: auto;
@@ -386,7 +386,7 @@ pre code.hljs {
   flex: 1;
   font-family: var(--font-sans);
   font-size: 0.9rem;
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
   border: 1.5px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text-secondary);
@@ -481,8 +481,8 @@ pre code.hljs {
 }
 
 body.all-mode .track-content + .track-content {
-  margin-top: var(--space-4xl);
-  padding-top: var(--space-4xl);
+  margin-top: var(--space-3xl);
+  padding-top: var(--space-3xl);
   border-top: 2px solid var(--color-border);
 }
 
@@ -494,7 +494,7 @@ body.all-mode #track-tutorial::before {
   font-weight: 700;
   color: var(--color-tutorial);
   letter-spacing: 0.08em;
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-lg);
 }
 
 body.all-mode #track-theory::before {
@@ -505,7 +505,7 @@ body.all-mode #track-theory::before {
   font-weight: 700;
   color: var(--color-theory);
   letter-spacing: 0.08em;
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-lg);
 }
 
 @keyframes fadeIn {
@@ -539,7 +539,7 @@ body.all-mode #track-theory::before {
 
 /* Main Content Layout */
 main {
-  padding: var(--space-lg) 0 var(--space-3xl);
+  padding: var(--space-md) 0 var(--space-2xl);
 }
 
 .main-content {
@@ -548,14 +548,14 @@ main {
   grid-template-areas:
     "content"
     "sidebar";
-  gap: var(--space-xl);
+  gap: var(--space-lg);
 }
 
 @media (min-width: 1200px) {
   .main-content.with-sidebar {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
     grid-template-areas: "sidebar content";
-    gap: var(--space-2xl);
+    gap: var(--space-xl);
   }
 }
 
@@ -566,7 +566,7 @@ main {
 
 /* Section Styling */
 section {
-  margin-bottom: var(--space-2xl);
+  margin-bottom: var(--space-xl);
 }
 
 section:first-child h2 {
@@ -576,10 +576,10 @@ section:first-child h2 {
 /* Abstract - Prominent styling */
 #abstract {
   background: var(--color-bg);
-  padding: var(--space-xl);
+  padding: var(--space-lg);
   border-radius: 6px;
   border: 1px solid var(--color-border);
-  margin: var(--space-xl) 0;
+  margin: var(--space-lg) 0;
   box-shadow: var(--shadow-sm);
 }
 
@@ -587,7 +587,7 @@ section:first-child h2 {
   margin-top: 0;
   font-size: 1.2rem;
   border-bottom: none;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
 .abstract {
@@ -605,7 +605,7 @@ section:first-child h2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-sm);
-  margin: var(--space-xl) 0;
+  margin: var(--space-lg) 0;
 }
 
 .link-btn {
@@ -613,7 +613,7 @@ section:first-child h2 {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 5px;
@@ -643,7 +643,7 @@ section:first-child h2 {
 
 /* Teaser Figure */
 .teaser {
-  margin: var(--space-3xl) 0;
+  margin: var(--space-2xl) 0;
   text-align: center;
 }
 
@@ -651,6 +651,7 @@ section:first-child h2 {
   width: 100%;
   max-width: none;
   height: auto;
+  display: block;
   border-radius: 4px;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--color-border);
@@ -659,7 +660,7 @@ section:first-child h2 {
 .teaser .caption {
   font-size: 0.9rem;
   color: var(--color-text-secondary);
-  margin-top: var(--space-lg);
+  margin-top: var(--space-md);
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
@@ -675,7 +676,7 @@ section:first-child h2 {
 
 /* Figures */
 .figure {
-  margin: var(--space-lg) 0;
+  margin: var(--space-md) 0;
   text-align: center;
 }
 
@@ -683,14 +684,15 @@ section:first-child h2 {
   width: 100%;
   max-width: none;
   height: auto;
+  display: block;
   border-radius: 3px;
   border: 1px solid var(--color-border);
 }
 
 .figure-row {
   display: grid;
-  gap: var(--space-md);
-  margin: var(--space-lg) 0;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
 }
 
 .figure-row.two-col {
@@ -711,7 +713,7 @@ section:first-child h2 {
 .fig-caption {
   font-size: 0.85rem;
   color: var(--color-text-muted);
-  margin-top: var(--space-sm);
+  margin-top: var(--space-xs);
   line-height: 1.55;
   text-align: left;
   text-indent: 0;
@@ -725,7 +727,7 @@ section:first-child h2 {
 /* Code Blocks - Enhanced */
 .code-block {
   position: relative;
-  margin: var(--space-lg) 0;
+  margin: var(--space-md) 0;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -738,7 +740,7 @@ section:first-child h2 {
   border: none;
   border-radius: 0;
   background: var(--color-bg-warm);
-  padding: var(--space-md);
+  padding: var(--space-sm);
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -805,8 +807,8 @@ section:first-child h2 {
 /* Math Blocks */
 .math-block {
   overflow-x: auto;
-  padding: var(--space-md);
-  margin: var(--space-lg) 0;
+  padding: var(--space-sm);
+  margin: var(--space-md) 0;
   text-align: center;
   background: var(--color-bg-secondary);
   border-radius: 4px;
@@ -844,8 +846,8 @@ mjx-container[jax="SVG"][display="false"] {
 .info-box {
   background: var(--color-bg-secondary);
   border-left: 3px solid var(--color-link);
-  padding: var(--space-sm) var(--space-md);
-  margin: var(--space-lg) 0;
+  padding: var(--space-xs) var(--space-sm);
+  margin: var(--space-md) 0;
   border-radius: 0 5px 5px 0;
 }
 
@@ -884,14 +886,14 @@ mjx-container[jax="SVG"][display="false"] {
 /* BibTeX */
 .bibtex-container {
   position: relative;
-  margin: var(--space-lg) 0;
+  margin: var(--space-md) 0;
 }
 
 .bibtex-block {
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  padding: var(--space-md);
+  padding: var(--space-sm);
   font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.55;
@@ -922,7 +924,7 @@ mjx-container[jax="SVG"][display="false"] {
 /* Lists */
 ul, ol {
   padding-left: 1.6rem;
-  margin: var(--space-sm) 0;
+  margin: var(--space-xs) 0;
 }
 
 li {
@@ -944,7 +946,7 @@ li p {
 .contributions li {
   position: relative;
   padding-left: 2.5rem;
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .contributions li::before {
@@ -961,13 +963,13 @@ li p {
 /* Tables - Academic style */
 .table-wrapper {
   overflow-x: auto;
-  margin: var(--space-xl) 0;
+  margin: var(--space-lg) 0;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: var(--space-lg) 0;
+  margin: var(--space-md) 0;
   font-size: 0.92rem;
   border: 1px solid var(--color-border);
 }
@@ -1013,7 +1015,7 @@ tr:last-child td {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.72rem;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
 .toc-nav ul {
@@ -1073,8 +1075,8 @@ tr:last-child td {
 
 /* Step/Tutorial styling */
 .tutorial-step {
-  margin: var(--space-2xl) 0;
-  padding: var(--space-lg);
+  margin: var(--space-xl) 0;
+  padding: var(--space-md);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -1093,15 +1095,15 @@ tr:last-child td {
   background: var(--color-bg);
   border: 1px solid var(--color-theory-light);
   border-radius: 6px;
-  padding: var(--space-md);
-  margin: var(--space-lg) 0;
+  padding: var(--space-sm);
+  margin: var(--space-md) 0;
 }
 
 .theorem-box .theorem-title {
   font-family: var(--font-sans);
   font-weight: 700;
   color: var(--color-theory);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   font-size: 1.05rem;
 }
 
@@ -1115,15 +1117,15 @@ tr:last-child td {
 .artifact-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--space-md);
-  margin: var(--space-lg) 0;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
 }
 
 .artifact-card {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  padding: var(--space-md);
+  padding: var(--space-sm);
   text-align: center;
   transition: all 0.15s ease;
 }
@@ -1167,8 +1169,8 @@ tr:last-child td {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: var(--space-2xl);
-  padding-top: var(--space-xl);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
   border-top: 1px solid var(--color-border-light);
 }
 
@@ -1176,7 +1178,7 @@ tr:last-child td {
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: 4px;
@@ -1195,7 +1197,7 @@ tr:last-child td {
 
 .tutorial-progress-dots {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .progress-dot {
@@ -1225,7 +1227,7 @@ tr:last-child td {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm);
+  padding: var(--space-xs);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 4px;
@@ -1249,14 +1251,14 @@ tr:last-child td {
 
 /* Definition list for concepts */
 .concept-list {
-  margin: var(--space-lg) 0;
+  margin: var(--space-md) 0;
 }
 
 .concept-list dt {
   font-family: var(--font-sans);
   font-weight: 600;
   color: var(--color-text);
-  margin-top: var(--space-lg);
+  margin-top: var(--space-md);
 }
 
 .concept-list dd {
@@ -1288,8 +1290,8 @@ h3:hover .section-anchor {
 /* Footer */
 .footer {
   border-top: 1px solid var(--color-border);
-  padding: var(--space-2xl) 0;
-  margin-top: var(--space-3xl);
+  padding: var(--space-xl) 0;
+  margin-top: var(--space-2xl);
   text-align: center;
   font-family: var(--font-sans);
   font-size: 0.88rem;
@@ -1388,8 +1390,8 @@ h3:hover .section-anchor {
   }
 
   body.all-mode .track-content + .track-content {
-    margin-top: 2.5rem;
-    padding-top: 2.5rem;
+    margin-top: 2rem;
+    padding-top: 2rem;
   }
 
   .figure {
