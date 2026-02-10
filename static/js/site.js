@@ -25,6 +25,9 @@
   function init() {
     if (isInitialized) return;
     
+    // Mark JS as enabled for CSS styling
+    document.body.classList.add('js-enabled');
+    
     loadTrackPreference();
     setupTrackSwitcher();
     setupSmoothScroll();
@@ -42,19 +45,16 @@
 
   /**
    * Load track preference from localStorage
+   * Note: We do NOT use URL hash for track state to preserve section anchors
    */
   function loadTrackPreference() {
     try {
       const saved = localStorage.getItem(CONFIG.storageKey);
       if (saved && CONFIG.tracks.includes(saved)) {
         currentTrack = saved;
-      } else if (window.location.hash === '#theory') {
-        currentTrack = 'theory';
-      } else if (window.location.hash === '#tutorial') {
-        currentTrack = 'tutorial';
-      } else if (window.location.hash === '#all') {
-        currentTrack = 'all';
       }
+      // Note: Hash is not used for track state - section anchors (#evaluation, etc.) 
+      // remain functional for deep-linking to content sections
     } catch (e) {
       // localStorage may be disabled
       console.warn('Could not load track preference:', e);
@@ -103,10 +103,9 @@
       saveTrackPreference(track);
     }
     
-    // Update URL hash without scrolling
-    const scrollPos = window.scrollY;
-    history.replaceState(null, null, '#' + track);
-    window.scrollTo(0, scrollPos);
+    // Note: We intentionally do NOT use URL hash for track state
+    // This keeps section anchors (#evaluation, #artifact, etc.) shareable
+    // Track preference is stored in localStorage only
     
     // Dispatch custom event
     document.dispatchEvent(new CustomEvent('trackchange', { 

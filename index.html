@@ -23,6 +23,25 @@
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <script src="static/js/site.js" defer></script>
+  <noscript>
+    <style>
+      /* No-JS fallback: ensure all content is visible */
+      .track-content { display: block !important; }
+      .track-switcher { display: none; }
+      .track-widget { display: none; }
+      body::before {
+        content: 'Note: JavaScript is disabled. Showing all content (Tutorial and Theory tracks).';
+        display: block;
+        background: var(--color-theory-bg);
+        color: var(--color-theory);
+        padding: var(--space-md) var(--space-xl);
+        text-align: center;
+        font-family: var(--font-sans);
+        font-size: 0.9rem;
+        border-bottom: 1px solid var(--color-border);
+      }
+    </style>
+  </noscript>
 </head>
 <body>
 
@@ -125,7 +144,8 @@
        alt="Progressive refinement of polynomial regression with programmable inference in GenJAX"
        loading="eager" />
   <p class="caption">
-    <strong>Figure 1.</strong> From simple importance sampling to programmable inference.
+    <strong>Figure 6 (Paper).</strong> Robust modeling with stochastic branching.
+    From simple importance sampling to programmable inference:
     (Left) Importance sampling on a simple polynomial model produces a tight fit, but cannot identify outliers.
     (Center) Importance sampling on an enriched outlier model identifies likely outliers but has wide posterior uncertainty.
     (Right) A custom Gibbs + HMC kernel on the outlier model produces accurate posterior samples.
@@ -331,7 +351,7 @@ def npoint_curve(xs):
       <img src="static/images/curvefit_prior_multipoint_traces_density.png"
            alt="Prior samples from the polynomial model"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 2.</strong> Prior samples from the polynomial generative model.
+      <p class="fig-caption"><strong>Prior samples.</strong> Samples from the polynomial generative model.
       Each trace samples coefficients $(a, b, c)$ and generates noisy observations via the <code>vmap</code>ped
       point model. The traces show the variability in the prior before seeing any data.</p>
     </div>
@@ -380,7 +400,7 @@ traces, weights = vectorized_is(model, obs, keys)</code></pre>
         <img src="static/images/curvefit_scaling_performance.png"
              alt="Scaling behavior of vectorized importance sampling"
              loading="lazy" />
-        <p class="fig-caption"><strong>Figure 4a.</strong> Vectorized importance sampling exhibits
+        <p class="fig-caption"><strong>Scaling behavior.</strong> Vectorized importance sampling exhibits
         near-constant wall-clock time on GPU as particle count increases, up to device memory limits.
         This enables scaling to $10^5$ particles in milliseconds.</p>
       </div>
@@ -388,7 +408,7 @@ traces, weights = vectorized_is(model, obs, keys)</code></pre>
         <img src="static/images/curvefit_posterior_scaling_combined.png"
              alt="Posterior approximation at different particle counts"
              loading="lazy" />
-        <p class="fig-caption"><strong>Figure 4b.</strong> Posterior approximations with increasing
+        <p class="fig-caption"><strong>Posterior convergence.</strong> Posterior approximations with increasing
         particle counts. Accuracy improves until convergence, demonstrating the statistical benefit
         of massive vectorization.</p>
       </div>
@@ -522,12 +542,12 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
       <div class="progress-dot completed" data-step="3"></div>
       <div class="progress-dot active" data-step="4"></div>
     </div>
-    <a href="#theory" class="tutorial-nav-btn" onclick="switchTrack('theory'); return false;">
+    <button type="button" class="tutorial-nav-btn" onclick="if(window.GenJAX) { window.GenJAX.switchTrack('theory'); }">
       <span>Theory Track</span>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="9 18 15 12 9 6"></polyline>
       </svg>
-    </a>
+    </button>
   </div>
   
   <div class="info-box" style="margin-top: var(--space-xl);">
@@ -865,15 +885,15 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
   <div class="track-widget" style="margin-top: var(--space-2xl); padding-top: var(--space-xl); border-top: 1px solid var(--color-border);">
     <div class="toc-title">View Mode</div>
     <div class="track-widget-buttons">
-      <a href="#tutorial" class="track-widget-btn" onclick="if(window.GenJAX) { window.GenJAX.switchTrack('tutorial'); return false; }">
+      <button type="button" class="track-widget-btn" onclick="if(window.GenJAX) { window.GenJAX.switchTrack('tutorial'); }">
         <span class="track-dot" style="background: var(--color-tutorial);"></span> Tutorial
-      </a>
-      <a href="#theory" class="track-widget-btn" onclick="if(window.GenJAX) { window.GenJAX.switchTrack('theory'); return false; }">
+      </button>
+      <button type="button" class="track-widget-btn" onclick="if(window.GenJAX) { window.GenJAX.switchTrack('theory'); }">
         <span class="track-dot" style="background: var(--color-theory);"></span> Theory
-      </a>
-      <a href="#all" class="track-widget-btn" onclick="if(window.GenJAX) { window.GenJAX.switchTrack('all'); return false; }">
+      </button>
+      <button type="button" class="track-widget-btn" onclick="if(window.GenJAX) { window.GenJAX.switchTrack('all'); }">
         <span class="track-dot" style="background: var(--color-all);"></span> All
-      </a>
+      </button>
     </div>
   </div>
 </aside>
@@ -895,7 +915,7 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
   <h3>Performance Survey</h3>
   
   <p>
-    We compare GenJAX against NumPyro, Pyro, TensorFlow Probability, hand-coded JAX, PyTorch, and Gen.jl
+    We compare GenJAX against NumPyro, Pyro, Gen.jl, hand-coded JAX, and hand-coded PyTorch
     on two fundamental inference paradigms: importance sampling (embarrassingly parallel) and 
     Hamiltonian Monte Carlo (iterative, gradient-based).
   </p>
@@ -912,7 +932,8 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
     <img src="static/images/combined_3x2_obs50_samples2000.png"
          alt="Beta-Bernoulli model: posterior accuracy and timing comparison"
          loading="lazy" />
-    <p class="fig-caption"><strong>Figure 6.</strong> Beta-Bernoulli model: all frameworks accurately recover 
+    <p class="fig-caption"><strong>Figure 17 (Paper).</strong> Performance evaluation across probabilistic programming 
+    languages and tensor frameworks. Beta-Bernoulli model: all frameworks accurately recover 
     the true posterior. GenJAX achieves near-identical performance to hand-coded JAX (100.1% relative time).</p>
   </div>
   
@@ -930,14 +951,14 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
       <img src="static/images/benchmark_timings_is_all_frameworks.png"
            alt="Importance sampling timing comparison"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 7a.</strong> Importance sampling: vectorized frameworks show 
+      <p class="fig-caption"><strong>Scaling: Importance sampling.</strong> Vectorized frameworks show 
       near-constant scaling while GPU is not saturated. GenJAX matches hand-coded JAX.</p>
     </div>
     <div class="figure">
       <img src="static/images/benchmark_timings_hmc_all_frameworks.png"
            alt="HMC timing comparison"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 7b.</strong> Hamiltonian Monte Carlo: linear scaling in chain length. 
+      <p class="fig-caption"><strong>Scaling: HMC.</strong> Hamiltonian Monte Carlo shows linear scaling in chain length. 
       GenJAX consistently matches hand-coded JAX performance.</p>
     </div>
   </div>
@@ -979,14 +1000,14 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
       <img src="static/images/gol_integrated_showcase_wizards_1024.png"
            alt="Game of Life inversion showcase"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 9a.</strong> Approximate inversion of Game of Life dynamics 
-      using vectorized Gibbs sampling on a 1024×1024 board (wizard book pattern).</p>
+      <p class="fig-caption"><strong>Figure 19 (Paper).</strong> Vectorized Gibbs sampling in the <em>Game of Life</em>.
+      Approximate inversion of Game of Life dynamics on a 1024×1024 board (wizard book pattern).</p>
     </div>
     <div class="figure">
       <img src="static/images/gol_gibbs_timing_bar_plot.png"
            alt="Game of Life Gibbs sampling throughput"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 9b.</strong> Gibbs sampling throughput across grid sizes, 
+      <p class="fig-caption"><strong>Throughput.</strong> Gibbs sampling throughput across grid sizes, 
       comparing CPU and GPU execution. Vectorization provides massive speedups on GPU.</p>
     </div>
   </div>
@@ -1045,14 +1066,14 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
       <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.png"
            alt="Robot localization problem"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 10a.</strong> Localization problem: robot with 8-ray LIDAR 
-      navigates a 2D environment. Goal is to infer position from noisy distance measurements.</p>
+      <p class="fig-caption"><strong>Figure 20 (Paper).</strong> Robot localization using programmable sequential 
+      Monte Carlo. Localization problem: robot with 8-ray LIDAR navigates a 2D environment.</p>
     </div>
     <div class="figure">
       <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.png"
            alt="SMC methods comparison"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 10b.</strong> SMC methods comparison. The locally optimal proposal 
+      <p class="fig-caption"><strong>SMC comparison.</strong> SMC methods comparison. The locally optimal proposal 
       with vectorized grid enumeration achieves the best accuracy-efficiency tradeoff.</p>
     </div>
   </div>
@@ -1091,7 +1112,7 @@ inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
     <div class="artifact-card">
       <div class="artifact-icon">📊</div>
       <h4>Benchmarks</h4>
-      <p>Performance comparison scripts for all frameworks (NumPyro, Pyro, TFP, Gen.jl) and models.</p>
+      <p>Performance comparison scripts for all frameworks (NumPyro, Pyro, Gen.jl, hand-coded JAX, hand-coded PyTorch) and models.</p>
     </div>
     <div class="artifact-card">
       <div class="artifact-icon">🔬</div>
