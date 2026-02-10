@@ -747,6 +747,25 @@ section:first-child h2 {
   border-radius: 3px;
 }
 
+/* MathJax (SVG) Rendering */
+mjx-container[jax="SVG"] {
+  max-width: 100%;
+}
+
+mjx-container[jax="SVG"] svg {
+  max-width: 100%;
+  height: auto;
+}
+
+mjx-container[jax="SVG"][display="false"] {
+  display: inline-block;
+  vertical-align: -0.08em;
+}
+
+.math-block mjx-container[jax="SVG"][display="true"] {
+  margin: 0 auto;
+}
+
 /* Info Boxes - Academic style */
 .info-box {
   background: var(--color-bg-secondary);
@@ -1259,6 +1278,14 @@ h3:hover .section-anchor {
   
   .track-btn .track-desc {
     display: none;
+  }
+
+  .math-block {
+    padding: var(--space-md);
+  }
+
+  .math-block mjx-container[jax="SVG"] {
+    font-size: 0.95em;
   }
   
   .authors {
