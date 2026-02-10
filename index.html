@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="GenJAX — a language and compiler for vectorized programmable probabilistic inference, built on JAX. POPL 2026." />
   <meta name="theme-color" content="#fdfcfa" />
+  <meta name="color-scheme" content="light" />
   <title>GenJAX: Probabilistic Programming with Vectorized Programmable Inference</title>
   <link rel="stylesheet" href="static/css/style.css" />
   <link rel="icon" type="image/svg+xml" href="static/images/logo.svg" />
@@ -439,7 +440,7 @@
 <div id="track-tutorial" class="track-content active" role="tabpanel" aria-labelledby="btn-tutorial">
 
 <section id="tutorial" data-nav-section aria-labelledby="tutorial-heading">
-  <h2 id="tutorial-heading">Tutorial: Vectorized Probabilistic Programming</h2>
+  <h2 id="tutorial-heading">Tutorial: Vectorized Probabilistic Programming <a href="#tutorial" class="section-anchor" aria-label="Link to Tutorial">#</a></h2>
   
   <p>
     Probabilistic programming enables Bayesian inference over complex models, but scaling inference
@@ -447,6 +448,20 @@
     introduces GenJAX through a running example—polynomial regression with outlier detection—
     showing how vectorization with <code>vmap</code> enables efficient inference on GPU.
   </p>
+
+  <div class="info-box">
+    <div class="info-box-title">Tutorial Roadmap</div>
+    <p>
+      This track mirrors the paper's running example and follows the same arc:
+      modeling, vectorization, stochastic branching, and programmable inference.
+    </p>
+    <ol class="roadmap-list">
+      <li>Define the polynomial regression model and trace structure.</li>
+      <li>Vectorize importance sampling with <code>vmap</code> and struct-of-arrays traces.</li>
+      <li>Add stochastic branching for outliers while preserving vectorization.</li>
+      <li>Compose custom Gibbs + HMC kernels via the generative function interface.</li>
+    </ol>
+  </div>
   
   <section id="tutorial-core" class="tutorial-subsection" aria-labelledby="tutorial-core-heading">
     <h3 id="tutorial-core-heading">Core Concepts</h3>
@@ -800,7 +815,7 @@ def enumerative_gibbs(trace):
 <div id="track-theory" class="track-content" role="tabpanel" aria-labelledby="btn-theory">
 
 <section id="theory" data-nav-section aria-labelledby="theory-heading">
-  <h2 id="theory-heading">Theory: $\gen$ — A Core Calculus</h2>
+  <h2 id="theory-heading">Theory: $\gen$ — A Core Calculus <a href="#theory" class="section-anchor" aria-label="Link to Theory">#</a></h2>
   
   <p>
     This section presents the formal foundations of GenJAX. We introduce $\gen$,
@@ -815,6 +830,13 @@ def enumerative_gibbs(trace):
       The equations and summaries below track those results in compressed form; see the PDF for
       the full figure set.
     </p>
+    <ol class="roadmap-list">
+      <li>Syntax and types for the core calculus.</li>
+      <li>Denotational semantics in quasi-Borel spaces.</li>
+      <li>Programmable inference transformations.</li>
+      <li>Vectorization as a type-directed program transform.</li>
+      <li>Compiler architecture and implementation pipeline.</li>
+    </ol>
   </div>
   
   <section id="theory-syntax" aria-labelledby="theory-syntax-heading">
@@ -1051,18 +1073,18 @@ def enumerative_gibbs(trace):
       <li data-track="tutorial"><a href="#tutorial" class="toc-h2">Tutorial Track</a>
         <ul>
           <li><a href="#tutorial-core" class="toc-h3">Core Concepts</a></li>
-          <li><a href="#tutorial-step-1" class="toc-h3">Step 1: Model</a></li>
-          <li><a href="#tutorial-step-2" class="toc-h3">Step 2: Inference</a></li>
-          <li><a href="#tutorial-step-3" class="toc-h3">Step 3: Branching</a></li>
+          <li><a href="#tutorial-step-1" class="toc-h3">Step 1: Polynomial Model</a></li>
+          <li><a href="#tutorial-step-2" class="toc-h3">Step 2: Vectorized IS</a></li>
+          <li><a href="#tutorial-step-3" class="toc-h3">Step 3: Stochastic Branching</a></li>
           <li><a href="#tutorial-step-4" class="toc-h3">Step 4: Gibbs + HMC</a></li>
         </ul>
       </li>
       <li data-track="theory"><a href="#theory" class="toc-h2">Theory Track</a>
         <ul>
-          <li><a href="#theory-syntax" class="toc-h3">Syntax &amp; Types</a></li>
-          <li><a href="#theory-semantics" class="toc-h3">Semantics</a></li>
-          <li><a href="#theory-inference" class="toc-h3">Inference Transforms</a></li>
-          <li><a href="#theory-vectorization" class="toc-h3">Vectorization</a></li>
+          <li><a href="#theory-syntax" class="toc-h3">Syntax and Types</a></li>
+          <li><a href="#theory-semantics" class="toc-h3">Denotational Semantics</a></li>
+          <li><a href="#theory-inference" class="toc-h3">Inference Transformations</a></li>
+          <li><a href="#theory-vectorization" class="toc-h3">Vectorization Transform</a></li>
           <li><a href="#theory-compiler" class="toc-h3">Compiler Architecture</a></li>
         </ul>
       </li>
@@ -1314,7 +1336,7 @@ def enumerative_gibbs(trace):
   <p>
     GenJAX is an embedded framework built on JAX, similar in spirit to Edward/Edward2, PyMC, Pyro,
     and NumPyro, which leverage TensorFlow, PyTorch, or JAX for accelerator execution. GenJAX focuses
-    on preserving vectorization for programmable inference: the <code>cond</code> construct enables
+    on preserving vectorization for programmable inference: the <code>Cond</code> construct enables
     stochastic branching while remaining compatible with <code>vmap</code>, and program transformation
     enables nested vectorization of both models and inference code. Benchmarks show this expressivity
     with competitive performance relative to NumPyro and hand-coded JAX.

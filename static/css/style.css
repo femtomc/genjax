@@ -776,6 +776,15 @@ section:first-child h2 {
   color: var(--color-text);
 }
 
+.roadmap-list {
+  margin: var(--space-sm) 0 0 0;
+  padding-left: 1.2rem;
+}
+
+.roadmap-list li {
+  margin-bottom: var(--space-xs);
+}
+
 /* BibTeX */
 .bibtex-container {
   position: relative;
