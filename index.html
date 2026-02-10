@@ -3,22 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GenJAX: Probabilistic Programming with Vectorized Programmable Inference</title>
   <meta name="description" content="GenJAX — a language and compiler for vectorized programmable probabilistic inference, built on JAX. POPL 2026." />
+  <meta name="theme-color" content="#2c5aa0" />
+  <title>GenJAX: Probabilistic Programming with Vectorized Programmable Inference</title>
   <link rel="stylesheet" href="static/css/style.css" />
   <link rel="icon" type="image/png" href="static/images/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&family=Source+Sans+Pro:wght@400;500;600;700&family=Source+Serif+Pro:wght@400;600&display=swap" rel="stylesheet">
   <script>
     window.MathJax = {
-      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
-      svg: { fontCache: 'global' }
+      tex: { 
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' },
+      startup: { typeset: false }
     };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 </head>
 <body>
 
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
 <!-- Navigation -->
-<nav class="site-nav">
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
   <div class="container nav-content">
     <div class="nav-brand"><a href="#">GenJAX</a></div>
     <div class="nav-links">
@@ -41,7 +51,7 @@
 </header>
 
 <!-- Authors -->
-<section class="authors-section">
+<section class="authors-section" aria-label="Authors">
   <div class="container">
     <div class="authors">
       <span class="author-name">McCoy R. Becker*</span>,
@@ -63,47 +73,34 @@
   </div>
 </section>
 
-<main class="container">
+<main id="main-content">
+<div class="container">
 
-<!-- Links Grid -->
-<section id="links">
+<!-- Quick Links -->
+<section id="links" aria-label="Quick links">
   <div class="links-grid">
     <a href="static/paper.pdf" class="link-btn">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
       Paper (PDF)
     </a>
     <a href="https://dl.acm.org/doi/10.1145/3776729" class="link-btn">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1a2 2 0 0 0 2 2v1.93zm6.9-2.54A1.99 1.99 0 0 0 16 16h-1v-3a1 1 0 0 0-1-1H8v-2h2a1 1 0 0 0 1-1V7h2a2 2 0 0 0 2-2v-.41A7.997 7.997 0 0 1 20 12c0 2.08-.8 3.97-2.1 5.39z"/></svg>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1a2 2 0 0 0 2 2v1.93zm6.9-2.54A1.99 1.99 0 0 0 16 16h-1v-3a1 1 0 0 0-1-1H8v-2h2a1 1 0 0 0 1-1V7h2a2 2 0 0 0 2-2v-.41A7.997 7.997 0 0 1 20 12c0 2.08-.8 3.97-2.1 5.39z"/></svg>
       ACM Digital Library
     </a>
     <a href="https://github.com/femtomc/genjax" class="link-btn">
-      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
       Source Code
     </a>
     <a href="https://doi.org/10.5281/zenodo.17342547" class="link-btn">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l7 3.5v7.64l-7 3.5-7-3.5V7.68l7-3.5z"/></svg>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l7 3.5v7.64l-7 3.5-7-3.5V7.68l7-3.5z"/></svg>
       Zenodo Artifact
     </a>
   </div>
 </section>
 
-<!-- Teaser Figure -->
-<section class="teaser">
-  <img src="static/images/curvefit_outlier_detection_comparison.png"
-       alt="Progressive refinement of polynomial regression with programmable inference in GenJAX" />
-  <p class="caption">
-    <strong>From simple importance sampling to programmable inference.</strong>
-    (Left) Importance sampling on a simple polynomial model produces a tight fit, but cannot identify outliers.
-    (Center) Importance sampling on an enriched outlier model identifies likely outliers but has wide posterior uncertainty.
-    (Right) A custom Gibbs + HMC kernel on the outlier model produces accurate posterior samples.
-    Each step adds a new GenJAX capability: <code>vmap</code> for scaling inference, 
-    stochastic branching for richer models, and programmable kernels for better posterior approximation.
-  </p>
-</section>
-
 <!-- Abstract -->
-<section id="abstract">
-  <h2>Abstract</h2>
+<section id="abstract" aria-labelledby="abstract-heading">
+  <h2 id="abstract-heading">Abstract</h2>
   <div class="abstract">
     <p>
       We present GenJAX, a new language and compiler for vectorized programmable probabilistic inference.
@@ -121,27 +118,24 @@
   </div>
 </section>
 
-<!-- Track Switcher -->
-<section id="track-selector">
-  <h2>Explore the Paper</h2>
-  <p style="text-align: center; color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
-    Choose your path through the material:
+<!-- Teaser Figure -->
+<section class="teaser" aria-label="Key result">
+  <img src="static/images/curvefit_outlier_detection_comparison.png"
+       alt="Progressive refinement of polynomial regression with programmable inference in GenJAX"
+       loading="eager" />
+  <p class="caption">
+    <strong>Figure 1.</strong> From simple importance sampling to programmable inference.
+    (Left) Importance sampling on a simple polynomial model produces a tight fit, but cannot identify outliers.
+    (Center) Importance sampling on an enriched outlier model identifies likely outliers but has wide posterior uncertainty.
+    (Right) A custom Gibbs + HMC kernel on the outlier model produces accurate posterior samples.
+    Each step adds a new GenJAX capability: <code>vmap</code> for scaling inference, 
+    stochastic branching for richer models, and programmable kernels for better posterior approximation.
   </p>
-  <div class="track-switcher">
-    <button class="track-btn active" onclick="switchTrack('tutorial')" id="btn-tutorial">
-      <span class="track-label">Tutorial Track</span>
-      <span class="track-desc">— Progressive examples, gentle introduction</span>
-    </button>
-    <button class="track-btn" onclick="switchTrack('theory')" id="btn-theory">
-      <span class="track-label">Theory Track</span>
-      <span class="track-desc">— Formal model, proofs, PL foundations</span>
-    </button>
-  </div>
 </section>
 
-<!-- OVERVIEW (Common to both tracks) -->
-<section id="overview">
-  <h2>Overview</h2>
+<!-- Overview Section (Common to both tracks) -->
+<section id="overview" aria-labelledby="overview-heading">
+  <h2 id="overview-heading">Overview</h2>
   
   <p>
     Probabilistic programming has demonstrated remarkable effectiveness in applications ranging from
@@ -188,30 +182,105 @@
   </ol>
 </section>
 
-<!-- TUTORIAL TRACK CONTENT -->
-<div id="track-tutorial" class="track-content active">
+</div><!-- end container -->
 
-<section id="tutorial">
-  <h2>Tutorial: Polynomial Regression with GenJAX</h2>
+<!-- Track Switcher -->
+<section class="track-switcher-section" aria-labelledby="track-heading">
+  <div class="container">
+    <h2 id="track-heading">Explore the Paper</h2>
+    <p class="track-description">Choose your path through the material based on your background and interests.</p>
+    <div class="track-switcher" role="tablist" aria-label="Content tracks">
+      <button class="track-btn tutorial-track active" onclick="switchTrack('tutorial')" id="btn-tutorial" 
+              role="tab" aria-selected="true" aria-controls="track-tutorial" tabindex="0">
+        <span class="track-icon">📚</span>
+        <span class="track-label">Tutorial Track</span>
+        <span class="track-desc">Progressive examples, code walkthroughs, intuitive explanations</span>
+      </button>
+      <button class="track-btn theory-track" onclick="switchTrack('theory')" id="btn-theory"
+              role="tab" aria-selected="false" aria-controls="track-theory" tabindex="-1">
+        <span class="track-icon">🔬</span>
+        <span class="track-label">Theory Track</span>
+        <span class="track-desc">Formal model, proofs, type systems, PL foundations</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+<div class="main-content">
+
+<!-- Content Area -->
+<div class="content-area">
+
+<!-- TUTORIAL TRACK CONTENT -->
+<div id="track-tutorial" class="track-content active" role="tabpanel" aria-labelledby="btn-tutorial">
+
+<section id="tutorial" aria-labelledby="tutorial-heading">
+  <h2 id="tutorial-heading">Tutorial: Vectorized Probabilistic Programming</h2>
   
   <p>
-    This tutorial walks through a running example: polynomial regression with outlier detection.
-    We start with a simple model and importance sampling, then progressively add capabilities
-    to handle more complex scenarios.
+    Probabilistic programming enables Bayesian inference over complex models, but scaling inference
+    to large datasets and complex posteriors requires exploiting parallel hardware. This tutorial
+    introduces GenJAX through a running example—polynomial regression with outlier detection—
+    showing how vectorization with <code>vmap</code> enables efficient inference on GPU.
   </p>
   
-  <h3>Step 1: A Simple Polynomial Model</h3>
+  <h3>Core Concepts</h3>
   
   <p>
-    Consider the task of polynomial regression: given noisy datapoints $(x_i, y_i)$,
-    we wish to infer a polynomial relating $x$ and $y$. In GenJAX, we define
-    <em>generative functions</em> using the <code>@gen</code> decorator. Each random
-    choice is assigned a string-valued <em>address</em> using the syntax <code>dist @ "name"</code>.
+    GenJAX is built around four key abstractions that work together to enable composable,
+    vectorizable probabilistic computation:
   </p>
   
-  <div class="code-block">
-    <div class="code-header">polynomial_regression.py</div>
-    <pre><code>@gen
+  <dl class="concept-list">
+    <dt>Generative Functions</dt>
+    <dd>
+      Python functions decorated with <code>@gen</code> that define probabilistic computations.
+      They represent probability distributions over both return values and internal random choices.
+    </dd>
+    
+    <dt>Addresses</dt>
+    <dd>
+      String-valued names assigned to random choices via the syntax <code>dist @ "name"</code>.
+      Addresses create a namespace for random variables, enabling trace manipulation and conditioning.
+    </dd>
+    
+    <dt>Traces</dt>
+    <dd>
+      Structured records of all random choices made during execution of a generative function.
+      Traces are the data lingua franca of programmable inference, enabling operations like
+      scoring, updating, and projecting to subsets of variables.
+    </dd>
+    
+    <dt>The Generative Function Interface (GFI)</dt>
+    <dd>
+      A standardized set of methods that every compiled generative function implements:
+      <code>simulate</code> (run forward), <code>assess</code> (compute density),
+      <code>update</code> (modify traces), and <code>project</code> (extract subsets).
+    </dd>
+  </dl>
+  
+  <div class="tutorial-step">
+    <h3>Step 1: A Simple Polynomial Model</h3>
+    
+    <p>
+      We begin with polynomial regression: given noisy datapoints $(x_i, y_i)$,
+      we wish to infer the quadratic coefficients $(a, b, c)$ relating $x$ and $y$.
+      Our model has three components:
+    </p>
+    
+    <ul>
+      <li><strong>Prior:</strong> A generative function <code>polynomial</code> that samples
+        coefficients from standard normal distributions.</li>
+      <li><strong>Likelihood:</strong> A generative function <code>point</code> that generates
+        a noisy observation given a specific $x$ value and coefficients.</li>
+      <li><strong>Dataset model:</strong> A generative function <code>npoint_curve</code> that
+        generates an entire dataset by mapping <code>point</code> over a vector of $x$ values.</li>
+    </ul>
+    
+    <div class="code-block">
+      <div class="code-header">polynomial_regression.py</div>
+      <pre><code>@gen
 def polynomial():
     """Prior on quadratic coefficients."""
     a = normal(0.0, 1.0) @ "a"
@@ -234,41 +303,51 @@ def npoint_curve(xs):
     # vmap applies 'point' to each element of xs
     ys = vmap(point, in_axes=(0, None))(xs, coeffs)
     return ys</code></pre>
+    </div>
+    
+    <p>
+      The <code>vmap</code> transformation exploits <em>conditional independence</em>: given the
+      coefficients, each datapoint is generated independently. This allows GenJAX to generate
+      all $n$ points in parallel rather than sequentially.
+    </p>
+    
+    <div class="info-box tip">
+      <div class="info-box-title">Key Mechanism: Trace Vectorization</div>
+      <p>
+        When <code>vmap</code> transforms a generative function, it transforms the trace structure too:
+        from <em>array-of-structs</em> (one trace object per execution) to <em>struct-of-arrays</em>
+        (each address contains a vector of values). This memory layout enables efficient GPU computation.
+      </p>
+    </div>
+    
+    <div class="figure">
+      <img src="static/images/curvefit_prior_multipoint_traces_density.png"
+           alt="Prior samples from the polynomial model"
+           loading="lazy" />
+      <p class="fig-caption"><strong>Figure 2.</strong> Prior samples from the polynomial generative model.
+      Each trace samples coefficients $(a, b, c)$ and generates noisy observations via the <code>vmap</code>ped
+      point model. The traces show the variability in the prior before seeing any data.</p>
+    </div>
   </div>
   
-  <p>
-    The key insight: <code>vmap</code> exploits conditional independence. Given the coefficients,
-    each datapoint is generated independently — so we can generate them in parallel.
-  </p>
-  
-  <div class="figure">
-    <img src="static/images/curvefit_prior_multipoint_traces_density.png"
-         alt="Prior samples from the polynomial model" />
-    <p class="fig-caption"><strong>Figure 1.</strong> Prior samples from the polynomial generative model.
-    Each trace samples coefficients $(a, b, c)$ and generates noisy observations via the <code>vmap</code>ped point model.</p>
-  </div>
-  
-  <h3>Step 2: Vectorized Importance Sampling</h3>
-  
-  <p>
-    Generative functions compile to implementations of the <em>generative function interface</em>:
-  </p>
-  
-  <ul>
-    <li><code>simulate</code>: Run the program and yield an execution trace.</li>
-    <li><code>assess</code>: Compute the probability density of a trace.</li>
-  </ul>
-  
-  <p>
-    These methods compose to implement inference algorithms. Importance sampling involves
-    simulating many traces from the prior and assessing them under the likelihood.
-    By vectorizing <code>simulate</code> and <code>assess</code> with <code>vmap</code>,
-    we scale to many particles — executing them in parallel on GPU.
-  </p>
-  
-  <div class="code-block">
-    <div class="code-header">inference.py</div>
-    <pre><code># Single-particle importance sampling
+  <div class="tutorial-step">
+    <h3>Step 2: Vectorized Importance Sampling</h3>
+    
+    <p>
+      To perform inference, we use the GFI methods. <code>simulate</code> runs the program forward
+      and returns a trace; <code>assess</code> computes the log-probability of a trace.
+      These primitives compose to implement inference algorithms.
+    </p>
+    
+    <p>
+      Importance sampling is the simplest algorithm: sample many possible explanations (traces)
+      from the prior, weight each by how well it explains the observed data (likelihood ratio),
+      and use the weighted samples to approximate the posterior.
+    </p>
+    
+    <div class="code-block">
+      <div class="code-header">inference.py</div>
+      <pre><code># Single-particle importance sampling
 def importance_sample(model, obs, key):
     trace = model.simulate(key)
     weight = model.assess(trace, obs)
@@ -279,37 +358,55 @@ vectorized_is = vmap(importance_sample,
                      in_axes=(None, None, 0))
 
 # Run with 10,000 particles — executes in parallel
-traces, weights = vectorized_is(model, obs, 
-                                split(key, 10000))</code></pre>
+keys = split(key, 10000)
+traces, weights = vectorized_is(model, obs, keys)</code></pre>
+    </div>
+    
+    <p>
+      By vectorizing both <code>simulate</code> and <code>assess</code>, we scale to thousands
+      of particles that execute simultaneously on GPU. The vectorization is compositional:
+      <code>vmap</code> of a GFI method is itself a GFI method operating on vectorized traces.
+    </p>
+    
+    <div class="figure-row two-col">
+      <div class="figure">
+        <img src="static/images/curvefit_scaling_performance.png"
+             alt="Scaling behavior of vectorized importance sampling"
+             loading="lazy" />
+        <p class="fig-caption"><strong>Figure 4a.</strong> Vectorized importance sampling exhibits
+        near-constant wall-clock time on GPU as particle count increases, up to device memory limits.
+        This enables scaling to $10^5$ particles in milliseconds.</p>
+      </div>
+      <div class="figure">
+        <img src="static/images/curvefit_posterior_scaling_combined.png"
+             alt="Posterior approximation at different particle counts"
+             loading="lazy" />
+        <p class="fig-caption"><strong>Figure 4b.</strong> Posterior approximations with increasing
+        particle counts. Accuracy improves until convergence, demonstrating the statistical benefit
+        of massive vectorization.</p>
+      </div>
+    </div>
   </div>
   
-  <div class="figure-row two-col">
-    <div class="figure">
-      <img src="static/images/curvefit_scaling_performance.png"
-           alt="Scaling behavior of vectorized importance sampling" />
-      <p class="fig-caption"><strong>Figure 2a.</strong> Vectorized importance sampling scales near-constantly
-      in wall-clock time on GPU as particle count increases.</p>
-    </div>
-    <div class="figure">
-      <img src="static/images/curvefit_posterior_scaling_combined.png"
-           alt="Posterior approximation at different particle counts" />
-      <p class="fig-caption"><strong>Figure 2b.</strong> Posterior approximations with different particle counts.
-      Accuracy improves to convergence as we scale to GPU capacity.</p>
-    </div>
-  </div>
-  
-  <h3>Step 3: Stochastic Branching for Outlier Detection</h3>
-  
-  <p>
-    Real data often violates model assumptions. What if 10% of measurements are outliers?
-    We enrich the model with <em>stochastic branching</em>: each datapoint has a latent
-    "outlier flag." If true, it comes from a broad uniform distribution; otherwise,
-    it follows the noisy polynomial.
-  </p>
-  
-  <div class="code-block">
-    <div class="code-header">outlier_model.py</div>
-    <pre><code>@gen
+  <div class="tutorial-step">
+    <h3>Step 3: Stochastic Branching for Outlier Detection</h3>
+    
+    <p>
+      The simple model assumes all data follows the same noise distribution. Real data often
+      violates this assumption. We enrich the model to handle outliers using
+      <em>stochastic branching</em>.
+    </p>
+    
+    <p>
+      Each datapoint now has a latent "outlier flag" sampled from a Bernoulli distribution.
+      If the flag is true, the observation comes from a broad uniform distribution (outlier);
+      otherwise, it follows our precise polynomial model (inlier). The <code>Cond</code> combinator
+      implements this branching while maintaining full vectorization.
+    </p>
+    
+    <div class="code-block">
+      <div class="code-header">outlier_model.py</div>
+      <pre><code>@gen
 def point_with_outlier(x, coeffs):
     """Point model with outlier detection."""
     a, b, c = coeffs
@@ -319,74 +416,99 @@ def point_with_outlier(x, coeffs):
     
     # Branch based on the random flag
     y = Cond(is_outlier,
-        # Outlier: broad uniform
+        # Outlier: broad uniform distribution
         lambda: uniform(-10, 10) @ "y",
-        # Inlier: precise polynomial
+        # Inlier: precise polynomial with noise
         lambda: normal(a*x**2 + b*x + c, 0.3) @ "y"
     )
     return y</code></pre>
+    </div>
+    
+    <p>
+      Stochastic branching maintains vectorization even when different elements take different
+      branches. The <code>Cond</code> combinator evaluates both branches and selects elements
+      based on the condition, enabling mixture models and regime-switching dynamics.
+    </p>
+    
+    <div class="info-box warning">
+      <div class="info-box-title">Inference Challenge</div>
+      <p>
+        The outlier model is more expressive but harder to fit. Importance sampling can identify
+        likely outliers, but posterior uncertainty remains high even with $10^5$ particles—a form
+        of underfitting caused by the added latent variables.
+      </p>
+    </div>
   </div>
   
-  <p>
-    The <code>Cond</code> combinator supports stochastic branching while maintaining vectorization —
-    even when different elements take different branches.
-  </p>
-  
-  <h3>Step 4: Programmable Inference with Gibbs + HMC</h3>
-  
-  <p>
-    Even with a good model, inference can fail. Importance sampling on the outlier model
-    identifies outliers but has wide uncertainty — underfitting from the added latent variables,
-    even at $10^5$ particles.
-  </p>
-  
-  <p>
-    The solution: a custom hybrid algorithm combining <strong>Gibbs sampling</strong> (for discrete
-    outlier labels) and <strong>Hamiltonian Monte Carlo</strong> (for continuous curve parameters).
-  </p>
-  
-  <div class="code-block">
-    <div class="code-header">gibbs_hmc.py</div>
-    <pre><code>@gen
-def gibbs_step(trace):
+  <div class="tutorial-step">
+    <h3>Step 4: Programmable Inference with Gibbs + HMC</h3>
+    
+    <p>
+      When generic inference fails, GenJAX enables custom algorithms tailored to the model structure.
+      We design a hybrid algorithm combining two techniques:
+    </p>
+    
+    <ul>
+      <li><strong>Gibbs sampling</strong> for the discrete outlier flags, exploiting conditional
+        independence to update all flags in parallel.</li>
+      <li><strong>Hamiltonian Monte Carlo (HMC)</strong> for the continuous polynomial coefficients,
+        using gradient information to explore the posterior efficiently.</li>
+    </ul>
+    
+    <div class="code-block">
+      <div class="code-header">gibbs_hmc.py</div>
+      <pre><code>@gen
+def gibbs_step(trace, key):
     """Vectorized Gibbs update for outlier flags."""
-    # Extract current outlier choices
+    # Extract subtrace containing outlier choices
     outlier_subtrace = trace.get_subtrace("ys")
     
-    # Enumerate both possibilities for each flag
-    # (True/False) and compute unnormalized posteriors
+    # For each data point, enumerate both possibilities (True/False)
+    # and compute unnormalized posterior densities
     for flag in [True, False]:
         new_trace, weight = trace.update(
-            {"outlier": flag}
+            key, {"outlier": flag}
         )
-        # Resample from categorical over flags
-        ...
-    return new_trace
+        log_probs[flag] = weight
+    
+    # Resample each flag from categorical over possibilities
+    new_flags = categorical(softmax(log_probs)) @ "outliers"
+    return updated_trace
 
-# Combine: Gibbs for discrete, HMC for continuous
-inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
-  </div>
-  
-  <p>
-    Because each outlier choice is conditionally independent given other choices,
-    the Gibbs updates can be <em>vectorized</em>. The result: accurate posterior samples
-    that correctly classify outliers and fit the polynomial trend.
-  </p>
-  
-  <div class="info-box tip">
-    <div class="info-box-title">Key Insight</div>
-    <p>Every opportunity for vectorization — in the model, in proposals, and across particles —
-    is expressed with <code>vmap</code>, leading to highly efficient inference algorithms.</p>
+# Hybrid kernel: Gibbs for discrete, HMC for continuous
+inference_kernel = compose(gibbs_step, hmc_step)
+
+# Run vectorized inference
+inference_kernel = vmap(inference_kernel, in_axes=(0, 0))</code></pre>
+    </div>
+    
+    <p>
+      Because the outlier flags are conditionally independent given the curve parameters,
+      we vectorize the Gibbs updates across all data points. The hybrid algorithm produces
+      accurate posterior samples that correctly identify outliers while tightly fitting
+      the polynomial trend to inlier data.
+    </p>
+    
+    <div class="info-box tip">
+      <div class="info-box-title">Key Insight: Three Levels of Vectorization</div>
+      <p>
+        GenJAX enables vectorization at three levels: <strong>(1)</strong> in the model
+        (e.g., <code>vmap(point)</code> over datapoints), <strong>(2)</strong> in proposals
+        (e.g., enumerative grids), and <strong>(3)</strong> across particles or chains
+        (e.g., $10^4$ parallel MCMC chains). Every opportunity for parallelism is expressed
+        with <code>vmap</code>, leading to highly efficient inference on GPU.
+      </p>
+    </div>
   </div>
 </section>
 
-</div>
+</div><!-- end tutorial track -->
 
 <!-- THEORY TRACK CONTENT -->
-<div id="track-theory" class="track-content">
+<div id="track-theory" class="track-content" role="tabpanel" aria-labelledby="btn-theory">
 
-<section id="theory">
-  <h2>Theory: $\lambda_{\text{GEN}}$ and Vectorization</h2>
+<section id="theory" aria-labelledby="theory-heading">
+  <h2 id="theory-heading">Theory: $\lambda_{\text{GEN}}$ and Vectorization</h2>
   
   <p>
     This section presents the formal foundations of GenJAX. We introduce $\lambda_{\text{GEN}}$,
@@ -428,43 +550,47 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   
   <h4>Key Constructs</h4>
   
-  <table>
-    <tr>
-      <th>Construct</th>
-      <th>Syntax</th>
-      <th>Type</th>
-      <th>Description</th>
-    </tr>
-    <tr>
-      <td>Sample</td>
-      <td><code>sample t</code></td>
-      <td>$\mathbb{P}\{\eta\}$</td>
-      <td>Sample from distribution $t : \mathbb{D}\{\eta\}$</td>
-    </tr>
-    <tr>
-      <td>Return</td>
-      <td><code>return t</code></td>
-      <td>$\mathbb{P}\{\eta\}$</td>
-      <td>Lift deterministic $t : \eta$ to probability monad</td>
-    </tr>
-    <tr>
-      <td>Trace</td>
-      <td><code>trace k t</code></td>
-      <td>$\mathbb{G}^{\{k:\gamma\}}\{\eta\}$</td>
-      <td>Name generative function $t : \mathbb{G}^\gamma\{\eta\}$ at address $k$</td>
-    </tr>
-    <tr>
-      <td>Bind</td>
-      <td><code>x ← t; m</code></td>
-      <td>$\mathbb{G}^{\gamma \doubleplus \gamma'}\{\eta'\}$</td>
-      <td>Sequence generative functions (disjoint address sets)</td>
-    </tr>
-    <tr>
-      <td>Select</td>
-      <td><code>select(c, t₁, t₂)</code></td>
-      <td>$T^s$</td>
-      <td>Stochastic branching (batched conditional)</td>
-    </tr>
+  <table class="comparison-table">
+    <thead>
+      <tr>
+        <th>Construct</th>
+        <th>Syntax</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Sample</td>
+        <td><code>sample t</code></td>
+        <td>$\mathbb{P}\{\eta\}$</td>
+        <td>Sample from distribution $t : \mathbb{D}\{\eta\}$</td>
+      </tr>
+      <tr>
+        <td>Return</td>
+        <td><code>return t</code></td>
+        <td>$\mathbb{P}\{\eta\}$</td>
+        <td>Lift deterministic $t : \eta$ to probability monad</td>
+      </tr>
+      <tr>
+        <td>Trace</td>
+        <td><code>trace k t</code></td>
+        <td>$\mathbb{G}^{\{k:\gamma\}}\{\eta\}$</td>
+        <td>Name generative function $t : \mathbb{G}^\gamma\{\eta\}$ at address $k$</td>
+      </tr>
+      <tr>
+        <td>Bind</td>
+        <td><code>x ← t; m</code></td>
+        <td>$\mathbb{G}^{\gamma \doubleplus \gamma'}\{\eta'\}$</td>
+        <td>Sequence generative functions (disjoint address sets)</td>
+      </tr>
+      <tr>
+        <td>Select</td>
+        <td><code>select(c, t₁, t₂)</code></td>
+        <td>$T^s$</td>
+        <td>Stochastic branching (batched conditional)</td>
+      </tr>
+    </tbody>
   </table>
   
   <h3>Vectorization as Transformation</h3>
@@ -492,18 +618,16 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     (get, set, merge) but operate on batched values.
   </p>
   
-  <h3>Correctness Theorem</h3>
-  
-  <div class="info-box">
-    <div class="info-box-title">Theorem (Vectorization Correctness)</div>
+  <div class="theorem-box">
+    <div class="theorem-title">Theorem (Vectorization Correctness)</div>
     <p>
       For any closed term $t : \mathbb{G}^\gamma\{\eta\}$, the vectorized program
       $\text{vmap}_n(t)$ satisfies:
     </p>
-    <p style="text-align: center; margin: var(--space-md) 0;">
-      $\llbracket \text{vmap}_n(t) \rrbracket = 
-      \lambda \rho. \prod_{i=1}^n \llbracket t \rrbracket(\rho_i)$
-    </p>
+    <div class="math-block" style="background: none;">
+      $$\llbracket \text{vmap}_n(t) \rrbracket = 
+      \lambda \rho. \prod_{i=1}^n \llbracket t \rrbracket(\rho_i)$$
+    </div>
     <p>
       where $\rho$ is a vectorized environment and $\rho_i$ extracts the $i$-th component.
       The vectorized program computes the product measure of $n$ independent executions.
@@ -517,31 +641,35 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   </p>
   
   <table>
-    <tr>
-      <th>Method</th>
-      <th>Signature</th>
-      <th>Description</th>
-    </tr>
-    <tr>
-      <td><code>simulate</code></td>
-      <td>$\text{Key} \to \text{Trace} \times \eta$</td>
-      <td>Execute program, return trace and retval</td>
-    </tr>
-    <tr>
-      <td><code>assess</code></td>
-      <td>$\text{Trace} \to \mathbb{R} \times \eta$</td>
-      <td>Compute log-density of trace</td>
-    </tr>
-    <tr>
-      <td><code>project</code></td>
-      <td>$\text{Trace} \times \text{Selection} \to \mathbb{R}$</td>
-      <td>Project trace to selected addresses</td>
-    </tr>
-    <tr>
-      <td><code>update</code></td>
-      <td>$\text{Trace} \times \text{Constraints} \to \text{Trace} \times \mathbb{R}$</td>
-      <td>Update trace with constraints, return new trace and weight</td>
-    </tr>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>Signature</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>simulate</code></td>
+        <td>$\text{Key} \to \text{Trace} \times \eta$</td>
+        <td>Execute program, return trace and return value</td>
+      </tr>
+      <tr>
+        <td><code>assess</code></td>
+        <td>$\text{Trace} \to \mathbb{R} \times \eta$</td>
+        <td>Compute log-density of trace</td>
+      </tr>
+      <tr>
+        <td><code>project</code></td>
+        <td>$\text{Trace} \times \text{Selection} \to \mathbb{R}$</td>
+        <td>Project trace to selected addresses</td>
+      </tr>
+      <tr>
+        <td><code>update</code></td>
+        <td>$\text{Trace} \times \text{Constraints} \to \text{Trace} \times \mathbb{R}$</td>
+        <td>Update trace with constraints, return new trace and weight</td>
+      </tr>
+    </tbody>
   </table>
   
   <p>
@@ -573,11 +701,30 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   </p>
 </section>
 
-</div>
+</div><!-- end theory track -->
+
+</div><!-- end content-area -->
+
+<!-- Sidebar (optional) -->
+<aside class="sidebar" aria-label="Table of contents">
+  <div class="toc-title">On this page</div>
+  <nav class="toc-nav" aria-label="Page sections">
+    <ul>
+      <li><a href="#overview" class="toc-h2">Overview</a></li>
+      <li><a href="#tutorial" class="toc-h2">Tutorial</a></li>
+      <li><a href="#theory" class="toc-h2">Theory</a></li>
+      <li><a href="#evaluation" class="toc-h2">Evaluation</a></li>
+      <li><a href="#artifact" class="toc-h2">Artifact</a></li>
+      <li><a href="#citation" class="toc-h2">Citation</a></li>
+    </ul>
+  </nav>
+</aside>
+
+</div><!-- end main-content -->
 
 <!-- EVALUATION (Common section) -->
-<section id="evaluation">
-  <h2>Evaluation</h2>
+<section id="evaluation" aria-labelledby="evaluation-heading">
+  <h2 id="evaluation-heading">Evaluation</h2>
   
   <p>
     We evaluate GenJAX on benchmarks and case studies assessing two criteria:
@@ -588,7 +735,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   <h3>Performance Survey</h3>
   
   <p>
-    We compare GenJAX against NumPyro, Pyro, TensorFlow Probability, hand-coded PyTorch, and Gen.jl
+    We compare GenJAX against NumPyro, Pyro, TensorFlow Probability, hand-coded JAX, PyTorch, and Gen.jl
     on importance sampling and Hamiltonian Monte Carlo. GenJAX achieves near-identical performance to
     hand-coded JAX (100.1% relative time on the Beta-Bernoulli model), validating that our abstractions
     for programmable inference introduce minimal overhead. Importance sampling exhibits parallel scaling
@@ -597,22 +744,25 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   
   <div class="figure">
     <img src="static/images/combined_3x2_obs50_samples2000.png"
-         alt="Beta-Bernoulli model: posterior accuracy and timing comparison" />
-    <p class="fig-caption"><strong>Figure 3.</strong> Beta-Bernoulli model: all frameworks accurately recover 
+         alt="Beta-Bernoulli model: posterior accuracy and timing comparison"
+         loading="lazy" />
+    <p class="fig-caption"><strong>Figure 6.</strong> Beta-Bernoulli model: all frameworks accurately recover 
     the true posterior. GenJAX achieves near-identical performance to hand-coded JAX.</p>
   </div>
   
   <div class="figure-row two-col">
     <div class="figure">
       <img src="static/images/benchmark_timings_is_all_frameworks.png"
-           alt="Importance sampling timing comparison" />
-      <p class="fig-caption"><strong>Figure 4a.</strong> Importance sampling: vectorized frameworks show 
+           alt="Importance sampling timing comparison"
+           loading="lazy" />
+      <p class="fig-caption"><strong>Figure 7a.</strong> Importance sampling: vectorized frameworks show 
       near-constant scaling while GPU is not saturated.</p>
     </div>
     <div class="figure">
       <img src="static/images/benchmark_timings_hmc_all_frameworks.png"
-           alt="HMC timing comparison" />
-      <p class="fig-caption"><strong>Figure 4b.</strong> Hamiltonian Monte Carlo: linear scaling in chain length. 
+           alt="HMC timing comparison"
+           loading="lazy" />
+      <p class="fig-caption"><strong>Figure 7b.</strong> Hamiltonian Monte Carlo: linear scaling in chain length. 
       GenJAX consistently matches hand-coded JAX.</p>
     </div>
   </div>
@@ -636,14 +786,16 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   <div class="figure-row two-col">
     <div class="figure">
       <img src="static/images/gol_integrated_showcase_wizards_1024.png"
-           alt="Game of Life inversion showcase" />
-      <p class="fig-caption"><strong>Figure 5a.</strong> Approximate inversion of Game of Life dynamics 
-      using vectorized Gibbs sampling on a 512×512 board.</p>
+           alt="Game of Life inversion showcase"
+           loading="lazy" />
+      <p class="fig-caption"><strong>Figure 9a.</strong> Approximate inversion of Game of Life dynamics 
+      using vectorized Gibbs sampling on a 1024×1024 board (wizard book cover pattern).</p>
     </div>
     <div class="figure">
       <img src="static/images/gol_gibbs_timing_bar_plot.png"
-           alt="Game of Life Gibbs sampling throughput" />
-      <p class="fig-caption"><strong>Figure 5b.</strong> Gibbs sampling throughput across grid sizes, 
+           alt="Game of Life Gibbs sampling throughput"
+           loading="lazy" />
+      <p class="fig-caption"><strong>Figure 9b.</strong> Gibbs sampling throughput across grid sizes, 
       comparing CPU and GPU execution.</p>
     </div>
   </div>
@@ -674,22 +826,24 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   <div class="figure-row two-col">
     <div class="figure">
       <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.png"
-           alt="Robot localization problem" />
-      <p class="fig-caption"><strong>Figure 6a.</strong> Localization problem: robot with 8-ray LIDAR 
+           alt="Robot localization problem"
+           loading="lazy" />
+      <p class="fig-caption"><strong>Figure 10a.</strong> Localization problem: robot with 8-ray LIDAR 
       navigates a 2D environment. Goal is to infer position from distance measurements.</p>
     </div>
     <div class="figure">
       <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.png"
-           alt="SMC methods comparison" />
-      <p class="fig-caption"><strong>Figure 6b.</strong> SMC methods comparison. The locally optimal proposal 
+           alt="SMC methods comparison"
+           loading="lazy" />
+      <p class="fig-caption"><strong>Figure 10b.</strong> SMC methods comparison. The locally optimal proposal 
       — with vectorized grid enumeration — achieves best efficiency and accuracy.</p>
     </div>
   </div>
 </section>
 
 <!-- Artifact -->
-<section id="artifact">
-  <h2>Artifact</h2>
+<section id="artifact" aria-labelledby="artifact-heading">
+  <h2 id="artifact-heading">Artifact</h2>
   
   <p>
     The GenJAX artifact is available on <a href="https://doi.org/10.5281/zenodo.17342547">Zenodo</a>
@@ -716,12 +870,12 @@ pip install -e ".[dev]"</code></pre>
 </section>
 
 <!-- Citation -->
-<section id="citation">
-  <h2>Citation</h2>
+<section id="citation" aria-labelledby="citation-heading">
+  <h2 id="citation-heading">Citation</h2>
   
   <div class="bibtex-container">
-    <button class="copy-btn" onclick="copyBibtex()">Copy</button>
-    <pre class="bibtex-block" id="bibtex">@article{becker2026genjax,
+    <button class="copy-btn" onclick="copyBibtex()" aria-label="Copy citation to clipboard">Copy</button>
+    <pre class="bibtex-block" id="bibtex"><code>@article{becker2026genjax,
   title     = {Probabilistic Programming with Vectorized Programmable Inference},
   author    = {Becker, McCoy R. and Huot, Mathieu and Matheos, George and
                Wang, Xiaoyan and Chung, Karen and Smith, Colin and
@@ -734,10 +888,11 @@ pip install -e ".[dev]"</code></pre>
   year      = {2026},
   publisher = {ACM},
   doi       = {10.1145/3776729},
-}</pre>
+}</code></pre>
   </div>
 </section>
 
+</div><!-- end container -->
 </main>
 
 <!-- Footer -->
@@ -747,7 +902,7 @@ pip install -e ".[dev]"</code></pre>
       GenJAX is developed at the
       <a href="https://probcomp.csail.mit.edu/">MIT Probabilistic Computing Project</a>.
     </p>
-    <p style="margin-top: var(--space-sm); color: var(--color-text-muted);">
+    <p>
       © 2026 The Authors. Published in PACMPL.
     </p>
   </div>
@@ -757,20 +912,32 @@ pip install -e ".[dev]"</code></pre>
 // Track Switching
 function switchTrack(track) {
   // Update buttons
-  document.querySelectorAll('.track-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById('btn-' + track).classList.add('active');
+  document.querySelectorAll('.track-btn').forEach(btn => {
+    btn.classList.remove('active');
+    btn.setAttribute('aria-selected', 'false');
+    btn.setAttribute('tabindex', '-1');
+  });
+  const activeBtn = document.getElementById('btn-' + track);
+  activeBtn.classList.add('active');
+  activeBtn.setAttribute('aria-selected', 'true');
+  activeBtn.setAttribute('tabindex', '0');
   
   // Update content
-  document.querySelectorAll('.track-content').forEach(content => content.classList.remove('active'));
+  document.querySelectorAll('.track-content').forEach(content => {
+    content.classList.remove('active');
+  });
   document.getElementById('track-' + track).classList.add('active');
   
   // Update URL hash
   history.replaceState(null, null, '#' + track);
   
   // Re-render MathJax if needed
-  if (typeof MathJax !== 'undefined') {
-    MathJax.typesetPromise?.();
+  if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+    MathJax.typesetPromise();
   }
+  
+  // Scroll to track section
+  document.getElementById('track-heading').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Copy BibTeX
@@ -778,8 +945,9 @@ function copyBibtex() {
   const bibtex = document.getElementById('bibtex').textContent;
   navigator.clipboard.writeText(bibtex).then(() => {
     const btn = document.querySelector('.copy-btn');
+    const originalText = btn.textContent;
     btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 2000);
+    setTimeout(() => btn.textContent = originalText, 2000);
   });
 }
 
@@ -794,14 +962,64 @@ if (window.location.hash === '#theory') {
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   anchor.addEventListener('click', function(e) {
     const href = this.getAttribute('href');
-    if (href !== '#theory' && href !== '#tutorial') {
+    if (href !== '#theory' && href !== '#tutorial' && href !== '#') {
       e.preventDefault();
       const target = document.querySelector(href);
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Update focus for accessibility
+        target.setAttribute('tabindex', '-1');
+        target.focus({ preventScroll: true });
       }
     }
   });
+});
+
+// Keyboard navigation for track switcher
+document.querySelectorAll('.track-btn').forEach(btn => {
+  btn.addEventListener('keydown', (e) => {
+    const buttons = Array.from(document.querySelectorAll('.track-btn'));
+    const index = buttons.indexOf(btn);
+    
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = buttons[(index + 1) % buttons.length];
+      next.focus();
+      next.click();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = buttons[(index - 1 + buttons.length) % buttons.length];
+      prev.focus();
+      prev.click();
+    }
+  });
+});
+
+// Active section highlighting in nav
+document.addEventListener('DOMContentLoaded', () => {
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+  
+  const observerOptions = {
+    root: null,
+    rootMargin: '-20% 0px -80% 0px',
+    threshold: 0
+  };
+  
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === '#' + entry.target.id) {
+            link.classList.add('active');
+          }
+        });
+      }
+    });
+  }, observerOptions);
+  
+  sections.forEach(section => observer.observe(section));
 });
 </script>
 
