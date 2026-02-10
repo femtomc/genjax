@@ -29,8 +29,13 @@
     document.body.classList.add('js-enabled');
     
     loadTrackPreference();
+    const hashTrack = getTrackFromHash();
+    if (hashTrack) {
+      currentTrack = hashTrack;
+    }
     setupTrackSwitcher();
     setupSmoothScroll();
+    setupHashTrackSync();
     setupActiveSectionHighlight();
     setupKeyboardNavigation();
     setupBibTexCopy();
@@ -71,12 +76,25 @@
       if (saved && CONFIG.tracks.includes(saved)) {
         currentTrack = saved;
       }
-      // Note: Hash is not used for track state - section anchors (#evaluation, etc.) 
-      // remain functional for deep-linking to content sections
+      // Hash is not used for persisted state, but may override on load.
     } catch (e) {
       // localStorage may be disabled
       console.warn('Could not load track preference:', e);
     }
+  }
+
+  /**
+   * Resolve a track from the current URL hash, if any.
+   */
+  function getTrackFromHash() {
+    const hash = window.location.hash;
+    if (!hash) return null;
+    const target = document.querySelector(hash);
+    if (!target) return null;
+    const trackSection = target.closest('.track-content');
+    if (!trackSection) return null;
+    const track = trackSection.id.replace('track-', '');
+    return CONFIG.tracks.includes(track) ? track : null;
   }
 
   /**
@@ -247,6 +265,18 @@
           }
         }
       });
+    });
+  }
+
+  /**
+   * Switch tracks when URL hash changes (deep-link support).
+   */
+  function setupHashTrackSync() {
+    window.addEventListener('hashchange', () => {
+      const hashTrack = getTrackFromHash();
+      if (hashTrack && hashTrack !== currentTrack) {
+        switchTrack(hashTrack, false);
+      }
     });
   }
 

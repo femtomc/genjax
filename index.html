@@ -70,6 +70,8 @@
       <a href="#tutorial">Tutorial</a>
       <a href="#theory">Theory</a>
       <a href="#evaluation">Evaluation</a>
+      <a href="#related-work">Related Work</a>
+      <a href="#conclusion">Conclusion</a>
       <a href="#artifact">Artifact</a>
       <a href="#citation">Citation</a>
     </div>
@@ -501,38 +503,47 @@
         generates an entire dataset by mapping <code>point</code> over a vector of $x$ values.</li>
     </ul>
     
-    <div class="code-block">
-      <div class="code-header">polynomial_regression.py</div>
-      <pre><code>@gen
-def polynomial():
-    """Prior on quadratic coefficients."""
-    a = normal(0.0, 1.0) @ "a"
-    b = normal(0.0, 1.0) @ "b"  
-    c = normal(0.0, 1.0) @ "c"
-    return (a, b, c)
-
-@gen
-def point(x, coeffs):
-    """Generate a single noisy observation."""
-    a, b, c = coeffs
-    y_mean = a * x**2 + b * x + c
-    y = normal(y_mean, 0.3) @ "y"
-    return y
-
-@gen
-def npoint_curve(xs):
-    """Model entire dataset via vmap."""
-    coeffs = polynomial()
-    # vmap applies 'point' to each element of xs
-    ys = vmap(point, in_axes=(0, None))(xs, coeffs)
-    return ys</code></pre>
-    </div>
-    
     <p>
       The <code>vmap</code> transformation exploits <em>conditional independence</em>: given the
       coefficients, each datapoint is generated independently. This allows GenJAX to generate
       all $n$ points in parallel rather than sequentially.
     </p>
+
+    <figure class="figure">
+      <div class="figure-row two-col">
+        <div class="code-block">
+          <div class="code-header">generative_functions.py</div>
+          <pre><code>@gen
+def polynomial():
+    a = normal(0.0, 1.0) @ "a"
+    b = normal(0.0, 1.0) @ "b"
+    c = normal(0.0, 1.0) @ "c"
+    return (a, b, c)
+
+@gen
+def point(x, coeffs):
+    a, b, c = coeffs
+    y_mean = a + b * x + c * x**2
+    y = normal(y_mean, 0.2) @ "obs"
+    return y</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">vectorized_model.py</div>
+          <pre><code>@gen
+def npoint_curve(xs):
+    coeffs = polynomial() @ "curve"
+    ys = vmap(point, in_axes=(0, None))(xs, coeffs) @ "ys"
+    return coeffs, ys
+
+xs = array([0.1, 0.3, 0.4, 0.6])
+traces = vmap(simulate(npoint_curve), repeat=4)(xs)
+densities, retvals = vmap(assess(npoint_curve), args_mapped=0)(traces, xs)</code></pre>
+        </div>
+      </div>
+      <figcaption class="fig-caption"><strong>Figure 3.</strong> Vectorization of generative functions.
+        Left: prior and likelihood code for polynomial regression. Right: <code>vmap</code> lifts the model to
+        batches and vectorizes <code>simulate</code> and <code>assess</code>.</figcaption>
+    </figure>
     
     <div class="info-box tip">
       <div class="info-box-title">Key Mechanism: Trace Vectorization</div>
@@ -545,11 +556,10 @@ def npoint_curve(xs):
     
     <div class="figure">
       <img src="static/images/curvefit_prior_multipoint_traces_density.svg"
-           alt="Prior samples from the polynomial model"
+           alt="Vectorized traces from vmap(simulate)"
            loading="lazy" />
-      <p class="fig-caption"><strong>Figure 3.</strong> Prior samples from the polynomial generative model.
-      Each trace samples coefficients $(a, b, c)$ and generates noisy observations via the <code>vmap</code>ped
-      point model.</p>
+      <p class="fig-caption"><strong>Figure 4.</strong> Vectorized traces. <code>vmap(simulate)</code> preserves
+      trace structure while batching random choices into arrays, yielding efficient struct-of-arrays traces.</p>
     </div>
   </section>
   
@@ -568,45 +578,43 @@ def npoint_curve(xs):
       and use the weighted samples to approximate the posterior.
     </p>
     
-    <div class="code-block">
-      <div class="code-header">inference.py</div>
-      <pre><code># Single-particle importance sampling
-def importance_sample(model, obs, key):
-    trace = model.simulate(key)
-    weight = model.assess(trace, obs)
-    return trace, weight
-
-# Vectorize to N particles via vmap
-vectorized_is = vmap(importance_sample, 
-                     in_axes=(None, None, 0))
-
-# Run with 10,000 particles — executes in parallel
-keys = split(key, 10000)
-traces, weights = vectorized_is(model, obs, keys)</code></pre>
-    </div>
-    
     <p>
       By vectorizing both <code>simulate</code> and <code>assess</code>, we scale to thousands
       of particles that execute simultaneously on GPU. The vectorization is compositional:
       <code>vmap</code> of a GFI method is itself a GFI method operating on vectorized traces.
     </p>
-    
-    <div class="figure-row two-col">
-      <div class="figure">
-        <img src="static/images/curvefit_scaling_performance.svg"
-             alt="Scaling behavior of vectorized importance sampling"
-             loading="lazy" />
-        <p class="fig-caption"><strong>Figure 4.</strong> Scaling behavior. Vectorized importance sampling exhibits
-        near-constant wall-clock time on GPU as particle count increases, up to device memory limits.</p>
+
+    <figure class="figure">
+      <div class="figure-row two-col">
+        <div class="code-block">
+          <div class="code-header">single_particle.py</div>
+          <pre><code># Single-particle importance sampling
+def importance_sample(model, obs, key):
+    trace = model.simulate(key)
+    weight = model.assess(trace, obs)
+    return trace, weight</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">vectorized.py</div>
+          <pre><code># Vectorize to N particles via vmap
+vectorized_is = vmap(importance_sample,
+                     in_axes=(None, None, 0))
+
+# Run with 10,000 particles in parallel
+keys = split(key, 10000)
+traces, weights = vectorized_is(model, obs, keys)</code></pre>
+        </div>
       </div>
-      <div class="figure">
-        <img src="static/images/curvefit_posterior_scaling_combined.svg"
-             alt="Posterior approximation at different particle counts"
-             loading="lazy" />
-        <p class="fig-caption"><strong>Figure 5.</strong> Posterior convergence. Posterior approximations with increasing
-        particle counts. Accuracy improves until convergence.</p>
-      </div>
-    </div>
+      <img src="static/images/curvefit_scaling_performance.svg"
+           alt="Scaling behavior of vectorized importance sampling"
+           loading="lazy" />
+      <img src="static/images/curvefit_posterior_scaling_combined.svg"
+           alt="Posterior approximations at different particle counts"
+           loading="lazy" />
+      <figcaption class="fig-caption"><strong>Figure 5.</strong> Vectorized programmable inference.
+        Top: single-particle importance sampling and its vectorized form. Middle: GPU scaling is near
+        constant until memory saturation. Bottom: posterior approximations converge as particle count grows.</figcaption>
+    </figure>
   </section>
   
   <section id="tutorial-step-3" class="tutorial-step" aria-labelledby="tutorial-step-3-heading">
@@ -625,16 +633,17 @@ traces, weights = vectorized_is(model, obs, keys)</code></pre>
       implements this branching while maintaining full vectorization.
     </p>
     
-    <div class="code-block">
-      <div class="code-header">outlier_model.py</div>
-      <pre><code>@gen
+    <figure class="figure">
+      <div class="code-block">
+        <div class="code-header">outlier_model.py</div>
+        <pre><code>@gen
 def point_with_outlier(x, coeffs):
     """Point model with outlier detection."""
     a, b, c = coeffs
-    
+
     # Latent outlier flag
     is_outlier = bernoulli(0.1) @ "outlier"
-    
+
     # Branch based on the random flag
     y = Cond(is_outlier,
         # Outlier: broad uniform distribution
@@ -643,7 +652,15 @@ def point_with_outlier(x, coeffs):
         lambda: normal(a*x**2 + b*x + c, 0.3) @ "y"
     )
     return y</code></pre>
-    </div>
+      </div>
+      <img src="static/images/curvefit_outlier_detection_comparison.svg"
+           alt="Outlier detection comparison"
+           loading="lazy" />
+      <figcaption class="fig-caption"><strong>Figure 6.</strong> Robust modeling with stochastic branching.
+        Stochastic branching enables mixture models with outliers. (Left) Importance sampling on the
+        simple model underfits; (Center) the outlier model is harder to fit with generic inference;
+        (Right) a custom Gibbs + HMC kernel yields accurate posterior samples.</figcaption>
+    </figure>
     
     <p>
       Stochastic branching maintains vectorization even when different elements take different
@@ -676,47 +693,83 @@ def point_with_outlier(x, coeffs):
         using gradient information to explore the posterior efficiently.</li>
     </ul>
     
-    <div class="code-block">
-      <div class="code-header">gibbs_hmc.py</div>
-      <pre><code>@gen
-def gibbs_step(trace, key):
-    """Vectorized Gibbs update for outlier flags."""
-    # Extract subtrace containing outlier choices
-    subtrace = trace.get_subtrace("ys")
-    
-    # For each data point, enumerate both possibilities
-    # and compute unnormalized posterior densities
-    log_probs = []
-    for flag in [True, False]:
-        new_trace, weight = trace.update(
-            key, {"outlier": flag}
-        )
-        log_probs.append(weight)
-    
-    # Resample each flag from categorical
-    new_flags = categorical(softmax(log_probs)) @ "outliers"
-    return new_trace
+    <figure class="figure">
+      <div class="figure-row two-col">
+        <div class="code-block">
+          <div class="code-header">gibbs_single.py</div>
+          <pre><code>def gibbs_outlier(subtrace):
+    def assess_flag(flag):
+        x, a, b, c = subtrace.args()
+        chm = {"outlier": flag,
+               "obs": subtrace["obs"]}
+        logp, _ = assess(point_with_outliers)(chm, x, a, b, c)
+        return logp
 
-# Hybrid kernel: Gibbs for discrete, HMC for continuous
-inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
-    </div>
-    
+    log_probs = vmap(assess_flag)(array([False, True]))
+    return categorical(log_probs) == 1</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">gibbs_vectorized.py</div>
+          <pre><code># `trace` stores batched values in struct-of-arrays form
+def enumerative_gibbs(trace):
+    subtrace = trace.get_subtrace("ys")
+    new_outliers = vmap(gibbs_outlier)(subtrace)
+    new_trace, weight, _ = update(
+        trace, {"ys": {"outlier": new_outliers}}
+    )
+    return new_trace</code></pre>
+        </div>
+      </div>
+      <figcaption class="fig-caption"><strong>Figure 7.</strong> Vectorized enumerative Gibbs sampling for outlier detection.
+        Left: single-point Gibbs update by enumerating outlier flags. Right: <code>vmap</code> lifts the update
+        across all datapoints, then applies a trace update.</figcaption>
+    </figure>
+
     <p>
-      Because the outlier flags are conditionally independent given the curve parameters,
-      we vectorize the Gibbs updates across all data points. The hybrid algorithm produces
-      accurate posterior samples that correctly identify outliers while tightly fitting
-      the polynomial trend to inlier data.
+      These updates rely on the generative function interface (GFI), a small set of methods that enable
+      programmable inference by composing sampling, scoring, and trace manipulation.
     </p>
-    
-    <div class="figure">
-      <img src="static/images/curvefit_outlier_detection_comparison.svg"
-           alt="Outlier detection comparison"
-           loading="lazy" />
-      <p class="fig-caption"><strong>Figure 6.</strong> Robust modeling with stochastic branching.
-      (Left) Simple importance sampling produces a tight fit but cannot identify outliers.
-      (Center) Importance sampling on the outlier model identifies likely outliers but has high uncertainty.
-      (Right) A custom Gibbs + HMC kernel produces accurate posterior samples.</p>
-    </div>
+
+    <figure class="figure">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Role</th>
+            <th>Used For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>simulate</code></td>
+            <td>Unconstrained sampling</td>
+            <td>Prior sampling, SMC proposals</td>
+          </tr>
+          <tr>
+            <td><code>assess</code></td>
+            <td>Density evaluation</td>
+            <td>Importance weights, diagnostics</td>
+          </tr>
+          <tr>
+            <td><code>generate</code></td>
+            <td>Constrained sampling</td>
+            <td>Importance sampling with observations</td>
+          </tr>
+          <tr>
+            <td><code>update</code></td>
+            <td>Trace modification</td>
+            <td>Gibbs, MCMC, local proposals</td>
+          </tr>
+        </tbody>
+      </table>
+      <figcaption class="fig-caption"><strong>Figure 8.</strong> Generative function interface methods for programmable inference.
+        These interfaces compose to build custom algorithms, from importance sampling to MCMC kernels.</figcaption>
+    </figure>
+
+    <p>
+      We then compose the Gibbs updates with HMC moves over continuous parameters, yielding a hybrid
+      kernel that is both expressive and efficient.
+    </p>
     
     <div class="info-box tip">
       <div class="info-box-title">Key Insight: Three Levels of Vectorization</div>
@@ -754,6 +807,15 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     a simply-typed lambda calculus for probabilistic programming with programmable inference,
     define vectorization as a source-to-source transformation, and prove correctness.
   </p>
+
+  <div class="info-box">
+    <div class="info-box-title">Paper Cross-Reference</div>
+    <p>
+      Figures 9–16 in the paper present the full formal syntax, semantics, and compiler diagrams.
+      The equations and summaries below track those results in compressed form; see the PDF for
+      the full figure set.
+    </p>
+  </div>
   
   <section id="theory-syntax" aria-labelledby="theory-syntax-heading">
     <h3 id="theory-syntax-heading">Syntax and Types</h3>
@@ -1003,6 +1065,8 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
           <li><a href="#evaluation-summary" class="toc-h3">Summary</a></li>
         </ul>
       </li>
+      <li><a href="#related-work" class="toc-h2">Related Work</a></li>
+      <li><a href="#conclusion" class="toc-h2">Conclusion</a></li>
       <li><a href="#artifact" class="toc-h2">Artifact</a></li>
       <li><a href="#citation" class="toc-h2">Citation</a></li>
     </ul>
@@ -1042,7 +1106,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     <h3 id="evaluation-performance-heading">Performance Survey</h3>
     
     <p>
-      We compare GenJAX against NumPyro, Pyro, Gen.jl, hand-coded JAX, and hand-coded PyTorch
+      We compare GenJAX against NumPyro, Pyro, PyMC, TensorFlow Probability, and hand-coded JAX
       on two fundamental inference paradigms: importance sampling (embarrassingly parallel) and 
       Hamiltonian Monte Carlo (iterative, gradient-based).
     </p>
@@ -1055,15 +1119,28 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     importance sampling.
   </p>
   
-  <div class="figure">
+  <figure class="figure">
     <img src="static/images/combined_3x2_obs50_samples2000.svg"
          alt="Beta-Bernoulli model: posterior accuracy and timing comparison"
          loading="lazy" />
-    <p class="fig-caption"><strong>Figure 7.</strong> Performance evaluation across probabilistic programming 
-    languages and tensor frameworks. Beta-Bernoulli model: all frameworks accurately recover 
-    the true posterior. GenJAX achieves near-identical performance to hand-coded JAX (100.1% relative time).</p>
-  </div>
-  
+    <div class="figure-row two-col">
+      <div>
+        <img src="static/images/benchmark_timings_is_all_frameworks.svg"
+             alt="Importance sampling timing comparison"
+             loading="lazy" />
+      </div>
+      <div>
+        <img src="static/images/benchmark_timings_hmc_all_frameworks.svg"
+             alt="HMC timing comparison"
+             loading="lazy" />
+      </div>
+    </div>
+    <figcaption class="fig-caption"><strong>Figure 17.</strong> Performance evaluation across probabilistic programming frameworks.
+      (a) Beta-Bernoulli inference comparing posterior accuracy and execution time for GenJAX, NumPyro, and hand-coded JAX
+      with 50 observations and 2000 samples. (b) Scaling analysis across six frameworks showing GenJAX remains near hand-coded
+      performance for both importance sampling and Hamiltonian Monte Carlo.</figcaption>
+  </figure>
+
   <h4>Scaling Analysis</h4>
   
   <p>
@@ -1073,21 +1150,10 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     in chain length, as expected for iterative algorithms.
   </p>
   
-  <div class="figure-row two-col">
-    <div class="figure">
-      <img src="static/images/benchmark_timings_is_all_frameworks.svg"
-           alt="Importance sampling timing comparison"
-           loading="lazy" />
-      <p class="fig-caption"><strong>Figure 8.</strong> Scaling: Importance sampling. Vectorized frameworks show 
-      near-constant scaling while GPU is not saturated.</p>
-    </div>
-    <div class="figure">
-      <img src="static/images/benchmark_timings_hmc_all_frameworks.svg"
-           alt="HMC timing comparison"
-           loading="lazy" />
-      <p class="fig-caption"><strong>Figure 9.</strong> Scaling: HMC. Hamiltonian Monte Carlo shows linear scaling in chain length.</p>
-    </div>
-  </div>
+  <p>
+    The scaling plots in Figure 17 highlight that importance sampling remains near-constant in runtime
+    as particle count grows (until GPU saturation), while HMC scales linearly with chain length.
+  </p>
   
     <div class="info-box tip">
       <div class="info-box-title">Key Result: Zero-Cost Abstractions</div>
@@ -1112,7 +1178,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     <img src="static/images/conway_gol.svg"
          alt="Conway's Game of Life evolution rules"
          loading="lazy" />
-    <p class="fig-caption"><strong>Figure 10.</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
+    <p class="fig-caption"><strong>Figure 18.</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
     We add a uniform prior over board state and probabilistic Bernoulli noise on top of the deterministic rules
     to construct a probabilistic inversion problem.</p>
   </div>
@@ -1132,22 +1198,17 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     The vectorized implementation achieves up to 90% inversion accuracy on 1024×1024 grids in seconds.
   </p>
   
-  <div class="figure-row two-col">
-    <div class="figure">
-      <img src="static/images/gol_integrated_showcase_wizards_1024.svg"
-           alt="Game of Life inversion showcase"
-           loading="lazy" />
-      <p class="fig-caption"><strong>Figure 11.</strong> Vectorized Gibbs sampling in the <em>Game of Life</em>.
-      Approximate inversion on a 1024×1024 board (wizard book pattern).</p>
-    </div>
-    <div class="figure">
-      <img src="static/images/gol_gibbs_timing_bar_plot.svg"
-           alt="Game of Life Gibbs sampling throughput"
-           loading="lazy" />
-      <p class="fig-caption"><strong>Figure 12.</strong> Gibbs sampling throughput across grid sizes, 
-      comparing CPU and GPU execution.</p>
-    </div>
-  </div>
+  <figure class="figure">
+    <img src="static/images/gol_integrated_showcase_wizards_1024.svg"
+         alt="Game of Life inversion showcase"
+         loading="lazy" />
+    <img src="static/images/gol_gibbs_timing_bar_plot.svg"
+         alt="Game of Life Gibbs sampling throughput"
+         loading="lazy" />
+    <figcaption class="fig-caption"><strong>Figure 19.</strong> Vectorized Gibbs sampling in the <em>Game of Life</em>.
+      Top: probabilistic inversion on a 1024×1024 wizard-book pattern; Bottom: sweep timing across grid sizes
+      comparing CPU and GPU execution.</figcaption>
+  </figure>
   </section>
   
   <section id="evaluation-localization" aria-labelledby="evaluation-localization-heading">
@@ -1199,22 +1260,17 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     particles and in the LIDAR measurement model, this yields a highly efficient algorithm.
   </p>
   
-  <div class="figure-row two-col">
-    <div class="figure">
-      <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.svg"
-           alt="Robot localization problem"
-           loading="lazy" />
-      <p class="fig-caption"><strong>Figure 13.</strong> Robot localization using programmable sequential 
-      Monte Carlo. Robot with 8-ray LIDAR navigates a 2D environment.</p>
-    </div>
-    <div class="figure">
-      <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.svg"
-           alt="SMC methods comparison"
-           loading="lazy" />
-      <p class="fig-caption"><strong>Figure 14.</strong> SMC methods comparison. The locally optimal proposal 
-      with vectorized grid enumeration achieves the best accuracy-efficiency tradeoff.</p>
-    </div>
-  </div>
+  <figure class="figure">
+    <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.svg"
+         alt="Robot localization problem"
+         loading="lazy" />
+    <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.svg"
+         alt="SMC methods comparison"
+         loading="lazy" />
+    <figcaption class="fig-caption"><strong>Figure 20.</strong> Robot localization using programmable sequential Monte Carlo.
+      Top: problem setup with LIDAR-based observations. Bottom: comparison of SMC variants showing the locally optimal
+      proposal achieves the best accuracy-efficiency tradeoff.</figcaption>
+  </figure>
   </section>
   
   <section id="evaluation-summary" aria-labelledby="evaluation-summary-heading">
@@ -1233,6 +1289,72 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
       solved efficiently using GPU-accelerated vectorized inference.</li>
   </ul>
 </section>
+</section>
+
+<!-- Related Work -->
+<section id="related-work" data-nav-section aria-labelledby="related-work-heading">
+  <h2 id="related-work-heading">Related Work <a href="#related-work" class="section-anchor" aria-label="Link to Related Work">#</a></h2>
+
+  <h3>Probabilistic Programming</h3>
+  <p>
+    Early probabilistic languages such as Church, WebPPL, Venture, and Anglican emphasized modeling
+    expressiveness over GPU execution. GPU-backed or compiled systems include Augur, RootPPL, Birch,
+    and Stan, which trade expressivity for performance through restricted control flow or specialized
+    compilation strategies.
+  </p>
+  <p>
+    GenJAX is an embedded framework built on JAX, similar in spirit to Edward/Edward2, PyMC, Pyro,
+    and NumPyro, which leverage TensorFlow, PyTorch, or JAX for accelerator execution. GenJAX focuses
+    on preserving vectorization for programmable inference: the <code>cond</code> construct enables
+    stochastic branching while remaining compatible with <code>vmap</code>, and program transformation
+    enables nested vectorization of both models and inference code. Benchmarks show this expressivity
+    with competitive performance relative to NumPyro and hand-coded JAX.
+  </p>
+
+  <h3>Data-Parallel and Array Programming</h3>
+  <p>
+    GenJAX builds on the lineage of data-parallel array languages, from NESL's transformation-based
+    parallelism to rank-polymorphic systems like APL and J, and modern frameworks such as NumPy,
+    TensorFlow, PyTorch, and JAX. JAX's <code>vmap</code> brings NESL-style transformations to Python,
+    and GenJAX extends this idea to probabilistic programs and traces.
+  </p>
+
+  <h3>Partial Evaluation and Staged Computation</h3>
+  <p>
+    Program tracing, partial evaluation, and multi-stage programming underpin the compilation pipeline
+    used by JAX and GenJAX. These techniques enable program transformation and the elimination of
+    abstraction overhead, while supporting compositional interpreters and effect handlers for inference.
+  </p>
+
+  <h3>Formalization of Sound Bayesian Inference</h3>
+  <p>
+    The formal model relies on quasi-Borel spaces to handle higher-order probabilistic programs and
+    measure-theoretic correctness. GenJAX extends prior semantic treatments of traces and programmable
+    inference with a vectorization model, using logical relations to establish correctness of
+    program transformations.
+  </p>
+</section>
+
+<!-- Conclusion -->
+<section id="conclusion" data-nav-section aria-labelledby="conclusion-heading">
+  <h2 id="conclusion-heading">Conclusion <a href="#conclusion" class="section-anchor" aria-label="Link to Conclusion">#</a></h2>
+
+  <p>
+    GenJAX integrates <code>vmap</code> with programmable inference to deliver vectorized probabilistic
+    programming on modern accelerators. By extending vectorization to generative functions, traces,
+    stochastic branching, and inference interfaces, GenJAX achieves low overhead relative to
+    hand-optimized JAX while preserving expressivity.
+  </p>
+
+  <h3>Future Work</h3>
+  <ul>
+    <li><strong>Vectorized inference diagnostics.</strong> Automating nested Monte Carlo estimators for
+      information-theoretic quantities (e.g., KL divergence, conditional mutual information) could
+      make diagnostics practical at scale when paired with GPU execution.</li>
+    <li><strong>Spatial and geometric probabilistic programs.</strong> GenJAX's array-oriented design and
+      vectorized inference are well-suited to robotics, navigation, computational imaging, and other
+      domains with high-dimensional spatial data.</li>
+  </ul>
 </section>
 
 <!-- Artifact -->
