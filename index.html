@@ -538,7 +538,7 @@ def npoint_curve(xs):
     </div>
     
     <div class="figure">
-      <img src="static/images/curvefit_prior_multipoint_traces_density.png"
+      <img src="static/images/curvefit_prior_multipoint_traces_density.svg"
            alt="Prior samples from the polynomial model"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 3.</strong> Prior samples from the polynomial generative model.
@@ -587,14 +587,14 @@ traces, weights = vectorized_is(model, obs, keys)</code></pre>
     
     <div class="figure-row two-col">
       <div class="figure">
-        <img src="static/images/curvefit_scaling_performance.png"
+        <img src="static/images/curvefit_scaling_performance.svg"
              alt="Scaling behavior of vectorized importance sampling"
              loading="lazy" />
         <p class="fig-caption"><strong>Figure 4.</strong> Scaling behavior. Vectorized importance sampling exhibits
         near-constant wall-clock time on GPU as particle count increases, up to device memory limits.</p>
       </div>
       <div class="figure">
-        <img src="static/images/curvefit_posterior_scaling_combined.png"
+        <img src="static/images/curvefit_posterior_scaling_combined.svg"
              alt="Posterior approximation at different particle counts"
              loading="lazy" />
         <p class="fig-caption"><strong>Figure 5.</strong> Posterior convergence. Posterior approximations with increasing
@@ -703,7 +703,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     </p>
     
     <div class="figure">
-      <img src="static/images/curvefit_outlier_detection_comparison.png"
+      <img src="static/images/curvefit_outlier_detection_comparison.svg"
            alt="Outlier detection comparison"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 6.</strong> Robust modeling with stochastic branching.
@@ -1050,7 +1050,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   </p>
   
   <div class="figure">
-    <img src="static/images/combined_3x2_obs50_samples2000.png"
+    <img src="static/images/combined_3x2_obs50_samples2000.svg"
          alt="Beta-Bernoulli model: posterior accuracy and timing comparison"
          loading="lazy" />
     <p class="fig-caption"><strong>Figure 7.</strong> Performance evaluation across probabilistic programming 
@@ -1069,14 +1069,14 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   
   <div class="figure-row two-col">
     <div class="figure">
-      <img src="static/images/benchmark_timings_is_all_frameworks.png"
+      <img src="static/images/benchmark_timings_is_all_frameworks.svg"
            alt="Importance sampling timing comparison"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 8.</strong> Scaling: Importance sampling. Vectorized frameworks show 
       near-constant scaling while GPU is not saturated.</p>
     </div>
     <div class="figure">
-      <img src="static/images/benchmark_timings_hmc_all_frameworks.png"
+      <img src="static/images/benchmark_timings_hmc_all_frameworks.svg"
            alt="HMC timing comparison"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 9.</strong> Scaling: HMC. Hamiltonian Monte Carlo shows linear scaling in chain length.</p>
@@ -1103,7 +1103,7 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
     </p>
   
   <div class="figure">
-    <img src="static/images/conway_gol.png"
+    <img src="static/images/conway_gol.svg"
          alt="Conway's Game of Life evolution rules"
          loading="lazy" />
     <p class="fig-caption"><strong>Figure 10.</strong> Deterministic evolution rules for Conway's <em>Game of Life</em>.
@@ -1128,14 +1128,14 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   
   <div class="figure-row two-col">
     <div class="figure">
-      <img src="static/images/gol_integrated_showcase_wizards_1024.png"
+      <img src="static/images/gol_integrated_showcase_wizards_1024.svg"
            alt="Game of Life inversion showcase"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 11.</strong> Vectorized Gibbs sampling in the <em>Game of Life</em>.
       Approximate inversion on a 1024×1024 board (wizard book pattern).</p>
     </div>
     <div class="figure">
-      <img src="static/images/gol_gibbs_timing_bar_plot.png"
+      <img src="static/images/gol_gibbs_timing_bar_plot.svg"
            alt="Game of Life Gibbs sampling throughput"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 12.</strong> Gibbs sampling throughput across grid sizes, 
@@ -1195,14 +1195,14 @@ inference_kernel = compose(gibbs_step, hmc_step)</code></pre>
   
   <div class="figure-row two-col">
     <div class="figure">
-      <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.png"
+      <img src="static/images/localization_r8_p200_basic_localization_problem_1x4_explanation.svg"
            alt="Robot localization problem"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 13.</strong> Robot localization using programmable sequential 
       Monte Carlo. Robot with 8-ray LIDAR navigates a 2D environment.</p>
     </div>
     <div class="figure">
-      <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.png"
+      <img src="static/images/localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.svg"
            alt="SMC methods comparison"
            loading="lazy" />
       <p class="fig-caption"><strong>Figure 14.</strong> SMC methods comparison. The locally optimal proposal 
