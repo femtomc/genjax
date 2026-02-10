@@ -42,25 +42,25 @@
                "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Source Code Pro", "SF Mono", "Monaco", "Inconsolata", "Fira Code", monospace;
   
-  /* Spacing scale - refined for academic feel */
-  --space-xs: 0.15rem;
-  --space-sm: 0.28rem;
-  --space-md: 0.45rem;
-  --space-lg: 0.7rem;
-  --space-xl: 1rem;
-  --space-2xl: 1.35rem;
-  --space-3xl: 1.9rem;
-  --space-4xl: 2.6rem;
+  /* Spacing scale - tighter for paper-like density */
+  --space-xs: 0.12rem;
+  --space-sm: 0.24rem;
+  --space-md: 0.4rem;
+  --space-lg: 0.6rem;
+  --space-xl: 0.85rem;
+  --space-2xl: 1.2rem;
+  --space-3xl: 1.6rem;
+  --space-4xl: 2.2rem;
   
   /* Layout */
   --max-width: 1040px;
   --max-width-wide: 1440px;
   --sidebar-width: 220px;
-  --nav-height: 56px;
+  --nav-height: 52px;
 
   /* Figure sizing */
-  --figure-max-width: 980px;
-  --figure-max-width-wide: 1120px;
+  --figure-max-width: 860px;
+  --figure-max-width-wide: 1000px;
   
   /* Shadows - subtle for academic feel */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
@@ -223,7 +223,7 @@ pre code.hljs {
 /* Header & Title Section */
 .paper-header {
   text-align: center;
-  padding: var(--space-lg) 0 var(--space-sm);
+  padding: var(--space-md) 0 var(--space-xs);
   background: linear-gradient(to bottom, var(--color-bg), var(--color-bg-warm));
   border-bottom: 1px solid var(--color-border);
 }
@@ -232,7 +232,7 @@ pre code.hljs {
   display: block;
   max-width: 240px;
   height: auto;
-  margin: 0 auto var(--space-sm);
+  margin: 0 auto var(--space-xs);
 }
 
 .paper-header h1 {
@@ -257,7 +257,7 @@ pre code.hljs {
 /* Authors Section */
 .authors-section {
   text-align: center;
-  padding: var(--space-sm) 0;
+  padding: var(--space-xs) 0;
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border-light);
 }
@@ -355,7 +355,7 @@ pre code.hljs {
 /* Track Switcher - Dual Path Navigation */
 .track-switcher-section {
   background: var(--color-bg);
-  padding: var(--space-md) 0;
+  padding: var(--space-sm) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -372,7 +372,7 @@ pre code.hljs {
   color: var(--color-text-muted);
   font-family: var(--font-sans);
   font-size: 0.92rem;
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
   max-width: 660px;
   margin-left: auto;
   margin-right: auto;
@@ -390,7 +390,7 @@ pre code.hljs {
   flex: 1;
   font-family: var(--font-sans);
   font-size: 0.9rem;
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
   border: 1.5px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text-secondary);
@@ -543,7 +543,7 @@ body.all-mode #track-theory::before {
 
 /* Main Content Layout */
 main {
-  padding: var(--space-sm) 0 var(--space-xl);
+  padding: var(--space-xs) 0 var(--space-lg);
 }
 
 .main-content {
@@ -570,7 +570,7 @@ main {
 
 /* Section Styling */
 section {
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 section:first-child h2 {
@@ -580,10 +580,10 @@ section:first-child h2 {
 /* Abstract - Prominent styling */
 #abstract {
   background: var(--color-bg);
-  padding: var(--space-md);
+  padding: var(--space-sm);
   border-radius: 6px;
   border: 1px solid var(--color-border);
-  margin: var(--space-md) 0;
+  margin: var(--space-sm) 0;
   box-shadow: var(--shadow-sm);
 }
 
@@ -608,8 +608,8 @@ section:first-child h2 {
 .links-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--space-sm);
-  margin: var(--space-md) 0;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
 }
 
 .link-btn {
@@ -647,7 +647,7 @@ section:first-child h2 {
 
 /* Teaser Figure */
 .teaser {
-  margin: var(--space-xl) 0;
+  margin: var(--space-lg) 0;
   text-align: center;
 }
 
@@ -681,17 +681,18 @@ section:first-child h2 {
 
 /* Figures */
 .figure {
-  margin: var(--space-sm) 0;
+  margin: var(--space-xs) auto;
   text-align: center;
+  max-width: var(--figure-max-width);
 }
 
 .figure--wide {
-  max-width: none;
+  max-width: var(--figure-max-width-wide);
 }
 
 .figure img {
   width: 100%;
-  max-width: var(--figure-max-width);
+  max-width: 100%;
   height: auto;
   display: block;
   margin: 0 auto;
@@ -700,13 +701,13 @@ section:first-child h2 {
 }
 
 .figure--wide img {
-  max-width: var(--figure-max-width-wide);
+  max-width: 100%;
 }
 
 .figure-row {
   display: grid;
   gap: var(--space-xs);
-  margin: var(--space-sm) 0;
+  margin: var(--space-xs) 0;
 }
 
 .figure-row img {
@@ -752,7 +753,7 @@ section:first-child h2 {
 /* Code Blocks - Enhanced */
 .code-block {
   position: relative;
-  margin: var(--space-sm) 0;
+  margin: var(--space-xs) 0;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -1100,8 +1101,8 @@ tr:last-child td {
 
 /* Step/Tutorial styling */
 .tutorial-step {
-  margin: var(--space-lg) 0;
-  padding: var(--space-sm);
+  margin: var(--space-md) 0;
+  padding: var(--space-xs);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -1315,8 +1316,8 @@ h3:hover .section-anchor {
 /* Footer */
 .footer {
   border-top: 1px solid var(--color-border);
-  padding: var(--space-lg) 0;
-  margin-top: var(--space-xl);
+  padding: var(--space-md) 0;
+  margin-top: var(--space-lg);
   text-align: center;
   font-family: var(--font-sans);
   font-size: 0.88rem;
