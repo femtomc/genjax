@@ -87,18 +87,38 @@
    * Setup syntax highlighting for code blocks.
    */
   function setupSyntaxHighlighting() {
-    applySyntaxHighlighting();
-    document.addEventListener('trackchange', applySyntaxHighlighting);
-  }
-
-  /**
-   * Apply highlight.js after annotating language hints.
-   */
-  function applySyntaxHighlighting() {
     annotateCodeBlocks();
-    if (window.hljs && typeof window.hljs.highlightAll === 'function') {
-      window.hljs.highlightAll();
+
+    function highlight() {
+      document.querySelectorAll('pre > code[class*="language-"]').forEach(block => {
+        if (!block.classList.contains('hljs')) {
+          window.hljs.highlightElement(block);
+        }
+      });
     }
+
+    if (window.hljs) {
+      highlight();
+    } else {
+      // hljs CDN script hasn't loaded yet — wait for it
+      var poll = setInterval(function() {
+        if (window.hljs) {
+          clearInterval(poll);
+          highlight();
+        }
+      }, 50);
+      // Give up after 10s
+      setTimeout(function() { clearInterval(poll); }, 10000);
+    }
+
+    document.addEventListener('trackchange', function() {
+      annotateCodeBlocks();
+      if (window.hljs) {
+        document.querySelectorAll('pre > code[class*="language-"]:not(.hljs)').forEach(function(block) {
+          window.hljs.highlightElement(block);
+        });
+      }
+    });
   }
 
   /**
