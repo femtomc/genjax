@@ -5,6 +5,7 @@
  */
 
 :root {
+  color-scheme: light;
   /* Colors - Refined Academic Palette (ACM/SIGGRAPH inspired) */
   --color-text: #1a1a1a;
   --color-text-secondary: #333;
