@@ -67,7 +67,7 @@
   <div class="container nav-content">
     <div class="nav-brand"><a href="#">GenJAX</a></div>
     <div class="nav-links">
-      <a href="#overview">Overview</a>
+      <a href="#introduction">Introduction</a>
       <a href="#tutorial">Tutorial</a>
       <a href="#theory">Theory</a>
       <a href="#evaluation">Evaluation</a>
@@ -254,9 +254,9 @@
   </figure>
 </section>
 
-<!-- Overview Section (Common to both tracks) -->
-<section id="overview" data-nav-section aria-labelledby="overview-heading">
-  <h2 id="overview-heading">Overview <a href="#overview" class="section-anchor" aria-label="Link to Overview">#</a></h2>
+<!-- Introduction Section (Common to both tracks) -->
+<section id="introduction" data-nav-section aria-labelledby="introduction-heading">
+  <h2 id="introduction-heading">Introduction <a href="#introduction" class="section-anchor" aria-label="Link to Introduction">#</a></h2>
   
   <p>
     Probabilistic programming has demonstrated remarkable effectiveness in applications ranging from
@@ -389,7 +389,7 @@
 <section class="track-switcher-section" aria-labelledby="track-heading">
   <div class="container">
     <h2 id="track-heading">Explore the Paper</h2>
-    <p class="track-description">Choose your path through the material. The <strong>Tutorial</strong> track offers progressive examples and intuitive explanations. The <strong>Theory</strong> track presents formal semantics, type systems, and proofs. <strong>All</strong> shows everything.</p>
+    <p class="track-description">Choose your path through the material. The <strong>Tutorial</strong> track follows the paper's Overview section with a running polynomial regression example. The <strong>Theory</strong> track follows the Formal Model and Compiler sections with semantics, transformations, and proofs. <strong>All</strong> shows everything.</p>
     <div class="track-switcher" role="tablist" aria-label="Content tracks">
       <button class="track-btn tutorial-track active" id="btn-tutorial" 
               role="tab" aria-selected="true" aria-controls="track-tutorial" tabindex="0">
@@ -440,7 +440,7 @@
 <div id="track-tutorial" class="track-content active" role="tabpanel" aria-labelledby="btn-tutorial">
 
 <section id="tutorial" data-nav-section aria-labelledby="tutorial-heading">
-  <h2 id="tutorial-heading">Tutorial: Vectorized Probabilistic Programming <a href="#tutorial" class="section-anchor" aria-label="Link to Tutorial">#</a></h2>
+  <h2 id="tutorial-heading">Overview (Tutorial): Vectorized Probabilistic Programming <a href="#tutorial" class="section-anchor" aria-label="Link to Overview (Tutorial)">#</a></h2>
   
   <p>
     Probabilistic programming enables Bayesian inference over complex models, but scaling inference
@@ -452,7 +452,7 @@
   <div class="info-box">
     <div class="info-box-title">Tutorial Roadmap</div>
     <p>
-      This track mirrors the paper's running example and follows the same arc:
+      This track mirrors Section 2 (Overview) of the paper and follows the running example:
       modeling, vectorization, stochastic branching, and programmable inference.
     </p>
     <ol class="roadmap-list">
@@ -815,7 +815,7 @@ def enumerative_gibbs(trace):
 <div id="track-theory" class="track-content" role="tabpanel" aria-labelledby="btn-theory">
 
 <section id="theory" data-nav-section aria-labelledby="theory-heading">
-  <h2 id="theory-heading">Theory: $\gen$ — A Core Calculus <a href="#theory" class="section-anchor" aria-label="Link to Theory">#</a></h2>
+  <h2 id="theory-heading">Formal Model (Theory): $\gen$ — A Core Calculus <a href="#theory" class="section-anchor" aria-label="Link to Formal Model (Theory)">#</a></h2>
   
   <p>
     This section presents the formal foundations of GenJAX. We introduce $\gen$,
@@ -826,7 +826,8 @@ def enumerative_gibbs(trace):
   <div class="info-box">
     <div class="info-box-title">Paper Cross-Reference</div>
     <p>
-      Figures 9–16 in the paper present the full formal syntax, semantics, and compiler diagrams.
+      This track follows Section 3 (Formal Model) and Section 6 (Compiler) of the paper.
+      Figures 9–16 present the full formal syntax, semantics, and compiler diagrams.
       The equations and summaries below track those results in compressed form; see the PDF for
       the full figure set.
     </p>
@@ -1069,8 +1070,8 @@ def enumerative_gibbs(trace):
   <nav class="toc-nav" aria-label="Page sections">
     <ul>
       <li><a href="#abstract" class="toc-h2">Abstract</a></li>
-      <li><a href="#overview" class="toc-h2">Overview</a></li>
-      <li data-track="tutorial"><a href="#tutorial" class="toc-h2">Tutorial Track</a>
+      <li><a href="#introduction" class="toc-h2">Introduction</a></li>
+      <li data-track="tutorial"><a href="#tutorial" class="toc-h2">Overview (Tutorial)</a>
         <ul>
           <li><a href="#tutorial-core" class="toc-h3">Core Concepts</a></li>
           <li><a href="#tutorial-step-1" class="toc-h3">Step 1: Polynomial Model</a></li>
@@ -1079,7 +1080,7 @@ def enumerative_gibbs(trace):
           <li><a href="#tutorial-step-4" class="toc-h3">Step 4: Gibbs + HMC</a></li>
         </ul>
       </li>
-      <li data-track="theory"><a href="#theory" class="toc-h2">Theory Track</a>
+      <li data-track="theory"><a href="#theory" class="toc-h2">Formal Model (Theory)</a>
         <ul>
           <li><a href="#theory-syntax" class="toc-h3">Syntax and Types</a></li>
           <li><a href="#theory-semantics" class="toc-h3">Denotational Semantics</a></li>
