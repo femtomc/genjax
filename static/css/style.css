@@ -867,21 +867,27 @@ section:first-child h2 {
 }
 
 .code-copy-btn {
-  position: absolute;
-  top: 5px;
-  right: var(--space-sm);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 4px;
-  padding: 2px var(--space-sm);
+  padding: 3px 8px;
   font-family: var(--font-sans);
   font-size: 0.72rem;
   color: var(--color-text-muted);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease;
-  z-index: 1;
   line-height: 1.4;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Fallback: absolute positioning when no code-header */
+.code-block > .code-copy-btn {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  z-index: 1;
 }
 
 .code-block:hover .code-copy-btn {

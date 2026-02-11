@@ -530,7 +530,12 @@
       btn.className = 'code-copy-btn';
       btn.textContent = 'Copy';
       btn.setAttribute('aria-label', 'Copy code to clipboard');
-      block.appendChild(btn);
+      const header = block.querySelector('.code-header');
+      if (header) {
+        header.appendChild(btn);
+      } else {
+        block.appendChild(btn);
+      }
 
       btn.addEventListener('click', async () => {
         try {
