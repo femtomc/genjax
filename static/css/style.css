@@ -42,19 +42,19 @@
                "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Source Code Pro", "SF Mono", "Monaco", "Inconsolata", "Fira Code", monospace;
   
-  /* Spacing scale - tighter for paper-like density */
-  --space-xs: 0.08rem;
-  --space-sm: 0.18rem;
-  --space-md: 0.26rem;
-  --space-lg: 0.4rem;
-  --space-xl: 0.55rem;
-  --space-2xl: 0.75rem;
-  --space-3xl: 1rem;
-  --space-4xl: 1.35rem;
+  /* Spacing scale - compact but breathable */
+  --space-xs: 0.15rem;
+  --space-sm: 0.3rem;
+  --space-md: 0.5rem;
+  --space-lg: 0.75rem;
+  --space-xl: 1rem;
+  --space-2xl: 1.4rem;
+  --space-3xl: 1.8rem;
+  --space-4xl: 2.5rem;
   
   /* Layout */
-  --max-width: 1040px;
-  --max-width-wide: 1440px;
+  --max-width: 800px;
+  --max-width-wide: 1000px;
   --sidebar-width: 220px;
   --nav-height: 52px;
 
@@ -84,7 +84,7 @@ html {
 body {
   font-family: var(--font-serif);
   font-size: 1rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--color-text);
   background: var(--color-bg-warm);
   color-scheme: light;
@@ -110,18 +110,18 @@ h1 {
   letter-spacing: -0.01em;
 }
 
-h2 { 
-  font-size: 1.4rem; 
-  margin-top: var(--space-lg);
-  margin-bottom: var(--space-xs);
+h2 {
+  font-size: 1.4rem;
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-sm);
   padding-bottom: var(--space-xs);
   border-bottom: 1.5px solid var(--color-border);
 }
 
-h3 { 
-  font-size: 1.1rem; 
-  margin-top: var(--space-md);
-  margin-bottom: var(--space-xs);
+h3 {
+  font-size: 1.1rem;
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-sm);
   font-weight: 600;
 }
 
@@ -223,7 +223,7 @@ pre code.hljs {
 /* Header & Title Section */
 .paper-header {
   text-align: center;
-  padding: var(--space-sm) 0 var(--space-xs);
+  padding: var(--space-lg) 0 var(--space-md);
   background: linear-gradient(to bottom, var(--color-bg), var(--color-bg-warm));
   border-bottom: 1px solid var(--color-border);
 }
@@ -257,7 +257,7 @@ pre code.hljs {
 /* Authors Section */
 .authors-section {
   text-align: center;
-  padding: var(--space-xs) 0;
+  padding: var(--space-sm) 0;
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border-light);
 }
@@ -355,7 +355,7 @@ pre code.hljs {
 /* Track Switcher - Dual Path Navigation */
 .track-switcher-section {
   background: var(--color-bg);
-  padding: var(--space-xs) 0;
+  padding: var(--space-md) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -543,7 +543,7 @@ body.all-mode #track-theory::before {
 
 /* Main Content Layout */
 main {
-  padding: var(--space-xs) 0 var(--space-md);
+  padding: var(--space-md) 0 var(--space-xl);
 }
 
 .main-content {
@@ -570,7 +570,7 @@ main {
 
 /* Section Styling */
 section {
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--space-lg);
 }
 
 section:first-child h2 {
@@ -580,10 +580,10 @@ section:first-child h2 {
 /* Abstract - Prominent styling */
 #abstract {
   background: var(--color-bg);
-  padding: var(--space-xs);
+  padding: var(--space-md);
   border-radius: 6px;
   border: 1px solid var(--color-border);
-  margin: var(--space-xs) 0;
+  margin: var(--space-md) 0;
   box-shadow: var(--shadow-sm);
 }
 
@@ -596,7 +596,7 @@ section:first-child h2 {
 
 .abstract {
   font-size: 0.98rem;
-  line-height: 1.5;
+  line-height: 1.65;
 }
 
 .abstract p {
@@ -1117,8 +1117,8 @@ tr:last-child td {
 
 /* Step/Tutorial styling */
 .tutorial-step {
-  margin: var(--space-sm) 0;
-  padding: var(--space-xs);
+  margin: var(--space-lg) 0;
+  padding: var(--space-md);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -1338,8 +1338,8 @@ h3:hover .section-anchor {
 /* Footer */
 .footer {
   border-top: 1px solid var(--color-border);
-  padding: var(--space-sm) 0;
-  margin-top: var(--space-md);
+  padding: var(--space-lg) 0;
+  margin-top: var(--space-xl);
   text-align: center;
   font-family: var(--font-sans);
   font-size: 0.88rem;
