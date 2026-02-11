@@ -1,64 +1,86 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="920.0000" height="270.0000" viewBox="35.0000 35.0000 920.0000 270.0000" role="img" shape-rendering="geometricPrecision">
-  <rect id="p1-bg" x="35.0000" y="35.0000" width="290.0000" height="270.0000" rx="2" ry="2" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
-  <text id="p1-label" x="47.0000" y="55.0000" font-size="11.0000" font-weight="bold" font-family="&apos;Source Sans 3&apos;, &apos;Source Sans Pro&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(a)</text>
-  <rect id="p1-outer" x="70.0000" y="80.0000" width="220.0000" height="140.0000" rx="3" ry="3" fill="#f6f8fa" stroke="#24292e" stroke-width="1.5000"/>
-  <text id="p1-outer-label" x="80.0000" y="100.0000" font-size="11.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#24292e">vmap(simulate(·))</text>
-  <rect id="p1-inner" x="100.0000" y="125.0000" width="160.0000" height="70.0000" rx="2" ry="2" fill="#ffffff" stroke="#0366d6" stroke-width="1.5000"/>
-  <text id="p1-inner-label" x="110.0000" y="145.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#0366d6">vmap(model)</text>
-  <circle id="p1-dot1" cx="125.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
-  <circle id="p1-dot2" cx="150.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
-  <circle id="p1-dot3" cx="175.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
-  <circle id="p1-dot4" cx="200.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
-  <circle id="p1-dot5" cx="225.0000" cy="160.0000" r="4.5000" fill="#0366d6" opacity="0.8500"/>
-  <circle id="p1-dot6" cx="125.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
-  <circle id="p1-dot7" cx="150.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
-  <circle id="p1-dot8" cx="175.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
-  <circle id="p1-dot9" cx="200.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
-  <circle id="p1-dot10" cx="225.0000" cy="175.0000" r="4.5000" fill="#0366d6" opacity="0.6500"/>
-  <circle id="p1-dot11" cx="125.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
-  <circle id="p1-dot12" cx="150.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
-  <circle id="p1-dot13" cx="175.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
-  <circle id="p1-dot14" cx="200.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
-  <circle id="p1-dot15" cx="225.0000" cy="190.0000" r="4.5000" fill="#0366d6" opacity="0.4500"/>
-  <text id="p1-title" x="180.0000" y="245.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Compositional Vectorization</text>
-  <text id="p1-subtitle" x="180.0000" y="265.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.0000)" fill="#586069">Models and inference interfaces</text>
-  <rect id="p2-bg" x="350.0000" y="35.0000" width="290.0000" height="270.0000" rx="2" ry="2" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
-  <text id="p2-label" x="362.0000" y="55.0000" font-size="11.0000" font-weight="bold" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(b)</text>
-  <rect id="p2-trace1" x="395.0000" y="85.0000" width="200.0000" height="55.0000" rx="2" ry="2" fill="#ffffff" stroke="#24292e" stroke-width="1.0000"/>
-  <text id="p2-trace1-label" x="405.0000" y="77.0000" font-size="10.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#24292e">trace ~ P</text>
-  <rect id="p2-addr1-bg" x="410.0000" y="97.0000" width="50.0000" height="18.0000" fill="#e1e4e8"/>
-  <text id="p2-addr1" x="415.0000" y="109.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#24292e">a</text>
-  <text id="p2-val1" x="445.0000" y="109.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#586069">f32[]</text>
-  <rect id="p2-addr2-bg" x="490.0000" y="97.0000" width="50.0000" height="18.0000" fill="#e1e4e8"/>
-  <text id="p2-addr2" x="495.0000" y="109.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#24292e">b</text>
-  <text id="p2-val2" x="525.0000" y="109.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#586069">f32[]</text>
-  <path id="p2-arrow" d="M 495.0000 150.0000 L 495.0000 175.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <path id="p2-arrow-head1" d="M 491.0000 155.0000 L 495.0000 150.0000 L 499.0000 155.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <path id="p2-arrow-head2" d="M 491.0000 170.0000 L 495.0000 175.0000 L 499.0000 170.0000 " fill="none" stroke="#586069" stroke-width="1.5000"/>
-  <text id="p2-vmap-label" x="515.0000" y="165.0000" font-size="9.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 3.6000)" fill="#586069">vmap</text>
-  <rect id="p2-trace2" x="395.0000" y="185.0000" width="200.0000" height="55.0000" rx="2" ry="2" fill="#f1f8ff" stroke="#0366d6" stroke-width="1.5000"/>
-  <text id="p2-trace2-label" x="405.0000" y="177.0000" font-size="10.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#0366d6">trace ~ vmap{P}</text>
-  <rect id="p2-addr3-bg" x="410.0000" y="197.0000" width="50.0000" height="18.0000" fill="#dbedff"/>
-  <text id="p2-addr3" x="415.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">a</text>
-  <text id="p2-val3" x="445.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">f32[N]</text>
-  <rect id="p2-addr4-bg" x="490.0000" y="197.0000" width="50.0000" height="18.0000" fill="#dbedff"/>
-  <text id="p2-addr4" x="495.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">b</text>
-  <text id="p2-val4" x="525.0000" y="209.0000" font-size="9.0000" font-family="monospace" transform="translate(0.0000, 3.6000)" fill="#0366d6">f32[N]</text>
-  <text id="p2-title" x="495.0000" y="265.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Vectorized Traces</text>
-  <text id="p2-subtitle" x="495.0000" y="283.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.0000)" fill="#586069">Struct-of-arrays layout</text>
-  <rect id="p3-bg" x="665.0000" y="35.0000" width="290.0000" height="270.0000" rx="2" ry="2" fill="#fafbfc" stroke="#e1e4e8" stroke-width="1.0000"/>
-  <text id="p3-label" x="677.0000" y="55.0000" font-size="11.0000" font-weight="bold" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.4000)" fill="#586069">(c)</text>
-  <circle id="p3-start" cx="810.0000" cy="90.0000" r="10.0000" fill="#28a745" stroke="#22863a" stroke-width="2.0000"/>
-  <path id="p3-diamond" d="M 810.0000 130.0000 L 835.0000 155.0000 L 810.0000 180.0000 L 785.0000 155.0000 Z " fill="#fff5b1" stroke="#d9a300" stroke-width="1.5000"/>
-  <text id="p3-diamond-label" x="810.0000" y="160.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#735c0f">X</text>
-  <path id="p3-line1" d="M 810.0000 100.0000 L 810.0000 130.0000 " fill="none" stroke="#24292e" stroke-width="1.5000"/>
-  <path id="p3-left-branch" d="M 798.0000 167.0000 L 740.0000 205.0000 " fill="none" stroke="#24292e" stroke-width="1.5000"/>
-  <path id="p3-right-branch" d="M 822.0000 167.0000 L 880.0000 205.0000 " fill="none" stroke="#24292e" stroke-width="1.5000"/>
-  <circle id="p3-end1" cx="740.0000" cy="210.0000" r="8.0000" fill="#d73a49" stroke="#cb2431" stroke-width="1.5000"/>
-  <circle id="p3-end2" cx="880.0000" cy="210.0000" r="8.0000" fill="#d73a49" stroke="#cb2431" stroke-width="1.5000"/>
-  <text id="p3-label-p" x="760.0000" y="180.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#586069">p</text>
-  <text id="p3-label-1p" x="860.0000" y="180.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" transform="translate(0.0000, 4.0000)" fill="#586069">1−p</text>
-  <text id="p3-title" x="810.0000" y="245.0000" font-size="12.0000" font-weight="600" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.8000)" fill="#24292e">Stochastic Branching</text>
-  <text id="p3-subtitle" x="810.0000" y="265.0000" font-size="10.0000" font-family="&apos;Source Sans 3&apos;, sans-serif" text-anchor="middle" transform="translate(0.0000, 4.0000)" fill="#586069">Branches on random values</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="295" viewBox="0 0 780 295" role="img" shape-rendering="geometricPrecision">
+
+  <!-- ===== Panel (a): Compositional Vectorization ===== -->
+  <rect x="0" y="0" width="240" height="225" rx="4" fill="#faf8f5" stroke="#d8d4cf" stroke-width="0.8"/>
+
+  <!-- Outer box: vmap of simulate of -->
+  <rect x="22" y="25" width="196" height="155" rx="4" fill="#f0ede8" stroke="#24292e" stroke-width="1.2"/>
+  <text x="32" y="46" font-family="'Source Sans 3', sans-serif" font-size="10.5" fill="#24292e">
+    <tspan font-family="'Source Code Pro', monospace" font-weight="700">vmap</tspan> of simulate of
+  </text>
+
+  <!-- Inner box: vmap of model -->
+  <rect x="42" y="60" width="156" height="100" rx="3" fill="#ffffff" stroke="#24292e" stroke-width="1"/>
+  <text x="52" y="80" font-family="'Source Sans 3', sans-serif" font-size="10.5" fill="#24292e">
+    <tspan font-family="'Source Code Pro', monospace" font-weight="700">vmap</tspan> of model
+  </text>
+
+  <!-- Particle dots (4 colored, representing independent computations) -->
+  <circle cx="78" cy="118" r="7.5" fill="#c84f8a" opacity="0.9"/>
+  <circle cx="100" cy="118" r="7.5" fill="#3f7fcf" opacity="0.9"/>
+  <circle cx="122" cy="118" r="7.5" fill="#3fa85f" opacity="0.9"/>
+  <circle cx="144" cy="118" r="7.5" fill="#cf7f3f" opacity="0.9"/>
+
+  <!-- Panel title and subtitle -->
+  <text x="120" y="248" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="11.5" font-weight="600" fill="#24292e">
+    <tspan font-family="'Source Code Pro', monospace" font-weight="700">vmap</tspan> in Modeling <tspan font-style="italic">and</tspan> Inference
+  </text>
+  <text x="120" y="264" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="9.5" fill="#586069">Vectorization can apply to</text>
+  <text x="120" y="277" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="9.5" fill="#586069">models and inference interfaces</text>
+
+
+  <!-- ===== Panel (b): Vectorized Traces ===== -->
+  <rect x="270" y="0" width="240" height="225" rx="4" fill="#faf8f5" stroke="#d8d4cf" stroke-width="0.8"/>
+
+  <!-- Top trace: scalar -->
+  <text x="300" y="42" font-family="'Source Sans 3', sans-serif" font-size="11" font-weight="600" fill="#24292e">trace ~ P</text>
+  <rect x="290" y="50" width="200" height="28" rx="2" fill="#f0f0f0" stroke="#ccc" stroke-width="0.8"/>
+  <text x="300" y="69" font-family="'Source Code Pro', monospace" font-size="9.5" fill="#333">{"a": f32[], "b": f32[]}</text>
+
+  <!-- Down arrow -->
+  <line x1="390" y1="88" x2="390" y2="118" stroke="#888" stroke-width="1.2"/>
+  <polygon points="386,113 390,122 394,113" fill="#888"/>
+
+  <!-- Bottom trace: vectorized -->
+  <text x="300" y="142" font-family="'Source Sans 3', sans-serif" font-size="11" font-weight="600" fill="#0366d6">trace ~ vmap{P}</text>
+  <rect x="290" y="150" width="200" height="28" rx="2" fill="#e8f0fe" stroke="#0366d6" stroke-width="1"/>
+  <text x="300" y="169" font-family="'Source Code Pro', monospace" font-size="9.5" fill="#0366d6">{"a": f32[N], "b": f32[N]}</text>
+
+  <!-- Panel title and subtitle -->
+  <text x="390" y="248" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="11.5" font-weight="600" fill="#24292e">Vectorized Traces</text>
+  <text x="390" y="264" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="9.5" fill="#586069">Traces are automatically</text>
+  <text x="390" y="277" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="9.5" fill="#586069">structs-of-arrays</text>
+
+
+  <!-- ===== Panel (c): Stochastic Branching ===== -->
+  <rect x="540" y="0" width="240" height="225" rx="4" fill="#faf8f5" stroke="#d8d4cf" stroke-width="0.8"/>
+
+  <!-- Start node (green circle) -->
+  <circle cx="660" cy="30" r="8" fill="#28a745" stroke="#22863a" stroke-width="1.5"/>
+
+  <!-- Arrow down to diamond -->
+  <line x1="660" y1="38" x2="660" y2="65" stroke="#24292e" stroke-width="1.2"/>
+
+  <!-- Diamond decision node -->
+  <polygon points="660,65 697,105 660,145 623,105" fill="#fff5c2" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="660" y="110" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="14" font-weight="600" font-style="italic" fill="#735c0f">X</text>
+
+  <!-- Left branch -->
+  <line x1="640" y1="128" x2="600" y2="188" stroke="#24292e" stroke-width="1.2"/>
+  <text x="606" y="153" font-family="'Source Sans 3', sans-serif" font-size="11" font-style="italic" fill="#586069">p</text>
+
+  <!-- Right branch -->
+  <line x1="680" y1="128" x2="720" y2="188" stroke="#24292e" stroke-width="1.2"/>
+  <text x="704" y="153" font-family="'Source Sans 3', sans-serif" font-size="11" font-style="italic" fill="#586069">1&#x2212;p</text>
+
+  <!-- End nodes (downward arrowheads) -->
+  <polygon points="596,188 600,200 604,188" fill="#24292e"/>
+  <polygon points="716,188 720,200 724,188" fill="#24292e"/>
+
+  <!-- Panel title and subtitle -->
+  <text x="660" y="248" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="11.5" font-weight="600" fill="#24292e">Stochastic Branching</text>
+  <text x="660" y="264" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="9.5" fill="#586069">Vectorization supports stochastic</text>
+  <text x="660" y="277" text-anchor="middle" font-family="'Source Sans 3', sans-serif" font-size="9.5" fill="#586069">branching on random values</text>
+
 </svg>
