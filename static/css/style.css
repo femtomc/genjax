@@ -645,9 +645,30 @@ section:first-child h2 {
   opacity: 0.8;
 }
 
+/* Video Embed - Responsive 16:9 */
+.video-embed {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  margin: var(--space-sm) 0;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+.video-embed iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 /* Teaser Figure */
 .teaser {
-  margin: var(--space-md) 0;
+  margin: var(--space-lg) 0;
   text-align: center;
 }
 
@@ -681,7 +702,7 @@ section:first-child h2 {
 
 /* Figures */
 .figure {
-  margin: var(--space-xs) auto;
+  margin: var(--space-lg) auto;
   text-align: center;
   max-width: var(--figure-max-width);
 }
