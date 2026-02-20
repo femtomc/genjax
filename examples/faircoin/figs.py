@@ -1,5 +1,7 @@
 """Visualization functions for fair coin case study timing comparisons."""
 
+import os
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -130,6 +132,7 @@ def timing_comparison_fig(
 
     # Save with parametrized filename and research paper quality settings
     filename = f"figs/faircoin_timing_performance_comparison_obs{num_obs}_samples{num_samples}_repeats{repeats}.pdf"
+    os.makedirs("figs", exist_ok=True)
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved comparison plot to {filename}")
@@ -254,6 +257,7 @@ def posterior_comparison_fig(
 
     # Save with parametrized filename
     filename = f"figs/faircoin_posterior_accuracy_comparison_obs{num_obs}_samples{num_samples}.pdf"
+    os.makedirs("figs", exist_ok=True)
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved posterior comparison plot to {filename}")
@@ -529,6 +533,7 @@ def combined_comparison_fig(
 
     # Save with parametrized filename (3x2 layout without Pyro)
     filename = f"figs/faircoin_combined_posterior_and_timing_obs{num_obs}_samples{num_samples}.pdf"
+    os.makedirs("figs", exist_ok=True)
 
     plt.savefig(filename, bbox_inches="tight", dpi=300, format="pdf")
     print(f"Saved combined comparison plot to {filename}")

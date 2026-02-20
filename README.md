@@ -381,7 +381,7 @@ These variants trim the GPU scaling benchmark to particle counts ≤20k (or supp
 
 **What it does**: Repackages the full `timing-benchmarks` project (commit `d4433b0`) that produces Figure 16(b): GenJAX vs. NumPyro, Pyro, TensorFlow Probability, hand-coded PyTorch, and Gen.jl on both importance sampling and HMC for the polynomial regression task.
 
-**Where it lives**: `examples/perfbench` remains its own Pixi project, but the repo-level task `pixi run paper-perfbench …` shells into `python examples/perfbench/main.py pipeline` so you can supply all flags from the root.
+**Where it lives**: `examples/perfbench` is orchestrated from the root Pixi workspace. The repo-level task `pixi run paper-perfbench …` runs `examples/perfbench/main.py pipeline`, and that pipeline dispatches framework-specific stages into dedicated top-level environments (`perfbench`, `perfbench-cuda`, `perfbench-pyro`, `perfbench-torch`).
 
 ```bash
 # CPU run (default; data -> examples/perfbench/data_cpu, figs -> figs_cpu)

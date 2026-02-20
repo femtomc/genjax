@@ -11,7 +11,7 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [tool.pixi.workspace]
-channels = ["conda-forge", "nvidia"]
+channels = ["conda-forge", "pytorch", "nvidia"]
 platforms = ["osx-arm64", "linux-64"]
 
 [tool.pixi.dependencies]
@@ -41,8 +41,8 @@ paper-curvefit-gen = "pixi run -e curvefit python -m examples.curvefit.main pape
 paper-curvefit-custom = "pixi run -e curvefit python -m examples.curvefit.main"
 paper-gol-gen = "pixi run -e gol python -m examples.gol.main --mode showcase"
 paper-localization-gen = "pixi run -e localization python -m examples.localization.main paper --include-basic-demo --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
-paper-perfbench = "python examples/perfbench/main.py pipeline"
-paper-perfbench-cuda = "python examples/perfbench/main.py pipeline --mode cuda"
+paper-perfbench = "pixi run -e perfbench python examples/perfbench/main.py pipeline"
+paper-perfbench-cuda = "pixi run -e perfbench-cuda python examples/perfbench/main.py pipeline --mode cuda"
 paper-perfbench-clean = "python examples/perfbench/main.py clean"
 paper-cone-gen = "python -m examples.cone.main fig2"
 paper-cone-table = "python -m examples.cone.main table4"
@@ -156,6 +156,50 @@ localization = "python -m examples.localization.main generate-data --include-bas
 # Paper-specific task: generates both localization figures
 localization-paper = { depends-on = ["localization-generate-data", "localization-plot-figures"] }
 
+[tool.pixi.feature.perfbench.dependencies]
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.feature.perfbench.pypi-dependencies]
+numpyro = "*"
+tensorflow-probability = "*"
+
+[tool.pixi.feature.perfbench-pyro.dependencies]
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.feature.perfbench-pyro.target.linux-64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+pytorch-cuda = { version = "12.*", channel = "pytorch" }
+torchvision = { version = "*", channel = "pytorch" }
+
+[tool.pixi.feature.perfbench-pyro.target.osx-arm64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+torchvision = { version = "*", channel = "pytorch" }
+
+[tool.pixi.feature.perfbench-pyro.pypi-dependencies]
+pyro-ppl = "*"
+
+[tool.pixi.feature.perfbench-torch.dependencies]
+numpy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+scipy = "*"
+
+[tool.pixi.feature.perfbench-torch.target.linux-64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+pytorch-cuda = { version = "12.*", channel = "pytorch" }
+
+[tool.pixi.feature.perfbench-torch.target.osx-arm64.dependencies]
+pytorch = { version = ">=2.0", channel = "pytorch" }
+
 
 [tool.pixi.feature.cuda.system-requirements]
 cuda = "12"
@@ -182,6 +226,10 @@ gol = { features = ["gol"], solve-group = "default" }
 gol-cuda = { features = ["gol", "cuda"], solve-group = "cuda" }
 localization = { features = ["localization"], solve-group = "default" }
 localization-cuda = { features = ["localization", "cuda"], solve-group = "cuda" }
+perfbench = { features = ["perfbench"], solve-group = "perfbench" }
+perfbench-cuda = { features = ["perfbench", "cuda"], solve-group = "perfbench-cuda" }
+perfbench-pyro = { features = ["perfbench-pyro"], solve-group = "perfbench-pyro" }
+perfbench-torch = { features = ["perfbench-torch"], solve-group = "perfbench-torch" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"

@@ -80,50 +80,25 @@ def _bench_env() -> dict[str, str]:
     return env
 
 
-def _ensure_env_bootstrap(env_name: str) -> None:
+def _run_example_script(
+    env_name: str | None,
+    script: str,
+    *args: str,
+    env_overrides: dict[str, str] | None = None,
+) -> None:
     pixi_bin = shutil.which("pixi")
     if pixi_bin is None:
-        raise RuntimeError(
-            f"Pixi executable not found in PATH; cannot initialize environment '{env_name}'."
-        )
+        raise RuntimeError("Pixi executable not found in PATH.")
+
     cmd = [pixi_bin, "run"]
-    if env_name != "default":
+    if env_name:
         cmd.extend(["-e", env_name])
-    cmd.extend(["python", "-c", "print('initializing pixi env')"])
-    subprocess.run(cmd, check=True, cwd=str(CASE_ROOT))
+    cmd.extend(["python", script, *args])
 
-
-def _python_in_env(env_name: str | None) -> str:
-    label = env_name or "default"
-    env_dir = CASE_ROOT / ".pixi" / "envs" / label
-    if os.name == "nt":
-        candidates = [
-            env_dir / "python.exe",
-            env_dir / "Scripts" / "python.exe",
-        ]
-    else:
-        candidates = [env_dir / "bin" / "python"]
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-    _ensure_env_bootstrap(label)
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-    raise FileNotFoundError(
-        f"Unable to locate Python interpreter for pixi environment '{label}'. "
-        "Run `pixi install` inside examples/perfbench to create the environment."
-    )
-
-
-def _run_example_script(
-    env_name: str | None, script: str, *args: str, env_overrides: dict[str, str] | None = None
-) -> None:
-    python_bin = _python_in_env(env_name)
-    cmd = [python_bin, script, *args]
     env = _bench_env()
     if env_overrides:
         env.update(env_overrides)
+
     subprocess.run(cmd, check=True, cwd=str(CASE_ROOT), env=env)
 
 
@@ -133,26 +108,15 @@ def _run_main_subcommand(
     _run_example_script(env_name, "main.py", *cli_args, env_overrides=env_overrides)
 
 
-def _is_env_for_framework(framework: str, mode: str) -> str | None:
+def _is_env_for_framework(framework: str, mode: str) -> str:
     norm = framework.replace("-", "_")
-    if norm in {"genjax", "numpyro", "handcoded_jax"} and mode == "cuda":
-        return "cuda"
-    if framework in {"pyro", "torch"}:
-        return "pyro"
-    return None
-
-
-def _hmc_env_for_framework(framework: str, mode: str) -> str | None:
-    norm = framework.replace("-", "_")
-    if norm in {"genjax", "numpyro", "handcoded_jax"}:
-        return "cuda" if mode == "cuda" else None
+    if norm in {"genjax", "numpyro", "handcoded_jax", "genjl"}:
+        return "perfbench-cuda" if mode == "cuda" else "perfbench"
     if norm == "pyro":
-        return "pyro"
-    if norm == "handcoded_torch":
-        return "torch"
-    if norm == "genjl":
-        return None
-    return None
+        return "perfbench-pyro"
+    if norm in {"torch", "handcoded_torch"}:
+        return "perfbench-torch"
+    raise ValueError(f"Unknown framework '{framework}'")
 
 
 def _normalize_hmc_framework(framework: str) -> str:
@@ -282,7 +246,7 @@ def command_combine(args: argparse.Namespace) -> None:
 
 
 def command_clean(_: argparse.Namespace) -> None:
-    for rel in ("data", "figs"):
+    for rel in ("data", "data_cpu", "figs", "figs_cpu"):
         target = CASE_ROOT / rel
         if target.exists():
             shutil.rmtree(target)
@@ -405,7 +369,7 @@ def command_pipeline(args: argparse.Namespace) -> None:
 
     if not args.skip_generate:
         print("→ Generating dataset")
-        gen_env = "cuda" if mode == "cuda" else None
+        gen_env = "perfbench-cuda" if mode == "cuda" else "perfbench"
         _run_main_subcommand(
             gen_env,
             "generate-data",
@@ -457,9 +421,9 @@ def command_pipeline(args: argparse.Namespace) -> None:
             extra_env = None
             if framework in {"pyro", "torch"}:
                 extra_env = {"JAX_PLATFORMS": "cpu"}
-            elif env_name == "cuda":
+            elif env_name == "perfbench-cuda":
                 extra_env = {"JAX_PLATFORMS": "cuda"}
-            print(f"→ IS {framework} (env={env_name or 'default'})")
+            print(f"→ IS {framework} (env={env_name})")
             _run_main_subcommand(env_name, *cmd, env_overrides=extra_env)
             _print_is_timings(framework, output_dir, particles)
             ran_is = True
@@ -499,18 +463,29 @@ def command_pipeline(args: argparse.Namespace) -> None:
         torch_group = [fw for fw in norm_hmc if fw == "handcoded_torch"]
         genjl_requested = "genjl" in norm_hmc
 
+        jax_env_name = "perfbench-cuda" if mode == "cuda" else "perfbench"
         jax_env_overrides = {"JAX_PLATFORMS": "cuda"} if mode == "cuda" else None
-        run_hmc_group(jax_group, "cuda" if mode == "cuda" else None, device, env_overrides=jax_env_overrides)
+        run_hmc_group(jax_group, jax_env_name, device, env_overrides=jax_env_overrides)
         for fw in jax_group:
             _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
             ran_hmc = True
 
-        run_hmc_group(pyro_group, "pyro", device, env_overrides={"JAX_PLATFORMS": "cpu"})
+        run_hmc_group(
+            pyro_group,
+            "perfbench-pyro",
+            device,
+            env_overrides={"JAX_PLATFORMS": "cpu"},
+        )
         for fw in pyro_group:
             _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
             ran_hmc = True
 
-        run_hmc_group(torch_group, "torch", device, env_overrides={"JAX_PLATFORMS": "cpu"})
+        run_hmc_group(
+            torch_group,
+            "perfbench-torch",
+            device,
+            env_overrides={"JAX_PLATFORMS": "cpu"},
+        )
         for fw in torch_group:
             _print_hmc_timings(fw, hmc_output_dir, args.hmc_chain_lengths)
             ran_hmc = True
@@ -538,7 +513,7 @@ def command_pipeline(args: argparse.Namespace) -> None:
                 str(args.data_n_points),
             ]
             print("→ HMC genjl")
-            _run_main_subcommand(None, *genjl_cmd)
+            _run_main_subcommand(jax_env_name, *genjl_cmd)
             _print_hmc_timings("genjl", genjl_dir, args.hmc_chain_lengths)
             ran_hmc = True
 
@@ -547,11 +522,13 @@ def command_pipeline(args: argparse.Namespace) -> None:
     if not ran_hmc and _has_hmc_results(hmc_output_dir, norm_hmc):
         ran_hmc = True
 
+    combine_env = "perfbench-cuda" if mode == "cuda" else "perfbench"
+
     if not args.skip_plots and (ran_is or ran_hmc):
         if ran_is:
             print("→ Combining IS results")
             _run_main_subcommand(
-                None,
+                combine_env,
                 "combine",
                 "--data-dir",
                 str(data_root),
@@ -569,12 +546,12 @@ def command_pipeline(args: argparse.Namespace) -> None:
                 *norm_hmc,
             ]
             print("→ Combining HMC results")
-            _run_example_script(None, *plot_args)
+            _run_example_script(combine_env, *plot_args)
 
     if not args.skip_export and (ran_is or ran_hmc):
         print("→ Exporting figures")
         _run_main_subcommand(
-            None,
+            combine_env,
             "export",
             "--source-dir",
             str(figs_root),
