@@ -13,7 +13,7 @@
   - Reparameterised gradients: `normal_reparam`, `beta_reparam`, etc.
   - Score-function gradients: `flip_reinforce`, `categorical_reinforce`, etc.
   - Enumeration / measure-valued estimators: `flip_enum`, `flip_mvd`, …
-- `ADEVPrimitive`: base class for custom estimators (override `sample` and `prim_jvp_estimate`).
+- `ADEVPrimitive`: base class for custom estimators (override `sample`, `sample_with_key`, and `prim_jvp_estimate`).
 
 ## Usage Pattern
 ```python
@@ -29,7 +29,8 @@ grad = objective.grad_estimate(theta)
 ```
 
 - Choose estimator variants per distribution according to variance/availability (e.g., reparameterisation for continuous, score-function for discrete).
-- Wrap ADEV programs with `genjax.pjax.seed` before applying `jax.jit`, `jax.vmap`, etc.
+- Wrap ADEV programs with `genjax.pjax.seed` before applying `jax.jit`.
+- When vectorization crosses probabilistic sampling sites, prefer `genjax.modular_vmap` over plain `jax.vmap`.
 
 ## Implementation Notes
 - All primitives are pytrees and support JAX transformations; keep static metadata (e.g., estimator selection) outside traced values.

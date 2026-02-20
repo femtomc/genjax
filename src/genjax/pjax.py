@@ -556,6 +556,13 @@ The primitive carries metadata about the sampler function, distribution
 parameters, and optional support constraints.
 """
 
+# ADEV-specific stochastic site primitive.
+# This lets ADEV define transformation/batching semantics independently of
+# plain PJAX sampling while still reusing PJAX interpreter infrastructure.
+adev_sample_p = InitialStylePrimitive(
+    f"{TerminalStyle.BOLD}{TerminalStyle.PURPLE}pjax.adev_sample{TerminalStyle.RESET}",
+)
+
 log_density_p = InitialStylePrimitive(
     f"{TerminalStyle.BOLD}{TerminalStyle.CYAN}pjax.log_density{TerminalStyle.RESET}",
 )
@@ -764,6 +771,8 @@ class SamplerConfig:
     name: str | None = None
     sample_shape: tuple[int, ...] = ()
     support: Callable[..., Any] | None = None
+    primitive: InitialStylePrimitive = sample_p
+    primitive_params: dict[str, Any] = field(default_factory=dict)
 
     def with_sample_shape(self, new_sample_shape: tuple[int, ...]) -> "SamplerConfig":
         """Create a new config with updated sample shape."""
@@ -772,6 +781,8 @@ class SamplerConfig:
             name=self.name,
             sample_shape=new_sample_shape,
             support=self.support,
+            primitive=self.primitive,
+            primitive_params=dict(self.primitive_params),
         )
 
     def get_keyful_sampler_with_shape(self) -> Callable[..., Any]:
@@ -1065,13 +1076,15 @@ def create_sample_primitive(config: SamplerConfig):
 
         # Bind to the primitive
         return initial_style_bind(
-            sample_p,
+            config.primitive,
             keyful_sampler=config.keyful_sampler,
             flat_keyful_sampler=flat_keyful_sampler,
+            sample_shape=config.sample_shape,
             batch=batch_rule,
             support=config.support,
             lowering_warning=lowering_msg,
             lowering_exception=lowering_exception,
+            **config.primitive_params,
         )(keyless_sampler, name=config.name)(*args, **kwargs)
 
     return sample
@@ -1087,6 +1100,8 @@ def sample_binder(
     name: str | None = None,
     sample_shape: tuple[int, ...] = (),
     support: Callable[..., Any] | None = None,
+    primitive: InitialStylePrimitive = sample_p,
+    primitive_params: dict[str, Any] | None = None,
 ):
     """Create a sample primitive that binds a keyful sampler to PJAX's sample_p primitive.
 
@@ -1122,6 +1137,8 @@ def sample_binder(
         name=name,
         sample_shape=sample_shape,
         support=support,
+        primitive=primitive,
+        primitive_params={} if primitive_params is None else dict(primitive_params),
     )
     return create_sample_primitive(config)
 
@@ -1313,7 +1330,7 @@ class Seed:
             args = subfuns + invals
             primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
 
-            if primitive == sample_p:
+            if primitive in (sample_p, adev_sample_p):
                 invals = safe_map(env.read, eqn.invars)
                 args = subfuns + invals
                 flat_keyful_sampler = inner_params["flat_keyful_sampler"]
@@ -1499,7 +1516,9 @@ class ModularVmap:
             args = subfuns + invals
 
             # Probabilistic.
-            if PPPrimitive.check(eqn.primitive, sample_p):
+            if PPPrimitive.check(eqn.primitive, sample_p) or PPPrimitive.check(
+                eqn.primitive, adev_sample_p
+            ):
                 outvals = eqn.primitive.bind(
                     dummy_arg,
                     *args,

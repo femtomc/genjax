@@ -64,6 +64,7 @@ from genjax.pjax import (
     Environment,
     sample_binder,
     sample_p,
+    adev_sample_p,
     modular_vmap,
     stage,
 )
@@ -74,6 +75,10 @@ from jax.extend import source_info_util as src_util
 from jax.extend.core import Jaxpr, Var, jaxpr_as_fun
 from jax.interpreters import ad as jax_autodiff
 from jaxtyping import ArrayLike
+
+from genjax._compat import ensure_jax_tfp_compat
+
+ensure_jax_tfp_compat()
 from tensorflow_probability.substrates import jax as tfp
 
 from genjax.distributions import (
@@ -81,6 +86,7 @@ from genjax.distributions import (
     categorical,
     geometric,
     normal,
+    uniform,
     multivariate_normal,
 )
 
@@ -128,6 +134,19 @@ class ADEVPrimitive(Pytree):
             Sample from the distribution/stochastic process
         """
         pass
+
+    def sample_with_key(self, key, *args, sample_shape=()):
+        """Keyful sampling operation used by PJAX transformations.
+
+        ADEV estimators keep a keyless `sample(...)` API for user-facing code,
+        but `sample_binder` requires keyed kernels so `seed`/`modular_vmap`
+        can stage and transform stochastic sites correctly.
+
+        Subclasses should override this method with a true keyful kernel.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement sample_with_key for keyed PJAX sampling."
+        )
 
     @abstractmethod
     def prim_jvp_estimate(
@@ -201,11 +220,16 @@ def sample_primitive(adev_prim: ADEVPrimitive, *args):
         parameter setup for JAX transformations.
     """
 
-    def _adev_prim_call(key, adev_prim, *args, **kwargs):
+    def _adev_prim_call(key, *args, sample_shape=(), **kwargs):
         """Wrapper function that conforms to sample_binder's expected signature."""
-        return adev_prim.sample(*args)
+        del kwargs
+        return adev_prim.sample_with_key(key, *args, sample_shape=sample_shape)
 
-    return sample_binder(_adev_prim_call)(adev_prim, *args)
+    return sample_binder(
+        _adev_prim_call,
+        primitive=adev_sample_p,
+        primitive_params={"adev_prim": adev_prim},
+    )(*args)
 
 
 ####################
@@ -388,6 +412,11 @@ class ADEV(Pytree):
         jax_util.safe_map(dual_env.write, jaxpr.constvars, Dual.tree_pure(consts))
         jax_util.safe_map(dual_env.write, jaxpr.invars, flat_duals)
 
+        def _primal_env(env: Environment):
+            pure_env = env.copy()
+            pure_env.env = {k: Dual.tree_primal(v) for k, v in pure_env.env.items()}
+            return pure_env
+
         # TODO: Pure evaluation.
         def eval_jaxpr_iterate_pure(eqns, pure_env, invars, flat_args):
             jax_util.safe_map(pure_env.write, invars, flat_args)
@@ -395,13 +424,10 @@ class ADEV(Pytree):
                 in_vals = jax_util.safe_map(pure_env.read, eqn.invars)
                 subfuns, params = eqn.primitive.get_bind_params(eqn.params)
                 args = subfuns + in_vals
-                if eqn.primitive is sample_p:
-                    pass
-                else:
-                    outs = eqn.primitive.bind(*args, **params)
-                    if not eqn.primitive.multiple_results:
-                        outs = [outs]
-                    jax_util.safe_map(pure_env.write, eqn.outvars, outs)
+                outs = eqn.primitive.bind(*args, **params)
+                if not eqn.primitive.multiple_results:
+                    outs = [outs]
+                jax_util.safe_map(pure_env.write, eqn.outvars, outs)
 
             return jax_util.safe_map(pure_env.read, jaxpr.outvars)
 
@@ -421,10 +447,10 @@ class ADEV(Pytree):
                     duals = subfuns + in_vals
 
                     primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
-                    # Our sample_p primitive.
-                    if primitive is sample_p:
+                    # ADEV stochastic site primitive.
+                    if primitive is adev_sample_p:
                         dual_env = dual_env.copy()
-                        pure_env = Dual.tree_primal(dual_env)
+                        pure_env = _primal_env(dual_env)
 
                         # Create pure continuation (kpure): represents E[f(X) | X=x]
                         # Operates on primal values only, no differentiation applied
@@ -446,14 +472,37 @@ class ADEV(Pytree):
                                 list(duals),
                             )
 
+                        adev_prim = inner_params["adev_prim"]
                         in_tree = inner_params["in_tree"]
                         num_consts = inner_params["num_consts"]
+                        yes_kwargs = bool(inner_params.get("yes_kwargs", False))
 
                         flat_primals, flat_tangents = ADEV.flat_unzip(
                             Dual.tree_leaves(Dual.tree_pure(duals[num_consts:]))
                         )
-                        adev_prim, *primals = jtu.tree_unflatten(in_tree, flat_primals)
-                        _, *tangents = jtu.tree_unflatten(in_tree, flat_tangents)
+                        primal_tree = jtu.tree_unflatten(in_tree, flat_primals)
+                        tangent_tree = jtu.tree_unflatten(in_tree, flat_tangents)
+
+                        if yes_kwargs:
+                            primals = primal_tree[0]
+                            tangents = tangent_tree[0]
+                        else:
+                            primals = primal_tree
+                            tangents = tangent_tree
+
+                        if not isinstance(primals, tuple):
+                            primals = (primals,)
+                        if not isinstance(tangents, tuple):
+                            tangents = (tangents,)
+
+                        sample_shape = tuple(inner_params.get("sample_shape", ()))
+                        if sample_shape:
+                            def _broadcast(v):
+                                return jnp.broadcast_to(v, sample_shape + jnp.shape(v))
+
+                            primals = jtu.tree_map(_broadcast, primals)
+                            tangents = jtu.tree_map(_broadcast, tangents)
+
                         dual_tree = Dual.dual_tree(primals, tangents)
 
                         return adev_prim.prim_jvp_estimate(
@@ -461,10 +510,14 @@ class ADEV(Pytree):
                             (_sample_pure_kont, _sample_dual_kont),
                         )
 
+                    elif primitive is sample_p:
+                        raise NotImplementedError(
+                            "ADEV encountered pjax.sample site without ADEV semantics. "
+                            "Use ADEV estimator primitives (e.g., normal_reparam) inside @expectation."
+                        )
+
                     # Handle branching.
                     elif eqn.primitive is jax.lax.cond_p:
-                        pure_env = Dual.tree_primal(dual_env)
-
                         # Create dual continuation for the computation after the cond_p.
                         def _cond_dual_kont(dual_tree: list[Any]):
                             dual_leaves = Dual.tree_pure(dual_tree)
@@ -943,10 +996,18 @@ class REINFORCE(ADEVPrimitive):
 
     sample_function: Const[Callable[..., Any]]
     differentiable_logpdf: Const[Callable[..., Any]]
+    keyful_sample_function: Const[Callable[..., Any]]
 
     def sample(self, *args):
         """Forward sampling using the provided sample function."""
         return self.sample_function.value(*args)
+
+    def sample_with_key(self, key, *args, sample_shape=()):
+        return self.keyful_sample_function.value(
+            key,
+            *args,
+            sample_shape=sample_shape,
+        )
 
     def prim_jvp_estimate(
         self,
@@ -992,30 +1053,121 @@ class REINFORCE(ADEVPrimitive):
             (v_tangent, *tangents),
         )
 
+        # In batched contexts, differentiable_logpdf may return elementwise
+        # contributions. REINFORCE uses the joint log-density, so we aggregate.
+        if jnp.shape(lp_tangent):
+            lp_tangent = jnp.sum(lp_tangent)
+
         # REINFORCE identity: ∇E[f(X)] = f(X) + f(X) * ∇log p(X)
         # This gives an unbiased estimate of the gradient as proven in the ADEV paper
         return Dual(out_primal, out_tangent + (out_primal * lp_tangent))
 
 
-def reinforce(sample_func, logpdf_func):
+def reinforce(sample_func, logpdf_func, keyful_sample_func=None):
     """Factory function for creating REINFORCE gradient estimators.
 
     Args:
-        sample_func: Function to sample from distribution
-        logpdf_func: Function to compute log-probability density
+        sample_func: Keyless function to sample from distribution.
+        logpdf_func: Function to compute log-probability density.
+        keyful_sample_func: Optional keyed sampler with signature
+            ``(key, *args, sample_shape=()) -> sample`` used by PJAX bindings.
 
     Returns:
         REINFORCE primitive for the given distribution
 
     Example:
-        >>> normal_reinforce_prim = reinforce(normal.sample, normal.logpdf)
+        >>> normal_reinforce_prim = reinforce(
+        ...     normal.sample,
+        ...     normal.logpdf,
+        ...     lambda key, mu, sigma, sample_shape=(): tfd.Normal(mu, sigma).sample(
+        ...         seed=key,
+        ...         sample_shape=sample_shape,
+        ...     ),
+        ... )
     """
-    return REINFORCE(const(sample_func), const(logpdf_func))
+    if keyful_sample_func is None:
+
+        def _missing_keyful_sampler(key, *args, sample_shape=()):
+            del key, args, sample_shape
+            raise NotImplementedError(
+                "This REINFORCE primitive was constructed without a keyful sampler. "
+                "Provide `keyful_sample_func=...` to reinforce(...) so seeded/"
+                "vectorized PJAX transformations can sample it."
+            )
+
+        keyful_sample_func = _missing_keyful_sampler
+
+    return REINFORCE(
+        const(sample_func),
+        const(logpdf_func),
+        const(keyful_sample_func),
+    )
 
 
 ######################################
 # Discrete gradient estimator primitives #
 ######################################
+
+
+def _discrete_zero_tangent(v):
+    """Create a zero tangent compatible with discrete JAX values."""
+    return (
+        jnp.zeros(v.shape, dtype=jax.dtypes.float0)
+        if v.dtype in (jnp.bool_, jnp.int32, jnp.int64)
+        else jnp.zeros_like(v)
+    )
+
+
+def _first_leaf(tree):
+    """Extract first leaf from a pytree (used for scalar expectation outputs)."""
+    flat, _ = jtu.tree_flatten(tree)
+    return flat[0]
+
+
+def _flip_lane_rb_estimate(kpure, kdual, p_primal, p_tangent):
+    """Lane-wise Rao-Blackwellized estimator for batched Bernoulli sites.
+
+    For batched Bernoulli samples b, this estimates per-lane derivatives by
+    conditioning on all other lanes and exactly differencing the selected lane:
+      f(b_i=1, b_-i) - f(b_i=0, b_-i)
+
+    This avoids exponential enumeration over all lane combinations.
+
+    Important: all continuation evaluations use the same dual continuation
+    semantics to avoid bias from mixing pure-vs-dual downstream estimators.
+    """
+    del kpure  # Kept for signature symmetry.
+
+    v = bernoulli.sample(probs=p_primal)
+    b = v == 1
+
+    b_dual = kdual(Dual(b, _discrete_zero_tangent(b)))
+    (b_primal,), (b_tangent,) = Dual.tree_unzip(b_dual)
+
+    def _cont_primal(mask):
+        out_dual = kdual(Dual(mask, _discrete_zero_tangent(mask)))
+        (out_primal,), _ = Dual.tree_unzip(out_dual)
+        return out_primal
+
+    b_flat = jnp.reshape(b, (-1,))
+    p_tangent_flat = jnp.reshape(p_tangent, (-1,))
+
+    est = jnp.zeros_like(b_primal)
+    num_lanes = int(b_flat.shape[0])
+    for i in range(num_lanes):
+        bi = b_flat[i]
+        flipped_flat = b_flat.at[i].set(jnp.logical_not(bi))
+        flipped = jnp.reshape(flipped_flat, b.shape)
+        other = _cont_primal(flipped)
+        sign = jnp.where(
+            bi,
+            jnp.array(-1.0, dtype=b_primal.dtype),
+            jnp.array(1.0, dtype=b_primal.dtype),
+        )
+        diff_i = sign * (other - b_primal)
+        est = est + diff_i * p_tangent_flat[i]
+
+    return Dual(b_primal, b_tangent + est)
 
 
 @Pytree.dataclass
@@ -1027,34 +1179,52 @@ class FlipEnum(ADEVPrimitive):
     This gives zero-variance gradient estimates for the flip/Bernoulli case.
 
     The estimator computes: ∇E[f(X)] = p*f(True) + (1-p)*f(False)
+
+    For batched Bernoulli sites (e.g., under modular_vmap inside an expectation),
+    we use lane-wise Rao-Blackwellization: each lane is differenced exactly
+    conditional on sampled values of the remaining lanes, avoiding O(2^B)
+    joint enumeration.
     """
 
     def sample(self, *args):
         (probs,) = args
         return 1 == bernoulli.sample(probs)
 
+    def sample_with_key(self, key, *args, sample_shape=()):
+        (probs,) = args
+        return tfd.Bernoulli(probs=probs, dtype=jnp.bool_).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
+
     def prim_jvp_estimate(
         self,
         dual_tree: tuple[DualTree, ...],
         konts: tuple[Any, ...],
     ):
-        (_, kdual) = konts
+        (kpure, kdual) = konts
         (p_primal,) = Dual.tree_primal(dual_tree)
         (p_tangent,) = Dual.tree_tangent(dual_tree)
-        true_dual = kdual(Dual(jnp.array(True), jnp.zeros_like(jnp.array(True))))
-        false_dual = kdual(Dual(jnp.array(False), jnp.zeros_like(jnp.array(False))))
-        (true_primal,), (true_tangent,) = Dual.tree_unzip(true_dual)
-        (false_primal,), (false_tangent,) = Dual.tree_unzip(false_dual)
 
-        def _inner(p, tl, fl):
-            return p * tl + (1 - p) * fl
+        # Scalar Bernoulli: exact two-point enumeration.
+        if jnp.ndim(p_primal) == 0:
+            true_dual = kdual(Dual(jnp.array(True), jnp.zeros_like(jnp.array(True))))
+            false_dual = kdual(Dual(jnp.array(False), jnp.zeros_like(jnp.array(False))))
+            (true_primal,), (true_tangent,) = Dual.tree_unzip(true_dual)
+            (false_primal,), (false_tangent,) = Dual.tree_unzip(false_dual)
 
-        out_primal, out_tangent = jax.jvp(
-            _inner,
-            (p_primal, true_primal, false_primal),
-            (p_tangent, true_tangent, false_tangent),
-        )
-        return Dual(out_primal, out_tangent)
+            def _inner(p, tl, fl):
+                return p * tl + (1 - p) * fl
+
+            out_primal, out_tangent = jax.jvp(
+                _inner,
+                (p_primal, true_primal, false_primal),
+                (p_tangent, true_tangent, false_tangent),
+            )
+            return Dual(out_primal, out_tangent)
+
+        # Batched Bernoulli: lane-wise Rao-Blackwellization to avoid O(2^B).
+        return _flip_lane_rb_estimate(kpure, kdual, p_primal, p_tangent)
 
 
 flip_enum = FlipEnum()
@@ -1096,12 +1266,22 @@ class FlipMVD(ADEVPrimitive):
         This is a "phantom estimator" that evaluates the function on auxiliary
         samples (the complement outcome) to construct the gradient estimate.
         The (-1)^v term creates the appropriate sign for the discrete difference.
+
+        In batched Bernoulli contexts, we use a lane-wise Rao-Blackwellized
+        variant to avoid exponential scaling in the number of lanes.
     """
 
     def sample(self, *args):
         """Sample from Bernoulli distribution."""
-        p = (args,)
+        (p,) = args
         return 1 == bernoulli.sample(probs=p)
+
+    def sample_with_key(self, key, *args, sample_shape=()):
+        (p,) = args
+        return tfd.Bernoulli(probs=p, dtype=jnp.bool_).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
 
     def prim_jvp_estimate(
         self,
@@ -1110,48 +1290,27 @@ class FlipMVD(ADEVPrimitive):
     ):
         """Measure-valued derivative gradient estimation for Bernoulli.
 
-        Implements the MVD approach using phantom estimation:
-        1. Sample v ~ Bernoulli(p) to get the primary outcome
-        2. Evaluate f(v) using the dual continuation (kdual)
-        3. Evaluate f(¬v) using the pure continuation (kpure) as phantom estimate
-        4. Combine with signed difference: (-1)^v * (f(¬v) - f(v))
-
-        The (-1)^v term ensures the correct sign for the discrete gradient:
-        - When v=1: -1 * (f(0) - f(1)) = f(1) - f(0)
-        - When v=0: +1 * (f(1) - f(0)) = f(1) - f(0)
-
-        This creates an unbiased estimator of ∇_p E[f(X)] for X ~ Bernoulli(p).
+        Scalar case uses the classic phantom estimator. Batched case uses
+        lane-wise Rao-Blackwellization to avoid exponential enumeration.
         """
         (kpure, kdual) = konts
         (p_primal,) = Dual.tree_primal(dual_tree)
-        (p_tangent,) = Dual.tree_tangent(dual_tree)  # Fix: was tree_primal
+        (p_tangent,) = Dual.tree_tangent(dual_tree)
 
-        # Sample from Bernoulli(p)
+        # Batched Bernoulli: lane-wise Rao-Blackwellized estimator.
+        if jnp.ndim(p_primal) > 0:
+            return _flip_lane_rb_estimate(kpure, kdual, p_primal, p_tangent)
+
+        # Scalar Bernoulli phantom estimator.
         v = bernoulli.sample(probs=p_primal)
         b = v == 1
 
-        # Evaluate f(v) using dual continuation
-        # For discrete values, use float0 tangent type as required by JAX
-        b_tangent_zero = (
-            jnp.zeros(b.shape, dtype=jax.dtypes.float0)
-            if b.dtype in (jnp.bool_, jnp.int32, jnp.int64)
-            else jnp.zeros_like(b)
-        )
-        b_dual = kdual(Dual(b, b_tangent_zero))
+        b_dual = kdual(Dual(b, _discrete_zero_tangent(b)))
         (b_primal,), (b_tangent,) = Dual.tree_unzip(b_dual)
 
-        # Evaluate f(¬v) using pure continuation (phantom estimate)
-        other_result = kpure(jnp.logical_not(b))
+        other = _first_leaf(kpure(jnp.logical_not(b)))
 
-        # Extract scalar value using JAX-compatible tree operations
-        # kpure may return a pytree structure, so we flatten and take the first element
-        other_flat, _ = jtu.tree_flatten(other_result)
-        other = other_flat[0]  # Assume there's always at least one element
-
-        # MVD estimator: (-1)^v * (f(¬v) - f(v))
-        # This creates the signed discrete difference for gradient estimation
         est = ((-1) ** v) * (other - b_primal)
-
         return Dual(b_primal, b_tangent + est * p_tangent)
 
 
@@ -1163,6 +1322,13 @@ class FlipEnumParallel(ADEVPrimitive):
     def sample(self, *args):
         (p,) = args
         return 1 == bernoulli.sample(probs=p)
+
+    def sample_with_key(self, key, *args, sample_shape=()):
+        (p,) = args
+        return tfd.Bernoulli(probs=p, dtype=jnp.bool_).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
 
     def prim_jvp_estimate(
         self,
@@ -1198,6 +1364,13 @@ class CategoricalEnumParallel(ADEVPrimitive):
         (probs,) = args
         return categorical.sample(probs)
 
+    def sample_with_key(self, key, *args, sample_shape=()):
+        (logits,) = args
+        return tfd.Categorical(logits=logits).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
+
     def prim_jvp_estimate(
         self,
         dual_tree: DualTree,
@@ -1229,10 +1402,27 @@ categorical_enum_parallel = CategoricalEnumParallel()
 # REINFORCE distribution estimators   #
 ########################################
 
+def _bernoulli_keyful_sample(key, probs, sample_shape=()):
+    return tfd.Bernoulli(probs=probs).sample(seed=key, sample_shape=sample_shape)
+
+
+def _geometric_keyful_sample(key, probs, sample_shape=()):
+    return tfd.Geometric(probs=probs).sample(seed=key, sample_shape=sample_shape)
+
+
+def _normal_keyful_sample(key, loc, scale, sample_shape=()):
+    return tfd.Normal(loc, scale).sample(seed=key, sample_shape=sample_shape)
+
+
+def _uniform_keyful_sample(key, low, high, sample_shape=()):
+    return tfd.Uniform(low, high).sample(seed=key, sample_shape=sample_shape)
+
+
 flip_reinforce = distribution(
     reinforce(
         bernoulli.sample,
         bernoulli.logpdf,
+        _bernoulli_keyful_sample,
     ),
     bernoulli.logpdf,
 )
@@ -1241,6 +1431,7 @@ geometric_reinforce = distribution(
     reinforce(
         geometric.sample,
         geometric.logpdf,
+        _geometric_keyful_sample,
     ),
     geometric.logpdf,
 )
@@ -1249,8 +1440,18 @@ normal_reinforce = distribution(
     reinforce(
         normal.sample,
         normal.logpdf,
+        _normal_keyful_sample,
     ),
     normal.logpdf,
+)
+
+uniform_reinforce = distribution(
+    reinforce(
+        uniform.sample,
+        uniform.logpdf,
+        _uniform_keyful_sample,
+    ),
+    uniform.logpdf,
 )
 
 
@@ -1290,6 +1491,13 @@ class NormalREPARAM(ADEVPrimitive):
         loc, scale_diag = args
         return normal.sample(loc, scale_diag)
 
+    def sample_with_key(self, key, *args, sample_shape=()):
+        loc, scale_diag = args
+        return tfd.Normal(loc, scale_diag).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
+
     def prim_jvp_estimate(
         self,
         dual_tree: DualTree,
@@ -1311,8 +1519,9 @@ class NormalREPARAM(ADEVPrimitive):
         (mu_primal, sigma_primal) = Dual.tree_primal(dual_tree)
         (mu_tangent, sigma_tangent) = Dual.tree_tangent(dual_tree)
 
-        # Sample parameter-free noise
-        eps = normal.sample(0.0, 1.0)
+        # Sample parameter-free noise with the same broadcast shape as parameters.
+        mu_b, sigma_b = jnp.broadcast_arrays(mu_primal, sigma_primal)
+        eps = normal.sample(jnp.zeros_like(mu_b), jnp.ones_like(sigma_b))
 
         # Reparameterization: X = μ + σ * ε with gradient flow
         def _inner(mu, sigma):
@@ -1329,6 +1538,54 @@ class NormalREPARAM(ADEVPrimitive):
 normal_reparam = distribution(
     NormalREPARAM(),
     normal.logpdf,
+)
+
+
+@Pytree.dataclass
+class UniformREPARAM(ADEVPrimitive):
+    """Reparameterization estimator for Uniform distributions.
+
+    For X ~ Uniform(low, high), we use the pathwise transform
+    X = low + (high - low) * eps where eps ~ Uniform(0, 1).
+    """
+
+    def sample(self, *args):
+        low, high = args
+        return uniform.sample(low, high)
+
+    def sample_with_key(self, key, *args, sample_shape=()):
+        low, high = args
+        return tfd.Uniform(low, high).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
+
+    def prim_jvp_estimate(
+        self,
+        dual_tree: DualTree,
+        konts: tuple[Any, ...],
+    ):
+        _, kdual = konts
+        (low_primal, high_primal) = Dual.tree_primal(dual_tree)
+        (low_tangent, high_tangent) = Dual.tree_tangent(dual_tree)
+
+        low_b, high_b = jnp.broadcast_arrays(low_primal, high_primal)
+        eps = uniform.sample(jnp.zeros_like(low_b), jnp.ones_like(high_b))
+
+        def _inner(low, high):
+            return low + (high - low) * eps
+
+        primal_out, tangent_out = jax.jvp(
+            _inner,
+            (low_primal, high_primal),
+            (low_tangent, high_tangent),
+        )
+        return kdual(Dual(primal_out, tangent_out))
+
+
+uniform_reparam = distribution(
+    UniformREPARAM(),
+    uniform.logpdf,
 )
 
 
@@ -1363,6 +1620,13 @@ class MultivariateNormalREPARAM(ADEVPrimitive):
     def sample(self, *args):
         loc, covariance_matrix = args
         return multivariate_normal.sample(loc, covariance_matrix)
+
+    def sample_with_key(self, key, *args, sample_shape=()):
+        loc, covariance_matrix = args
+        return tfd.MultivariateNormalFullCovariance(loc, covariance_matrix).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
 
     def prim_jvp_estimate(
         self,
@@ -1410,10 +1674,18 @@ multivariate_normal_reparam = distribution(
     multivariate_normal.logpdf,
 )
 
+def _multivariate_normal_keyful_sample(key, loc, covariance_matrix, sample_shape=()):
+    return tfd.MultivariateNormalFullCovariance(loc, covariance_matrix).sample(
+        seed=key,
+        sample_shape=sample_shape,
+    )
+
+
 multivariate_normal_reinforce = distribution(
     reinforce(
         multivariate_normal.sample,
         multivariate_normal.logpdf,
+        _multivariate_normal_keyful_sample,
     ),
     multivariate_normal.logpdf,
 )
@@ -1437,7 +1709,9 @@ __all__ = [
     "flip_reinforce",
     "geometric_reinforce",
     "normal_reinforce",
+    "uniform_reinforce",
     "normal_reparam",
+    "uniform_reparam",
     "multivariate_normal_reparam",
     "multivariate_normal_reinforce",
     # Gradient strategy factories

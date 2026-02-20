@@ -3,10 +3,12 @@ import jax.random as jrand
 import pytest
 from genjax.adev import Dual, expectation, flip_enum, flip_mvd
 from genjax.core import gen
-from genjax.pjax import seed
+from genjax.pjax import seed, stage, PPPrimitive, sample_p, adev_sample_p
 from genjax import (
     normal_reparam,
     normal_reinforce,
+    uniform_reparam,
+    uniform_reinforce,
     multivariate_normal_reparam,
     multivariate_normal_reinforce,
     flip_reinforce,
@@ -101,6 +103,38 @@ class TestADEVSeedCompatibility:
         assert "x" in result.get_choices()
         assert jnp.allclose(result.get_retval(), result.get_choices()["x"])
 
+    def test_uniform_reparam_with_seed_and_addressing(self):
+        """Test uniform_reparam works with seed + addressing."""
+
+        @gen
+        def simple_model():
+            x = uniform_reparam(-1.0, 2.0) @ "x"
+            return x
+
+        result = seed(simple_model.simulate)(jrand.key(440))
+
+        assert isinstance(result.get_retval(), (float, jnp.ndarray))
+        assert "x" in result.get_choices()
+        assert jnp.allclose(result.get_retval(), result.get_choices()["x"])
+        assert result.get_retval() >= -1.0
+        assert result.get_retval() <= 2.0
+
+    def test_uniform_reinforce_with_seed_and_addressing(self):
+        """Test uniform_reinforce works with seed + addressing."""
+
+        @gen
+        def simple_model():
+            x = uniform_reinforce(-1.0, 2.0) @ "x"
+            return x
+
+        result = seed(simple_model.simulate)(jrand.key(441))
+
+        assert isinstance(result.get_retval(), (float, jnp.ndarray))
+        assert "x" in result.get_choices()
+        assert jnp.allclose(result.get_retval(), result.get_choices()["x"])
+        assert result.get_retval() >= -1.0
+        assert result.get_retval() <= 2.0
+
     def test_multivariate_normal_reparam_with_seed_and_addressing(self):
         """Test multivariate_normal_reparam works with seed + addressing."""
 
@@ -152,6 +186,128 @@ class TestADEVSeedCompatibility:
         assert "x2" in choices
         assert "x3" in choices
         assert choices["x3"].shape == (2,)
+
+
+class TestADEVVmapSemantics:
+    """Characterize vmap behavior for models using ADEV primitives."""
+
+    def test_adev_primitives_stage_to_adev_sample(self):
+        @expectation
+        def objective(theta):
+            x = normal_reparam(theta, 1.0)
+            return x**2
+
+        closed_jaxpr, _ = stage(objective.prog.source.value)(0.0)
+
+        sample_prims = []
+        for eqn in closed_jaxpr.jaxpr.eqns:
+            primitive, _ = PPPrimitive.unwrap(eqn.primitive)
+            if primitive in (sample_p, adev_sample_p):
+                sample_prims.append(primitive)
+
+        assert len(sample_prims) > 0
+        assert all(p is adev_sample_p for p in sample_prims)
+
+    def test_modular_vmap_direct_adev_primitive(self):
+        thetas = jnp.linspace(-1.0, 1.0, 16)
+        xs = modular_vmap(lambda th: normal_reparam(th, 1.0))(thetas)
+
+        assert xs.shape == (16,)
+        assert jnp.all(jnp.isfinite(xs))
+
+    def test_modular_vmap_seeded_simulate_with_adev_primitive(self):
+        @gen
+        def model(theta):
+            x = normal_reparam(theta, 1.0) @ "x"
+            return x
+
+        seeded_sim = seed(model.simulate)
+        keys = jrand.split(jrand.key(500), 16)
+        thetas = jnp.linspace(-1.0, 1.0, 16)
+
+        traces = modular_vmap(seeded_sim, in_axes=(0, 0))(keys, thetas)
+        xs = traces.get_choices()["x"]
+
+        assert xs.shape == (16,)
+        assert jnp.var(xs) > 0.0
+
+    def test_expectation_with_internal_modular_vmap(self):
+        @expectation
+        def batched_objective(thetas):
+            xs = modular_vmap(lambda th: normal_reparam(th, 1.0))(thetas)
+            return jnp.sum(xs)
+
+        thetas = jnp.zeros(8)
+        grad = batched_objective.grad_estimate(thetas)
+
+        assert grad.shape == (8,)
+        assert jnp.all(jnp.isfinite(grad))
+
+    def test_expectation_with_internal_modular_vmap_reinforce(self):
+        @expectation
+        def batched_objective(thetas):
+            xs = modular_vmap(lambda th: normal_reinforce(th, 1.0))(thetas)
+            return jnp.sum(xs)
+
+        thetas = jnp.zeros(8)
+        grad = batched_objective.grad_estimate(thetas)
+
+        assert grad.shape == (8,)
+        assert jnp.all(jnp.isfinite(grad))
+
+    def test_expectation_with_internal_modular_vmap_flip_enum(self):
+        @expectation
+        def batched_objective(ps):
+            bs = modular_vmap(lambda p: flip_enum(p))(ps)
+            return jnp.sum(jnp.float32(bs))
+
+        ps = jnp.array([0.2, 0.4, 0.7, 0.9])
+        grad = batched_objective.grad_estimate(ps)
+
+        assert grad.shape == ps.shape
+        assert jnp.allclose(grad, jnp.ones_like(ps), atol=1e-6)
+
+    def test_expectation_with_internal_modular_vmap_flip_mvd(self):
+        @expectation
+        def batched_objective(ps):
+            bs = modular_vmap(lambda p: flip_mvd(p))(ps)
+            return jnp.sum(jnp.float32(bs))
+
+        ps = jnp.array([0.2, 0.4, 0.7, 0.9])
+        grad = batched_objective.grad_estimate(ps)
+
+        assert grad.shape == ps.shape
+        assert jnp.allclose(grad, jnp.ones_like(ps), atol=1e-6)
+
+    def test_plain_jax_vmap_seeded_simulate_works(self):
+        @gen
+        def model(theta):
+            x = normal_reparam(theta, 1.0) @ "x"
+            return x
+
+        seeded_sim = seed(model.simulate)
+        keys = jrand.split(jrand.key(501), 8)
+        thetas = jnp.linspace(-1.0, 1.0, 8)
+
+        traces = jax.vmap(seeded_sim, in_axes=(0, 0))(keys, thetas)
+        xs = traces.get_choices()["x"]
+
+        assert xs.shape == (8,)
+        assert jnp.var(xs) > 0.0
+
+    def test_expectation_with_internal_modular_vmap_axis_size_only(self):
+        @expectation
+        def batched_objective(theta):
+            xs = modular_vmap(
+                lambda: normal_reparam(theta, 1.0),
+                in_axes=(),
+                axis_size=8,
+            )()
+            return jnp.sum(xs)
+
+        grad = batched_objective.grad_estimate(0.0)
+
+        assert jnp.allclose(grad, 8.0, atol=1e-6)
 
 
 class TestADEVGradientComputation:
@@ -228,6 +384,40 @@ class TestADEVGradientComputation:
         grad_result = objective.grad_estimate(theta)
         assert grad_result.shape == (2,)
 
+    def test_uniform_reparam_gradient_is_unbiased_in_mean(self):
+        """Averaged pathwise gradients should match the analytic gradient."""
+
+        @expectation
+        def objective(low, high):
+            x = uniform_reparam(low, high)
+            return x**2
+
+        low = 0.0
+        high = 1.0
+
+        seeded_grad = seed(lambda l, h: objective.grad_estimate(l, h))
+        keys = jrand.split(jrand.key(600), 1024)
+        grad_low, grad_high = jax.vmap(
+            seeded_grad,
+            in_axes=(0, None, None),
+        )(keys, low, high)
+
+        assert jnp.allclose(jnp.mean(grad_low), 1.0 / 3.0, atol=0.08)
+        assert jnp.allclose(jnp.mean(grad_high), 2.0 / 3.0, atol=0.08)
+
+    def test_uniform_reinforce_gradient_is_finite(self):
+        """REINFORCE estimator for Uniform should produce finite gradients."""
+
+        @expectation
+        def objective(low, high):
+            x = uniform_reinforce(low, high)
+            return x**2
+
+        grad_low, grad_high = objective.grad_estimate(-1.0, 2.0)
+
+        assert jnp.isfinite(grad_low)
+        assert jnp.isfinite(grad_high)
+
 
 class TestADEVNoSeedCompatibility:
     """Test that ADEV estimators still work without seed (regression test)."""
@@ -245,6 +435,21 @@ class TestADEVNoSeedCompatibility:
 
         assert isinstance(result.get_retval(), (float, jnp.ndarray))
         assert "x" in result.get_choices()
+
+    def test_uniform_reparam_without_seed(self):
+        """Test uniform_reparam works without seed transformation."""
+
+        @gen
+        def simple_model():
+            x = uniform_reparam(-1.0, 2.0) @ "x"
+            return x
+
+        result = simple_model.simulate()
+
+        assert isinstance(result.get_retval(), (float, jnp.ndarray))
+        assert "x" in result.get_choices()
+        assert result.get_retval() >= -1.0
+        assert result.get_retval() <= 2.0
 
     def test_multivariate_normal_reparam_without_seed(self):
         """Test multivariate_normal_reparam works without seed transformation."""

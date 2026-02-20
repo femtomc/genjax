@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax.scipy.special as jsp
 import jax.tree_util as jtu
 
-from genjax import gen, normal, normal_reparam
+from genjax import gen, modular_vmap, normal, normal_reparam
 from genjax.adev import expectation
 from genjax.pjax import seed
 
@@ -69,10 +69,10 @@ def make_naive_iwae_objective(num_particles: int):
 
     @expectation
     def objective(data, phi):
-        log_weights = []
-        for _ in range(num_particles):
-            log_weights.append(_naive_log_weight(data, phi))
-        log_weights = jnp.stack(log_weights)
+        particle_idxs = jnp.arange(num_particles)
+        log_weights = modular_vmap(
+            lambda _: _naive_log_weight(data, phi),
+        )(particle_idxs)
         return jsp.logsumexp(log_weights) - log_num_particles
 
     return objective
@@ -118,23 +118,25 @@ def make_expressive_objective(num_inner_particles: int, num_outer_particles: int
 
         model_logp, _ = cone_model.assess({"x": x, "y": y, "z": data["z"]})
 
-        log_q_candidates = [_expressive_log_q_xy_given_u(data, phi, x, y, u0)]
-        for _ in range(num_inner_particles - 1):
-            # Additional auxiliary proposals for the marginal-density estimate.
-            u_aux = normal_reparam(0.0, 1.0)
-            log_q_candidates.append(
-                _expressive_log_q_xy_given_u(data, phi, x, y, u_aux)
-            )
+        log_q0 = _expressive_log_q_xy_given_u(data, phi, x, y, u0)
 
-        log_q_est = jsp.logsumexp(jnp.stack(log_q_candidates)) - log_num_inner
+        if num_inner_particles > 1:
+            aux_idxs = jnp.arange(num_inner_particles - 1)
+            u_aux = modular_vmap(lambda _: normal_reparam(0.0, 1.0))(aux_idxs)
+            log_q_aux = modular_vmap(
+                lambda u: _expressive_log_q_xy_given_u(data, phi, x, y, u)
+            )(u_aux)
+            log_q_terms = jnp.concatenate((jnp.expand_dims(log_q0, 0), log_q_aux), axis=0)
+        else:
+            log_q_terms = jnp.expand_dims(log_q0, 0)
+
+        log_q_est = jsp.logsumexp(log_q_terms) - log_num_inner
         return model_logp - log_q_est
 
     @expectation
     def objective(data, phi):
-        log_weights = []
-        for _ in range(num_outer_particles):
-            log_weights.append(_single_log_weight(data, phi))
-        log_weights = jnp.stack(log_weights)
+        outer_idxs = jnp.arange(num_outer_particles)
+        log_weights = modular_vmap(lambda _: _single_log_weight(data, phi))(outer_idxs)
         return jsp.logsumexp(log_weights) - log_num_outer
 
     return objective
