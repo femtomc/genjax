@@ -49,3 +49,7 @@ examples/perfbench/figs_cpu/
 !examples/*/assets/*.jpeg
 
 .claude/settings.local.json
+
+# Local operator/control-plane artifacts
+.mu/
+.pi/

@@ -44,6 +44,8 @@ paper-localization-gen = "pixi run -e localization python -m examples.localizati
 paper-perfbench = "python examples/perfbench/main.py pipeline"
 paper-perfbench-cuda = "python examples/perfbench/main.py pipeline --mode cuda"
 paper-perfbench-clean = "python examples/perfbench/main.py clean"
+paper-cone-gen = "python -m examples.cone.main fig2"
+paper-cone-table = "python -m examples.cone.main table4"
 
 paper-faircoin-gpu-gen = "pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
 paper-curvefit-gpu-gen = "pixi run -e curvefit-cuda python -m examples.curvefit.main paper"
@@ -94,7 +96,6 @@ cmd = "curvefit"
 curvefit = "python -m examples.curvefit.main paper"  # Default POPL figure generation
 curvefit-paper = "python -m examples.curvefit.main paper"  # Alias for backwards compatibility
 curvefit-custom = "python -m examples.curvefit.main"  # Pass flags after `--` to customise runs
-
 
 [tool.pixi.feature.format.tasks]
 # Code formatting and linting
@@ -226,6 +227,7 @@ addopts = [
     "--cov-report=xml",          # Generate XML coverage for CI
 ]
 testpaths = ["tests"]
+pythonpath = ["."]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
