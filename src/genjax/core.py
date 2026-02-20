@@ -9,8 +9,12 @@ import jax.tree_util as jtu
 import jaxtyping as jtyping
 import penzai.pz as pz
 from jax.lax import scan
-from tensorflow_probability.substrates import jax as tfp
 from typing_extensions import dataclass_transform
+
+from ._compat import ensure_jax_tfp_compat
+
+ensure_jax_tfp_compat()
+from tensorflow_probability.substrates import jax as tfp
 
 # Import PJAX functionality that was moved from this file
 from .pjax import (

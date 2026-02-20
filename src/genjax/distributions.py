@@ -6,6 +6,10 @@ using TensorFlow Probability as the backend.
 """
 
 import jax.numpy as jnp
+
+from genjax._compat import ensure_jax_tfp_compat
+
+ensure_jax_tfp_compat()
 from tensorflow_probability.substrates import jax as tfp
 
 from genjax.core import (

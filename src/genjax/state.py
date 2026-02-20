@@ -128,7 +128,7 @@ from functools import wraps
 import jax.extend as jex
 import jax.tree_util as jtu
 from jax.extend.core import Jaxpr
-from jax.util import safe_map, split_list
+from jax._src.util import safe_map, split_list
 from jax.lax import scan_p, scan
 
 import beartype.typing as btyping
