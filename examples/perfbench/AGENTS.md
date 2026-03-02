@@ -1,46 +1,48 @@
-# Performance Benchmark Case Study Guide
+# Perfbench Case Study Guide
 
-This directory contains the `timing-benchmarks` integration used for POPL Figure 16(b):
-GenJAX vs NumPyro, Pyro, hand-coded JAX/PyTorch, and Gen.jl on the shared
-polynomial regression benchmark.
+Perfbench wraps the multi-framework timing benchmark used for paper Figure 16(b).
 
-## Layout
+## Purpose
 
-- `benchmarks/src/timing_benchmarks/` – framework implementations and plotting utilities
-- `benchmarks/run_hmc_benchmarks.py`, `benchmarks/run_genjl_hmc.py`, `benchmarks/combine_results.py` – orchestration helpers
-- `main.py` – single CLI entry point used by root Pixi tasks
-- `julia/` – Gen.jl project used for `genjl` baselines
+Benchmark GenJAX against NumPyro, Pyro, hand-coded JAX/PyTorch, and optional Gen.jl on a shared curvefit task.
 
-Outputs are written under:
-- `examples/perfbench/data{,_cpu}/`
-- `examples/perfbench/figs{,_cpu}/`
-- exported PDFs copied to repo-level `figs/` (unless `--skip-export`)
+## Key Files
 
-## Environments (top-level Pixi)
+- `main.py`: orchestration CLI (`pipeline`, `run`, `combine`, `export`, etc.)
+- `benchmarks/`: framework runners + result combiner scripts
+- `README.md`: broader user-facing benchmark notes
 
-Perfbench now uses root-level environments (not a nested Pixi project):
-
-- `perfbench` – CPU JAX/NumPyro/plotting stack
-- `perfbench-cuda` – same + CUDA JAX
-- `perfbench-pyro` – PyTorch + Pyro runners
-- `perfbench-torch` – hand-coded PyTorch runners
-
-`main.py pipeline` dispatches each framework into the right env automatically.
-
-## Typical commands
+## Main Commands
 
 ```bash
-# CPU full pipeline
+# Full CPU pipeline
 pixi run paper-perfbench
 
-# CUDA full pipeline
+# Full CUDA pipeline
 pixi run paper-perfbench-cuda
 
-# CPU IS-only quick rerun
-pixi run paper-perfbench --inference is --particles 1000 2000 4000
+# Manual entrypoint
+pixi run -e perfbench python examples/perfbench/main.py pipeline --mode cpu
 ```
 
-## Notes
+Useful pipeline controls:
+- `--inference {all,is,hmc}`
+- `--frameworks ...` (or `--is-frameworks` / `--hmc-frameworks`)
+- `--particles ...`
+- `--skip-generate`, `--skip-is`, `--skip-hmc`, `--skip-plots`, `--skip-export`
 
-- Install Julia (>=1.10) if you want Gen.jl baselines. If unavailable, skip `genjl` via `--frameworks` / `--hmc-frameworks`.
-- Pyro / hand-coded torch runs are intentionally clamped in the HMC helper for manageable total runtime.
+## Environment Routing
+
+`main.py pipeline` dispatches each framework into the appropriate Pixi environment (`perfbench`, `perfbench-cuda`, `perfbench-pyro`, `perfbench-torch`).
+
+## Data / Output Locations
+
+- Data: `examples/perfbench/data*/`
+- Figures/tables: `examples/perfbench/figs*/`
+- Exported PDFs copied to repo-level `figs/` unless `--skip-export`
+
+## Practical Notes
+
+- Gen.jl benchmarks require Julia and first-run package instantiation.
+- Some frameworks are intentionally runtime-clamped in helper scripts to keep end-to-end runtime manageable.
+- Keep command compatibility with top-level Pixi tasks when editing CLI flags.

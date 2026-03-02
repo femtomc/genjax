@@ -1,21 +1,25 @@
 # ADEV Module Guide
 
-`genjax.adev` implements Automatic Differentiation of Expected Values (ADEV), providing unbiased gradient estimators for probabilistic programs.
+`genjax.adev` implements **Automatic Differentiation of Expected Values (ADEV)**:
+unbiased gradient estimators for stochastic programs.
 
-## Layout
-- `__init__.py`: public API (decorators, primitives, helper dataclasses)
-- `REFERENCES.md`: bibliography for the underlying theory
+## What to Use First
 
-## Core APIs
-- `@expectation`: wraps a probabilistic program; exposes `.estimate(...)`, `.grad_estimate(...)`, and `.jvp_estimate(...)`.
-- `Dual`: tree container for primal/tangent pairs. Use `Dual.tree_pure` and `Dual.dual_tree` to build inputs for low-level estimators.
-- Primitive families (imported from `__init__.py`):
-  - Reparameterised gradients: `normal_reparam`, `beta_reparam`, etc.
-  - Score-function gradients: `flip_reinforce`, `categorical_reinforce`, etc.
-  - Enumeration / measure-valued estimators: `flip_enum`, `flip_mvd`, …
-- `ADEVPrimitive`: base class for custom estimators (override `sample`, `sample_with_key`, and `prim_jvp_estimate`).
+- `@expectation`: wraps a stochastic objective.
+- `Expectation.estimate(...)`: Monte Carlo estimate of the objective.
+- `Expectation.grad_estimate(...)`: unbiased gradient estimate.
+- `Expectation.jvp_estimate(...)`: low-level forward-mode estimate.
 
-## Usage Pattern
+## Estimator Primitives (Current Public Set)
+
+- Reparameterized: `normal_reparam`, `uniform_reparam`, `multivariate_normal_reparam`
+- Score-function / REINFORCE: `flip_reinforce`, `geometric_reinforce`, `normal_reinforce`, `uniform_reinforce`, `multivariate_normal_reinforce`
+- Discrete estimators: `flip_enum`, `flip_enum_parallel`, `flip_mvd`, `categorical_enum_parallel`
+
+Choose low-variance estimators when possible (reparameterization for continuous sites, exact/enum when tractable for discrete sites).
+
+## Canonical Pattern
+
 ```python
 from genjax.adev import expectation, normal_reparam
 
@@ -28,16 +32,42 @@ value = objective.estimate(theta)
 grad = objective.grad_estimate(theta)
 ```
 
-- Choose estimator variants per distribution according to variance/availability (e.g., reparameterisation for continuous, score-function for discrete).
-- Wrap ADEV programs with `genjax.pjax.seed` before applying `jax.jit`.
-- When vectorization crosses probabilistic sampling sites, prefer `genjax.modular_vmap` over plain `jax.vmap`.
+## Key Idioms
 
-## Implementation Notes
-- All primitives are pytrees and support JAX transformations; keep static metadata (e.g., estimator selection) outside traced values.
-- When subclassing `ADEVPrimitive`, ensure `prim_jvp_estimate` returns a pair `(dual_value, trace)` compatible with downstream continuations.
-- Use helper functions in `genjax.adev.continuations` (imported via `__all__`) rather than reimplementing CPS plumbing.
+- Inside `@expectation`, use **ADEV primitives**, not plain `normal(...)` etc.
+- Seed call sites before staging/vectorization:
+  - `seeded = genjax.pjax.seed(fn)`
+  - `seeded(key, ...)`
+- If probabilistic vectorization is needed, prefer `modular_vmap`.
 
-## Testing Checklist
-- Compare estimator outputs against analytic gradients or finite-difference approximations (see `tests/test_adev.py`).
-- Validate unbiasedness empirically by averaging multiple gradient estimates and checking against known targets.
-- Keep variance-mitigation techniques (control variates, baselines) encapsulated so tests exercise both raw estimators and tuned variants.
+## Extending ADEV (Custom Primitives)
+
+Subclass `ADEVPrimitive` and implement:
+
+1. `sample(self, *args)`
+2. `sample_with_key(self, key, *args, sample_shape=())`
+3. `prim_jvp_estimate(self, dual_tree, konts)`
+
+Guidelines:
+- Keep output structures pytree-compatible.
+- Make `sample_with_key` obey PJAX keyful sampler conventions.
+- Ensure `prim_jvp_estimate` returns a `Dual`-compatible value/tangent pair shape.
+
+## Common Mistakes
+
+- Mixing plain distribution sites with ADEV expectation sites.
+- Missing keyful sampler support in custom primitives.
+- Using `jax.vmap` directly over probabilistic ADEV sites when `modular_vmap` is needed.
+- Assuming low variance from REINFORCE in difficult objectives.
+
+## Testing
+
+Primary coverage lives in:
+- `tests/test_adev.py`
+- `tests/test_mvnormal_estimators.py`
+- relevant VI tests (`tests/test_vi.py`) for end-to-end objective optimization
+
+When adding estimators:
+1. test finite outputs,
+2. test gradient sanity vs analytic/finite-difference references where possible,
+3. add seeded/vectorized regression tests.

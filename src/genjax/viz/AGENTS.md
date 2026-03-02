@@ -1,36 +1,50 @@
 # Visualization Module Guide
 
-`genjax.viz` provides reusable plotting helpers used across case studies, with an emphasis on particle diagnostics.
+`genjax.viz` contains reusable plotting utilities shared across case studies.
 
-## Key Components
-- `raincloud.py`: raincloud plots for summarising weight distributions.
-  - `horizontal_raincloud(...)`: half-violin + box + strip plot for one or more groups.
-  - `raincloud(...)`: pandas-friendly wrapper mirroring the PtitPrince interface.
-  - `diagnostic_raincloud(...)`: particle-filter specific variant returning `(ess_value, ess_label)`.
-- `standard.py`: GenJAX Research Visualization Standards (GRVS) helpers for fonts, colours, figure sizing, tick handling, and publication-quality exports.
+## Module Map
 
-## Usage
+- `standard.py`: GenJAX Research Visualization Standards (GRVS)
+  - typography setup
+  - color palettes
+  - figure-size presets
+  - publication export helpers
+- `raincloud.py`
+  - `horizontal_raincloud(...)`
+  - `raincloud(...)`
+  - `diagnostic_raincloud(...)`
+
+## Recommended Usage
+
 ```python
 from genjax.viz.standard import (
-    setup_publication_fonts, FIGURE_SIZES, get_method_color,
-    apply_grid_style, save_publication_figure,
+    setup_publication_fonts,
+    FIGURE_SIZES,
+    apply_grid_style,
+    save_publication_figure,
 )
 from genjax.viz.raincloud import horizontal_raincloud
 
 setup_publication_fonts()
 fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
-horizontal_raincloud([weights_a, weights_b], labels=["MH", "HMC"], ax=ax)
+horizontal_raincloud([a, b], labels=["A", "B"], ax=ax)
 apply_grid_style(ax)
 save_publication_figure(fig, "weights.pdf")
 ```
 
-`horizontal_raincloud` accepts NumPy or JAX arrays; inputs are converted to NumPy internally for Matplotlib compatibility.
+## Styling Policy
 
-## Implementation Notes
-- Keep styling consistent by routing all case-study figures through the utilities in `standard.py` rather than customising `matplotlib` globally.
-- Raincloud helpers depend on `scipy.stats.gaussian_kde` for density estimation; ensure SciPy remains in the environment when extending features.
-- When adding new diagnostic plots, expose colour palettes and figure-size presets via `standard.py` so other modules can reuse them.
+- Prefer `standard.py` helpers over ad-hoc `matplotlib` globals.
+- Keep method colors and sizing centralized for cross-figure consistency.
+- Use figure helpers from case-study `figs.py` files when possible.
 
-## Testing
-- `tests/test_viz_raincloud.py` (if present) or case-study-specific smoke tests should cover new visual components.
-- For diagnostic helpers, unit test ESS thresholds and return values independent of Matplotlib rendering.
+## Data/Rendering Notes
+
+- Raincloud helpers convert inputs to NumPy for Matplotlib compatibility.
+- KDE support relies on SciPy; keep this dependency intact when extending.
+- Diagnostic plotting code should be testable independently of rendering (e.g., ESS computation paths).
+
+## Tests / Validation
+
+- Add focused tests for non-visual logic (thresholds, labels, returned diagnostics).
+- Use smoke checks in case-study workflows for rendered outputs.

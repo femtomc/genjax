@@ -1,38 +1,42 @@
 # Test Suite Guide
 
-The test suite mirrors the `src/genjax/` package. Each `tests/test_*.py` file targets the module with the matching name (for example `tests/test_core.py` validates `src/genjax/core.py` APIs). Regression utilities such as `tests/test_vmap_generate_bug.py` and `tests/test_vmap_rejuvenation_smc.py` guard previously fixed issues.
+The test tree mirrors `src/genjax/` and case-study behavior.
+Use tests as executable documentation for API and idiom expectations.
 
 ## Running Tests
-- `pixi run test` – full suite (pytest + coverage profile)
-- `pixi run test -m tests/test_smc.py` – single file
-- `pixi run test -m tests/test_smc.py::test_case` – individual test
-- `pixi run test -m tests/test_smc.py -k keyword -vv` – focused debugging
 
-## Writing Tests
-- Use deterministic randomness: `jax.random.PRNGKey(seed)` and pass keys explicitly.
-- Keep sizes small but representative (few chains, low particle counts) to minimise runtime.
-- Name tests `test_<feature>_<expected_behaviour>` and group related ones with module-level comments instead of nested classes.
-- Reuse shared helpers or fixtures by adding them to `conftest.py` / `conftest_jit.py`.
+- Full suite: `pixi run test`
+- Single file: `pixi run test -- tests/test_core.py`
+- Single test: `pixi run test -- tests/test_core.py::test_fn_simulate_assess_consistency`
+- Keyword filter: `pixi run test -- tests/test_smc.py -k rejuvenation -vv`
 
-## Algorithm-Specific Expectations
-- **SMC** (`tests/test_smc.py`): include effective-sample-size checks and log marginal likelihood comparisons across multiple particle counts.
-- **MCMC** (`tests/test_mcmc.py`): verify acceptance ratios, convergence trends, and trace invariants (e.g., scores after `update` / `regenerate`).
-- **VI** (`tests/test_vi.py`): track ELBO progression or posterior moments against analytic baselines where available.
-- **ADEV / gradient estimators**: compare analytical gradients or finite-difference references against estimator outputs.
-- **Vectorisation**: maintain dedicated regression tests (e.g., `test_vmap_generate_bug.py`) whenever adding new `vmap` pathways.
+## Coverage Map (High Level)
 
-## Numerical Tolerances
-Apply the smallest tolerance that still passes reliably:
-- Deterministic identities: `atol <= 1e-10`
-- Log-density comparisons: `atol <= 1e-6`
-- Monte Carlo estimates: choose tolerances based on sample size (document rationale inside the test).
+- Core runtime: `test_core.py`, `test_pjax.py`, `test_distributions.py`
+- Inference: `test_mcmc.py`, `test_smc.py`, `test_vi.py`
+- ADEV: `test_adev.py`, `test_mvnormal_estimators.py`
+- Baselines/extras: `test_discrete_hmm.py`, `test_linear_gaussian.py`
+- Regressions: `test_vmap_generate_bug.py`, `test_vmap_rejuvenation_smc.py`
+- Case-study checks: `test_cone_example.py`, benchmark smoke tests
 
-## Performance Hygiene
-- Cache compiled functions with fixtures (`jit_compiler`, `jitted_distributions`, etc.) when tests exceed ~0.5 s.
-- Prefer `jax.vmap` over Python loops in tests that exercise many inputs.
-- For new benchmarks, add smoke tests under `tests/test_benchmarks.py` or `tests/test_simple_benchmark.py` but keep heavy workloads in notebooks or scripts outside the suite.
+## Testing Idioms
 
-## Before Submitting Changes
-1. Run the relevant subset of tests plus a quick `pixi run test` smoke pass.
-2. Confirm new tests fail without the code change and pass afterwards.
-3. Keep fixtures and helper utilities in-sync with module APIs (update imports when refactoring).
+- Use deterministic randomness (`jax.random.key(...)`) and explicit seeding.
+- Keep unit tests small (few chains/particles/steps) unless specifically testing convergence.
+- Use `Const[...]` for static loop/shape controls where model APIs expect it.
+- Prefer analytic checks where available (exact posteriors/log marginals).
+
+## Numeric Tolerance Guidance
+
+- Deterministic identities: very tight (`~1e-10` to `1e-8`).
+- Log-density/probability checks: moderate (`~1e-6`).
+- Monte Carlo tests: looser, justified by sample count and variance.
+
+Document tolerance reasoning in-test when non-obvious.
+
+## Before Submitting
+
+1. Run the most local affected tests.
+2. Run a broader smoke subset (or full suite when feasible).
+3. Ensure new tests fail without your change and pass with it.
+4. Update AGENTS docs if public behavior changed.

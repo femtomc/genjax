@@ -1,31 +1,62 @@
 # GenJAX Agent Guide
 
-Use this note as the entry point before touching the repository. It points to the canonical module guides and highlights the conventions that apply everywhere.
+Use this file as the top-level onboarding brief when working in this repository.
+Its goal is to help external agents quickly learn GenJAX’s model, APIs, and idioms.
 
-## Read First
-- `src/genjax/AGENTS.md` – core runtime, GFI methods, addressing rules  
-- `src/genjax/inference/AGENTS.md` – MCMC/SMC/VI drivers and diagnostics  
-- `src/genjax/adev/AGENTS.md` – ADEV expectations and estimator catalog  
-- `<module>/AGENTS.md` – every directory you modify has a local brief
+## Start Here (Fast Ramp)
 
-## Global Conventions
-- Keep control flow JAX-friendly: use `jax.lax.cond/scan/fori_loop/while_loop` instead of Python branching inside traced code.
-- Treat static parameters with `Const[...]` and expose probabilistic functions without keys.
-- When you need explicit randomness, or before `jax.jit`, `jax.vmap` or using probabilistic sampling within a `jax.scan`, 
-  wrap callables with `seeded = genjax.pjax.seed(fn)` and call `seeded(key, ...)`.
-- Prefer `genjax.inference.modular_vmap` over raw `jax.vmap` when probabilistic sampling is involved.
+1. Read `src/genjax/AGENTS.md` for the core generative function interface (GFI).
+2. Read the module-level guide for the area you are changing:
+   - `src/genjax/inference/AGENTS.md`
+   - `src/genjax/adev/AGENTS.md`
+   - `src/genjax/extras/AGENTS.md`
+   - `src/genjax/viz/AGENTS.md`
+3. If touching a case study, read both:
+   - `examples/AGENTS.md`
+   - `examples/<case>/AGENTS.md`
+4. If adding/changing behavior, read related tests in `tests/test_*.py`.
+
+## GenJAX Mental Model
+
+GenJAX is a programmable inference PPL built around:
+
+- **Generative functions** (`@gen`) that define probabilistic programs.
+- **Traces** that store choices, args, retval, and score (`-log p`).
+- **GFI methods** (`simulate`, `assess`, `generate`, `update`, `regenerate`) used to build inference algorithms.
+
+Treat these as the core contract. Most of the repository is either:
+- implementing this contract,
+- composing it into inference algorithms,
+- or validating it in tests/examples.
+
+## Global Coding Idioms (Important)
+
+- Keep traced control flow JAX-safe: use `jax.lax.cond/scan/while_loop/fori_loop` instead of Python branching in traced paths.
+- Use static addresses and stable choice structure in `@gen` functions.
+- Wrap static values with `Const[...]` / `const(...)` when needed for JAX staging.
+- Expose keyless probabilistic functions in library code; seed at call sites:
+  - `seeded = genjax.pjax.seed(fn)`
+  - `seeded(key, ...)`
+- Prefer `genjax.pjax.modular_vmap` (or `genjax.modular_vmap`) when probabilistic sampling appears under vectorization.
 
 ## Repository Layout
-```
-src/genjax/        core library (core.py, pjax.py, inference/, adev/, viz/, ...)
-examples/          publication case studies (each with its own AGENTS.md)
-tests/             regression and unit tests mirroring the src/ tree
-docs/, quarto/     documentation sources
-```
 
-## Working Checklist
-1. Review the relevant AGENTS guide(s) and existing tests/examples for the feature you touch.
-2. Prototype changes in modules or helper scripts—avoid interactive REPL work.
-3. Add or update targeted tests (`tests/test_*.py`) alongside code changes.
-4. Run the scoped pytest command (`pixi run test -m ...`) before submitting.
-5. Keep documentation edits minimal and aligned with the per-module format.
+- `src/genjax/`: library implementation (core, inference, adev, pjax, state, viz, extras)
+- `examples/`: case studies used in paper/artifact workflows
+- `tests/`: regression + unit/integration coverage
+
+## Development Checklist
+
+1. Read local `AGENTS.md` files for every directory you modify.
+2. Make the smallest change that preserves existing idioms.
+3. Add/update focused tests in `tests/`.
+4. Run targeted tests first, then a broader smoke run.
+5. Keep AGENTS docs in sync when APIs or workflows change.
+
+## Useful Commands
+
+- Full tests: `pixi run test`
+- Single file: `pixi run test -- tests/test_core.py`
+- Single test: `pixi run test -- tests/test_core.py::test_name`
+
+Use `pixi run <task> -- ...` for task-specific flags where needed.

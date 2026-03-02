@@ -1,32 +1,45 @@
 # Cone Case Study Guide
 
-This case study ports the PLDI'24 cone objectives into the current GenJAX API.
+Cone reproduces the PLDI'24 cone objectives with current GenJAX APIs.
 
-## Scope
-- Naive variational family with ELBO and IWAE objectives.
-- Expressive auxiliary-variable family with nested importance objectives:
-  - HVI-style (`N=1, K=1`)
-  - IWHVI-style (`N=5, K=1`)
-  - DIWHVI-style (`N=5, K=5`)
+## Purpose
+
+Compare objective families:
+- naive ELBO
+- naive IWAE (`K` particles)
+- expressive auxiliary-variable objectives (HVI/IWHVI/DIWHVI-style settings)
 
 ## Key Files
-- `core.py`: model/guide definitions, objective builders, optimization helpers
-- `figs.py`: figure generation for prior and posterior samples
-- `main.py`: CLI entry point for table-style summaries and figure export
 
-## Typical Commands
+- `core.py`: model/guide definitions, objective factories, optimization loops
+- `figs.py`: posterior/prior figure generation
+- `main.py`: CLI (`table4`, `fig2`)
+
+## CLI Commands
+
 ```bash
 pixi run python -m examples.cone.main table4
 pixi run python -m examples.cone.main fig2 --output-dir figs
 ```
 
-## Implementation Notes
-- ADEV objectives are written with `@expectation` and optimized via Monte Carlo gradient ascent.
-- Seed any objective evaluation that is `vmap`/`jit` transformed via `genjax.pjax.seed`.
-- Keep probabilistic control flow static (fixed particle counts in objective factories).
+Useful knobs:
+- `--n-steps`
+- `--batch-size`
+- `--learning-rate`
+- `--eval-samples` (table mode)
 
-## Testing
-Use the focused test:
-```bash
-pixi run test -m "not benchmark" tests/test_cone_example.py
-```
+## Idioms in this Case
+
+- Objectives are built with `@expectation` and optimized by stochastic gradient ascent.
+- Sampling-heavy batched objective evaluation uses seeded/vectorized call paths.
+- Keep particle counts and objective structure static during traced execution.
+
+## When Modifying
+
+1. Keep objective factories pure/composable (`make_*_objective`).
+2. Keep CLI in `main.py` thin; move logic into `core.py` / `figs.py`.
+3. Ensure naming and output artifacts remain stable for paper workflows.
+
+## Tests
+
+- Primary: `tests/test_cone_example.py`

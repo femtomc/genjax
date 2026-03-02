@@ -1,33 +1,38 @@
 # Game of Life Case Study Guide
 
-The Game of Life (GoL) example showcases GenJAX Gibbs sampling for inverse cellular automata problems, including animation and performance benchmarking.
+The GoL case study demonstrates inverse cellular-automata inference with Gibbs sampling plus timing/showcase figures.
 
 ## Key Files
-- `core.py`: probabilistic GoL update rules, Gibbs sampler utilities, animation helpers
-- `data.py`: pattern generators and optional image-to-grid loaders
-- `figs.py`: figure builders using `genjax.viz.standard`
-- `main.py`: CLI with presets for blinker demos, logo reconstructions, and timing studies
-- `assets/`: optional input imagery (not tracked)
 
-## Running the Case Study
+- `core.py`: probabilistic GoL dynamics + Gibbs sampler utilities
+- `data.py`: pattern generators / asset preprocessing helpers
+- `figs.py`: showcase and timing figure generation
+- `main.py`: CLI entrypoint (currently showcase-oriented)
+
+## Current CLI Usage
+
 ```bash
-pixi run python -m examples.gol.main --demo          # quick blinker walkthrough
-pixi run python -m examples.gol.main --logo          # logo reconstruction figures
-pixi run python -m examples.gol.main --timing        # scaling benchmarks
-pixi run -e gol-cuda python -m examples.gol.main --timing --device gpu
+pixi run -e gol python -m examples.gol.main
+pixi run -e gol python -m examples.gol.main --mode showcase
+pixi run -e gol-cuda python -m examples.gol.main --mode showcase
 ```
 
-Figures are emitted to the repository `figs/` directory; ensure it exists or pass `--output-dir`.
+Primary output artifacts:
+- `figs/gol_integrated_showcase_*.pdf`
+- `figs/gol_gibbs_timing_bar_plot.pdf`
 
-## Modeling Notes
-- Cells are updated with a vectorised single-cell Gibbs move; `Const[...]` keeps lattice dimensions static for JIT.
-- The sampler maintains both the latent board and the deterministic forward step. Use the provided helpers in `core.py` instead of reimplementing scan loops.
-- When loading custom assets, normalise to binary grids before passing them into the sampler utilities.
+## Important Implementation Note
 
-## Visualization Notes
-- `figs.py` centralises layout and colour choices; import typography and palette helpers from `genjax.viz.standard`.
-- Animation and monitoring plots are separated—extend them by following the existing helper signatures rather than adding inline plotting logic.
+`main.py` currently calls `save_all_showcase_figures()` with internal defaults.
+Some parsed CLI parameters are informational today and not fully threaded through.
+If you expand CLI behavior, update both parser wiring and this AGENTS file.
 
-## Extension Guidelines
-- Add new experiments by introducing CLI flags in `main.py` that call composable routines from `core.py` and `figs.py`.
-- Update tests in `tests/test_vmap_generate_bug.py` and related harnesses if modifying the vectorised update pathways.
+## Idioms
+
+- Keep lattice/update dimensions static in JIT-sensitive paths.
+- Reuse sampler utilities from `core.py`; do not duplicate update loops in CLI code.
+- Keep figure style routed through shared viz helpers where already used.
+
+## Tests
+
+- Regression and vectorization checks in `tests/test_vmap_generate_bug.py` and related suites.

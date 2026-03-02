@@ -1,48 +1,49 @@
-# Curve Fitting Case Study Guide
+# Curvefit Case Study Guide
 
-This case study compares GenJAX importance sampling and HMC on a polynomial regression model, with optional NumPyro and Pyro baselines for parity checks.
+This case study drives the polynomial-regression artifact figures (including scaling and outlier analyses).
+
+## Current CLI Shape
+
+`examples/curvefit/main.py` currently exposes **paper mode** only.
+
+```bash
+pixi run -e curvefit python -m examples.curvefit.main paper
+pixi run -e curvefit python -m examples.curvefit.main paper --scaling-max-samples 20000 --scaling-trials 2
+pixi run -e curvefit-cuda python -m examples.curvefit.main paper
+```
+
+Outputs are written to the repo-level `figs/` directory.
 
 ## Key Files
-- `core.py`: GenJAX models (`polynomial`, `npoint_curve`, outlier extensions) and inference helpers
-- `data.py`: reproducible polynomial datasets shared across frameworks
-- `figs.py`: figure builders that rely on `genjax.viz.standard`
-- `main.py`: CLI orchestrating quick demos, full figure suites, scaling runs, and outlier experiments
 
-## Typical Commands
-```bash
-pixi run python -m examples.curvefit.main --quick          # lightweight smoke test
-pixi run python -m examples.curvefit.main --full           # full paper figures
-pixi run python -m examples.curvefit.main --scaling        # scaling diagnostics
-pixi run python -m examples.curvefit.main --outlier        # mixture-model workflow
-pixi run -e curvefit-cuda python -m examples.curvefit.main --scaling  # GPU timing
-```
+- `core.py`: models (`polynomial`, point/npoint variants), inference helpers, framework baselines
+- `data.py`: synthetic dataset helpers
+- `figs.py`: paper figure generation and scaling visualizations
+- `main.py`: CLI argument parsing + paper workflow orchestration
 
-Figures are written to the repository-level `figs/` directory. Create it (`mkdir -p figs`) before running the CLI or pass `--output-dir`.
+## Important Flags
 
-### Resource-Constrained Benchmarks
-- `--scaling-max-samples <N>` limits the largest particle count used in the GPU scaling figure (default grid tops out at 1M particles).
-- `--scaling-particle-counts <comma separated list>` replaces the grid entirely (e.g., `--scaling-particle-counts 10,100,1000`).
-- `--scaling-trials` and `--scaling-max-large-trials` control how many repetitions are run per particle count.
+- `--scaling-trials`
+- `--scaling-max-large-trials`
+- `--scaling-max-samples`
+- `--scaling-particle-counts`
+- `--scaling-extended-timing`
 
-To reproduce a minimal GPU-friendly variant of the paper figures:
-```bash
-pixi run -e curvefit python -m examples.curvefit.main paper \
-  --scaling-max-samples 20000 --scaling-trials 2
-```
-Pixi tasks expose both the default (full particle grid) and a customizable entry point:
-- `pixi run paper-curvefit-gen` – full range (up to 1M particles, long CPU runtime)
-- `pixi run paper-curvefit-custom -- --scaling-max-samples 20000 --scaling-trials 2` – pass your own flags after `--` (same idea for CUDA via `paper-curvefit-gpu-custom`).
+## Modeling / Inference Idioms
 
-## Modeling Notes
-- All static sizes (sample counts, chain lengths) should use the `Const[...]` wrapper.
-- When building mixture models, define branch functions at module scope and reuse the `Cond` combinator pattern shown in `core.py`.
-- Keep inference utilities seedable: `seeded = genjax.pjax.seed(fn)` and call `seeded(key, ...)` before `jax.jit` or batching.
+- Keep static counts wrapped with `Const[...]` in inference helpers.
+- Use seeded call sites before vectorized/JIT-heavy runs.
+- For outlier branches, follow the existing `Cond`-based pattern in `core.py`.
+- Keep framework comparison paths symmetric (GenJAX vs NumPyro/Pyro/etc.).
 
-## Visualization Notes
-- Import fonts, colours, and layout helpers from `genjax.viz.standard` rather than setting `matplotlib` globals.
-- Reuse the figure helpers in `figs.py` when adding or modifying plots so that timing, ESS, and posterior visualisations stay stylistically aligned.
+## When Modifying
 
-## Extension Guidelines
-- Add new CLI modes by updating `main.py` and wiring command-line flags to the relevant helpers in `core.py` or `figs.py`.
-- Place shared utilities in `core.py`/`data.py`; avoid duplicating inference code inside `main.py`.
-- If integrating new baselines, mirror the structure used for NumPyro/Pyro to keep comparisons symmetric.
+1. Add logic to `core.py` / `figs.py`, not directly in CLI branches.
+2. Keep generated artifact filenames stable unless intentionally changing outputs.
+3. Maintain compatibility with Pixi tasks (`paper-curvefit-gen`, GPU variants).
+
+## Tests
+
+- `tests/test_benchmarks.py`
+- `tests/test_simple_benchmark.py`
+- relevant regressions for vectorized pathways
