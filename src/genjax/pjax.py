@@ -96,10 +96,10 @@ from jax._src.interpreters.batching import AxisData  # pyright: ignore
 from jax.core import eval_jaxpr
 from jax.extend.core import ClosedJaxpr, Jaxpr, Literal, Primitive, Var
 from jax.interpreters import ad, batching, mlir
-from jax.interpreters import partial_eval as pe
+from jax._src.interpreters import partial_eval as pe
 from jax.lax import cond_p, scan, scan_p, switch
 
-# Use internal util for safe_map and split_list (jax.util versions deprecated in 0.6.0)
+# Internal JAX utilities used by staging/binding helpers.
 from jax._src.util import safe_map, split_list
 
 # External imports
