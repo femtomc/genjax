@@ -564,8 +564,7 @@ def get_gol_figure_and_updater(
     *,
     include_time_line=True,
 ):
-    """Create combined figure (backwards compatibility)"""
-    # For backwards compatibility with animation, create the combined figure
+    """Create a combined monitoring + sample figure with animation update callback."""
     fig = plt.figure(figsize=(14, 8), constrained_layout=True)
     gs_main = GridSpec(
         2,

@@ -132,7 +132,7 @@ def infer_latents(xs, ys, n_samples: Const[int]):
         constraints,  # constraints
     )
 
-    # Extract samples (traces) and weights for compatibility
+    # Extract traces and weights for downstream analysis
     return result.traces, result.log_weights
 
 
@@ -466,37 +466,31 @@ def numpyro_hmc_summary_statistics(hmc_result):
 
 # Define branch functions outside to avoid JAX local function comparison issues
 @gen
-def inlier_branch(mean, std):
+def inlier_branch(mean):
     """Inlier branch: follows the polynomial regression with small noise."""
-    # For inliers, we use the mean (y_det) but ignore std, using fixed 0.05
     return normal(mean, 0.1) @ "obs"  # Same address in both branches
 
 
 @gen
-def outlier_branch(mean, std):
-    """Outlier branch: samples from a uniform distribution."""
-    # For outliers, we use a uniform distribution over a wide range
-    # This models that outliers can appear anywhere, not following the curve
+def outlier_branch(mean):
+    """Outlier branch: samples from a broad uniform distribution."""
+    # Outliers are modeled as curve-independent measurements.
+    del mean
     return uniform(-2.0, 2.0) @ "obs"  # Same address in both branches
 
 
 @gen
-def point_with_outliers(x, curve, outlier_rate=0.1, outlier_mean=0.0, outlier_std=5.0):
+def point_with_outliers(x, curve, outlier_rate=0.1):
     """Point model that can be either inlier or outlier.
 
     This model uses the Cond combinator to naturally express a mixture model where:
-    - Inliers: follow the polynomial regression with small observation noise (std=0.05)
-    - Outliers: are drawn from Normal(0, 5), completely independent of the curve
-
-    This models realistic scenarios where outliers are corrupted measurements,
-    sensor failures, or data entry errors unrelated to the true underlying curve.
+    - Inliers: follow the polynomial regression with small observation noise
+    - Outliers: are drawn from a broad uniform distribution, independent of the curve
 
     Args:
         x: Input point
         curve: Curve function
         outlier_rate: Probability of being an outlier (default 0.1)
-        outlier_mean: (ignored - kept for API compatibility)
-        outlier_std: (ignored - kept for API compatibility)
     """
     y_det = curve(x)
 
@@ -506,29 +500,24 @@ def point_with_outliers(x, curve, outlier_rate=0.1, outlier_mean=0.0, outlier_st
     # Use Cond combinator with proper branches
     cond_model = Cond(outlier_branch, inlier_branch)
 
-    # Call Cond with appropriate arguments for each branch
-    # When is_outlier=True: outlier_branch() - ignores y_det, uses Normal(0, 10)
-    # When is_outlier=False: inlier_branch(y_det) - uses curve value with small noise
-    # Pass y_det to both branches for consistent signatures
-    y_observed = cond_model(is_outlier, y_det, outlier_std) @ "y"
+    # Call Cond with shared input signature.
+    y_observed = cond_model(is_outlier, y_det) @ "y"
 
     return y_observed
 
 
 @gen
-def npoint_curve_with_outliers(xs, outlier_rate=0.1, outlier_mean=0.0, outlier_std=5.0):
+def npoint_curve_with_outliers(xs, outlier_rate=0.1):
     """N-point curve model with outlier detection.
 
     Each point can be classified as inlier or outlier.
-    Inliers follow the polynomial curve, outliers are from an independent Gaussian.
+    Inliers follow the polynomial curve, outliers are curve-independent.
     """
     curve = polynomial() @ "curve"
 
     # Vectorize the outlier model
     ys = (
-        point_with_outliers.vmap(in_axes=(0, None, None, None, None))(
-            xs, curve, outlier_rate, outlier_mean, outlier_std
-        )
+        point_with_outliers.vmap(in_axes=(0, None, None))(xs, curve, outlier_rate)
         @ "ys"
     )
 
@@ -556,13 +545,7 @@ def npoint_curve_with_outliers_beta(xs, alpha=1.0, beta_param=10.0):
 
     # Vectorize the outlier model with sampled outlier rate
     ys = (
-        point_with_outliers.vmap(in_axes=(0, None, None, None, None))(
-            xs,
-            curve,
-            outlier_rate,
-            0.0,
-            5.0,  # outlier_mean and std are ignored
-        )
+        point_with_outliers.vmap(in_axes=(0, None, None))(xs, curve, outlier_rate)
         @ "ys"
     )
 
@@ -574,8 +557,6 @@ def infer_latents_with_outliers(
     ys,
     n_samples: Const[int],
     outlier_rate=0.1,
-    outlier_mean=0.0,
-    outlier_std=5.0,
 ):
     """
     Infer latent curve parameters and outlier indicators using GenJAX SMC.
@@ -584,9 +565,7 @@ def infer_latents_with_outliers(
         xs: Input points where observations were made
         ys: Observed values at xs
         n_samples: Number of importance samples (wrapped in Const)
-        outlier_rate: Prior probability of outlier (wrapped in Const)
-        outlier_mean: Mean of outlier distribution (wrapped in Const)
-        outlier_std: Std dev for outlier distribution (wrapped in Const)
+        outlier_rate: Prior probability of outlier
     """
     from genjax.inference import init
 
@@ -596,7 +575,7 @@ def infer_latents_with_outliers(
     # Use SMC init for importance sampling
     result = init(
         npoint_curve_with_outliers,  # outlier-aware model
-        (xs, outlier_rate, outlier_mean, outlier_std),  # model args
+        (xs, outlier_rate),
         n_samples,
         constraints,
     )
@@ -612,8 +591,6 @@ def hmc_infer_latents_with_outliers(
     step_size=0.05,
     n_steps: Const[int] = Const(10),
     outlier_rate=0.1,
-    outlier_mean=0.0,
-    outlier_std=5.0,
 ):
     """
     Infer latent curve parameters using HMC on continuous parameters only.
@@ -629,7 +606,7 @@ def hmc_infer_latents_with_outliers(
 
     # Generate initial trace
     initial_trace, _ = npoint_curve_with_outliers.generate(
-        constraints, xs, outlier_rate, outlier_mean, outlier_std
+        constraints, xs, outlier_rate
     )
 
     # Define HMC kernel for continuous parameters only

@@ -525,7 +525,7 @@ def run_particle_filter(
 
     print(f"Extracted {n_timesteps} timesteps of particle history")
 
-    # Simple extraction - keep it compatible with existing code
+    # Extract per-timestep particle Pose objects for downstream plotting
     particle_history = []
     for t in range(n_timesteps):
         timestep_particles = []
@@ -544,7 +544,7 @@ def run_particle_filter(
     weight_sums = jnp.sum(weights, axis=1, keepdims=True)  # Shape: (n_timesteps, 1)
     normalized_weights = weights / weight_sums  # Shape: (n_timesteps, n_particles)
 
-    # Convert to list for compatibility
+    # Store per-timestep normalized weights as a list
     weight_history = [normalized_weights[t] for t in range(n_timesteps)]
 
     # Extract diagnostic weights if requested

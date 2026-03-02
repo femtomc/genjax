@@ -600,9 +600,9 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
     """Plot sensor observations over time.
 
     Args:
-        observations: List of observations. Each can be:
-                     - Single float (backward compatibility)
-                     - Array of 8 LIDAR distances
+        observations: List of observations. Each item can be:
+                     - single scalar distance
+                     - vector of LIDAR distances
         true_distances: Optional true distances for comparison
         save_path: Optional path to save figure
     """
@@ -760,7 +760,7 @@ def plot_sensor_observations(observations, true_distances=None, save_path=None):
             plt.tight_layout()
 
     else:
-        # Backward compatibility: scalar observations
+        # Scalar observation sequence
         fig, ax = plt.subplots(figsize=FIGURE_SIZES["single_medium"])
 
         # Plot observations with larger markers (following curvefit standards)
@@ -1149,8 +1149,7 @@ def plot_weight_flow(weight_data, save_path=None):
 
     Args:
         weight_data: Either:
-                    - List of diagnostic weight arrays from state API
-                    - List of regular weight arrays (backward compatibility)
+                    - List/array of diagnostic weight arrays from state API
                     - None (uses uniform weights placeholder)
         save_path: Optional path to save figure
 

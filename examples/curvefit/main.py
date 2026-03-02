@@ -1,10 +1,6 @@
-"""
-GenJAX Curvefit Case Study - Simplified Main Entry Point
+"""GenJAX Curvefit case-study entrypoint.
 
-Supports three modes:
-- quick: Fast demonstration with basic visualizations
-- full: Complete analysis with all visualizations
-- benchmark: Framework comparison (IS 1000 vs HMC methods)
+This CLI currently supports the paper figure workflow.
 """
 
 import argparse
@@ -13,7 +9,7 @@ import argparse
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="GenJAX Curvefit Case Study - Bayesian Sine Wave Parameter Estimation"
+        description="GenJAX Curvefit Case Study - paper figure generation"
     )
 
     parser.add_argument(
@@ -21,64 +17,7 @@ def parse_args():
         choices=["paper"],
         nargs="?",
         default="paper",
-        help="Analysis mode: paper (generate only paper figures)",
-    )
-
-    # Analysis parameters
-    parser.add_argument(
-        "--n-points", type=int, default=10, help="Number of data points (default: 10)"
-    )
-    parser.add_argument(
-        "--n-samples-is",
-        type=int,
-        default=1000,
-        help="Number of importance sampling particles (default: 1000)",
-    )
-    parser.add_argument(
-        "--n-samples-hmc",
-        type=int,
-        default=1000,
-        help="Number of HMC samples (default: 1000)",
-    )
-    parser.add_argument(
-        "--n-warmup",
-        type=int,
-        default=500,
-        help="Number of HMC warmup samples (default: 500)",
-    )
-    parser.add_argument(
-        "--timing-repeats",
-        type=int,
-        default=20,
-        help="Timing repetitions (default: 20)",
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed (default: 42)"
-    )
-
-    # Outlier model parameters
-    parser.add_argument(
-        "--outlier-rate",
-        type=float,
-        default=0.2,
-        help="Prior outlier probability (default: 0.2)",
-    )
-    parser.add_argument(
-        "--outlier-mean",
-        type=float,
-        default=0.0,
-        help="Outlier distribution mean (default: 0.0)",
-    )
-    parser.add_argument(
-        "--outlier-std",
-        type=float,
-        default=5.0,
-        help="Outlier distribution std dev (default: 5.0)",
-    )
-    parser.add_argument(
-        "--outlier-comprehensive",
-        action="store_true",
-        help="Run comprehensive outlier analysis with all figures",
+        help="Analysis mode: paper",
     )
 
     # Scaling benchmark controls
@@ -86,13 +25,13 @@ def parse_args():
         "--scaling-trials",
         type=int,
         default=5,
-        help="Trials per particle count in the scaling benchmark (default: 5)",
+        help="Trials per particle count in the scaling benchmark",
     )
     parser.add_argument(
         "--scaling-max-large-trials",
         type=int,
         default=2,
-        help="Maximum trials to run for particle counts above 100k (default: 2)",
+        help="Maximum trials to run for particle counts above 100k",
     )
     parser.add_argument(
         "--scaling-max-samples",
@@ -111,9 +50,6 @@ def parse_args():
     )
 
     return parser.parse_args()
-
-
-# All old modes removed - keeping only paper mode
 
 
 def _parse_particle_counts_arg(arg: str | None) -> list[int] | None:
@@ -174,7 +110,7 @@ def main():
     args = parse_args()
 
     print("\nGenJAX Curvefit Case Study")
-    print("Mode: paper (artifact submission)")
+    print("Mode: paper")
 
     run_paper_mode(args)
 

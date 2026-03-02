@@ -614,20 +614,18 @@ class Trace(Generic[X, R], Pytree):
     def update(self, x: X, *args, **kwargs):
         gen_fn = self.get_gen_fn()
         if not args and not kwargs:
-            # Use original args if none provided
             original_args = self.get_args()
             if (
                 isinstance(original_args, tuple)
                 and len(original_args) == 2
                 and isinstance(original_args[1], dict)
             ):
-                # Handle (args, kwargs) tuple format
+                # Standard (args, kwargs) storage format used by traces.
                 return gen_fn.update(self, x, *original_args[0], **original_args[1])
-            else:
-                # Handle legacy args format
-                return gen_fn.update(self, x, original_args)
-        else:
-            return gen_fn.update(self, x, *args, **kwargs)
+            if isinstance(original_args, tuple):
+                return gen_fn.update(self, x, *original_args)
+            return gen_fn.update(self, x, original_args)
+        return gen_fn.update(self, x, *args, **kwargs)
 
     def __getitem__(self, addr):
         choices = self.get_choices()

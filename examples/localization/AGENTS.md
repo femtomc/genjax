@@ -35,7 +35,6 @@ Paper mode writes figure PDFs to `figs/` (or the provided `--output-dir`).
 ## Notes for External Agents
 
 - `--include-smc-comparison` controls whether the expensive benchmark panel is generated.
-- `--include-basic-demo` exists in parser for compatibility but is not central to current paper-mode flow.
 - Keep static counts/configuration explicit for traced performance-sensitive code.
 
 ## When Modifying

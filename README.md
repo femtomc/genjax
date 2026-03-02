@@ -456,24 +456,22 @@ pixi run -e gol gol-paper
 **Command (GPU, matches paper)**:
 ```bash
 pixi run -e localization-cuda python -m examples.localization.main paper \
-  --include-basic-demo --include-smc-comparison \
+  --include-smc-comparison \
   --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs
 ```
 
-Running without CUDA (`pixi run -e localization …`) executes the same probabilistic program, but the SMC benchmark scales back the vectorised LIDAR beams and rejuvenation sweeps to keep the CPU runtime manageable, so timing/ESS panels will no longer match the GPU figure shown in the paper (see “Case-study device expectations” above for details).
-
-**Historical CPU command** (slower, produces reduced-resolution figures):
+CPU run:
 ```bash
 pixi run -e localization python -m examples.localization.main paper \
-  --include-basic-demo --include-smc-comparison \
+  --include-smc-comparison \
   --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs
 ```
+
+Running without CUDA executes the same probabilistic program, but the SMC benchmark scales back the vectorised LIDAR beams and rejuvenation sweeps to keep runtime manageable, so timing/ESS panels will differ from the GPU figure shown in the paper (see “Case-study device expectations” above for details).
 
 **Outputs**: 2 figures in `figs/`:
 - `localization_r8_p200_basic_localization_problem_1x4_explanation.pdf`
 - `localization_r8_p200_basic_comprehensive_4panel_smc_methods_analysis.pdf`
-
-**Note**: Also generates experimental data in `examples/localization/data/` (regenerated each run).
 
 ## Generated Figures
 

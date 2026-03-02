@@ -189,7 +189,7 @@ def generate_ground_truth_data(
             waypoints, world, key1, noise_std=0.15, n_rays=n_rays
         )
 
-        # Create dummy controls (not used in waypoint approach but needed for compatibility)
+        # Create placeholder controls for the returned trajectory record
         controls = [
             Control(velocity=1.0, angular_velocity=0.0)
             for _ in range(len(all_poses) - 1)
@@ -203,7 +203,7 @@ def generate_ground_truth_data(
             waypoints, world, key1, noise_std=0.15, n_rays=n_rays
         )
 
-        # Create dummy controls
+        # Create placeholder controls
         controls = [
             Control(velocity=1.0, angular_velocity=0.0)
             for _ in range(len(all_poses) - 1)

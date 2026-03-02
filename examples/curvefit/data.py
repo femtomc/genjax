@@ -27,9 +27,7 @@ def polyfn(x, a, b, c):
     return a + b * x + c * x**2
 
 
-def generate_test_dataset(
-    key=None, n_points=10, true_freq=None, true_offset=None, noise_std=None, seed=42
-):
+def generate_test_dataset(key=None, n_points=10, seed=42):
     """
     Generate a standardized test dataset by sampling from the GenJAX model.
 
@@ -39,9 +37,6 @@ def generate_test_dataset(
     Args:
         key: JAX random key (if None, uses seed)
         n_points: Number of data points
-        true_freq: Ignored (kept for backward compatibility)
-        true_offset: Ignored (kept for backward compatibility)
-        noise_std: Ignored (uses model's 0.05)
         seed: Random seed (used if key is None)
 
     Returns:

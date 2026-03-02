@@ -45,4 +45,4 @@ Useful pipeline controls:
 
 - Gen.jl benchmarks require Julia and first-run package instantiation.
 - Some frameworks are intentionally runtime-clamped in helper scripts to keep end-to-end runtime manageable.
-- Keep command compatibility with top-level Pixi tasks when editing CLI flags.
+- Keep command behavior aligned with top-level Pixi tasks when editing CLI flags.

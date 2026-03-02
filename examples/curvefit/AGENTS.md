@@ -40,7 +40,7 @@ Outputs are written to the repo-level `figs/` directory.
 
 1. Add logic to `core.py` / `figs.py`, not directly in CLI branches.
 2. Keep generated artifact filenames stable unless intentionally changing outputs.
-3. Maintain compatibility with Pixi tasks (`paper-curvefit-gen`, GPU variants).
+3. Keep CLI behavior aligned with Pixi tasks (`paper-curvefit-gen`, GPU variants).
 
 ## Tests
 

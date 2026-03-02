@@ -137,7 +137,7 @@ def handcoded_jax_polynomial_hmc_timing(
     
     # HMC implementation
     def leapfrog(q, p, step_size, n_leapfrog):
-        """Leapfrog integrator for HMC (legacy timing-benchmarks version)."""
+        """Leapfrog integrator for HMC."""
         grad = jax.grad(log_joint)(q)
         p = p + 0.5 * step_size * grad
         for _ in range(n_leapfrog - 1):

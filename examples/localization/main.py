@@ -1,10 +1,7 @@
-"""
-Main execution script for the localization case study.
+"""Main execution script for the localization case study.
 
 Demonstrates probabilistic robot localization using particle filtering.
-Restructured to have two main commands:
-1. generate-data: Generate all experimental data and save to data/
-2. plot-figures: Generate all figures from saved data
+The current CLI exposes paper-mode figure generation.
 """
 
 import argparse
@@ -41,13 +38,6 @@ def parse_args():
         nargs="?",
         default="paper",
         help="Main command: paper (generate only paper figures)",
-    )
-
-    # Data experiment name (for both commands)
-    parser.add_argument(
-        "--experiment-name",
-        type=str,
-        help="Experiment name (for plot-figures, defaults to latest if not specified)",
     )
 
     # LIDAR configuration
@@ -98,13 +88,6 @@ def parse_args():
         help="Output directory for generated figures",
     )
 
-    # Visualization options
-    parser.add_argument(
-        "--no-lidar-rays",
-        action="store_true",
-        help="Disable LIDAR ray visualization in plots",
-    )
-
     # World configuration
     parser.add_argument(
         "--world-type",
@@ -122,30 +105,14 @@ def parse_args():
         help="Number of timing repetitions for each method",
     )
 
-    parser.add_argument(
-        "--data-dir",
-        type=str,
-        default="data",
-        help="Directory to save/load experimental data (relative to localization dir)",
-    )
-
     # Run mode options
     parser.add_argument(
         "--include-smc-comparison",
         action="store_true",
-        help="Include SMC method comparison in data generation (adds significant computation time)",
-    )
-
-    parser.add_argument(
-        "--include-basic-demo",
-        action="store_true",
-        help="Include basic particle filter demo in data generation",
+        help="Include SMC method comparison figure (adds significant computation time)",
     )
 
     return parser.parse_args()
-
-
-# Old generate_data and plot_figures functions removed - keeping only paper mode which combines both
 
 
 def paper_mode(args):
@@ -181,7 +148,7 @@ def paper_mode(args):
     # Generate ground truth data
     print("\nGenerating ground truth trajectory...")
     key, subkey = jrand.split(key)
-    true_poses, controls, observations = generate_ground_truth_data(
+    true_poses, _controls, observations = generate_ground_truth_data(
         world, subkey, n_steps=args.n_steps, n_rays=args.n_rays
     )
     initial_pose = true_poses[0]

@@ -1,7 +1,7 @@
-"""
-Helper CLI that wraps the legacy timing-benchmarks scripts so they can be invoked
-from either the case-study directory or the repository root with the correct
-PYTHONPATH.
+"""Perfbench CLI.
+
+This command orchestrates the multi-framework benchmark pipeline and wraps the
+helper scripts under `examples/perfbench/benchmarks/`.
 """
 
 from __future__ import annotations
