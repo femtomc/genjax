@@ -4,7 +4,7 @@ This module contains Pyro-specific models and timing functions for
 polynomial regression with importance sampling and HMC.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import numpy as np
 
 from .timing_utils import benchmark_with_warmup

@@ -5,7 +5,6 @@ polynomial regression with importance sampling, using direct distribution sampli
 for optimal performance.
 """
 
-import time
 from typing import Dict, Any, Optional
 import jax
 import jax.numpy as jnp
@@ -17,7 +16,7 @@ from numpyro.infer.hmc import hmc as hmc_lowlevel
 from numpyro.infer.util import initialize_model
 
 from genjax.timing import benchmark_with_warmup
-from ..data.generation import PolynomialDataset, polyfn
+from ..data.generation import PolynomialDataset
 
 
 # NumPyro model definition

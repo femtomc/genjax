@@ -7,7 +7,6 @@ import torch.distributions as dist
 from pathlib import Path
 import json
 from datetime import datetime
-import time
 
 from ..data.generation import generate_polynomial_data, PolynomialDataset
 from .timing_utils import benchmark_with_warmup
@@ -169,7 +168,6 @@ def handcoded_torch_polynomial_hmc_timing(
     # Convert data to PyTorch tensors
     xs = torch.tensor(dataset.xs.__array__(), dtype=torch.float32, device=device)
     ys = torch.tensor(dataset.ys.__array__(), dtype=torch.float32, device=device)
-    n_points = len(xs)
     
     # Log joint density
     def log_joint(params):

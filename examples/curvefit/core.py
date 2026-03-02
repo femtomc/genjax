@@ -633,7 +633,6 @@ def mixed_infer_latents_with_outliers_beta(
     ys,
     n_samples: Const[int],
     n_warmup: Const[int] = Const(500),
-    mh_moves_per_step: Const[int] = Const(5),
     hmc_step_size=0.01,
     hmc_n_steps: Const[int] = Const(10),
     alpha=1.0,
@@ -649,7 +648,6 @@ def mixed_infer_latents_with_outliers_beta(
         ys: Observed values
         n_samples: Number of MCMC samples
         n_warmup: Number of warmup samples
-        mh_moves_per_step: Number of MH moves for outlier indicators per MCMC step
         hmc_step_size: Step size for HMC
         hmc_n_steps: Number of leapfrog steps for HMC
         alpha: Beta distribution alpha parameter

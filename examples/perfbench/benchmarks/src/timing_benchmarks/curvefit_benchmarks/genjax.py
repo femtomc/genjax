@@ -3,19 +3,15 @@
 This implementation uses a flattened model structure for optimal performance.
 """
 
-import time
 from typing import Dict, Any, Optional
 import jax
-import jax.numpy as jnp
 import jax.random as jrand
-from genjax.inference import init
-from genjax import gen, normal, Cond, Const, sel
-from genjax.core import Pytree
+from genjax import gen, normal
 from genjax.pjax import seed
 from genjax import modular_vmap as vmap
 
 from genjax.timing import benchmark_with_warmup
-from timing_benchmarks.data.generation import PolynomialDataset, polyfn
+from timing_benchmarks.data.generation import PolynomialDataset
 
 
 ### Optimized GenJAX Model ###

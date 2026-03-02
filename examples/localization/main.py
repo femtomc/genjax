@@ -163,7 +163,7 @@ def paper_mode(args):
 
     # 1. Localization problem explanation (1x4)
     print("  Generating localization problem explanation (1x4)...")
-    fig_explain, axes_explain = plot_localization_problem_explanation(
+    fig_explain, _axes_explain = plot_localization_problem_explanation(
         true_poses, observations, world, n_rays=args.n_rays
     )
     filename_explain = f"{param_prefix}_localization_problem_1x4_explanation.pdf"

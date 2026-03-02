@@ -5,7 +5,6 @@ in a separate environment with PyTorch and Pyro installed.
 """
 
 import argparse
-import numpy as np
 from ..data import get_benchmark_datasets
 from ..export import save_benchmark_results
 from .pyro import (

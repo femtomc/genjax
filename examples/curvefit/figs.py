@@ -158,7 +158,6 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
         posterior_curves = []
 
         # Run IS multiple times, each time resampling a single particle
-        base_key = jrand.key(seed)
         for run in range(n_runs):
             run_key = jrand.key(seed + run * 1000 + n_particles)
 
@@ -197,7 +196,6 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
         # Compute and print statistics for diagnostics
         if n_particles == 100000:
             posterior_array = jnp.array(posterior_curves)
-            mean_curve = jnp.mean(posterior_array, axis=0)
             std_curve = jnp.std(posterior_array, axis=0)
             max_std = jnp.max(std_curve)
             print(
@@ -241,21 +239,6 @@ def save_posterior_scaling_plots(n_runs=1000, seed=42):
     plt.savefig(filename, dpi=300)
     plt.close(fig)
     print(f"\nOK Saved combined posterior scaling plot: {filename}")
-
-    # Also save individual plots
-    for idx, n_particles in enumerate(n_particles_list):
-        fig_individual = plt.figure(figsize=(5, 4))
-        ax = plt.gca()
-
-        # Recreate the plot for individual saving
-        true_curve = true_a + true_b * x_plot + true_c * x_plot**2
-        ax.plot(x_plot, true_curve, "k-", linewidth=3, label="True curve", zorder=50)
-
-        # Use the same posterior curves we already computed
-        # (In practice, we'd store these, but for now let's just save the combined)
-
-        individual_filename = f"figs/curvefit_posterior_n{n_particles}.pdf"
-        print("  Individual plots saved separately")
 
     print("\nOK Saved all posterior scaling plots")
 
@@ -763,7 +746,7 @@ def save_outlier_detection_comparison(
             result = init_jit(
                 subkey,
                 npoint_curve_with_outliers,
-                (xs, 0.33, 0.0, 2.0),  # outlier_rate=0.33
+                (xs, 0.33),
                 Const(n_samples),
                 constraints,
             )
@@ -887,7 +870,7 @@ def save_outlier_detection_comparison(
 
     # JIT compile and time
     run_standard_is_jit = jax.jit(run_standard_is_timed)
-    standard_times, (standard_mean, standard_std) = benchmark_with_warmup(
+    _, (standard_mean, standard_std) = benchmark_with_warmup(
         run_standard_is_jit, repeats=20
     )
     print(f"   Time: {standard_mean * 1000:.1f} ± {standard_std * 1000:.1f} ms")
@@ -905,7 +888,7 @@ def save_outlier_detection_comparison(
         result = seed(init)(
             key,
             npoint_curve_with_outliers,
-            (xs, 0.33, 0.0, 2.0),
+            (xs, 0.33),
             Const(300),
             constraints,
         )
@@ -913,7 +896,7 @@ def save_outlier_detection_comparison(
 
     # JIT compile and time
     run_outlier_is_jit = jax.jit(run_outlier_is_timed)
-    outlier_is_times, (outlier_is_mean, outlier_is_std) = benchmark_with_warmup(
+    _, (outlier_is_mean, outlier_is_std) = benchmark_with_warmup(
         run_outlier_is_jit, repeats=20
     )
     print(f"   Time: {outlier_is_mean * 1000:.1f} ± {outlier_is_std * 1000:.1f} ms")
@@ -960,7 +943,7 @@ def save_outlier_detection_comparison(
 
     # JIT compile and time
     run_gibbs_hmc_jit = jax.jit(run_gibbs_hmc_timed)
-    gibbs_times, (gibbs_mean, gibbs_std) = benchmark_with_warmup(
+    _, (gibbs_mean, gibbs_std) = benchmark_with_warmup(
         run_gibbs_hmc_jit,
         repeats=10,  # Fewer repeats since it's slower
     )
@@ -1258,7 +1241,7 @@ def save_outlier_detection_comparison(
             ax.plot(x_plot, y_pred, "#EE7733", alpha=0.05, linewidth=1.5)
 
     # Plot data colored by outlier probability
-    scatter2 = ax.scatter(
+    ax.scatter(
         xs,
         ys,
         c=gibbs_outlier_probs,

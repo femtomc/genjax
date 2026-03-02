@@ -33,7 +33,7 @@ def timing(
         possible = []
         for j in range(inner_repeats):
             start_time = time.perf_counter()
-            result = fn()
+            _ = fn()
             interval = time.perf_counter() - start_time
             possible.append(interval)
         times.append(np.array(possible).min())

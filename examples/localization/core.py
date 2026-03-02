@@ -926,33 +926,6 @@ def run_smc_with_locally_optimal_big_grid(
     diagnostic_weights = particles_smc.diagnostic_weights
     return particle_history, weight_history, diagnostic_weights
 
-    # Extract particle history and weights from SMC result
-    all_traces = particles_smc.traces
-    all_weights = particles_smc.log_weights
-
-    choices = all_traces.get_choices()
-    n_timesteps = choices["x"].shape[0]
-
-    particle_history = []
-    weight_history = []
-
-    for t in range(n_timesteps):
-        timestep_particles = []
-        for i in range(n_particles):
-            pose = Pose(
-                x=choices["x"][t, i], y=choices["y"][t, i], theta=choices["theta"][t, i]
-            )
-            timestep_particles.append(pose)
-
-        particle_history.append(timestep_particles)
-
-        timestep_weights = jnp.exp(all_weights[t])
-        timestep_weights = timestep_weights / jnp.sum(timestep_weights)
-        weight_history.append(timestep_weights)
-
-    diagnostic_weights = particles_smc.diagnostic_weights
-    return particle_history, weight_history, diagnostic_weights
-
 
 def benchmark_smc_methods(
     n_particles,

@@ -5,7 +5,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 import sys
-import os
 
 from ..data.generation import generate_polynomial_data
 from ..julia_interface import GenJLBenchmark

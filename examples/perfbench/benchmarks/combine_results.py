@@ -5,7 +5,6 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
 from datetime import datetime
 import argparse
@@ -208,10 +207,16 @@ def create_hmc_comparison_plot(results_df, output_dir):
                 label = display_names.get(framework, framework) if idx == 0 else None
                 
                 # Simple bars for all frameworks
-                bar = ax.bar(x_pos, time_ms, width,
-                             label=label,
-                             color=colors.get(framework, 'gray'), 
-                             alpha=0.9, edgecolor='black', linewidth=0.5)
+                ax.bar(
+                    x_pos,
+                    time_ms,
+                    width,
+                    label=label,
+                    color=colors.get(framework, 'gray'),
+                    alpha=0.9,
+                    edgecolor='black',
+                    linewidth=0.5,
+                )
                 
                 # Add gold star at bottom of GenJAX bars
                 if framework == 'genjax':
@@ -445,10 +450,16 @@ def create_plots(df, output_dir):
                 label = display_names.get(framework, framework) if idx == 0 else None
                 
                 # Simple bars for all frameworks
-                bar = ax2.bar(x_pos, time_ms, width,
-                             label=label,
-                             color=colors.get(framework, 'gray'), 
-                             alpha=0.9, edgecolor='black', linewidth=0.5)
+                ax2.bar(
+                    x_pos,
+                    time_ms,
+                    width,
+                    label=label,
+                    color=colors.get(framework, 'gray'),
+                    alpha=0.9,
+                    edgecolor='black',
+                    linewidth=0.5,
+                )
                 
                 # Add gold star at bottom of GenJAX bars
                 if framework == 'genjax':

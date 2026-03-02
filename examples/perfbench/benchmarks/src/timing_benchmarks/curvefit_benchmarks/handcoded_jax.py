@@ -4,7 +4,6 @@ This module contains direct JAX implementations using TensorFlow Probability dis
 serving as a baseline for performance comparison with proper probability distribution APIs.
 """
 
-import time
 from typing import Dict, Any, Optional
 import jax
 import jax.numpy as jnp
@@ -12,7 +11,7 @@ import jax.random as jrand
 import tensorflow_probability.substrates.jax as tfp
 
 from genjax.timing import benchmark_with_warmup
-from ..data.generation import PolynomialDataset, polyfn
+from ..data.generation import PolynomialDataset
 
 # TFP distributions
 tfd = tfp.distributions
@@ -120,7 +119,6 @@ def handcoded_jax_polynomial_hmc_timing(
         key = jax.random.PRNGKey(0)
     
     xs, ys = dataset.xs, dataset.ys
-    n_points = len(xs)
     
     # Log joint density
     def log_joint(params):

@@ -253,7 +253,6 @@ def plot_particles(
     color=None,
     label=None,
     cmap="viridis",
-    show_colorbar=False,
 ):
     """Plot particle distribution with optional weights."""
     if ax is None:
@@ -431,7 +430,6 @@ def plot_particle_filter_evolution(
 
     # Show all timesteps (up to 16)
     step_indices = list(range(min(16, n_steps)))
-    n_steps_to_show = len(step_indices)
 
     # Create figure with 4x4 grid layout
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 3 * n_rows))
@@ -1633,7 +1631,6 @@ def plot_smc_method_comparison(
                 # Alpha for ground truth - make it more visible than particles
                 # With many timesteps: 0.3 to 1.0
                 alpha = 0.3 + (0.7 * blend_idx / max(1, n_blend_steps - 1))
-                arrow_length = 0.15 + (0.35 * blend_idx / max(1, n_blend_steps - 1))
 
                 # Plot position with fading red - medium visibility
                 ax_particles.scatter(

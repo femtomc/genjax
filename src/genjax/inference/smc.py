@@ -821,25 +821,6 @@ def init_csmc(
         proposal_gf=proposal_gf,
     )
 
-    # Override the choices in particle 0 with retained choices
-    # This is a simplified approach - we manually set the choice values
-    current_choices = particles.traces.get_choices()
-
-    # Create a function to override specific keys
-    def override_with_retained(choices_dict):
-        # Make a copy and override keys that exist in retained_choices
-        new_dict = {}
-        for key, value in choices_dict.items():
-            if key in retained_choices:
-                # Set index 0 to the retained value
-                new_dict[key] = value.at[0].set(retained_choices[key])
-            else:
-                new_dict[key] = value
-        return new_dict
-
-    # Apply the override
-    new_choices_dict = override_with_retained(current_choices)
-
     # Assess the retained choices to get the correct weight
     retained_log_density, _ = target_gf.assess(retained_choices, *target_args)
 

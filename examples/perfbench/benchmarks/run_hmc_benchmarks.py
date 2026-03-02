@@ -3,7 +3,6 @@
 
 import os
 import sys
-import time
 from pathlib import Path
 import argparse
 import importlib.util
@@ -34,7 +33,6 @@ def ensure_jax_backend():
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import PolynomialDataset from the correct location
-from timing_benchmarks.data.generation import PolynomialDataset
 
 
 def load_module(framework_name):
