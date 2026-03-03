@@ -51,6 +51,10 @@ paper-perfbench-clean = "python examples/perfbench/main.py clean"
 paper-cone-gen = "python -m examples.cone.main fig2"
 paper-cone-table = "python -m examples.cone.main table4"
 
+# AIR estimator comparison (GenJAX-only)
+air-compare = "python -m examples.air.main compare --small-config --num-examples 256 --epochs 2"
+air-train = "python -m examples.air.main train --estimator enum --small-config --num-examples 256 --epochs 2"
+
 paper-faircoin-gpu-gen = "pixi run -e faircoin-cuda python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000 --repeats 10"
 paper-curvefit-gpu-gen = "pixi run -e curvefit-cuda python -m examples.curvefit.main paper"
 paper-curvefit-gpu-custom = "pixi run -e curvefit-cuda python -m examples.curvefit.main"

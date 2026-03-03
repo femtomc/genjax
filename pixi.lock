@@ -6030,7 +6030,7 @@ packages:
 - pypi: ./
   name: genjax
   version: 1.0.13
-  sha256: 59b9f7ca0326168868bb964aaf0379d7e1a9f096558e9d90ab3ce5e645281682
+  sha256: 9c32890718d094a53197426a0356b43f4eddb0ec8cf7c4ff5cfb29ccf444b728
   requires_dist:
   - penzai>=0.2.5,<0.3
   - beartype>=0.22.9,<0.23

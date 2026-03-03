@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import jax.random as jrand
 import pytest
 from genjax.adev import Dual, expectation, flip_enum, flip_mvd
-from genjax.core import gen
+from genjax.core import gen, distribution
 from genjax.pjax import seed, stage, PPPrimitive, sample_p, adev_sample_p
 from genjax import (
     normal_reparam,
@@ -11,6 +11,7 @@ from genjax import (
     uniform_reinforce,
     multivariate_normal_reparam,
     multivariate_normal_reinforce,
+    flip,
     flip_reinforce,
     geometric_reinforce,
     modular_vmap,
@@ -278,6 +279,41 @@ class TestADEVVmapSemantics:
 
         assert grad.shape == ps.shape
         assert jnp.allclose(grad, jnp.ones_like(ps), atol=1e-6)
+
+    def test_flip_mvd_float0_tangent_canonicalization_under_staging(self):
+        """Regression: float0 tangents must be canonicalized before primitive JVP dispatch.
+
+        This catches a failure mode where `flip_mvd` produced bool-valued sites,
+        downstream code cast those booleans with `astype`, and staged
+        `seed + vmap + jit` gradient tracing crashed inside
+        `convert_element_type` JVP constant-folding.
+        """
+
+        flip_mvd_dist = distribution(flip_mvd, flip.logpdf)
+
+        @gen
+        def model(p):
+            b = flip_mvd_dist(p) @ "b"
+            x = b.astype(jnp.float32)
+            _ = multivariate_normal_reparam(
+                jnp.array([x, 0.0], dtype=jnp.float32),
+                jnp.eye(2, dtype=jnp.float32) * 0.1,
+            ) @ "y"
+
+        @expectation
+        def objective(p):
+            tr = model.simulate(p)
+            return tr.get_score()
+
+        seeded_grad = seed(lambda p: objective.grad_estimate(p))
+        batched_grad = jax.jit(jax.vmap(seeded_grad, in_axes=(0, 0)))
+
+        keys = jrand.split(jrand.key(777), 8)
+        ps = jnp.linspace(0.1, 0.9, 8)
+        grads = batched_grad(keys, ps)
+
+        assert grads.shape == ps.shape
+        assert jnp.all(jnp.isfinite(grads))
 
     def test_plain_jax_vmap_seeded_simulate_works(self):
         @gen

@@ -5,6 +5,7 @@ Each case has its own `AGENTS.md`—read it before editing that case.
 
 ## Case Study Map
 
+- `air/`: AIR estimator comparison (GenJAX-only port from PLDI'24 artifact)
 - `cone/`: ADEV objective variants (ELBO / IWAE / HVI-style families)
 - `curvefit/`: polynomial regression + scalable inference + outlier modeling
 - `faircoin/`: Beta–Bernoulli baseline benchmarking

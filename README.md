@@ -339,6 +339,31 @@ pixi run -e faircoin python -m examples.faircoin.main \
 
 **Outputs**: `figs/faircoin_combined_posterior_and_timing_obs50_samples2000.pdf`
 
+### AIR Estimator Study (GenJAX-only)
+
+**What it does**: Trains an AIR-style latent-variable model and compares GenJAX discrete-gradient estimators (`enum`, `reinforce`, `mvd`, `hybrid`) under a shared objective/training loop.
+
+**Figures in the paper**: Port of the PLDI'24 AIR estimator experiment (GenJAX path only).
+
+**Commands**:
+```bash
+# quick smoke comparison (small architecture + synthetic prior samples)
+pixi run air-compare
+
+# single-estimator run with CSV outputs
+pixi run python -m examples.air.main train \
+  --estimator enum \
+  --small-config \
+  --num-examples 512 \
+  --epochs 6 \
+  --history-csv figs/air_enum_history.csv \
+  --summary-csv figs/air_enum_summary.csv
+```
+
+**Dataset modes**:
+- `--dataset synthetic` (default): samples from the AIR prior (no extra framework dependencies).
+- `--dataset multi-mnist --data-path /path/to/multi_mnist_uint8.npz`: load pre-generated multi-MNIST arrays.
+
 ### Curve Fitting with Outlier Detection
 
 **What it does**: Polynomial regression with robust outlier detection, demonstrating:
@@ -476,6 +501,10 @@ Running without CUDA executes the same probabilistic program, but the SMC benchm
 ## Generated Figures
 
 All figures are saved to `figs/`:
+
+### AIR
+- `air_*_history.csv` - Per-epoch objective/accuracy/time logs (optional)
+- `air_*_summary.csv` - Estimator summary table (optional)
 
 ### Faircoin
 - `faircoin_combined_posterior_and_timing_obs50_samples2000.pdf` - Framework comparison (timing + posterior accuracy)

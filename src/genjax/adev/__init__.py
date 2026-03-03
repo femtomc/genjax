@@ -30,6 +30,14 @@ Gradient Estimation Strategies:
     - Enumeration: Exact computation for finite discrete distributions
     - Measure-Valued Derivatives: Advanced discrete gradient estimators
 
+AD Runtime Note:
+    ADEV evaluates deterministic primitives by directly invoking JAX primitive
+    JVP rules. To match JAX AD semantics, ADEV canonicalizes float0 tangents
+    (from discrete/bool/int primals) into symbolic Zero sentinels before
+    primitive JVP dispatch and short-circuits all-zero-tangent primitive calls.
+    This avoids staged failures in paths such as seed+vmap+jit when downstream
+    code applies dtype conversions (e.g. bool `astype` / convert_element_type).
+
 Example:
     ```python
     from genjax.adev import expectation, normal_reparam
@@ -99,6 +107,52 @@ DualTree = Annotated[
 """
 `DualTree` is the type of `Pytree` argument values with `Dual` leaves.
 """
+
+
+def _is_ad_zero(v) -> bool:
+    """Whether ``v`` is JAX's symbolic AD zero sentinel."""
+    return isinstance(v, jax_autodiff.Zero)
+
+
+def _is_float0_tangent(v) -> bool:
+    """Whether ``v`` has float0 tangent dtype.
+
+    We use ``get_aval`` so this works for both concrete arrays and tracers.
+    """
+    try:
+        aval = jax._src.core.get_aval(v)
+    except TypeError:
+        return False
+    return isinstance(aval, jax._src.core.ShapedArray) and aval.dtype == jax.dtypes.float0
+
+
+def _canonicalize_tangent_for_primitive_jvp(primal, tangent):
+    """Canonicalize ADEV tangents before invoking JAX primitive JVP rules.
+
+    JAX's AD interpreter normalizes float0 arrays to symbolic ``Zero`` objects
+    before primitive JVP dispatch. ADEV invokes primitive JVP rules directly, so
+    we mirror that normalization here.
+    """
+    if _is_ad_zero(tangent):
+        return tangent
+    if _is_float0_tangent(tangent):
+        return jax_autodiff.Zero.from_primal_value(primal)
+    return tangent
+
+
+def _instantiate_zero_tangents(tree):
+    """Materialize symbolic ``Zero`` tangents into concrete zero arrays."""
+    return jtu.tree_map(
+        jax_autodiff.instantiate_zeros,
+        tree,
+        is_leaf=_is_ad_zero,
+    )
+
+
+def _zero_tangent_like(v):
+    """Construct a zero tangent with the correct tangent dtype for ``v``."""
+    return jax_autodiff.instantiate_zeros(jax_autodiff.Zero.from_primal_value(v))
+
 
 ###################
 # ADEV primitives #
@@ -275,7 +329,7 @@ class Dual(Pytree):
             if isinstance(v, Dual):
                 return v
             else:
-                return Dual(v, jnp.zeros_like(v))
+                return Dual(v, _zero_tangent_like(v))
 
         return jtu.tree_map(_inner, v, is_leaf=lambda v: isinstance(v, Dual))
 
@@ -553,15 +607,29 @@ class ADEV(Pytree):
                         )
                         if len(flat_primals) == 0:
                             primal_outs = eqn.primitive.bind(*flat_primals, **params)
-                            tangent_outs = jtu.tree_map(jnp.zeros_like, primal_outs)
+                            tangent_outs = jtu.tree_map(_zero_tangent_like, primal_outs)
                         else:
-                            jvp = jax_autodiff.primitive_jvps.get(eqn.primitive)
-                            if not jvp:
-                                msg = f"differentiation rule for '{eqn.primitive}' not implemented"
-                                raise NotImplementedError(msg)
-                            primal_outs, tangent_outs = jvp(
-                                flat_primals, flat_tangents, **params
-                            )
+                            # Mirror JAX AD's internal canonicalization:
+                            # float0 arrays represent symbolic zero tangents.
+                            canonical_tangents = [
+                                _canonicalize_tangent_for_primitive_jvp(p, t)
+                                for p, t in zip(flat_primals, flat_tangents)
+                            ]
+
+                            # If all inputs have zero tangents, skip primitive JVP
+                            # rule dispatch and evaluate primal-only.
+                            if all(_is_ad_zero(t) for t in canonical_tangents):
+                                primal_outs = eqn.primitive.bind(*flat_primals, **params)
+                                tangent_outs = jtu.tree_map(_zero_tangent_like, primal_outs)
+                            else:
+                                jvp = jax_autodiff.primitive_jvps.get(eqn.primitive)
+                                if not jvp:
+                                    msg = f"differentiation rule for '{eqn.primitive}' not implemented"
+                                    raise NotImplementedError(msg)
+                                primal_outs, tangent_outs = jvp(
+                                    flat_primals, canonical_tangents, **params
+                                )
+                                tangent_outs = _instantiate_zero_tangents(tangent_outs)
 
                 if not eqn.primitive.multiple_results:
                     primal_outs = [primal_outs]
@@ -574,7 +642,7 @@ class ADEV(Pytree):
                 )
             (out_dual,) = jax_util.safe_map(dual_env.read, jaxpr.outvars)
             if not isinstance(out_dual, Dual):
-                out_dual = Dual(out_dual, jnp.zeros_like(out_dual))
+                out_dual = Dual(out_dual, _zero_tangent_like(out_dual))
             return out_dual
 
         return eval_jaxpr_iterate_dual(jaxpr.eqns, dual_env, jaxpr.invars, flat_duals)
@@ -1041,12 +1109,7 @@ class REINFORCE(ADEVPrimitive):
         (out_primal,), (out_tangent,) = Dual.tree_unzip(out_dual)
 
         # Compute score function: ∇log p(X)
-        # For discrete values, use float0 tangent type as required by JAX
-        v_tangent = (
-            jnp.zeros(v.shape, dtype=jax.dtypes.float0)
-            if v.dtype in (jnp.bool_, jnp.int32, jnp.int64)
-            else jnp.zeros_like(v)
-        )
+        v_tangent = _zero_tangent_like(v)
         _, lp_tangent = jax.jvp(
             self.differentiable_logpdf.value,
             (v, *primals),
@@ -1111,11 +1174,7 @@ def reinforce(sample_func, logpdf_func, keyful_sample_func=None):
 
 def _discrete_zero_tangent(v):
     """Create a zero tangent compatible with discrete JAX values."""
-    return (
-        jnp.zeros(v.shape, dtype=jax.dtypes.float0)
-        if v.dtype in (jnp.bool_, jnp.int32, jnp.int64)
-        else jnp.zeros_like(v)
-    )
+    return _zero_tangent_like(v)
 
 
 def _first_leaf(tree):
@@ -1208,8 +1267,12 @@ class FlipEnum(ADEVPrimitive):
 
         # Scalar Bernoulli: exact two-point enumeration.
         if jnp.ndim(p_primal) == 0:
-            true_dual = kdual(Dual(jnp.array(True), jnp.zeros_like(jnp.array(True))))
-            false_dual = kdual(Dual(jnp.array(False), jnp.zeros_like(jnp.array(False))))
+            true_dual = kdual(
+                Dual(jnp.array(True), _discrete_zero_tangent(jnp.array(True)))
+            )
+            false_dual = kdual(
+                Dual(jnp.array(False), _discrete_zero_tangent(jnp.array(False)))
+            )
             (true_primal,), (true_tangent,) = Dual.tree_unzip(true_dual)
             (false_primal,), (false_tangent,) = Dual.tree_unzip(false_dual)
 
@@ -1338,9 +1401,10 @@ class FlipEnumParallel(ADEVPrimitive):
         (_, kdual) = konts
         (p_primal,) = Dual.tree_primal(dual_tree)
         (p_tangent,) = Dual.tree_tangent(dual_tree)
+        support = jnp.array([True, False])
         ret_primals, ret_tangents = modular_vmap(kdual)(
-            (jnp.array([True, False]),),
-            (jnp.zeros_like(jnp.array([True, False]))),
+            (support,),
+            (_discrete_zero_tangent(support)),
         )
 
         def _inner(p, ret):
@@ -1381,7 +1445,7 @@ class CategoricalEnumParallel(ADEVPrimitive):
         (probs_tangent,) = Dual.tree_tangent(dual_tree)
         idxs = jnp.arange(len(probs_primal))
         ret_primals, ret_tangents = modular_vmap(kdual)(
-            (idxs,), (jnp.zeros_like(idxs),)
+            (idxs,), (_discrete_zero_tangent(idxs),)
         )
 
         def _inner(probs, primals):

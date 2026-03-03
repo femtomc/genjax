@@ -40,6 +40,23 @@ grad = objective.grad_estimate(theta)
   - `seeded(key, ...)`
 - If probabilistic vectorization is needed, prefer `modular_vmap`.
 
+## AD Zero-Tangent Canonicalization (Important Runtime Detail)
+
+- In JAX, non-inexact primals (bool/int/discrete-like values) have tangent dtype
+  `float0`.
+- JAX AD canonicalizes `float0` tangents to symbolic `ad.Zero` sentinels before
+  primitive JVP rule dispatch and short-circuits primitive-JVP execution when all
+  tangents are zero.
+- ADEV invokes primitive JVP rules directly from its interpreter, so it must mirror
+  this behavior:
+  1. canonicalize `float0` tangents to `ad.Zero`,
+  2. primal-only fast-path when all tangents are zero,
+  3. materialize returned symbolic zeros with `instantiate_zeros` before storing
+     into `Dual`.
+- This prevents staged failures in `seed + vmap + jit` paths (notably
+  `flip_mvd` + downstream `astype`/`convert_element_type` chains).
+- Regression coverage: `tests/test_adev.py::TestADEVVmapSemantics::test_flip_mvd_float0_tangent_canonicalization_under_staging`.
+
 ## Extending ADEV (Custom Primitives)
 
 Subclass `ADEVPrimitive` and implement:
