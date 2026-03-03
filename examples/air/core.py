@@ -10,6 +10,7 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.special as jsp
 import jax.tree_util as jtu
+from jax.example_libraries import optimizers
 import numpy as np
 
 from genjax import (
@@ -18,7 +19,7 @@ from genjax import (
     flip_mvd,
     flip_reinforce,
     gen,
-    multivariate_normal_reparam,
+    multivariate_normal_diag_reparam,
 )
 from genjax.core import distribution
 from genjax.adev import expectation
@@ -404,14 +405,15 @@ def image_to_object(config: AIRConfig, z_where, image):
 def make_air_model(*, config: AIRConfig = DEFAULT_CONFIG):
     z_where_prior_loc = _as_float32(config.z_where_prior_loc)
     z_where_prior_scale = _as_float32(config.z_where_prior_scale)
-    z_where_prior_cov = jnp.diag(z_where_prior_scale**2)
 
     z_what_prior_loc = jnp.zeros((config.z_what_size,), dtype=jnp.float32)
-    z_what_prior_cov = jnp.eye(config.z_what_size, dtype=jnp.float32)
+    z_what_prior_scale = jnp.ones((config.z_what_size,), dtype=jnp.float32)
 
     z_pres_prior = _as_float32(config.z_pres_prior)
-    obs_var = config.obs_noise_scale**2
-    obs_cov = obs_var * jnp.eye(config.canvas_size**2, dtype=jnp.float32)
+    obs_scale = config.obs_noise_scale * jnp.ones(
+        (config.canvas_size, config.canvas_size),
+        dtype=jnp.float32,
+    )
 
     @gen
     def model(decoder_params):
@@ -426,11 +428,11 @@ def make_air_model(*, config: AIRConfig = DEFAULT_CONFIG):
             )
 
             z_where = (
-                multivariate_normal_reparam(z_where_prior_loc, z_where_prior_cov)
+                multivariate_normal_diag_reparam(z_where_prior_loc, z_where_prior_scale)
                 @ f"z_where_{t}"
             )
             z_what = (
-                multivariate_normal_reparam(z_what_prior_loc, z_what_prior_cov)
+                multivariate_normal_diag_reparam(z_what_prior_loc, z_what_prior_scale)
                 @ f"z_what_{t}"
             )
 
@@ -438,8 +440,7 @@ def make_air_model(*, config: AIRConfig = DEFAULT_CONFIG):
             y = object_to_image(config, z_where, y_att)
             x = x + (y * z_pres_scalar)
 
-        obs_loc = jnp.reshape(x, (-1,))
-        multivariate_normal_reparam(obs_loc, obs_cov) @ "obs"
+        multivariate_normal_diag_reparam(x, obs_scale) @ "obs"
         return x
 
     return model
@@ -453,64 +454,64 @@ def make_air_guide(
     if estimator not in VALID_ESTIMATORS:
         raise ValueError(f"Unknown estimator: {estimator}")
 
-    z_where_prior_loc = _as_float32(config.z_where_prior_loc)
-    z_where_prior_scale = _as_float32(config.z_where_prior_scale)
-
     @gen
     def guide(obs, params):
         h = jnp.zeros((config.hidden_size,), dtype=jnp.float32)
         c = jnp.zeros((config.hidden_size,), dtype=jnp.float32)
         z_where = jnp.zeros((3,), dtype=jnp.float32)
         z_what = jnp.zeros((config.z_what_size,), dtype=jnp.float32)
+        z_pres = jnp.ones((1,), dtype=jnp.float32)
 
         obs_flat = jnp.reshape(obs, (-1,))
 
         for t in range(config.num_steps):
-            # Keep the recurrent input independent of previously sampled z_pres to
-            # avoid discrete-induced float0 tangents leaking into STN indexing ops.
             rnn_input = jnp.concatenate(
-                [
-                    obs_flat,
-                    z_where,
-                    z_what,
-                    jnp.ones((1,), dtype=jnp.float32),
-                ],
+                [obs_flat, z_where, z_what, z_pres],
                 axis=0,
             )
             h, c = lstm_cell_apply(params.rnn, rnn_input, h, c)
 
             z_pres_p, z_where_loc, z_where_scale = predict_apply(params.predict, h)
-
-            z_pres_prob = jnp.clip(z_pres_p[0], config.eps, 1.0 - config.eps)
+            z_pres_prob = (
+                config.eps + (z_pres_p[0] * z_pres[0])
+            ) / (1.0 + (1.01 * config.eps))
 
             if estimator == "enum":
-                flip_enum_dist(z_pres_prob) @ f"z_pres_{t}"
+                z_pres_site = flip_enum_dist(z_pres_prob) @ f"z_pres_{t}"
             elif estimator == "mvd":
-                flip_mvd_dist(z_pres_prob) @ f"z_pres_{t}"
+                z_pres_site = flip_mvd_dist(z_pres_prob) @ f"z_pres_{t}"
             elif estimator == "reinforce":
-                flip_reinforce(z_pres_prob) @ f"z_pres_{t}"
+                z_pres_site = flip_reinforce(z_pres_prob) @ f"z_pres_{t}"
             elif estimator == "hybrid":
                 if t < config.num_steps - 1:
-                    flip_mvd_dist(z_pres_prob) @ f"z_pres_{t}"
+                    z_pres_site = flip_mvd_dist(z_pres_prob) @ f"z_pres_{t}"
                 else:
-                    flip_enum_dist(z_pres_prob) @ f"z_pres_{t}"
+                    z_pres_site = flip_enum_dist(z_pres_prob) @ f"z_pres_{t}"
             else:
                 raise ValueError(f"Unknown estimator: {estimator}")
 
-            z_where_scale_total = z_where_scale * z_where_prior_scale
-            z_where_cov = jnp.diag(z_where_scale_total**2 + 1e-6)
+            z_pres = jnp.array(
+                [
+                    jnp.where(
+                        z_pres_site,
+                        jnp.array(1.0, dtype=jnp.float32),
+                        jnp.array(0.0, dtype=jnp.float32),
+                    )
+                ],
+                dtype=jnp.float32,
+            )
+
             z_where = (
-                multivariate_normal_reparam(
-                    z_where_loc + z_where_prior_loc,
-                    z_where_cov,
-                )
+                multivariate_normal_diag_reparam(z_where_loc, z_where_scale)
                 @ f"z_where_{t}"
             )
 
             x_att = image_to_object(config, z_where, obs)
             z_what_loc, z_what_scale = encoder_apply(params.encoder, x_att)
-            z_what_cov = jnp.diag(z_what_scale**2 + 1e-6)
-            z_what = multivariate_normal_reparam(z_what_loc, z_what_cov) @ f"z_what_{t}"
+            z_what = (
+                multivariate_normal_diag_reparam(z_what_loc, z_what_scale)
+                @ f"z_what_{t}"
+            )
 
     return guide
 
@@ -533,7 +534,7 @@ def make_air_objective(
         tr = guide.simulate(obs, params)
 
         merged_choices, _ = model.merge(
-            {"obs": jnp.reshape(obs, (-1,))},
+            {"obs": obs},
             tr.get_choices(),
         )
         model_logp, _ = model.assess(merged_choices, params.decoder)
@@ -664,36 +665,51 @@ def estimate_count_accuracy(
     *,
     config: AIRConfig = DEFAULT_CONFIG,
     seed_value: int = 0,
+    batch_size: int = 1024,
 ) -> tuple[float, np.ndarray]:
-    """Estimate object-count accuracy of the guide on labeled observations."""
+    """Estimate object-count accuracy of the guide on labeled observations.
+
+    Evaluation is batched to avoid compiling/running a single giant vmap over the
+    full dataset, which can exhaust GPU memory for larger AIR datasets.
+    """
 
     num_examples = observations.shape[0]
     if num_examples == 0:
         return 0.0, np.zeros((config.num_steps + 1, config.num_steps + 1), dtype=int)
 
+    if batch_size <= 0:
+        raise ValueError("batch_size must be >= 1")
+
     seeded_simulate = seed(guide.simulate)
-    keys = jax.random.split(jax.random.key(seed_value), num_examples)
-    traces = jax.jit(jax.vmap(seeded_simulate, in_axes=(0, 0, None)))(
-        keys,
-        observations,
-        params,
-    )
-
-    choices = traces.get_choices()
-    inferred_counts = jnp.zeros((num_examples,), dtype=jnp.int32)
-    for t in range(config.num_steps):
-        inferred_counts = inferred_counts + choices[f"z_pres_{t}"].astype(jnp.int32)
-
-    true_np = np.asarray(true_counts, dtype=int)
-    inferred_np = np.asarray(inferred_counts, dtype=int)
+    batched_simulate = jax.jit(jax.vmap(seeded_simulate, in_axes=(0, 0, None)))
 
     max_count = config.num_steps
     confusion = np.zeros((max_count + 1, max_count + 1), dtype=int)
-    for true_c, infer_c in zip(true_np, inferred_np):
-        if 0 <= true_c <= max_count and 0 <= infer_c <= max_count:
-            confusion[true_c, infer_c] += 1
+    total_correct = 0
 
-    accuracy = float(np.mean(true_np == inferred_np))
+    for start in range(0, num_examples, batch_size):
+        stop = min(start + batch_size, num_examples)
+        obs_batch = observations[start:stop]
+        true_batch = true_counts[start:stop]
+
+        sub_key = jax.random.fold_in(jax.random.key(seed_value), start)
+        keys = jax.random.split(sub_key, stop - start)
+        traces = batched_simulate(keys, obs_batch, params)
+
+        choices = traces.get_choices()
+        inferred_counts = jnp.zeros((stop - start,), dtype=jnp.int32)
+        for t in range(config.num_steps):
+            inferred_counts = inferred_counts + choices[f"z_pres_{t}"].astype(jnp.int32)
+
+        true_np = np.asarray(true_batch, dtype=int)
+        inferred_np = np.asarray(inferred_counts, dtype=int)
+
+        total_correct += int(np.sum(true_np == inferred_np))
+        for true_c, infer_c in zip(true_np, inferred_np):
+            if 0 <= true_c <= max_count and 0 <= infer_c <= max_count:
+                confusion[true_c, infer_c] += 1
+
+    accuracy = float(total_correct / num_examples)
     return accuracy, confusion
 
 
@@ -709,6 +725,7 @@ def train_air(
     batch_size: int = 64,
     learning_rate: float = 1e-4,
     evaluate_accuracy_every: int = 1,
+    eval_batch_size: int = 256,
     seed_value: int = 0,
 ) -> AIRTrainingResult:
     """Train AIR with a chosen discrete gradient estimator."""
@@ -740,22 +757,28 @@ def train_air(
             "Need at least one full batch; increase dataset size or lower batch_size"
         )
 
+    opt_init, opt_update, get_params = optimizers.adam(learning_rate)
+    opt_state = opt_init(init_params)
+
     @jax.jit
     def update_step(
-        params: AIRParams,
+        step: jnp.int32,
+        opt_state,
         keys: jnp.ndarray,
         batch_obs: jnp.ndarray,
-    ) -> tuple[AIRParams, jnp.ndarray]:
+    ):
+        params = get_params(opt_state)
         batch_losses, batch_grads = batch_loss_and_grad(keys, batch_obs, params)
         mean_loss = jnp.mean(batch_losses)
         mean_grads = jtu.tree_map(lambda g: jnp.mean(g, axis=0), batch_grads)
-        new_params = jtu.tree_map(
-            lambda p, g: p + learning_rate * g, params, mean_grads
-        )
-        return new_params, mean_loss
 
-    params = init_params
+        # The objective is maximized; Adam is a minimizer, so negate gradients.
+        ascent_grads = jtu.tree_map(lambda g: -g, mean_grads)
+        next_opt_state = opt_update(step, ascent_grads, opt_state)
+        return next_opt_state, mean_loss
+
     key = jax.random.key(seed_value)
+    global_step = 0
 
     loss_history = []
     accuracy_history = []
@@ -778,7 +801,13 @@ def train_air(
             key, sub_key = jax.random.split(key)
             keys = jax.random.split(sub_key, effective_batch_size)
 
-            params, batch_loss = update_step(params, keys, batch_obs)
+            opt_state, batch_loss = update_step(
+                jnp.asarray(global_step, dtype=jnp.int32),
+                opt_state,
+                keys,
+                batch_obs,
+            )
+            global_step += 1
             epoch_losses.append(batch_loss)
 
         cumulative_time += time.perf_counter() - epoch_start
@@ -787,6 +816,7 @@ def train_air(
         epoch_loss = jnp.mean(jnp.stack(epoch_losses))
         loss_history.append(epoch_loss)
 
+        params = get_params(opt_state)
         if evaluate_accuracy_every > 0 and (
             epoch % evaluate_accuracy_every == 0 or epoch == num_epochs - 1
         ):
@@ -797,13 +827,15 @@ def train_air(
                 true_counts,
                 config=config,
                 seed_value=seed_value + 1000 + epoch,
+                batch_size=eval_batch_size,
             )
             accuracy_history.append(accuracy)
         else:
             accuracy_history.append(float("nan"))
 
+    final_params = get_params(opt_state)
     return AIRTrainingResult(
-        params=params,
+        params=final_params,
         loss_history=jnp.asarray(loss_history),
         accuracy_history=jnp.asarray(accuracy_history),
         epoch_times=jnp.asarray(epoch_times),
@@ -817,22 +849,38 @@ def estimate_objective_statistics(
     *,
     n_mc_samples: int = 8,
     seed_value: int = 0,
+    batch_size: int = 1024,
 ) -> tuple[float, float]:
-    """Estimate mean/variance of objective values over data and RNG draws."""
+    """Estimate mean/variance of objective values over data and RNG draws.
+
+    Evaluation is batched over observations to keep memory bounded on GPU.
+    """
 
     if n_mc_samples <= 0:
         raise ValueError("n_mc_samples must be >= 1")
+    if batch_size <= 0:
+        raise ValueError("batch_size must be >= 1")
 
     batch_estimate = _compile_batched_estimate(objective)
 
     key = jax.random.key(seed_value)
     means = []
+    num_examples = observations.shape[0]
 
     for _ in range(n_mc_samples):
         key, sub_key = jax.random.split(key)
-        keys = jax.random.split(sub_key, observations.shape[0])
-        values = batch_estimate(keys, observations, params)
-        means.append(jnp.mean(values))
+
+        total = 0.0
+        for start in range(0, num_examples, batch_size):
+            stop = min(start + batch_size, num_examples)
+            obs_batch = observations[start:stop]
+
+            batch_key = jax.random.fold_in(sub_key, start)
+            keys = jax.random.split(batch_key, stop - start)
+            values = batch_estimate(keys, obs_batch, params)
+            total = total + jnp.sum(values)
+
+        means.append(total / num_examples)
 
     sample_means = jnp.stack(means)
     return float(jnp.mean(sample_means)), float(jnp.var(sample_means))
@@ -849,6 +897,7 @@ def run_estimator_suite(
     batch_size: int = 64,
     learning_rate: float = 1e-4,
     eval_objective_samples: int = 8,
+    eval_batch_size: int = 256,
     seed_value: int = 0,
 ) -> list[AIRSuiteResult]:
     """Train/evaluate multiple AIR estimators and summarize final metrics."""
@@ -874,6 +923,7 @@ def run_estimator_suite(
             batch_size=batch_size,
             learning_rate=learning_rate,
             evaluate_accuracy_every=1,
+            eval_batch_size=eval_batch_size,
             seed_value=seed_value + idx,
         )
 
@@ -889,6 +939,7 @@ def run_estimator_suite(
             observations,
             n_mc_samples=eval_objective_samples,
             seed_value=seed_value + 100 + idx,
+            batch_size=eval_batch_size,
         )
 
         final_accuracy, _ = estimate_count_accuracy(
@@ -898,6 +949,7 @@ def run_estimator_suite(
             true_counts,
             config=config,
             seed_value=seed_value + 200 + idx,
+            batch_size=eval_batch_size,
         )
 
         results.append(

@@ -23,6 +23,7 @@ from .adev import (  # noqa: E402
     uniform_reinforce,
     normal_reparam,
     uniform_reparam,
+    multivariate_normal_diag_reparam,
     multivariate_normal_reparam,
     multivariate_normal_reinforce,
 )
@@ -190,6 +191,7 @@ __all__ = [
     "normal_reparam",
     "uniform_reparam",
     "multivariate_normal",
+    "multivariate_normal_diag_reparam",
     "multivariate_normal_reparam",
     "multivariate_normal_reinforce",
     "seed",

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import Sequence
 
 import jax
+import numpy as np
 
 from .core import (
     AIRSuiteResult,
@@ -83,6 +85,12 @@ def parse_args() -> argparse.Namespace:
     train_parser.add_argument("--batch-size", type=int, default=32)
     train_parser.add_argument("--learning-rate", type=float, default=1e-4)
     train_parser.add_argument(
+        "--eval-batch-size",
+        type=int,
+        default=256,
+        help="Evaluation batch size for accuracy/objective metrics.",
+    )
+    train_parser.add_argument(
         "--eval-samples",
         type=int,
         default=6,
@@ -122,6 +130,12 @@ def parse_args() -> argparse.Namespace:
     compare_parser.add_argument("--epochs", type=int, default=4)
     compare_parser.add_argument("--batch-size", type=int, default=32)
     compare_parser.add_argument("--learning-rate", type=float, default=1e-4)
+    compare_parser.add_argument(
+        "--eval-batch-size",
+        type=int,
+        default=256,
+        help="Evaluation batch size for accuracy/objective metrics.",
+    )
     compare_parser.add_argument("--eval-samples", type=int, default=6)
     compare_parser.add_argument(
         "--summary-csv",
@@ -134,6 +148,29 @@ def parse_args() -> argparse.Namespace:
         "--small-config",
         action="store_true",
         help="Use a smaller architecture for smoke tests and quick iteration.",
+    )
+
+    fetch_parser = subparsers.add_parser(
+        "fetch-data",
+        help="Download/generate multi-MNIST data and write an AIR NPZ file.",
+    )
+    fetch_parser.add_argument(
+        "--output",
+        type=str,
+        default="examples/air/data/multi_mnist_uint8.npz",
+        help="Output NPZ path containing x (uint8 images) and y (object labels).",
+    )
+    fetch_parser.add_argument(
+        "--cache-root",
+        type=str,
+        default="/tmp/air-data",
+        help="Cache directory used by pyro.contrib.examples.multi_mnist.",
+    )
+    fetch_parser.add_argument(
+        "--max-examples",
+        type=int,
+        default=None,
+        help="Optional prefix length to keep from the generated dataset.",
     )
 
     parser.set_defaults(command="compare")
@@ -154,6 +191,35 @@ def _print_suite_table(results: Sequence[AIRSuiteResult]) -> None:
             f"{result.final_loss:>14.4f} {result.final_accuracy:>12.4f} "
             f"{result.objective_mean:>12.4f} {result.objective_variance:>12.4f}"
         )
+
+
+def run_fetch_data(args: argparse.Namespace) -> None:
+    try:
+        from pyro.contrib.examples import multi_mnist
+    except Exception as exc:  # pragma: no cover - depends on optional env
+        raise RuntimeError(
+            "fetch-data requires pyro + torchvision. Run it via: "
+            "`pixi run -e perfbench-pyro python -m examples.air.main fetch-data ...`"
+        ) from exc
+
+    cache_root = Path(args.cache_root)
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    print(f"loading/generating Multi-MNIST under {cache_root} ...")
+    x, y = multi_mnist.load(str(cache_root))
+
+    if args.max_examples is not None:
+        if args.max_examples <= 0:
+            raise ValueError("--max-examples must be >= 1 when provided")
+        x = x[: args.max_examples]
+        y = y[: args.max_examples]
+
+    np.savez_compressed(out_path, x=x, y=y)
+    print("saved AIR dataset")
+    print(f"path:      {out_path}")
+    print(f"examples:  {x.shape[0]}")
+    print(f"shape:     {x.shape[1:]} (uint8)")
 
 
 def run_train(args: argparse.Namespace) -> None:
@@ -180,6 +246,7 @@ def run_train(args: argparse.Namespace) -> None:
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         evaluate_accuracy_every=1,
+        eval_batch_size=args.eval_batch_size,
         seed_value=args.seed + 2,
     )
 
@@ -194,6 +261,7 @@ def run_train(args: argparse.Namespace) -> None:
         dataset.observations,
         n_mc_samples=args.eval_samples,
         seed_value=args.seed + 3,
+        batch_size=args.eval_batch_size,
     )
     final_accuracy, confusion = estimate_count_accuracy(
         guide,
@@ -202,6 +270,7 @@ def run_train(args: argparse.Namespace) -> None:
         dataset.true_counts,
         config=config,
         seed_value=args.seed + 4,
+        batch_size=args.eval_batch_size,
     )
 
     result = AIRSuiteResult(
@@ -262,6 +331,7 @@ def run_compare(args: argparse.Namespace) -> None:
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         eval_objective_samples=args.eval_samples,
+        eval_batch_size=args.eval_batch_size,
         seed_value=args.seed + 2,
     )
 
@@ -282,7 +352,9 @@ def run_compare(args: argparse.Namespace) -> None:
 def main() -> None:
     args = parse_args()
 
-    if args.command == "train":
+    if args.command == "fetch-data":
+        run_fetch_data(args)
+    elif args.command == "train":
         run_train(args)
     elif args.command == "compare":
         run_compare(args)

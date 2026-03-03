@@ -62,6 +62,45 @@ def test_flip_exact_loss_at_half():
     assert jnp.allclose(p_dual.tangent, 0.0, atol=1e-6)
 
 
+def test_flip_reinforce_assess_uses_probability_parameterization():
+    """Regression: flip_reinforce must interpret its argument as probs, not logits."""
+
+    @gen
+    def model(p):
+        flip_reinforce(p) @ "z"
+
+    p = jnp.array(0.2, dtype=jnp.float32)
+
+    lp_false, _ = model.assess({"z": jnp.array(False)}, p)
+    lp_true, _ = model.assess({"z": jnp.array(True)}, p)
+
+    assert jnp.allclose(lp_false, jnp.log1p(-p), atol=1e-6)
+    assert jnp.allclose(lp_true, jnp.log(p), atol=1e-6)
+
+
+def test_flip_enum_distribution_sample_matches_probability_parameterization():
+    """Regression: wrapped flip_enum sampling should match probs semantics."""
+
+    flip_enum_dist = distribution(flip_enum, flip.logpdf)
+
+    @gen
+    def model(p):
+        flip_enum_dist(p) @ "z"
+
+    seeded_simulate = seed(model.simulate)
+
+    n = 4096
+    p = 0.2
+    keys = jrand.split(jrand.key(999), n)
+    ps = jnp.full((n,), p, dtype=jnp.float32)
+
+    traces = jax.jit(jax.vmap(seeded_simulate, in_axes=(0, 0)))(keys, ps)
+    samples = traces.get_choices()["z"].astype(jnp.float32)
+
+    assert jnp.isfinite(jnp.mean(samples))
+    assert jnp.allclose(jnp.mean(samples), p, atol=0.03)
+
+
 ###############################################################################
 # Regression tests for flat_keyful_sampler error
 # These tests ensure ADEV estimators work correctly with seed + addressing

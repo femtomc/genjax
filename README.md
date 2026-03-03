@@ -364,6 +364,32 @@ pixi run python -m examples.air.main train \
 - `--dataset synthetic` (default): samples from the AIR prior (no extra framework dependencies).
 - `--dataset multi-mnist --data-path /path/to/multi_mnist_uint8.npz`: load pre-generated multi-MNIST arrays.
 
+**Reliable multi-MNIST acquisition**:
+```bash
+# Generates/downloads and writes examples/air/data/multi_mnist_uint8.npz
+pixi run air-fetch-data
+```
+
+This uses `pyro.contrib.examples.multi_mnist` in the `perfbench-pyro` environment.
+
+**GPU execution (recommended for AIR)**:
+```bash
+# Verify CUDA JAX is available
+pixi run -e cuda cuda-info
+
+# Train one estimator on multi-MNIST (2048 examples)
+pixi run air-train-gpu
+
+# Compare estimators on multi-MNIST (2048 examples)
+pixi run air-compare-gpu
+```
+
+Notes:
+- AIR on large batches/examples is memory-heavy; use `--eval-batch-size` to bound eval-time memory.
+- On systems with constrained `/tmp`, set `TMPDIR=/dev/shm` and disable Triton GEMM autotuning:
+  `XLA_FLAGS='--xla_gpu_enable_triton_gemm=false --xla_gpu_autotune_level=0'`.
+- Our current CLI defaults are tuned for smoke/repro runs. Paper-scale runs may require longer epochs and more data.
+
 ### Curve Fitting with Outlier Detection
 
 **What it does**: Polynomial regression with robust outlier detection, demonstrating:

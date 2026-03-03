@@ -90,8 +90,8 @@ ensure_jax_tfp_compat()
 from tensorflow_probability.substrates import jax as tfp
 
 from genjax.distributions import (
-    bernoulli,
     categorical,
+    flip,
     geometric,
     normal,
     uniform,
@@ -1197,8 +1197,7 @@ def _flip_lane_rb_estimate(kpure, kdual, p_primal, p_tangent):
     """
     del kpure  # Kept for signature symmetry.
 
-    v = bernoulli.sample(probs=p_primal)
-    b = v == 1
+    b = flip.sample(p_primal)
 
     b_dual = kdual(Dual(b, _discrete_zero_tangent(b)))
     (b_primal,), (b_tangent,) = Dual.tree_unzip(b_dual)
@@ -1247,7 +1246,7 @@ class FlipEnum(ADEVPrimitive):
 
     def sample(self, *args):
         (probs,) = args
-        return 1 == bernoulli.sample(probs)
+        return flip.sample(probs)
 
     def sample_with_key(self, key, *args, sample_shape=()):
         (probs,) = args
@@ -1337,7 +1336,7 @@ class FlipMVD(ADEVPrimitive):
     def sample(self, *args):
         """Sample from Bernoulli distribution."""
         (p,) = args
-        return 1 == bernoulli.sample(probs=p)
+        return flip.sample(p)
 
     def sample_with_key(self, key, *args, sample_shape=()):
         (p,) = args
@@ -1365,15 +1364,19 @@ class FlipMVD(ADEVPrimitive):
             return _flip_lane_rb_estimate(kpure, kdual, p_primal, p_tangent)
 
         # Scalar Bernoulli phantom estimator.
-        v = bernoulli.sample(probs=p_primal)
-        b = v == 1
+        b = flip.sample(p_primal)
 
         b_dual = kdual(Dual(b, _discrete_zero_tangent(b)))
         (b_primal,), (b_tangent,) = Dual.tree_unzip(b_dual)
 
         other = _first_leaf(kpure(jnp.logical_not(b)))
 
-        est = ((-1) ** v) * (other - b_primal)
+        sign = jnp.where(
+            b,
+            jnp.array(-1.0, dtype=b_primal.dtype),
+            jnp.array(1.0, dtype=b_primal.dtype),
+        )
+        est = sign * (other - b_primal)
         return Dual(b_primal, b_tangent + est * p_tangent)
 
 
@@ -1384,7 +1387,7 @@ flip_mvd = FlipMVD()
 class FlipEnumParallel(ADEVPrimitive):
     def sample(self, *args):
         (p,) = args
-        return 1 == bernoulli.sample(probs=p)
+        return flip.sample(p)
 
     def sample_with_key(self, key, *args, sample_shape=()):
         (p,) = args
@@ -1467,7 +1470,10 @@ categorical_enum_parallel = CategoricalEnumParallel()
 ########################################
 
 def _bernoulli_keyful_sample(key, probs, sample_shape=()):
-    return tfd.Bernoulli(probs=probs).sample(seed=key, sample_shape=sample_shape)
+    return tfd.Bernoulli(probs=probs, dtype=jnp.bool_).sample(
+        seed=key,
+        sample_shape=sample_shape,
+    )
 
 
 def _geometric_keyful_sample(key, probs, sample_shape=()):
@@ -1484,11 +1490,11 @@ def _uniform_keyful_sample(key, low, high, sample_shape=()):
 
 flip_reinforce = distribution(
     reinforce(
-        bernoulli.sample,
-        bernoulli.logpdf,
+        flip.sample,
+        flip.logpdf,
         _bernoulli_keyful_sample,
     ),
-    bernoulli.logpdf,
+    flip.logpdf,
 )
 
 geometric_reinforce = distribution(
@@ -1602,6 +1608,64 @@ class NormalREPARAM(ADEVPrimitive):
 normal_reparam = distribution(
     NormalREPARAM(),
     normal.logpdf,
+)
+
+
+@Pytree.dataclass
+class MultivariateNormalDiagREPARAM(ADEVPrimitive):
+    """Diagonal multivariate normal reparameterization estimator.
+
+    For X ~ N(loc, diag(scale_diag^2)), this implements the pathwise form
+    X = loc + scale_diag * eps with eps ~ N(0, I).
+    """
+
+    def sample(self, *args):
+        loc, scale_diag = args
+        return loc + scale_diag * normal.sample(
+            jnp.zeros_like(loc),
+            jnp.ones_like(scale_diag),
+        )
+
+    def sample_with_key(self, key, *args, sample_shape=()):
+        loc, scale_diag = args
+        return tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag).sample(
+            seed=key,
+            sample_shape=sample_shape,
+        )
+
+    def prim_jvp_estimate(
+        self,
+        dual_tree: DualTree,
+        konts: tuple[Any, ...],
+    ):
+        _, kdual = konts
+        (loc_primal, scale_primal) = Dual.tree_primal(dual_tree)
+        (loc_tangent, scale_tangent) = Dual.tree_tangent(dual_tree)
+
+        loc_b, scale_b = jnp.broadcast_arrays(loc_primal, scale_primal)
+        eps = normal.sample(jnp.zeros_like(loc_b), jnp.ones_like(scale_b))
+
+        def _inner(loc, scale_diag):
+            return loc + scale_diag * eps
+
+        primal_out, tangent_out = jax.jvp(
+            _inner,
+            (loc_primal, scale_primal),
+            (loc_tangent, scale_tangent),
+        )
+        return kdual(Dual(primal_out, tangent_out))
+
+
+def _multivariate_normal_diag_logpdf(v, loc, scale_diag):
+    lp = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag).log_prob(v)
+    if jnp.shape(lp):
+        return jnp.sum(lp)
+    return lp
+
+
+multivariate_normal_diag_reparam = distribution(
+    MultivariateNormalDiagREPARAM(),
+    _multivariate_normal_diag_logpdf,
 )
 
 
@@ -1776,6 +1840,7 @@ __all__ = [
     "uniform_reinforce",
     "normal_reparam",
     "uniform_reparam",
+    "multivariate_normal_diag_reparam",
     "multivariate_normal_reparam",
     "multivariate_normal_reinforce",
     # Gradient strategy factories
