@@ -1,6 +1,7 @@
 # Extras Module Guide
 
-`genjax.extras` provides exact state-space baselines used to validate approximate inference code.
+`genjax.extras` provides exact state-space baselines used to validate
+approximate inference code.
 
 ## What Lives Here
 
@@ -23,9 +24,11 @@ Main file: `state_space.py`
 
 1. Generate a dataset (`*_test_dataset` or `*_inference_problem`).
 2. Compute exact log marginal baseline (`*_exact_log_marginal`).
-3. Compare approximate inference outputs (SMC/MCMC/VI) against this baseline in tests.
+3. Compare approximate inference outputs (SMC/MCMC/VI) against this baseline in
+   tests.
 
 Most dataset helpers return:
+
 - `"z"`: latent states
 - `"obs"`: observations
 
@@ -33,13 +36,16 @@ Most dataset helpers return:
 
 - Keep sequence lengths/static dimensions explicit (often via `Const[int]`).
 - Use seeded call sites before staging/vectorization (`seed(fn)(key, ...)`).
-- Prefer these exact utilities in regression tests instead of ad-hoc hand-derived checks.
+- Prefer these exact utilities in regression tests instead of ad-hoc
+  hand-derived checks.
 
 ## Common Mistakes
 
-- Confusing `linear_gaussian` with names from older docs (`linear_gaussian_ssm`).
+- Confusing `linear_gaussian` with names from older docs
+  (`linear_gaussian_ssm`).
 - Ignoring matrix shape compatibility in LGSSM parameters.
-- Using long trajectories in unit tests (keep tests fast; push heavy sweeps to scripts).
+- Using long trajectories in unit tests (keep tests fast; push heavy sweeps to
+  scripts).
 
 ## Tests to Consult
 

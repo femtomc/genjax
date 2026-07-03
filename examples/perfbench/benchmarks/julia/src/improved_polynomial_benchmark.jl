@@ -13,13 +13,13 @@ function run_polynomial_is_benchmark_improved(
 )
     xs = data.xs
     ys = data.ys
-    
+
     # Create observations
     observations = choicemap()
     for i in 1:length(ys)
         observations[:y => i] = ys[i]
     end
-    
+
     # Multiple warm-up runs to ensure JIT compilation
     println("Running $(warmup_repeats) warm-up iterations...")
     for i in 1:warmup_repeats
@@ -27,10 +27,10 @@ function run_polynomial_is_benchmark_improved(
             polynomial_model, (xs,), observations, n_particles
         )
     end
-    
+
     # Force garbage collection before timing
     GC.gc()
-    
+
     # Timing runs
     println("Running $(repeats) timing iterations...")
     times = Float64[]
@@ -39,7 +39,7 @@ function run_polynomial_is_benchmark_improved(
         if i % 10 == 0
             GC.gc()
         end
-        
+
         start_time = time_ns()
         traces, log_weights, _ = importance_sampling(
             polynomial_model, (xs,), observations, n_particles
@@ -47,7 +47,7 @@ function run_polynomial_is_benchmark_improved(
         elapsed = (time_ns() - start_time) / 1e9  # Convert to seconds
         push!(times, elapsed)
     end
-    
+
     # Remove outliers (top and bottom 10%)
     sorted_times = sort(times)
     trim_count = Int(floor(length(times) * 0.1))
@@ -56,12 +56,12 @@ function run_polynomial_is_benchmark_improved(
     else
         trimmed_times = sorted_times
     end
-    
+
     # Extract final samples for validation
     samples_a = [traces[i][:a] for i in 1:n_particles]
     samples_b = [traces[i][:b] for i in 1:n_particles]
     samples_c = [traces[i][:c] for i in 1:n_particles]
-    
+
     return Dict(
         "framework" => "gen.jl",
         "method" => "is",

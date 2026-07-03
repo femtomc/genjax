@@ -42,9 +42,11 @@ save_publication_figure(fig, "weights.pdf")
 
 - Raincloud helpers convert inputs to NumPy for Matplotlib compatibility.
 - KDE support relies on SciPy; keep this dependency intact when extending.
-- Diagnostic plotting code should be testable independently of rendering (e.g., ESS computation paths).
+- Diagnostic plotting code should be testable independently of rendering (e.g.,
+  ESS computation paths).
 
 ## Tests / Validation
 
-- Add focused tests for non-visual logic (thresholds, labels, returned diagnostics).
+- Add focused tests for non-visual logic (thresholds, labels, returned
+  diagnostics).
 - Use smoke checks in case-study workflows for rendered outputs.

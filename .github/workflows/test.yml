@@ -2,25 +2,25 @@ name: Test Suite
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install pixi
-      uses: prefix-dev/setup-pixi@v0.8.3
-      with:
-        pixi-version: v0.48.1
-        locked: false
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.8.3
+        with:
+          pixi-version: v0.48.1
+          locked: false
 
-    - name: Run tests
-      run: pixi run test
+      - name: Run tests
+        run: pixi run test
 
-    - name: Run doctests
-      run: pixi run doctest
+      - name: Run doctests
+        run: pixi run doctest

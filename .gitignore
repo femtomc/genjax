@@ -42,11 +42,8 @@ examples/perfbench/figs_cpu/
 *.JPG
 *.JPEG
 
-# Keep specific asset directories and their images
-!examples/*/assets/
-!examples/*/assets/*.png
-!examples/*/assets/*.jpg
-!examples/*/assets/*.jpeg
+# Asset images stay out of the repo; fetch them from the GitHub
+# upstream or regenerate them before running examples that need them.
 
 .claude/settings.local.json
 

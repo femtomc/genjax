@@ -1,7 +1,8 @@
 # GenJAX Agent Guide
 
 Use this file as the top-level onboarding brief when working in this repository.
-Its goal is to help external agents quickly learn GenJAX’s model, APIs, and idioms.
+Its goal is to help external agents quickly learn GenJAX’s model, APIs, and
+idioms.
 
 ## Start Here (Fast Ramp)
 
@@ -22,26 +23,33 @@ GenJAX is a programmable inference PPL built around:
 
 - **Generative functions** (`@gen`) that define probabilistic programs.
 - **Traces** that store choices, args, retval, and score (`-log p`).
-- **GFI methods** (`simulate`, `assess`, `generate`, `update`, `regenerate`) used to build inference algorithms.
+- **GFI methods** (`simulate`, `assess`, `generate`, `update`, `regenerate`)
+  used to build inference algorithms.
 
 Treat these as the core contract. Most of the repository is either:
+
 - implementing this contract,
 - composing it into inference algorithms,
 - or validating it in tests/examples.
 
 ## Global Coding Idioms (Important)
 
-- Keep traced control flow JAX-safe: use `jax.lax.cond/scan/while_loop/fori_loop` instead of Python branching in traced paths.
+- Keep traced control flow JAX-safe: use
+  `jax.lax.cond/scan/while_loop/fori_loop` instead of Python branching in traced
+  paths.
 - Use static addresses and stable choice structure in `@gen` functions.
-- Wrap static values with `Const[...]` / `const(...)` when needed for JAX staging.
+- Wrap static values with `Const[...]` / `const(...)` when needed for JAX
+  staging.
 - Expose keyless probabilistic functions in library code; seed at call sites:
   - `seeded = genjax.pjax.seed(fn)`
   - `seeded(key, ...)`
-- Prefer `genjax.pjax.modular_vmap` (or `genjax.modular_vmap`) when probabilistic sampling appears under vectorization.
+- Prefer `genjax.pjax.modular_vmap` (or `genjax.modular_vmap`) when
+  probabilistic sampling appears under vectorization.
 
 ## Repository Layout
 
-- `src/genjax/`: library implementation (core, inference, adev, pjax, state, viz, extras)
+- `src/genjax/`: library implementation (core, inference, adev, pjax, state,
+  viz, extras)
 - `examples/`: case studies used in paper/artifact workflows
 - `tests/`: regression + unit/integration coverage
 

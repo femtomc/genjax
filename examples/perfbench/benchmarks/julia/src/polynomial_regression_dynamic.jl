@@ -8,11 +8,11 @@ function run_polynomial_is_benchmark_dynamic(
 )
     # Run the regular benchmark
     result = run_polynomial_is_benchmark(data, n_particles; repeats=repeats)
-    
+
     # Change the framework name to distinguish it
     result["framework"] = "genjl_dynamic"
     result["model_type"] = "dynamic"
-    
+
     return result
 end
 

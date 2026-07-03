@@ -11,11 +11,11 @@ def main():
     # Create output directory
     output_dir = Path("data/curvefit")
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Generate data
     print("Generating polynomial regression data...")
     data = generate_polynomial_data(n_points=50, seed=42)
-    
+
     # Convert JAX arrays to numpy for saving
     data_dict = {
         'xs': np.array(data.xs),
@@ -26,7 +26,7 @@ def main():
         'noise_std': data.noise_std,
         'n_points': data.n_points
     }
-    
+
     # Save data
     output_file = output_dir / "polynomial_data.npz"
     np.savez(output_file, **data_dict)

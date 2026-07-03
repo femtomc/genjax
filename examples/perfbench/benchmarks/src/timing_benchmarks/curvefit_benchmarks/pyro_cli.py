@@ -17,20 +17,20 @@ def main():
     """Main entry point for Pyro benchmarks."""
     parser = argparse.ArgumentParser(description="Run Pyro benchmarks")
     parser.add_argument("command", choices=["pyro-is", "pyro-hmc", "pyro-all"])
-    parser.add_argument("--data-size", default="small", 
+    parser.add_argument("--data-size", default="small",
                        choices=["tiny", "small", "medium", "large"])
     parser.add_argument("--repeats", type=int, default=20)
     parser.add_argument("--export", action="store_true")
     parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
-    
+
     args = parser.parse_args()
-    
+
     # Get dataset
     datasets = get_benchmark_datasets()
     dataset = datasets[args.data_size]
-    
+
     results = {}
-    
+
     if args.command in ["pyro-is", "pyro-all"]:
         print("Running Pyro IS benchmarks...")
         is_results = {}
@@ -42,7 +42,7 @@ def main():
                 )
             }
         results["is_comparison"] = is_results
-    
+
     if args.command in ["pyro-hmc", "pyro-all"]:
         print("Running Pyro HMC benchmarks...")
         hmc_results = {
@@ -52,7 +52,7 @@ def main():
             )
         }
         results["hmc_comparison"] = hmc_results
-    
+
     if args.export and results:
         config = {
             "benchmark": f"pyro_{args.command}",
@@ -61,7 +61,7 @@ def main():
             "device": args.device,
             "frameworks": ["pyro"]
         }
-        
+
         save_results = {"config": config, **results}
         exp_dir = save_benchmark_results(
             save_results,

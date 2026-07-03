@@ -1,12 +1,14 @@
 # Fair Coin Case Study Guide
 
-Faircoin benchmarks GenJAX against NumPyro and hand-coded baselines on a Beta–Bernoulli model with analytic posterior checks.
+Faircoin benchmarks GenJAX against NumPyro and hand-coded baselines on a
+Beta–Bernoulli model with analytic posterior checks.
 
 ## Key Files
 
 - `core.py`: model, timing harnesses, posterior sampling helpers
 - `figs.py`: timing/posterior plotting helpers
-- `main.py`: CLI dispatcher (`--combined`, `--posterior`, `--all`, default timing)
+- `main.py`: CLI dispatcher (`--combined`, `--posterior`, `--all`, default
+  timing)
 
 ## CLI Commands
 
@@ -27,13 +29,16 @@ Figures are written under `figs/`.
 
 ## Modeling Notes
 
-- Prior is Beta–Bernoulli; analytic posterior reference lives in `exact_beta_posterior_stats`.
-- Importance-sampling paths should keep sample counts explicit/static when staged.
+- Prior is Beta–Bernoulli; analytic posterior reference lives in
+  `exact_beta_posterior_stats`.
+- Importance-sampling paths should keep sample counts explicit/static when
+  staged.
 
 ## Styling Note
 
-`figs.py` currently uses case-local Matplotlib/Seaborn styling rather than full GRVS helpers.
-Preserve existing output style unless you are intentionally migrating styling.
+`figs.py` currently uses case-local Matplotlib/Seaborn styling rather than full
+GRVS helpers. Preserve existing output style unless you are intentionally
+migrating styling.
 
 ## Tests / Validation
 

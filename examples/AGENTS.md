@@ -1,7 +1,8 @@
 # Examples Directory Guide
 
-`examples/` contains case studies used for artifact reproduction and API demonstration.
-Each case has its own `AGENTS.md`—read it before editing that case.
+`examples/` contains case studies used for artifact reproduction and API
+demonstration. Each case has its own `AGENTS.md`—read it before editing that
+case.
 
 ## Case Study Map
 
@@ -29,4 +30,5 @@ Each case has its own `AGENTS.md`—read it before editing that case.
 
 ## Validation
 
-Run case-specific commands in the appropriate Pixi environment (see each case guide), then run focused tests under `tests/`.
+Run case-specific commands in the appropriate Pixi environment (see each case
+guide), then run focused tests under `tests/`.

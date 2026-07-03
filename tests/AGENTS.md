@@ -1,13 +1,14 @@
 # Test Suite Guide
 
-The test tree mirrors `src/genjax/` and case-study behavior.
-Use tests as executable documentation for API and idiom expectations.
+The test tree mirrors `src/genjax/` and case-study behavior. Use tests as
+executable documentation for API and idiom expectations.
 
 ## Running Tests
 
 - Full suite: `pixi run test`
 - Single file: `pixi run test -- tests/test_core.py`
-- Single test: `pixi run test -- tests/test_core.py::test_fn_simulate_assess_consistency`
+- Single test:
+  `pixi run test -- tests/test_core.py::test_fn_simulate_assess_consistency`
 - Keyword filter: `pixi run test -- tests/test_smc.py -k rejuvenation -vv`
 
 ## Coverage Map (High Level)
@@ -22,7 +23,8 @@ Use tests as executable documentation for API and idiom expectations.
 ## Testing Idioms
 
 - Use deterministic randomness (`jax.random.key(...)`) and explicit seeding.
-- Keep unit tests small (few chains/particles/steps) unless specifically testing convergence.
+- Keep unit tests small (few chains/particles/steps) unless specifically testing
+  convergence.
 - Use `Const[...]` for static loop/shape controls where model APIs expect it.
 - Prefer analytic checks where available (exact posteriors/log marginals).
 

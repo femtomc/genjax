@@ -1,6 +1,7 @@
 # Curvefit Case Study Guide
 
-This case study drives the polynomial-regression artifact figures (including scaling and outlier analyses).
+This case study drives the polynomial-regression artifact figures (including
+scaling and outlier analyses).
 
 ## Current CLI Shape
 
@@ -16,7 +17,8 @@ Outputs are written to the repo-level `figs/` directory.
 
 ## Key Files
 
-- `core.py`: models (`polynomial`, point/npoint variants), inference helpers, framework baselines
+- `core.py`: models (`polynomial`, point/npoint variants), inference helpers,
+  framework baselines
 - `data.py`: synthetic dataset helpers
 - `figs.py`: paper figure generation and scaling visualizations
 - `main.py`: CLI argument parsing + paper workflow orchestration
@@ -39,8 +41,10 @@ Outputs are written to the repo-level `figs/` directory.
 ## When Modifying
 
 1. Add logic to `core.py` / `figs.py`, not directly in CLI branches.
-2. Keep generated artifact filenames stable unless intentionally changing outputs.
-3. Keep CLI behavior aligned with Pixi tasks (`paper-curvefit-gen`, GPU variants).
+2. Keep generated artifact filenames stable unless intentionally changing
+   outputs.
+3. Keep CLI behavior aligned with Pixi tasks (`paper-curvefit-gen`, GPU
+   variants).
 
 ## Tests
 

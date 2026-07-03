@@ -1,6 +1,7 @@
 # Inference Module Guide
 
-`genjax.inference` provides reusable programmable inference components over GFI traces.
+`genjax.inference` provides reusable programmable inference components over GFI
+traces.
 
 ## Module Map
 
@@ -90,7 +91,8 @@ result = seed(lambda: elbo_vi(
 - Selections changing shape/structure across traced calls.
 - Mixing keyed and keyless APIs inside library internals.
 - Using plain `jax.vmap` where probabilistic primitives are present.
-- Ignoring incremental weights from `update`/`regenerate` when composing kernels.
+- Ignoring incremental weights from `update`/`regenerate` when composing
+  kernels.
 
 ## Testing Expectations
 
@@ -99,6 +101,7 @@ result = seed(lambda: elbo_vi(
 - `tests/test_vi.py`: ELBO/parameter progression + API integrity
 
 For new algorithmic helpers:
+
 1. add minimal unit coverage,
 2. add at least one end-to-end regression test,
 3. document public additions here.
