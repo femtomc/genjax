@@ -26,13 +26,13 @@ def polynomial_model(xs, ys=None):
     a = numpyro.sample("a", dist.Normal(0.0, 1.0))
     b = numpyro.sample("b", dist.Normal(0.0, 1.0))
     c = numpyro.sample("c", dist.Normal(0.0, 1.0))
-    
+
     # Compute predictions
     y_pred = a + b * xs + c * xs**2
-    
+
     # Observe data
     numpyro.sample("ys", dist.Normal(y_pred, 0.05), obs=ys)
-    
+
     return y_pred
 
 
@@ -44,66 +44,66 @@ def numpyro_polynomial_is_timing(
     inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Time NumPyro importance sampling on polynomial regression.
-    
+
     This implementation uses direct sampling and likelihood computation for minimal overhead.
-    
+
     Args:
         dataset: Polynomial dataset
         n_particles: Number of importance sampling particles
         repeats: Number of timing repetitions
         key: Random key (optional)
-        
+
     Returns:
         Dictionary with timing results and samples
     """
     if key is None:
         key = jrand.key(42)
-    
+
     xs, ys = dataset.xs, dataset.ys
-    
+
     # Importance sampling using NumPyro's trace handler (like GenJAX)
     def importance_sampling_traced(key, xs, ys, n_particles):
         """Importance sampling using NumPyro's trace handler."""
         keys = jrand.split(key, n_particles)
-        
+
         def sample_and_weight(k):
             # Run model and capture trace
             trace_fn = handlers.trace(handlers.seed(polynomial_model, k))
             tr = trace_fn.get_trace(xs, ys)
-            
+
             # Extract samples
             a = tr['a']['value']
             b = tr['b']['value']
             c = tr['c']['value']
-            
+
             # Compute log weight (sum of log probs)
             log_weight = 0.0
             for site in tr.values():
                 if site['type'] == 'sample':
                     log_weight += site['fn'].log_prob(site['value']).sum()
-            
+
             return a, b, c, log_weight
-        
+
         # Vectorize over particles
         a_samples, b_samples, c_samples, log_weights = jax.vmap(sample_and_weight)(keys)
-        
+
         return {
             'a': a_samples,
             'b': b_samples,
             'c': c_samples,
             'log_weights': log_weights
         }
-    
+
     # JIT compile the inference function with static n_particles
     jitted_is = jax.jit(importance_sampling_traced, static_argnums=(3,))
-    
-    # Define task for benchmarking  
+
+    # Define task for benchmarking
     def task():
         result = jitted_is(key, xs, ys, n_particles)
         # Block only on log weights for fair comparison
         jax.block_until_ready(result['log_weights'])
         return result
-    
+
     # Run benchmark with automatic warm-up - more inner repeats for accuracy
     times, (mean_time, std_time) = benchmark_with_warmup(
         task,
@@ -112,10 +112,10 @@ def numpyro_polynomial_is_timing(
         inner_repeats=inner_repeats,
         auto_sync=False,
     )
-    
+
     # Get samples for validation
     samples = task()
-    
+
     return {
         "framework": "numpyro",
         "method": "importance_sampling",
@@ -144,7 +144,7 @@ def numpyro_polynomial_hmc_timing(
     inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Time NumPyro HMC on polynomial regression.
-    
+
     Args:
         dataset: Polynomial dataset
         n_samples: Number of HMC samples
@@ -153,13 +153,13 @@ def numpyro_polynomial_hmc_timing(
         key: Random key (optional)
         step_size: HMC step size (fixed)
         n_leapfrog: Number of leapfrog steps (fixed)
-        
+
     Returns:
         Dictionary with timing results
     """
     if key is None:
         key = jrand.key(42)
-    
+
     xs, ys = dataset.xs, dataset.ys
 
     def model(xs, ys):
@@ -223,7 +223,7 @@ def numpyro_polynomial_hmc_timing(
     )
 
     samples = task()
-    
+
     return {
         "framework": "numpyro",
         "method": "hmc",
@@ -248,11 +248,11 @@ if __name__ == "__main__":
     import json
     from datetime import datetime
     from pathlib import Path
-    
+
     from ..data.generation import generate_polynomial_data
-    
+
     parser = argparse.ArgumentParser(description="Run NumPyro benchmarks")
-    parser.add_argument("--n-particles", type=int, nargs="+", 
+    parser.add_argument("--n-particles", type=int, nargs="+",
                         default=[100, 1000, 10000, 100000],
                         help="Number of particles for IS")
     parser.add_argument("--n-points", type=int, default=50,
@@ -273,22 +273,22 @@ if __name__ == "__main__":
                         help="HMC step size")
     parser.add_argument("--target-accept-prob", type=float, default=0.8,
                         help="HMC target acceptance probability")
-    
+
     args = parser.parse_args()
-    
+
     # Generate dataset
     dataset = generate_polynomial_data(n_points=args.n_points, seed=42)
-    
+
     # Create output directory
     if args.output_dir is None:
         output_dir = Path("data/numpyro")
     else:
         output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Run benchmarks
     results = {}
-    
+
     # Run importance sampling benchmarks
     if args.method in ["is", "all"]:
         print("Running NumPyro Importance Sampling benchmarks...")
@@ -302,22 +302,22 @@ if __name__ == "__main__":
                 inner_repeats=args.inner_repeats,
             )
             is_results[f"n{n_particles}"] = result
-            
+
             # Save individual result (without samples)
             result_file = output_dir / f"is_n{n_particles}.json"
             result_to_save = {k: v for k, v in result.items() if k not in ['samples', 'log_weights']}
             result_to_save['times'] = [float(t) for t in result['times']]
             with open(result_file, "w") as f:
                 json.dump(result_to_save, f, indent=2)
-        
+
         results["is"] = is_results
-    
+
     # Run HMC benchmarks
     if args.method in ["hmc", "all"]:
         print("Running NumPyro HMC benchmarks...")
         print(f"  N = {args.n_samples:,} samples (warmup: {args.n_warmup})...")
         print(f"  Step size = {args.step_size}, Target accept = {args.target_accept_prob}")
-        
+
         hmc_result = numpyro_polynomial_hmc_timing(
             dataset,
             n_samples=args.n_samples,
@@ -326,19 +326,19 @@ if __name__ == "__main__":
             step_size=args.step_size,
             target_accept_prob=args.target_accept_prob,
         )
-        
+
         # Save HMC result
         result_file = output_dir / f"hmc_n{args.n_samples}.json"
         result_to_save = {k: v for k, v in hmc_result.items() if k != "samples"}
         result_to_save["times"] = [float(t) for t in hmc_result["times"]]
         with open(result_file, "w") as f:
             json.dump(result_to_save, f, indent=2)
-            
+
         results["hmc"] = hmc_result
-    
+
     # Save summary
     summary_file = output_dir / f"summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    
+
     # Clean up results for JSON serialization
     clean_results = {}
     for method, method_results in results.items():
@@ -347,7 +347,7 @@ if __name__ == "__main__":
             for key, result in method_results.items():
                 if isinstance(result, dict):
                     clean_result = {
-                        k: v for k, v in result.items() 
+                        k: v for k, v in result.items()
                         if k not in ['samples', 'log_weights']
                     }
                     # Convert times to Python floats
@@ -358,7 +358,7 @@ if __name__ == "__main__":
                     clean_results[method] = result
         else:
             clean_results[method] = method_results
-    
+
     with open(summary_file, "w") as f:
         json.dump({
             "framework": "numpyro",
@@ -369,5 +369,5 @@ if __name__ == "__main__":
             "config": vars(args),
             "results": clean_results
         }, f, indent=2)
-    
+
     print(f"\nResults saved to {output_dir}")

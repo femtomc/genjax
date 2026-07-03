@@ -7,8 +7,8 @@ This guide covers the core runtime in `src/genjax/`:
 - `pjax.py`: probabilistic JAX transforms (`seed`, `modular_vmap`)
 - `state.py`: state-tagging interpreter (`@state`, `save`, `namespace`)
 
-For inference algorithms, see `inference/AGENTS.md`.
-For ADEV estimators, see `adev/AGENTS.md`.
+For inference algorithms, see `inference/AGENTS.md`. For ADEV estimators, see
+`adev/AGENTS.md`.
 
 ## Core Mental Model
 
@@ -21,6 +21,7 @@ A GenJAX program is a **generative function** (GF) with the GFI contract:
 - `regenerate(trace, selection, *args, **kwargs) -> (Trace, weight, discard)`
 
 A `Trace` carries:
+
 - random choices,
 - args,
 - return value,
@@ -47,7 +48,8 @@ def model(x):
 trace, w = model.generate({"y": observed_y}, x)
 ```
 
-- `generate` is the basic entry point for likelihood weighting / SMC-style initialization.
+- `generate` is the basic entry point for likelihood weighting / SMC-style
+  initialization.
 
 ### 3) Randomness + JAX transforms
 
@@ -71,13 +73,15 @@ out = batched(xs, shared_arg)
 
 ### 5) Static config via `Const`
 
-Use `Const[...]` for static values (loop lengths, fixed configuration) that must not be traced dynamically.
+Use `Const[...]` for static values (loop lengths, fixed configuration) that must
+not be traced dynamically.
 
 ## Selections and Addressing
 
 - Build selections with `sel(...)`.
 - Compose selections with `|`, `&`, and `~`.
-- Use selections in `regenerate` and inference kernels (`mh`, `mala`, `hmc`) to target subsets of choices.
+- Use selections in `regenerate` and inference kernels (`mh`, `mala`, `hmc`) to
+  target subsets of choices.
 
 Keep address hierarchies predictable so selections remain robust.
 
@@ -99,7 +103,8 @@ Use `namespace(fn, "name")` to organize saved values hierarchically.
 
 - `Scan(callee, length=Const[int])`: sequential probabilistic loops
 - `Vmap` via `.vmap(...)`: structure-preserving vectorization of GFs
-- `Cond(branch_true, branch_false)`: probabilistic branching compatible with shared addresses
+- `Cond(branch_true, branch_false)`: probabilistic branching compatible with
+  shared addresses
 
 Prefer these over Python control flow inside traced probabilistic code.
 
@@ -107,7 +112,8 @@ Prefer these over Python control flow inside traced probabilistic code.
 
 - Missing `@ "addr"` on stochastic sites (choice not tracked).
 - Python `if/for/while` in traced probabilistic paths.
-- Calling raw `jax.vmap` around probabilistic code when `modular_vmap` is needed.
+- Calling raw `jax.vmap` around probabilistic code when `modular_vmap` is
+  needed.
 - Forgetting to seed before `jit`/`scan`/`vmap` usage.
 - Dynamic address construction (hard to select/debug).
 
@@ -115,5 +121,7 @@ Prefer these over Python control flow inside traced probabilistic code.
 
 1. Preserve GFI semantics first; optimize second.
 2. Keep pytrees and shape behavior transform-safe.
-3. Add tests in matching files (`tests/test_core.py`, `tests/test_pjax.py`, etc.).
-4. Validate edge cases (empty selections, full selections, constrained/unconstrained paths).
+3. Add tests in matching files (`tests/test_core.py`, `tests/test_pjax.py`,
+   etc.).
+4. Validate edge cases (empty selections, full selections,
+   constrained/unconstrained paths).

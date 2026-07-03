@@ -41,7 +41,7 @@ def load_module(framework_name):
     if not module_path.exists():
         print(f"Warning: Module {module_path} not found")
         return None
-    
+
     spec = importlib.util.spec_from_file_location(f"timing_benchmarks.curvefit_benchmarks.{framework_name}", module_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[f"timing_benchmarks.curvefit_benchmarks.{framework_name}"] = module
@@ -67,15 +67,15 @@ def run_framework_hmc(
     module = load_module(framework)
     if module is None:
         return None
-    
+
     # Get the HMC timing function
     hmc_fn_name = f"{framework}_polynomial_hmc_timing"
     if not hasattr(module, hmc_fn_name):
         print(f"Warning: {hmc_fn_name} not found in {framework} module")
         return None
-    
+
     hmc_timing_fn = getattr(module, hmc_fn_name)
-    
+
     # Prepare framework-specific kwargs
     if framework == "numpyro":
         # NumPyro now uses fixed n_leapfrog like other frameworks
@@ -126,7 +126,7 @@ def run_framework_hmc(
             "step_size": kwargs.get("step_size", 0.01),
             "n_leapfrog": kwargs.get("n_leapfrog", 20)
         }
-    
+
     # Run the timing
     try:
         framework_kwargs["inner_repeats"] = inner_repeats
@@ -147,7 +147,7 @@ def run_framework_hmc(
 
 def main():
     parser = argparse.ArgumentParser(description="Run HMC benchmarks with varying chain lengths")
-    parser.add_argument("--frameworks", nargs="+", 
+    parser.add_argument("--frameworks", nargs="+",
                        default=["genjax", "numpyro", "handcoded_jax", "handcoded_torch", "pyro", "genjl"],
                        help="Frameworks to benchmark")
     parser.add_argument("--chain-lengths", nargs="+", type=int,
@@ -183,18 +183,18 @@ def main():
                        help="Target acceptance probability (NumPyro)")
     parser.add_argument("--device", type=str, default="cuda",
                        help="Device for PyTorch/Pyro (cpu or cuda)")
-    
+
     args = parser.parse_args()
     needs_jax = any(f in JAX_FRAMEWORKS for f in args.frameworks)
     if needs_jax:
         ensure_jax_backend()
-    
+
     # Print GPU status
     print("\n" + "="*60)
     print("GPU Configuration:")
     print("="*60)
     print(f"Device setting: {args.device}")
-    
+
     # Check PyTorch GPU if needed
     if args.device == "cuda" and any(f in args.frameworks for f in ["pyro", "handcoded_torch"]):
         try:
@@ -205,24 +205,24 @@ def main():
                 print("PyTorch CUDA: Not available - will fall back to CPU")
         except ImportError:
             print("PyTorch: Not installed")
-    
+
     # Generate dataset
     print(f"\nGenerating polynomial dataset with {args.n_points} points...")
     dataset = generate_polynomial_data(n_points=args.n_points)
-    
+
     # Run benchmarks for each framework and chain length
     for framework in args.frameworks:
         print(f"\n{'='*60}")
         print(f"Running HMC benchmarks for {framework}")
         print(f"{'='*60}")
-        
+
         framework_dir = args.output_dir / framework
         framework_dir.mkdir(parents=True, exist_ok=True)
-        
+
         for n_samples in args.chain_lengths:
             print(f"\nChain length: {n_samples}")
             print("-" * 40)
-            
+
             # Run benchmark
             results = run_framework_hmc(
                 framework=framework,
@@ -242,14 +242,14 @@ def main():
                 genjl_repeats=args.genjl_repeats,
                 genjl_inner_repeats=args.genjl_inner_repeats,
             )
-            
+
             if results is not None:
                 # Clean results for JSON serialization
                 clean_results = {
-                    k: v for k, v in results.items() 
+                    k: v for k, v in results.items()
                     if k not in ["samples", "log_weights"]
                 }
-                
+
                 # Convert numpy/JAX arrays to Python types
                 if "times" in clean_results:
                     clean_results["times"] = [float(t) for t in clean_results["times"]]
@@ -257,17 +257,17 @@ def main():
                     clean_results["mean_time"] = float(clean_results["mean_time"])
                 if "std_time" in clean_results:
                     clean_results["std_time"] = float(clean_results["std_time"])
-                
+
                 # Save results
                 output_file = framework_dir / f"hmc_n{n_samples}.json"
                 with open(output_file, "w") as f:
                     json.dump(clean_results, f, indent=2)
-                
+
                 print(f"✓ {framework} HMC (n={n_samples}): {results['mean_time']:.3f}s ± {results['std_time']:.3f}s")
                 print(f"  Saved to: {output_file}")
             else:
                 print(f"✗ {framework} HMC (n={n_samples}): Failed")
-    
+
     print("\n" + "="*60)
     print("HMC benchmarking complete!")
     print("="*60)

@@ -1,7 +1,7 @@
 # ADEV Module Guide
 
-`genjax.adev` implements **Automatic Differentiation of Expected Values (ADEV)**:
-unbiased gradient estimators for stochastic programs.
+`genjax.adev` implements **Automatic Differentiation of Expected Values
+(ADEV)**: unbiased gradient estimators for stochastic programs.
 
 ## What to Use First
 
@@ -12,11 +12,15 @@ unbiased gradient estimators for stochastic programs.
 
 ## Estimator Primitives (Current Public Set)
 
-- Reparameterized: `normal_reparam`, `uniform_reparam`, `multivariate_normal_reparam`
-- Score-function / REINFORCE: `flip_reinforce`, `geometric_reinforce`, `normal_reinforce`, `uniform_reinforce`, `multivariate_normal_reinforce`
-- Discrete estimators: `flip_enum`, `flip_enum_parallel`, `flip_mvd`, `categorical_enum_parallel`
+- Reparameterized: `normal_reparam`, `uniform_reparam`,
+  `multivariate_normal_reparam`
+- Score-function / REINFORCE: `flip_reinforce`, `geometric_reinforce`,
+  `normal_reinforce`, `uniform_reinforce`, `multivariate_normal_reinforce`
+- Discrete estimators: `flip_enum`, `flip_enum_parallel`, `flip_mvd`,
+  `categorical_enum_parallel`
 
-Choose low-variance estimators when possible (reparameterization for continuous sites, exact/enum when tractable for discrete sites).
+Choose low-variance estimators when possible (reparameterization for continuous
+sites, exact/enum when tractable for discrete sites).
 
 ## Canonical Pattern
 
@@ -45,17 +49,18 @@ grad = objective.grad_estimate(theta)
 - In JAX, non-inexact primals (bool/int/discrete-like values) have tangent dtype
   `float0`.
 - JAX AD canonicalizes `float0` tangents to symbolic `ad.Zero` sentinels before
-  primitive JVP rule dispatch and short-circuits primitive-JVP execution when all
-  tangents are zero.
-- ADEV invokes primitive JVP rules directly from its interpreter, so it must mirror
-  this behavior:
+  primitive JVP rule dispatch and short-circuits primitive-JVP execution when
+  all tangents are zero.
+- ADEV invokes primitive JVP rules directly from its interpreter, so it must
+  mirror this behavior:
   1. canonicalize `float0` tangents to `ad.Zero`,
   2. primal-only fast-path when all tangents are zero,
   3. materialize returned symbolic zeros with `instantiate_zeros` before storing
      into `Dual`.
 - This prevents staged failures in `seed + vmap + jit` paths (notably
   `flip_mvd` + downstream `astype`/`convert_element_type` chains).
-- Regression coverage: `tests/test_adev.py::TestADEVVmapSemantics::test_flip_mvd_float0_tangent_canonicalization_under_staging`.
+- Regression coverage:
+  `tests/test_adev.py::TestADEVVmapSemantics::test_flip_mvd_float0_tangent_canonicalization_under_staging`.
 
 ## Extending ADEV (Custom Primitives)
 
@@ -66,25 +71,30 @@ Subclass `ADEVPrimitive` and implement:
 3. `prim_jvp_estimate(self, dual_tree, konts)`
 
 Guidelines:
+
 - Keep output structures pytree-compatible.
 - Make `sample_with_key` obey PJAX keyful sampler conventions.
-- Ensure `prim_jvp_estimate` returns a `Dual`-compatible value/tangent pair shape.
+- Ensure `prim_jvp_estimate` returns a `Dual`-compatible value/tangent pair
+  shape.
 
 ## Common Mistakes
 
 - Mixing plain distribution sites with ADEV expectation sites.
 - Missing keyful sampler support in custom primitives.
-- Using `jax.vmap` directly over probabilistic ADEV sites when `modular_vmap` is needed.
+- Using `jax.vmap` directly over probabilistic ADEV sites when `modular_vmap` is
+  needed.
 - Assuming low variance from REINFORCE in difficult objectives.
 
 ## Testing
 
 Primary coverage lives in:
+
 - `tests/test_adev.py`
 - `tests/test_mvnormal_estimators.py`
 - relevant VI tests (`tests/test_vi.py`) for end-to-end objective optimization
 
 When adding estimators:
+
 1. test finite outputs,
 2. test gradient sanity vs analytic/finite-difference references where possible,
 3. add seeded/vectorized regression tests.

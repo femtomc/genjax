@@ -1,6 +1,7 @@
 # Localization Case Study Guide
 
-This case study runs particle-filter localization (with optional rejuvenation comparisons) and generates paper figures.
+This case study runs particle-filter localization (with optional rejuvenation
+comparisons) and generates paper figures.
 
 ## Key Files
 
@@ -20,6 +21,7 @@ pixi run -e localization-cuda python -m examples.localization.main paper --inclu
 ```
 
 Common flags:
+
 - `--n-rays`
 - `--n-particles`
 - `--n-steps`
@@ -34,8 +36,10 @@ Paper mode writes figure PDFs to `figs/` (or the provided `--output-dir`).
 
 ## Notes for External Agents
 
-- `--include-smc-comparison` controls whether the expensive benchmark panel is generated.
-- Keep static counts/configuration explicit for traced performance-sensitive code.
+- `--include-smc-comparison` controls whether the expensive benchmark panel is
+  generated.
+- Keep static counts/configuration explicit for traced performance-sensitive
+  code.
 
 ## When Modifying
 

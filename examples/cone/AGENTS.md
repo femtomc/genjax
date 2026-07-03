@@ -5,6 +5,7 @@ Cone reproduces the PLDI'24 cone objectives with current GenJAX APIs.
 ## Purpose
 
 Compare objective families:
+
 - naive ELBO
 - naive IWAE (`K` particles)
 - expressive auxiliary-variable objectives (HVI/IWHVI/DIWHVI-style settings)
@@ -23,6 +24,7 @@ pixi run python -m examples.cone.main fig2 --output-dir figs
 ```
 
 Useful knobs:
+
 - `--n-steps`
 - `--batch-size`
 - `--learning-rate`
@@ -30,7 +32,8 @@ Useful knobs:
 
 ## Idioms in this Case
 
-- Objectives are built with `@expectation` and optimized by stochastic gradient ascent.
+- Objectives are built with `@expectation` and optimized by stochastic gradient
+  ascent.
 - Sampling-heavy batched objective evaluation uses seeded/vectorized call paths.
 - Keep particle counts and objective structure static during traced execution.
 

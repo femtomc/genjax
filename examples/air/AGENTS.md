@@ -1,6 +1,7 @@
 # AIR Case Study Guide
 
-This case ports the GenJAX AIR estimator experiment from the PLDI'24 programmable-VI artifact.
+This case ports the GenJAX AIR estimator experiment from the PLDI'24
+programmable-VI artifact.
 
 ## Purpose
 
@@ -13,7 +14,8 @@ Evaluate discrete-gradient estimators in an AIR-style latent-variable model:
 
 ## Key Files
 
-- `core.py`: model/guide definitions, STN transforms, objectives, training/eval utilities
+- `core.py`: model/guide definitions, STN transforms, objectives, training/eval
+  utilities
 - `main.py`: CLI (`train`, `compare`)
 
 ## CLI Commands
@@ -39,7 +41,8 @@ pixi run python -m examples.air.main compare \
 
 ## Notes
 
-- Default dataset mode is `synthetic` (samples from the AIR prior), so the case runs without Pyro/Torch.
+- Default dataset mode is `synthetic` (samples from the AIR prior), so the case
+  runs without Pyro/Torch.
 - For `multi-mnist`, supply an existing NPZ file.
 - Keep heavy logic in `core.py`; keep `main.py` as orchestration only.
 

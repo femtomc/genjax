@@ -17,15 +17,15 @@ end
 @gen function polynomial_model(xs::Vector{Float64})
     # Prior on polynomial coefficients
     a ~ normal(0.0, 1.0)
-    b ~ normal(0.0, 1.0) 
+    b ~ normal(0.0, 1.0)
     c ~ normal(0.0, 1.0)
-    
+
     # Likelihood
     for i in 1:length(xs)
         y_det = polyfn(xs[i], a, b, c)
         {:y => i} ~ normal(y_det, 0.05)
     end
-    
+
     return (a, b, c)
 end
 
@@ -37,13 +37,13 @@ function run_polynomial_is_benchmark(
 )
     xs = data.xs
     ys = data.ys
-    
+
     # Create observations
     observations = choicemap()
     for i in 1:length(ys)
         observations[:y => i] = ys[i]
     end
-    
+
     times = Float64[]
     for _ in 1:repeats
         elapsed = @elapsed begin
@@ -53,17 +53,17 @@ function run_polynomial_is_benchmark(
     end
     mean_time = mean(times)
     std_time = std(times)
-    
+
     # Get representative outputs for downstream validation
     traces, log_weights, _ = importance_sampling(
         polynomial_model, (xs,), observations, n_particles
     )
-    
+
     # Extract final samples for validation
     samples_a = [traces[i][:a] for i in 1:n_particles]
     samples_b = [traces[i][:b] for i in 1:n_particles]
     samples_c = [traces[i][:c] for i in 1:n_particles]
-    
+
     return Dict(
         "framework" => "genjl",
         "method" => "is",
@@ -91,16 +91,16 @@ function run_polynomial_hmc_benchmark(
 )
     xs = data.xs
     ys = data.ys
-    
+
     # Create observations
     observations = choicemap()
     for i in 1:length(ys)
         observations[:y => i] = ys[i]
     end
-    
+
     # Selection for continuous parameters
     selection = Gen.select(:a, :b, :c)
-    
+
     total_steps = n_warmup + n_samples
     times = Float64[]
     for _ in 1:repeats
@@ -114,18 +114,18 @@ function run_polynomial_hmc_benchmark(
     end
     mean_time = mean(times)
     std_time = std(times)
-    
+
     # Get one final chain for samples
     trace, _ = Gen.generate(polynomial_model, (xs,), observations)
     samples_a = Float64[]
     samples_b = Float64[]
     samples_c = Float64[]
-    
+
     # Burn-in
     for _ in 1:n_warmup
         trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
     end
-    
+
     # Collect samples
     for _ in 1:n_samples
         trace, _ = Gen.hmc(trace, selection; L=n_leapfrog, eps=step_size)
@@ -133,7 +133,7 @@ function run_polynomial_hmc_benchmark(
         push!(samples_b, trace[:b])
         push!(samples_c, trace[:c])
     end
-    
+
     return Dict(
         "framework" => "genjl",
         "method" => "hmc",

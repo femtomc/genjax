@@ -39,17 +39,17 @@ def polynomial_flat(xs):
 
 def make_genjax_infer_is(n_particles: int):
     """Create optimized GenJAX importance sampling inference function.
-    
+
     This follows the faircoin pattern for minimal overhead.
     """
     def infer(xs, ys):
         constraints = {"ys": ys}
-        
+
         def importance_(constraints):
             trace, w = polynomial_flat.generate(constraints, xs)
             choices = trace.get_choices()
             return w, choices["a"], choices["b"], choices["c"]
-        
+
         # Direct vmap without dummy arrays
         imp = vmap(importance_, axis_size=n_particles, in_axes=None)
         logw, a_samples, b_samples, c_samples = imp(constraints)
@@ -59,7 +59,7 @@ def make_genjax_infer_is(n_particles: int):
             "b": b_samples,
             "c": c_samples,
         }
-    
+
     return infer
 
 
@@ -144,7 +144,7 @@ def genjax_polynomial_hmc_timing(
     inner_repeats: int = 10,
 ) -> Dict[str, Any]:
     """Time GenJAX HMC on polynomial regression.
-    
+
     Args:
         dataset: Polynomial dataset
         n_samples: Number of HMC samples
@@ -153,38 +153,38 @@ def genjax_polynomial_hmc_timing(
         key: Random key (optional)
         step_size: HMC step size (default: 0.01)
         n_leapfrog: Number of leapfrog steps (default: 20)
-        
+
     Returns:
         Dictionary with timing results
     """
     if key is None:
         key = jrand.key(42)
-    
+
     xs, ys = dataset.xs, dataset.ys
-    
+
     # Import HMC from GenJAX
     from genjax.inference import hmc, chain
     from genjax import sel, const, seed
     from genjax.core import Trace
-    
+
     # Create HMC kernel
     def hmc_kernel(trace: Trace):
         # Select all continuous parameters
         selection = sel("a") | sel("b") | sel("c")
         return hmc(trace, selection, step_size, n_leapfrog)
-    
+
     # Create MCMC chain with burn-in
     mcmc_algorithm = chain(hmc_kernel)
-    
+
     # Initialize with importance sampling
     constraints = {"ys": ys}
     init_trace, _ = polynomial_flat.generate(constraints, xs)
-    
+
     # Create inference function WITHOUT key parameter - seed will add it
     def run_hmc():
         # Total steps = warmup + samples
         total_steps = n_warmup + n_samples
-        
+
         # Run MCMC with single chain (for timing comparison)
         result = mcmc_algorithm(
             init_trace,
@@ -193,21 +193,21 @@ def genjax_polynomial_hmc_timing(
             burn_in=const(n_warmup),
             autocorrelation_resampling=const(1)  # No thinning
         )
-        
+
         # Extract samples
         choices = result.traces.get_choices()
         return choices
-    
+
     # seed(run_hmc) will create a function that takes (key, *original_args)
     # Since run_hmc has no args, seeded version will just take (key)
     jitted_hmc = jax.jit(seed(run_hmc))
-    
+
     # Timing function
     def task():
         samples = jitted_hmc(key)
         jax.block_until_ready(samples["a"])
         return samples
-    
+
     # Run benchmark with automatic warm-up
     times, (mean_time, std_time) = benchmark_with_warmup(
         task,
@@ -216,10 +216,10 @@ def genjax_polynomial_hmc_timing(
         inner_repeats=inner_repeats,
         auto_sync=False,
     )
-    
+
     # Get final samples for validation
     samples = task()
-    
+
     return {
         "framework": "genjax",
         "method": "hmc",
@@ -337,7 +337,7 @@ if __name__ == "__main__":
         print("Running GenJAX HMC benchmarks...")
         print(f"  N = {args.n_samples:,} samples (warmup: {args.n_warmup})...")
         print(f"  Step size = {args.step_size}, Leapfrog steps = {args.n_leapfrog}")
-        
+
         hmc_result = genjax_polynomial_hmc_timing(
             dataset,
             n_samples=args.n_samples,
@@ -346,7 +346,7 @@ if __name__ == "__main__":
             step_size=args.step_size,
             n_leapfrog=args.n_leapfrog,
         )
-        
+
         # Save HMC result
         result_file = output_dir / f"hmc_n{args.n_samples}.json"
         result_to_save = {
@@ -357,7 +357,7 @@ if __name__ == "__main__":
         ]  # Convert to Python floats
         with open(result_file, "w") as f:
             json.dump(result_to_save, f, indent=2)
-            
+
         results["hmc"] = hmc_result
 
     # Save summary
