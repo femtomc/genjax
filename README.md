@@ -1,5 +1,5 @@
 <p align="center">
-<img width="450" src="./logo.png"/>
+<img width="450" src="https://raw.githubusercontent.com/femtomc/genjax/main/logo.png"/>
 </p>
 
 [![DOI](https://zenodo.org/badge/971731825.svg)](https://doi.org/10.5281/zenodo.17342547)
