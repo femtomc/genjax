@@ -12,7 +12,8 @@
 ## Use
 
 ```sh
-cd research/genjax
+git clone https://github.com/femtomc/genjax.git
+cd genjax
 pixi install
 pixi run test-fast
 pixi run paper-figures
@@ -70,7 +71,7 @@ choices = trace.get_choices()
 
 ## References
 
-- [Probabilistic Programming with Vectorized Programmable Inference](../../press/papers/tex/genjax-popl-2026/README.md)
+- [Probabilistic Programming with Vectorized Programmable Inference](https://doi.org/10.1145/3776729)
 - [Artifact DOI](https://doi.org/10.5281/zenodo.17342547)
 - [Gen: programmable inference](https://doi.org/10.1145/3314221.3314642)
 - [ADEV](https://doi.org/10.1145/3571198)
