@@ -405,7 +405,7 @@ def test_fn_conditional_sampling(standard_tolerance, helpers):
 @pytest.mark.unit
 @pytest.mark.regression
 def test_cond_update_with_vmap_regression(base_key, standard_tolerance, helpers):
-    """Regression test for Cond.update bug with vmap (Issue #XXX).
+    """Regression test for Cond.update with vmap.
 
     This test verifies that Cond.update works correctly in vectorized contexts.
     The bug was that jnp.select was used incorrectly with scalar conditions.

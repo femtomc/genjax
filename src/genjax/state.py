@@ -137,6 +137,8 @@ from genjax.pjax import (
     PPPrimitive,
     Environment,
     InitialStylePrimitive,
+    primitive_bind_params,
+    scan_input_lengths,
     stage,
     TerminalStyle,
     initial_style_bind,
@@ -214,8 +216,8 @@ class State:
 
         for eqn in jaxpr.eqns:
             invals = safe_map(env.read, eqn.invars)
-            subfuns, params = eqn.primitive.get_bind_params(eqn.params)
-            args = subfuns + invals
+            params = primitive_bind_params(eqn.primitive, eqn.params)
+            args = invals
             primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
 
             if primitive == state_p:
@@ -282,8 +284,7 @@ class State:
                 body_jaxpr = params["jaxpr"]
                 length = params["length"]
                 reverse = params["reverse"]
-                num_consts = params["num_consts"]
-                num_carry = params["num_carry"]
+                num_consts, num_carry = scan_input_lengths(params)
                 const_vals, carry_vals, xs_vals = split_list(
                     invals, [num_consts, num_carry]
                 )

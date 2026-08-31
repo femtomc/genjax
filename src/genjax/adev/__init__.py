@@ -74,6 +74,7 @@ from genjax.pjax import (
     sample_p,
     adev_sample_p,
     modular_vmap,
+    primitive_bind_params,
     stage,
 )
 
@@ -84,9 +85,6 @@ from jax.extend.core import Jaxpr, Var, jaxpr_as_fun
 from jax.interpreters import ad as jax_autodiff
 from jaxtyping import ArrayLike
 
-from genjax._compat import ensure_jax_tfp_compat
-
-ensure_jax_tfp_compat()
 from tensorflow_probability.substrates import jax as tfp
 
 from genjax.distributions import (
@@ -117,13 +115,20 @@ def _is_ad_zero(v) -> bool:
 def _is_float0_tangent(v) -> bool:
     """Whether ``v`` has float0 tangent dtype.
 
-    We use ``get_aval`` so this works for both concrete arrays and tracers.
+    We use ``jax.typeof`` so this works for both concrete arrays and tracers.
     """
     try:
-        aval = jax._src.core.get_aval(v)
+        aval = jax.typeof(v)
     except TypeError:
         return False
-    return isinstance(aval, jax._src.core.ShapedArray) and aval.dtype == jax.dtypes.float0
+    return (
+        isinstance(aval, jax._src.core.ShapedArray) and aval.dtype == jax.dtypes.float0
+    )
+
+
+def _symbolic_zero_tangent(primal):
+    """Construct JAX's internal symbolic zero for a primal value."""
+    return jax_autodiff.Zero(jax.typeof(primal).to_tangent_aval())
 
 
 def _canonicalize_tangent_for_primitive_jvp(primal, tangent):
@@ -136,7 +141,7 @@ def _canonicalize_tangent_for_primitive_jvp(primal, tangent):
     if _is_ad_zero(tangent):
         return tangent
     if _is_float0_tangent(tangent):
-        return jax_autodiff.Zero.from_primal_value(primal)
+        return _symbolic_zero_tangent(primal)
     return tangent
 
 
@@ -151,7 +156,7 @@ def _instantiate_zero_tangents(tree):
 
 def _zero_tangent_like(v):
     """Construct a zero tangent with the correct tangent dtype for ``v``."""
-    return jax_autodiff.instantiate_zeros(jax_autodiff.Zero.from_primal_value(v))
+    return jax_autodiff.instantiate_zeros(_symbolic_zero_tangent(v))
 
 
 ###################
@@ -471,14 +476,12 @@ class ADEV(Pytree):
             pure_env.env = {k: Dual.tree_primal(v) for k, v in pure_env.env.items()}
             return pure_env
 
-        # TODO: Pure evaluation.
         def eval_jaxpr_iterate_pure(eqns, pure_env, invars, flat_args):
             jax_util.safe_map(pure_env.write, invars, flat_args)
             for eqn in eqns:
                 in_vals = jax_util.safe_map(pure_env.read, eqn.invars)
-                subfuns, params = eqn.primitive.get_bind_params(eqn.params)
-                args = subfuns + in_vals
-                outs = eqn.primitive.bind(*args, **params)
+                params = primitive_bind_params(eqn.primitive, eqn.params)
+                outs = eqn.primitive.bind(*in_vals, **params)
                 if not eqn.primitive.multiple_results:
                     outs = [outs]
                 jax_util.safe_map(pure_env.write, eqn.outvars, outs)
@@ -497,8 +500,8 @@ class ADEV(Pytree):
             for eqn_idx, eqn in enumerate(eqns):
                 with src_util.user_context(eqn.source_info.traceback):
                     in_vals = jax_util.safe_map(dual_env.read, eqn.invars)
-                    subfuns, params = eqn.primitive.get_bind_params(eqn.params)
-                    duals = subfuns + in_vals
+                    params = primitive_bind_params(eqn.primitive, eqn.params)
+                    duals = in_vals
 
                     primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
                     # ADEV stochastic site primitive.
@@ -551,6 +554,7 @@ class ADEV(Pytree):
 
                         sample_shape = tuple(inner_params.get("sample_shape", ()))
                         if sample_shape:
+
                             def _broadcast(v):
                                 return jnp.broadcast_to(v, sample_shape + jnp.shape(v))
 
@@ -619,8 +623,12 @@ class ADEV(Pytree):
                             # If all inputs have zero tangents, skip primitive JVP
                             # rule dispatch and evaluate primal-only.
                             if all(_is_ad_zero(t) for t in canonical_tangents):
-                                primal_outs = eqn.primitive.bind(*flat_primals, **params)
-                                tangent_outs = jtu.tree_map(_zero_tangent_like, primal_outs)
+                                primal_outs = eqn.primitive.bind(
+                                    *flat_primals, **params
+                                )
+                                tangent_outs = jtu.tree_map(
+                                    _zero_tangent_like, primal_outs
+                                )
                             else:
                                 jvp = jax_autodiff.primitive_jvps.get(eqn.primitive)
                                 if not jvp:
@@ -1469,6 +1477,7 @@ categorical_enum_parallel = CategoricalEnumParallel()
 # REINFORCE distribution estimators   #
 ########################################
 
+
 def _bernoulli_keyful_sample(key, probs, sample_shape=()):
     return tfd.Bernoulli(probs=probs, dtype=jnp.bool_).sample(
         seed=key,
@@ -1801,6 +1810,7 @@ multivariate_normal_reparam = distribution(
     MultivariateNormalREPARAM(),
     multivariate_normal.logpdf,
 )
+
 
 def _multivariate_normal_keyful_sample(key, loc, covariance_matrix, sample_shape=()):
     return tfd.MultivariateNormalFullCovariance(loc, covariance_matrix).sample(
