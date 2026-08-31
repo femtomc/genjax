@@ -11,9 +11,6 @@ import penzai.pz as pz
 from jax.lax import scan
 from typing_extensions import dataclass_transform
 
-from ._compat import ensure_jax_tfp_compat
-
-ensure_jax_tfp_compat()
 from tensorflow_probability.substrates import jax as tfp
 
 # Import PJAX functionality that was moved from this file

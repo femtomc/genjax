@@ -1,85 +1,47 @@
-# Performance Benchmark Case Study (POPL Figure 16b)
+# Performance benchmark case study
 
-This case study runs the multi-framework timing benchmark used for Figure 16b.
+- **Purpose:** Reproduce POPL 2026 Figure 16b across GenJAX, NumPyro, Pyro,
+  TensorFlow Probability, hand-coded JAX/PyTorch, and Gen.jl.
 
-## Scope
+## Use
 
-The pipeline compares GenJAX with:
+- From `research/genjax/`:
 
-- NumPyro
-- Pyro
-- hand-coded JAX
-- hand-coded PyTorch
-- Gen.jl (when Julia is installed)
-
-for both importance sampling (IS) and HMC workflows.
-
-## Layout
-
-```text
-examples/perfbench/
-├── AGENTS.md
-├── README.md
-├── main.py
-└── benchmarks/
-    ├── src/timing_benchmarks/
-    ├── julia/
-    ├── run_hmc_benchmarks.py
-    ├── run_genjl_hmc.py
-    └── combine_results.py
-```
-
-## Running from Repository Root
-
-Use the root Pixi tasks:
-
-```bash
-# CPU pipeline
+```sh
 pixi run paper-perfbench
-
-# CUDA pipeline
-pixi run paper-perfbench-cuda
-
-# Clean generated data/figures for perfbench
+pixi run paper-perfbench --mode cuda
+pixi run paper-perfbench --inference is
+pixi run paper-perfbench --inference hmc
+pixi run paper-perfbench --frameworks genjax numpyro handcoded_jax
 pixi run paper-perfbench-clean
 ```
 
-You can pass pipeline flags directly:
+- Direct orchestration:
 
-```bash
-pixi run paper-perfbench --inference is --frameworks genjax numpyro
-pixi run paper-perfbench-cuda --inference hmc --hmc-chain-lengths 1000 5000
+```sh
+pixi run -e perfbench python examples/perfbench/main.py pipeline --help
 ```
 
-## Direct CLI Usage
+- CPU output: `data_cpu/` and `figs_cpu/`.
+- CUDA output: `data/` and `figs/`.
+- Resume with the `--skip-*` flags shown by `--help`.
+- Gen.jl lanes require Julia 1.10 or newer.
+- Framework-specific environments and repeat caps are encoded in the pipeline.
 
-```bash
-pixi run -e perfbench python examples/perfbench/main.py pipeline --mode cpu
-pixi run -e perfbench-cuda python examples/perfbench/main.py pipeline --mode cuda
-```
+## Code
 
-Key flags:
+- [Pipeline](main.py)
+- [Benchmark runners](benchmarks/)
+- [Framework adapters](benchmarks/src/timing_benchmarks/curvefit_benchmarks/)
+- [Result merge and plotting](benchmarks/combine_results.py)
+- [Pixi task registration](../../pyproject.toml)
+- [Parent artifact index](../../README.md)
 
-- `--inference {all,is,hmc}`
-- `--frameworks ...` (or `--is-frameworks` / `--hmc-frameworks`)
-- `--particles ...`
-- `--is-repeats`, `--is-inner-repeats`
-- `--hmc-chain-lengths`, `--hmc-repeats`, `--hmc-warmup`, `--hmc-step-size`,
-  `--hmc-n-leapfrog`
-- `--skip-generate`, `--skip-is`, `--skip-hmc`, `--skip-plots`, `--skip-export`
+## References
 
-## Outputs
+- [POPL 2026 paper source](../../../../press/papers/tex/genjax-popl-2026/README.md)
+- Imported timing benchmark baseline: `timing-benchmarks@d4433b0`.
 
-- CUDA mode:
-  - data: `examples/perfbench/data/`
-  - figures/tables: `examples/perfbench/figs/`
-- CPU mode:
-  - data: `examples/perfbench/data_cpu/`
-  - figures/tables: `examples/perfbench/figs_cpu/`
+## License
 
-When export is enabled, PDFs are copied to the repository `figs/` directory.
-
-## Julia / Gen.jl
-
-Gen.jl benchmarks require Julia (>= 1.10) on PATH. The pipeline
-auto-instantiates the Julia project on first use.
+Apache-2.0. See [LICENSE](../../LICENSE.md).

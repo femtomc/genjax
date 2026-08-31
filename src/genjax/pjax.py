@@ -74,7 +74,6 @@ Technical Details:
 
 References:
     - JAX Primitives: https://jax.readthedocs.io/en/latest/notebooks/How_JAX_primitives_work.html
-    - GenJAX Documentation: See src/genjax/AGENTS.md for PJAX usage patterns
 """
 
 import itertools as it
@@ -85,16 +84,24 @@ from functools import partial, wraps
 
 # Core JAX imports
 import jax
-import jax.core as jc
 import jax.extend as jex
 import jax.extend.linear_util as lu
 import jax.numpy as jnp
 import jax.random as jrand
 import jax.tree_util as jtu
 from jax import api_util, tree_util
+from jax._src import flattree as ft
+from jax._src.core import eval_jaxpr
 from jax._src.interpreters.batching import AxisData  # pyright: ignore
-from jax.core import eval_jaxpr
-from jax.extend.core import ClosedJaxpr, Jaxpr, Literal, Primitive, Var
+from jax.extend.core import (
+    ClosedJaxpr,
+    DropVar,
+    Jaxpr,
+    Literal,
+    Primitive,
+    TraceTag,
+    Var,
+)
 from jax.interpreters import ad, batching, mlir
 from jax._src.interpreters import partial_eval as pe
 from jax.lax import cond_p, scan, scan_p, switch
@@ -131,7 +138,18 @@ VarOrLiteral = Var | Literal
 
 def get_shaped_aval(x):
     """Get the shaped abstract value of a JAX array."""
-    return jc.get_aval(x)
+    return jax.typeof(x)
+
+
+def primitive_bind_params(primitive: Primitive, params: dict[str, Any]):
+    """Prepare a private copy of a primitive's interpreter bind parameters."""
+    return dict(primitive.get_bind_params(params))
+
+
+def scan_input_lengths(params: dict[str, Any]) -> tuple[int, int]:
+    """Return the constant and carry arities encoded by a scan input tree."""
+    const_tree, carry_tree, _ = params["ft_in"].unpack()
+    return len(const_tree), len(carry_tree)
 
 
 @lu.cache
@@ -389,7 +407,7 @@ class PPPrimitive(Primitive):
 
 
 def batch_fun(fun: lu.WrappedFun, axis_data, in_dims):
-    tag = jc.TraceTag()
+    tag = TraceTag()
     in_dims = in_dims() if callable(in_dims) else in_dims
     batched, out_dims = batching.batch_subtrace(fun, tag, axis_data, in_dims)
     return batched, out_dims
@@ -415,7 +433,7 @@ def initial_style_bind(
 
             def impl(*flat_args, **params) -> list[Any]:
                 consts, flat_args = split_list(flat_args, [params["num_consts"]])
-                return jc.eval_jaxpr(jaxpr.jaxpr, consts, *flat_args)
+                return eval_jaxpr(jaxpr.jaxpr, consts, *flat_args)
 
             def abstract(*flat_avals, **params):
                 if modular_vmap_aware:
@@ -442,9 +460,11 @@ def initial_style_bind(
                 flat_tangents: tuple[Any, ...] | list[Any],
                 **params,
             ) -> tuple[list[Any], list[Any]]:
+                primals = ft.flatten(tuple(flat_primals))
+                tangents = primals.update(flat_tangents)
                 primals_out, tangents_out = ad.jvp(
-                    lu.wrap_init(impl, params, debug_info=debug_info)
-                ).call_wrapped(flat_primals, flat_tangents)
+                    partial(impl, **params), primals, tangents
+                )
 
                 # We always normalize back to list.
                 return list(primals_out), list(tangents_out)
@@ -1209,7 +1229,7 @@ class Environment:
     PJAX's specialized interpreters.
     """
 
-    env: dict[int, Any] = field(default_factory=dict)
+    env: dict[Var, Any] = field(default_factory=dict)
 
     def read(self, var: VarOrLiteral) -> Any:
         """
@@ -1219,7 +1239,8 @@ class Environment:
         if v is None:
             assert isinstance(var, Var)
             raise ValueError(
-                f"Unbound variable in interpreter environment at count {var.count}:\nEnvironment keys (count): {list(self.env.keys())}"
+                f"Unbound variable in interpreter environment: {var!r}\n"
+                f"Environment keys: {list(self.env.keys())}"
             )
         return v
 
@@ -1227,7 +1248,7 @@ class Environment:
         if isinstance(var, Literal):
             return var.val
         else:
-            return self.env.get(var.count)
+            return self.env.get(var)
 
     def write(self, var: VarOrLiteral, cell: Any) -> Any:
         """
@@ -1236,10 +1257,10 @@ class Environment:
         if isinstance(var, Literal):
             return cell
         cur_cell = self.get(var)
-        if isinstance(var, jc.DropVar):
+        if isinstance(var, DropVar):
             return cur_cell
-        self.env[var.count] = cell
-        return self.env[var.count]
+        self.env[var] = cell
+        return self.env[var]
 
     def __getitem__(self, var: VarOrLiteral) -> Any:
         return self.read(var)
@@ -1256,7 +1277,7 @@ class Environment:
         """
         if isinstance(var, Literal):
             return True
-        return var.count in self.env
+        return var in self.env
 
     def copy(self):
         """
@@ -1326,20 +1347,20 @@ class Seed:
         safe_map(env.write, jaxpr.invars, args)
         for eqn in jaxpr.eqns:
             invals = safe_map(env.read, eqn.invars)
-            subfuns, params = eqn.primitive.get_bind_params(eqn.params)
-            args = subfuns + invals
+            params = primitive_bind_params(eqn.primitive, eqn.params)
+            args = invals
             primitive, inner_params = PPPrimitive.unwrap(eqn.primitive)
 
             if primitive in (sample_p, adev_sample_p):
                 invals = safe_map(env.read, eqn.invars)
-                args = subfuns + invals
+                args = invals
                 flat_keyful_sampler = inner_params["flat_keyful_sampler"]
                 self.key, sub_key = jrand.split(self.key)
                 outvals = flat_keyful_sampler(sub_key, *args, **inner_params)
 
             elif primitive == cond_p:
                 invals = safe_map(env.read, eqn.invars)
-                subfuns, params = eqn.primitive.get_bind_params(eqn.params)
+                params = primitive_bind_params(eqn.primitive, eqn.params)
                 branch_closed_jaxprs = params["branches"]
                 self.key, sub_key = jrand.split(self.key)
                 branches = tuple(
@@ -1361,8 +1382,7 @@ class Seed:
                 body_jaxpr = params["jaxpr"]
                 length = params["length"]
                 reverse = params["reverse"]
-                num_consts = params["num_consts"]
-                num_carry = params["num_carry"]
+                num_consts, num_carry = scan_input_lengths(params)
                 const_vals, carry_vals, xs_vals = split_list(
                     invals, [num_consts, num_carry]
                 )
@@ -1512,8 +1532,8 @@ class ModularVmap:
         safe_map(env.write, jaxpr.invars, flat_args)
         for eqn in jaxpr.eqns:
             invals = safe_map(env.read, eqn.invars)
-            subfuns, params = eqn.primitive.get_bind_params(eqn.params)
-            args = subfuns + invals
+            params = primitive_bind_params(eqn.primitive, eqn.params)
+            args = invals
 
             # Probabilistic.
             if PPPrimitive.check(eqn.primitive, sample_p) or PPPrimitive.check(
@@ -1529,7 +1549,7 @@ class ModularVmap:
 
             elif eqn.primitive == cond_p:
                 invals = safe_map(env.read, eqn.invars)
-                subfuns, params = eqn.primitive.get_bind_params(eqn.params)
+                params = primitive_bind_params(eqn.primitive, eqn.params)
                 branch_closed_jaxprs = params["branches"]
                 branches = tuple(
                     partial(
@@ -1552,8 +1572,7 @@ class ModularVmap:
                 length = params["length"]
                 reverse = params["reverse"]
                 unroll = params["unroll"]
-                num_consts = params["num_consts"]
-                num_carry = params["num_carry"]
+                num_consts, num_carry = scan_input_lengths(params)
                 const_vals, carry_vals, xs_vals = split_list(
                     invals, [num_consts, num_carry]
                 )

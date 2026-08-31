@@ -6,21 +6,25 @@ version = "1.0.13"
 dependencies = [
     "penzai>=0.2.5,<0.3",
     "beartype>=0.22.9,<0.23",
-    "jaxtyping>=0.3.9,<0.4",
-    "tensorflow-probability>=0.25.0,<0.26",
+    "jax>=0.11.1,<0.12",
+    "jaxtyping>=0.3.11,<0.4",
+    "tfp-nightly==0.26.0.dev20260831",
 ]
 
 [build-system]
 build-backend = "hatchling.build"
-requires = ["hatchling"]
+requires = ["hatchling>=1.32,<2"]
 
 [tool.pixi.workspace]
-channels = ["conda-forge", "pytorch", "nvidia"]
-platforms = ["osx-arm64", "linux-64"]
+channels = ["conda-forge"]
+platforms = [
+    "osx-arm64",
+    "linux-64",
+    { name = "linux-64-cuda-129", platform = "linux-64", cuda = "12.9" },
+]
 
 [tool.pixi.dependencies]
-jax = ">=0.7.2,<0.8"
-matplotlib = ">=3.10.3,<4"
+matplotlib = ">=3.11.1,<4"
 
 [tool.pixi.pypi-dependencies]
 genjax = { path = ".", editable = true }
@@ -28,6 +32,10 @@ genjax = { path = ".", editable = true }
 [tool.pixi.tasks]
 # Clean all generated figures from examples
 clean-figs = "find examples -name '*.pdf' -o -name '*.png' -o -name '*.jpg' -o -name '*.svg' | grep '/figs/' | xargs rm -f"
+
+# Fetch the untracked binary inputs (the gol wizards raster) pinned to
+# the GitHub mirror; verifies the recorded sha256.
+assets = "test -f examples/gol/assets/wizards.jpg || (mkdir -p examples/gol/assets && curl -fsSL --retry 3 -o examples/gol/assets/wizards.jpg https://raw.githubusercontent.com/femtomc/genjax/507f927021c9ef149d12a6b6450cefcbce9ac94d/examples/gol/assets/wizards.jpg && echo 'c680998ab5c25a505fdf0e1e03181d4275fbde66e1f1eb1da4cad13bf8db5cb1  examples/gol/assets/wizards.jpg' | sha256sum -c -)"
 
 # =====================================================================
 # PAPER FIGURE GENERATION - Centralized to genjax/figs/
@@ -168,9 +176,12 @@ scipy = "*"
 
 [tool.pixi.feature.perfbench.pypi-dependencies]
 numpyro = "*"
-tensorflow-probability = "*"
+
+[tool.pixi.feature.perfbench-pyro]
+platforms = ["osx-arm64", "linux-64-cuda-129"]
 
 [tool.pixi.feature.perfbench-pyro.dependencies]
+python = ">=3.12,<3.14"
 numpy = "*"
 matplotlib = "*"
 seaborn = "*"
@@ -178,18 +189,21 @@ pandas = "*"
 scipy = "*"
 
 [tool.pixi.feature.perfbench-pyro.target.linux-64.dependencies]
-pytorch = { version = ">=2.0", channel = "pytorch" }
-pytorch-cuda = { version = "12.*", channel = "pytorch" }
-torchvision = { version = "*", channel = "pytorch" }
+pytorch = { version = ">=2.13,<2.14", build = "*cuda129*" }
+torchvision = { version = ">=0.28,<0.29", build = "*cuda129*" }
 
 [tool.pixi.feature.perfbench-pyro.target.osx-arm64.dependencies]
-pytorch = { version = ">=2.0", channel = "pytorch" }
-torchvision = { version = "*", channel = "pytorch" }
+pytorch = { version = ">=2.13,<2.14", build = "*cpu*" }
+torchvision = { version = ">=0.28,<0.29", build = "*cpu*" }
 
 [tool.pixi.feature.perfbench-pyro.pypi-dependencies]
 pyro-ppl = "*"
 
+[tool.pixi.feature.perfbench-torch]
+platforms = ["osx-arm64", "linux-64-cuda-129"]
+
 [tool.pixi.feature.perfbench-torch.dependencies]
+python = ">=3.12,<3.14"
 numpy = "*"
 matplotlib = "*"
 seaborn = "*"
@@ -197,22 +211,22 @@ pandas = "*"
 scipy = "*"
 
 [tool.pixi.feature.perfbench-torch.target.linux-64.dependencies]
-pytorch = { version = ">=2.0", channel = "pytorch" }
-pytorch-cuda = { version = "12.*", channel = "pytorch" }
+pytorch = { version = ">=2.13,<2.14", build = "*cuda129*" }
 
 [tool.pixi.feature.perfbench-torch.target.osx-arm64.dependencies]
-pytorch = { version = ">=2.0", channel = "pytorch" }
+pytorch = { version = ">=2.13,<2.14", build = "*cpu*" }
 
+[tool.pixi.feature.cuda]
+platforms = ["linux-64-cuda-129"]
 
-[tool.pixi.feature.cuda.system-requirements]
-cuda = "12"
+[tool.pixi.feature.cuda.pypi-dependencies]
+# CUDA-enabled JAX for GPU acceleration on linux-64.
+jax = { version = ">=0.11.1,<0.12", extras = ["cuda12"] }
 
-[tool.pixi.feature.cuda.target.linux-64.dependencies]
+[tool.pixi.feature.cuda.dependencies]
 # Python 3.14 currently lacks dm-tree wheels in our stack, forcing source builds
 # that require newer CMake than many systems provide.
 python = ">=3.12,<3.14"
-# CUDA-enabled JAX for GPU acceleration on linux-64
-jaxlib = { version = ">=0.7.2,<0.8", build = "*cuda12*" }
 
 [tool.pixi.feature.cuda.tasks]
 # CUDA GPU acceleration tasks
@@ -241,15 +255,21 @@ perfbench-torch = { features = ["perfbench-torch"], solve-group = "perfbench-tor
 nodejs = "*"
 
 [dependency-groups]
-format = ["ruff>=0.15.2,<0.16", "vulture>=2.14,<3", "pre-commit>=4.0,<5"]
+format = ["ruff>=0.16.5,<0.17", "vulture>=2.16,<3", "pre-commit>=4.6.2,<5"]
 test = [
-    "pytest>=9.0,<10",
-    "pytest-cov>=7.0,<8",
-    "coverage>=7.0,<8",
-    "xdoctest>=1.1.0,<2",
-    "pytest-xdist>=3.0,<4",
-    "pytest-benchmark>=5.0,<6",
+    "pytest>=9.1.1,<10",
+    "pytest-cov>=7.1.0,<8",
+    "coverage>=7.16.0,<8",
+    "xdoctest>=1.3.2,<2",
+    "pytest-xdist>=3.8.0,<4",
+    "pytest-benchmark>=5.3.0,<6",
 ]
+
+[tool.ruff]
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 
 [tool.coverage.run]
 source = ["src"]
