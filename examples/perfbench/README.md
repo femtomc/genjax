@@ -39,7 +39,7 @@ pixi run -e perfbench python examples/perfbench/main.py pipeline --help
 
 ## References
 
-- [POPL 2026 paper source](../../../../press/papers/tex/genjax-popl-2026/README.md)
+- [POPL 2026 paper](https://doi.org/10.1145/3776729)
 - Imported timing benchmark baseline: `timing-benchmarks@d4433b0`.
 
 ## License
