@@ -4,8 +4,13 @@
 
 [![DOI](https://zenodo.org/badge/971731825.svg)](https://doi.org/10.5281/zenodo.17342547)
 
-- **Purpose:** JAX probabilistic programming with generative functions,
-  structured traces, vectorized programmable inference, MCMC, SMC, VI, and ADEV.
+- **Purpose:** Vectorized probabilistic programming with generative functions
+  and programmable inference in JAX.
+- **Formal foundations:** A mechanized Lean model proves product density
+  preservation and fundamental vectorization under explicit primitive
+  conformance certificates. Concrete execution maps vectorized generative
+  primitives to XLA kernels, separating denotational density semantics from
+  machine array compilation.
 - **POPL 2026 artifact:**
   [v1.0.10](https://github.com/femtomc/genjax/releases/tag/v1.0.10)
 
