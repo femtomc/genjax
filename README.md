@@ -7,10 +7,10 @@
 - **Purpose:** Vectorized probabilistic programming with generative functions
   and programmable inference in JAX.
 - **Formal foundations:** A mechanized Lean model proves product density
-  preservation and fundamental vectorization under explicit primitive
-  conformance certificates. Concrete execution maps vectorized generative
-  primitives to XLA kernels, separating denotational density semantics from
-  machine array compilation.
+  preservation and fundamental vectorization for finite models under explicit
+  primitive conformance certificates. Concrete execution maps vectorized
+  generative primitives to XLA kernels, separating denotational density
+  semantics from machine array compilation.
 - **POPL 2026 artifact:**
   [v1.0.10](https://github.com/femtomc/genjax/releases/tag/v1.0.10)
 
@@ -53,12 +53,12 @@ choices = trace.get_choices()
 | AIR estimators            | PLDI 2024 port | `pixi run air-compare`                         |
 
 - Add `--mode cuda` to `paper-perfbench` for its CUDA pipeline.
-- CPU and GPU execute the same models but do not have the same scaling curves.
+- CPU and GPU execute the same models but have different scaling curves.
 - Figure 19 and paper-scale curve fitting require CUDA-like throughput to match
   the published timing/ESS panels.
 - Gen.jl benchmark lanes require Julia 1.10 or newer.
-- Generated figures land under `figs/`. Perfbench owns separate CPU/CUDA output
-  roots.
+- Generated figures are saved in `figs/`. Perfbench outputs to separate CPU and
+  CUDA directories.
 
 ## Code
 
