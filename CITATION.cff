@@ -52,8 +52,8 @@ authors:
     email: vkm@mit.edu
     affiliation: Massachusetts Institute of Technology
     orcid: "https://orcid.org/0000-0003-2507-0833"
-repository-code: "https://github.com/femtomc/genjax"
-url: "https://github.com/femtomc/genjax"
+repository-code: "https://github.com/a-tiny-project/genjax"
+url: "https://github.com/a-tiny-project/genjax"
 abstract: >
   GenJAX is a probabilistic programming language (PPL) designed around
   programmable inference - automation that allows users to express and

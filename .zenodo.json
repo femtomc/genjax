@@ -65,7 +65,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "https://github.com/femtomc/genjax",
+      "identifier": "https://github.com/a-tiny-project/genjax",
       "relation": "isSupplementTo",
       "scheme": "url"
     }

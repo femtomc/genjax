@@ -12,12 +12,12 @@
   generative primitives to XLA kernels, separating denotational density
   semantics from machine array compilation.
 - **POPL 2026 artifact:**
-  [v1.0.10](https://github.com/femtomc/genjax/releases/tag/v1.0.10)
+  [v1.0.10](https://github.com/a-tiny-project/genjax/releases/tag/v1.0.10)
 
 ## Use
 
 ```sh
-git clone https://github.com/femtomc/genjax.git
+git clone https://github.com/a-tiny-project/genjax.git
 cd genjax
 pixi install
 pixi run test-fast

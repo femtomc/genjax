@@ -38,7 +38,7 @@ clean-figs = "find examples -name '*.pdf' -o -name '*.png' -o -name '*.jpg' -o -
 
 # Fetch the untracked binary inputs (the gol wizards raster) pinned to
 # the GitHub mirror; verifies the recorded sha256.
-assets = "test -f examples/gol/assets/wizards.jpg || (mkdir -p examples/gol/assets && curl -fsSL --retry 3 -o examples/gol/assets/wizards.jpg https://raw.githubusercontent.com/femtomc/genjax/507f927021c9ef149d12a6b6450cefcbce9ac94d/examples/gol/assets/wizards.jpg && echo 'c680998ab5c25a505fdf0e1e03181d4275fbde66e1f1eb1da4cad13bf8db5cb1  examples/gol/assets/wizards.jpg' | sha256sum -c -)"
+assets = "test -f examples/gol/assets/wizards.jpg || (mkdir -p examples/gol/assets && curl -fsSL --retry 3 -o examples/gol/assets/wizards.jpg https://raw.githubusercontent.com/a-tiny-project/genjax/507f927021c9ef149d12a6b6450cefcbce9ac94d/examples/gol/assets/wizards.jpg && echo 'c680998ab5c25a505fdf0e1e03181d4275fbde66e1f1eb1da4cad13bf8db5cb1  examples/gol/assets/wizards.jpg' | sha256sum -c -)"
 
 # =====================================================================
 # PAPER FIGURE GENERATION - Centralized to genjax/figs/
