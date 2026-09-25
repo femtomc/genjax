@@ -1,8 +1,20 @@
 [project]
 authors = [{ name = "McCoy Becker", email = "mccoyb@mit.edu" }]
 name = "genjax"
+description = "Vectorized probabilistic programming with generative functions and programmable inference in JAX"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE.md"]
+keywords = [
+  "probabilistic programming",
+  "programmable inference",
+  "Bayesian inference",
+  "JAX",
+  "Monte Carlo",
+  "variational inference",
+]
 requires-python = ">= 3.12"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
   "penzai>=0.2.5,<0.3",
   "beartype>=0.22.9,<0.23",
@@ -14,9 +26,21 @@ dependencies = [
 [project.optional-dependencies]
 viz = ["matplotlib>=3.11.1,<4"]
 
+[project.urls]
+Homepage = "https://github.com/a-tiny-project/genjax"
+Repository = "https://github.com/a-tiny-project/genjax"
+Paper = "https://doi.org/10.1145/3776729"
+Artifact = "https://doi.org/10.5281/zenodo.17342547"
+
 [build-system]
 build-backend = "hatchling.build"
 requires = ["hatchling>=1.32,<2"]
+
+# The source distribution carries the package, its tests, and the examples
+# two tests import. Pixi locks and raster assets stay in the repository.
+[tool.hatch.build.targets.sdist]
+include = ["src/genjax", "tests", "examples", "CITATION.cff"]
+exclude = ["examples/**/assets"]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
