@@ -4,11 +4,11 @@ name = "genjax"
 requires-python = ">= 3.12"
 version = "1.0.13"
 dependencies = [
-    "penzai>=0.2.5,<0.3",
-    "beartype>=0.22.9,<0.23",
-    "jax>=0.11.1,<0.12",
-    "jaxtyping>=0.3.11,<0.4",
-    "tfp-nightly==0.26.0.dev20260831",
+  "penzai>=0.2.5,<0.3",
+  "beartype>=0.22.9,<0.23",
+  "jax>=0.11.1,<0.12",
+  "jaxtyping>=0.3.11,<0.4",
+  "tfp-nightly==0.26.0.dev20260831",
 ]
 
 [build-system]
@@ -18,9 +18,9 @@ requires = ["hatchling>=1.32,<2"]
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = [
-    "osx-arm64",
-    "linux-64",
-    { name = "linux-64-cuda-129", platform = "linux-64", cuda = "12.9" },
+  "osx-arm64",
+  "linux-64",
+  { name = "linux-64-cuda-129", platform = "linux-64", cuda = "12.9" },
 ]
 
 [tool.pixi.dependencies]
@@ -75,8 +75,20 @@ paper-gol-gpu-gen = "pixi run -e gol-cuda python -m examples.gol.main --mode sho
 paper-localization-gpu-gen = "pixi run -e localization-cuda python -m examples.localization.main paper --include-smc-comparison --n-particles 200 --n-steps 8 --timing-repeats 3 --n-rays 8 --output-dir figs"
 
 # Main paper figures generation tasks
-paper-figures = { depends-on = ["paper-setup", "paper-faircoin-gen", "paper-curvefit-gen", "paper-gol-gen", "paper-localization-gen"] }
-paper-figures-gpu = { depends-on = ["paper-setup", "paper-faircoin-gpu-gen", "paper-curvefit-gpu-gen", "paper-gol-gpu-gen", "paper-localization-gpu-gen"] }
+paper-figures = { depends-on = [
+  "paper-setup",
+  "paper-faircoin-gen",
+  "paper-curvefit-gen",
+  "paper-gol-gen",
+  "paper-localization-gen",
+] }
+paper-figures-gpu = { depends-on = [
+  "paper-setup",
+  "paper-faircoin-gpu-gen",
+  "paper-curvefit-gpu-gen",
+  "paper-gol-gpu-gen",
+  "paper-localization-gpu-gen",
+] }
 
 [tool.vulture]
 make_whitelist = true
@@ -95,9 +107,9 @@ numpyro = "*"
 [tool.pixi.feature.faircoin.tasks]
 cmd = "faircoin"
 # Beta-Bernoulli framework comparison (GenJAX vs NumPyro vs handcoded JAX)
-faircoin = "python -m examples.faircoin.main --combined"  # Main command (combined timing + posterior)
-faircoin-timing = "python -m examples.faircoin.main"  # Timing comparison only
-faircoin-combined = "python -m examples.faircoin.main --combined"  # Combined timing + posterior figure (recommended)
+faircoin = "python -m examples.faircoin.main --combined"          # Main command (combined timing + posterior)
+faircoin-timing = "python -m examples.faircoin.main"              # Timing comparison only
+faircoin-combined = "python -m examples.faircoin.main --combined" # Combined timing + posterior figure (recommended)
 # Paper-specific task: generates faircoin_combined_posterior_and_timing_obs50_samples2000.pdf to figs/
 faircoin-paper = "python -m examples.faircoin.main --combined --num-obs 50 --num-samples 2000"
 
@@ -115,33 +127,33 @@ funsor = "*"
 cmd = "curvefit"
 # Paper-friendly defaults (only "paper" mode is supported)
 curvefit = "python -m examples.curvefit.main paper"  # Default POPL figure generation
-curvefit-custom = "python -m examples.curvefit.main"  # Pass flags after `--` to customise runs
+curvefit-custom = "python -m examples.curvefit.main" # Pass flags after `--` to customise runs
 
 [tool.pixi.feature.format.tasks]
 # Code formatting and linting
-format = "ruff format . && ruff check . --fix"  # Format and lint Python code with ruff
-format-md = "npx prettier --write '**/*.md'"  # Format Markdown files with prettier
-format-all = "ruff format . && ruff check . --fix && npx prettier --write '**/*.md'"  # Format both Python and Markdown files
-vulture = "vulture"  # Find unused code
-precommit-install = "pre-commit install"  # Install pre-commit hooks
-precommit-run = "pre-commit run --all-files"  # Run pre-commit hooks
+format = "ruff format . && ruff check . --fix"                                                       # Format and lint Python code with ruff
+format-md = "npx prettier --write '**/*.md'"                                                         # Format Markdown files with prettier
+format-all = "ruff format . && ruff check . --fix && npx prettier --write '**/*.md'"                 # Format both Python and Markdown files
+vulture = "vulture"                                                                                  # Find unused code
+precommit-install = "pre-commit install"     # Install pre-commit hooks
+precommit-run = "pre-commit run --all-files" # Run pre-commit hooks
 
 
 [tool.pixi.feature.test.tasks]
 # Testing and coverage
-test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"  # Run tests with coverage
-test-parallel = "pytest tests/ -v -n auto --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"  # Run tests in parallel with auto-detected cores
-test-fast = "pytest tests/ -v -n 4 -m 'not slow' --cov=src/genjax"  # Run fast tests on 4 cores
-coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=term && echo 'Coverage report available at htmlcov/index.html'"  # Generate coverage report
-doctest = "xdoctest src/genjax --verbose=2"  # Run doctests only
-doctest-module = "xdoctest src/genjax/{module} --verbose=2"  # Run doctests for specific module
-test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"  # Run tests + doctests
+test = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"                                              # Run tests with coverage
+test-parallel = "pytest tests/ -v -n auto --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term"                             # Run tests in parallel with auto-detected cores
+test-fast = "pytest tests/ -v -n 4 -m 'not slow' --cov=src/genjax"                                                                           # Run fast tests on 4 cores
+coverage = "pytest tests/ -v --cov=src/genjax --cov-report=html --cov-report=term && echo 'Coverage report available at htmlcov/index.html'" # Generate coverage report
+doctest = "xdoctest src/genjax --verbose=2"                                                                                                  # Run doctests only
+doctest-module = "xdoctest src/genjax/{module} --verbose=2"                                                                                  # Run doctests for specific module
+test-all = "pytest tests/ -v --cov=src/genjax --cov-report=xml --cov-report=html --cov-report=term && xdoctest src/genjax --verbose=2"       # Run tests + doctests
 # Benchmarking tasks
-benchmark = "pytest tests/ --benchmark-only -v"  # Run only benchmark tests
-benchmark-all = "pytest tests/ --benchmark-disable-gc --benchmark-sort=mean -v"  # Run all tests with benchmarking
-benchmark-compare = "pytest tests/ --benchmark-compare=0001 --benchmark-compare-fail=mean:10% -v"  # Compare with previous benchmark results
-benchmark-save = "pytest tests/ --benchmark-save=current --benchmark-disable-gc -v"  # Save benchmark results
-benchmark-slowest = "pytest tests/ --durations=20 --benchmark-disable -v"  # Show 20 slowest tests without benchmarking
+benchmark = "pytest tests/ --benchmark-only -v"                                                   # Run only benchmark tests
+benchmark-all = "pytest tests/ --benchmark-disable-gc --benchmark-sort=mean -v"                   # Run all tests with benchmarking
+benchmark-compare = "pytest tests/ --benchmark-compare=0001 --benchmark-compare-fail=mean:10% -v" # Compare with previous benchmark results
+benchmark-save = "pytest tests/ --benchmark-save=current --benchmark-disable-gc -v"               # Save benchmark results
+benchmark-slowest = "pytest tests/ --durations=20 --benchmark-disable -v"                         # Show 20 slowest tests without benchmarking
 
 
 [tool.pixi.feature.gol.dependencies]
@@ -230,8 +242,8 @@ python = ">=3.12,<3.14"
 
 [tool.pixi.feature.cuda.tasks]
 # CUDA GPU acceleration tasks
-cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); print(f\"JAX devices: {jax.devices()}\"); print(f\"Default backend: {jax.default_backend()}\")'"  # Check CUDA availability
-cuda-test = "pixi run test -k 'not slow'"  # Run tests with CUDA backend
+cuda-info = "python -c 'import jax; print(f\"JAX version: {jax.__version__}\"); print(f\"JAX devices: {jax.devices()}\"); print(f\"Default backend: {jax.default_backend()}\")'" # Check CUDA availability
+cuda-test = "pixi run test -k 'not slow'"                                                                                                                                        # Run tests with CUDA backend
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
@@ -245,11 +257,21 @@ curvefit-cuda = { features = ["curvefit", "cuda"], solve-group = "cuda" }
 gol = { features = ["gol"], solve-group = "default" }
 gol-cuda = { features = ["gol", "cuda"], solve-group = "cuda" }
 localization = { features = ["localization"], solve-group = "default" }
-localization-cuda = { features = ["localization", "cuda"], solve-group = "cuda" }
+localization-cuda = { features = [
+  "localization",
+  "cuda",
+], solve-group = "cuda" }
 perfbench = { features = ["perfbench"], solve-group = "perfbench" }
-perfbench-cuda = { features = ["perfbench", "cuda"], solve-group = "perfbench-cuda" }
-perfbench-pyro = { features = ["perfbench-pyro"], solve-group = "perfbench-pyro" }
-perfbench-torch = { features = ["perfbench-torch"], solve-group = "perfbench-torch" }
+perfbench-cuda = { features = [
+  "perfbench",
+  "cuda",
+], solve-group = "perfbench-cuda" }
+perfbench-pyro = { features = [
+  "perfbench-pyro",
+], solve-group = "perfbench-pyro" }
+perfbench-torch = { features = [
+  "perfbench-torch",
+], solve-group = "perfbench-torch" }
 
 [tool.pixi.feature.format.dependencies]
 nodejs = "*"
@@ -257,12 +279,12 @@ nodejs = "*"
 [dependency-groups]
 format = ["ruff>=0.16.5,<0.17", "vulture>=2.16,<3", "pre-commit>=4.6.2,<5"]
 test = [
-    "pytest>=9.1.1,<10",
-    "pytest-cov>=7.1.0,<8",
-    "coverage>=7.16.0,<8",
-    "xdoctest>=1.3.2,<2",
-    "pytest-xdist>=3.8.0,<4",
-    "pytest-benchmark>=5.3.0,<6",
+  "pytest>=9.1.1,<10",
+  "pytest-cov>=7.1.0,<8",
+  "coverage>=7.16.0,<8",
+  "xdoctest>=1.3.2,<2",
+  "pytest-xdist>=3.8.0,<4",
+  "pytest-benchmark>=5.3.0,<6",
 ]
 
 [tool.ruff]
@@ -277,28 +299,28 @@ omit = ["*/tests/*", "*/examples/*"]
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
+  "pragma: no cover",
+  "def __repr__",
+  "if self.debug:",
+  "if settings.DEBUG",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if 0:",
+  "if __name__ == .__main__.:",
+  "class .*\\bProtocol\\):",
+  "@(abc\\.)?abstractmethod",
 ]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = [
-    "-ra",                       # Show short test summary for all results
-    "--strict-markers",          # Require all markers to be defined
-    "--strict-config",           # Strict configuration parsing
-    "--cov=src/genjax",          # Coverage for source code
-    "--cov-report=term-missing", # Show missing lines in terminal
-    "--cov-report=html",         # Generate HTML coverage report
-    "--cov-report=xml",          # Generate XML coverage for CI
+  "-ra",                       # Show short test summary for all results
+  "--strict-markers",          # Require all markers to be defined
+  "--strict-config",           # Strict configuration parsing
+  "--cov=src/genjax",          # Coverage for source code
+  "--cov-report=term-missing", # Show missing lines in terminal
+  "--cov-report=html",         # Generate HTML coverage report
+  "--cov-report=xml",          # Generate XML coverage for CI
 ]
 testpaths = ["tests"]
 pythonpath = ["."]
@@ -306,42 +328,52 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
-    "slow: marks tests as slow (taking >5 seconds)",
-    "fast: marks tests as fast (taking <1 second)",
-    "integration: marks tests as integration tests (cross-component)",
-    "unit: marks tests as unit tests (single component)",
-    "regression: marks tests as regression tests (bug prevention)",
-    "adev: marks tests for ADEV gradient estimators",
-    "smc: marks tests for Sequential Monte Carlo",
-    "mcmc: marks tests for Markov Chain Monte Carlo",
-    "vi: marks tests for Variational Inference",
-    "hmm: marks tests for Hidden Markov Models",
-    "core: marks tests for core GenJAX functionality",
-    "pjax: marks tests for PJAX (Probabilistic JAX) functionality",
-    "distributions: marks tests for probability distributions",
-    "tfp: marks tests requiring TensorFlow Probability",
-    "requires_gpu: marks tests that need GPU acceleration",
-    "benchmark: marks tests that should be benchmarked",
+  "slow: marks tests as slow (taking >5 seconds)",
+  "fast: marks tests as fast (taking <1 second)",
+  "integration: marks tests as integration tests (cross-component)",
+  "unit: marks tests as unit tests (single component)",
+  "regression: marks tests as regression tests (bug prevention)",
+  "adev: marks tests for ADEV gradient estimators",
+  "smc: marks tests for Sequential Monte Carlo",
+  "mcmc: marks tests for Markov Chain Monte Carlo",
+  "vi: marks tests for Variational Inference",
+  "hmm: marks tests for Hidden Markov Models",
+  "core: marks tests for core GenJAX functionality",
+  "pjax: marks tests for PJAX (Probabilistic JAX) functionality",
+  "distributions: marks tests for probability distributions",
+  "tfp: marks tests requiring TensorFlow Probability",
+  "requires_gpu: marks tests that need GPU acceleration",
+  "benchmark: marks tests that should be benchmarked",
 ]
 filterwarnings = [
-    "ignore::DeprecationWarning:jax.*",
-    "ignore::DeprecationWarning:tensorflow_probability.*",
-    "error::UserWarning",                                  # Turn UserWarnings into errors to catch issues
+  "ignore::DeprecationWarning:jax.*",
+  "ignore::DeprecationWarning:tensorflow_probability.*",
+  "error::UserWarning",                                  # Turn UserWarnings into errors to catch issues
 ]
 
 [tool.pytest-benchmark]
 # Configuration for pytest-benchmark
-min_rounds = 3                    # Minimum number of benchmark rounds
-max_time = 10.0                   # Maximum time per benchmark (seconds)
-min_time = 0.01                   # Minimum time per round (seconds)
-timer = "time.perf_counter"       # High-resolution timer
-disable_gc = true                 # Disable garbage collection during benchmarks
-sort = "mean"                     # Sort results by mean time
-columns = ["min", "max", "mean", "stddev", "median", "iqr", "outliers", "ops", "rounds"]
-histogram = true                  # Generate histogram data
-save = ".benchmarks/benchmarks.json"  # Save results to file
-save_data = true                  # Save benchmark data
-autosave = true                   # Automatically save results
+min_rounds = 3 # Minimum number of benchmark rounds
+max_time = 10.0 # Maximum time per benchmark (seconds)
+min_time = 0.01 # Minimum time per round (seconds)
+timer = "time.perf_counter" # High-resolution timer
+disable_gc = true # Disable garbage collection during benchmarks
+sort = "mean" # Sort results by mean time
+columns = [
+  "min",
+  "max",
+  "mean",
+  "stddev",
+  "median",
+  "iqr",
+  "outliers",
+  "ops",
+  "rounds",
+]
+histogram = true # Generate histogram data
+save = ".benchmarks/benchmarks.json" # Save results to file
+save_data = true # Save benchmark data
+autosave = true # Automatically save results
 
 [tool.xdoctest]
 # Configure xdoctest for running doctests
