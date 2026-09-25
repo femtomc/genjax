@@ -1,3 +1,5 @@
+import importlib
+
 from beartype import BeartypeConf
 from beartype.claw import beartype_this_package
 
@@ -100,10 +102,19 @@ from .state import (  # noqa: E402
     tag_state,
     namespace,
 )
-from .viz import (  # noqa: E402
-    horizontal_raincloud,
-    raincloud,
-)
+
+# Plotting needs matplotlib, which the `viz` extra installs. The package loads
+# `viz` on first access, so `import genjax` does not require matplotlib.
+_VIZ_ATTRIBUTES = ("viz", "horizontal_raincloud", "raincloud")
+
+
+def __getattr__(name):
+    if name in _VIZ_ATTRIBUTES:
+        # `from . import viz` would probe this hook again and recurse.
+        viz = importlib.import_module(".viz", __name__)
+        return viz if name == "viz" else getattr(viz, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # Import extras module for additional functionality
 from . import extras  # noqa: E402
@@ -211,9 +222,6 @@ __all__ = [
     "save",
     "tag_state",
     "namespace",
-    # Visualization functionality
-    "horizontal_raincloud",
-    "raincloud",
     # Extras
     "extras",
     # Discrete HMM

@@ -11,6 +11,9 @@ dependencies = [
   "tfp-nightly==0.26.0.dev20260831",
 ]
 
+[project.optional-dependencies]
+viz = ["matplotlib>=3.11.1,<4"]
+
 [build-system]
 build-backend = "hatchling.build"
 requires = ["hatchling>=1.32,<2"]

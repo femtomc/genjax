@@ -11686,6 +11686,7 @@ packages:
   - jax>=0.11.1,<0.12
   - jaxtyping>=0.3.11,<0.4
   - tfp-nightly==0.26.0.dev20260831
+  - matplotlib>=3.11.1,<4 ; extra == 'viz'
   requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/01/a4/9b63d595d748e3aff8812b65eacc1a2c4bd90b7c2012e08e72373b4835eb/filelock-3.32.4-py3-none-any.whl
   name: filelock
